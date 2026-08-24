@@ -21,7 +21,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.especialidade.EspecialidadeRepository;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
@@ -36,12 +39,19 @@ public class AgendamentoController {
     private final AgendamentoRepository repository;
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
+    private final EspecialidadeRepository especialidadeRepository;
+    private final ProfissionalSaudeRepository profissionalRepository;
+    private final ProcedimentoRepository procedimentoRepository;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
-            UnidadeRepository unidadeRepository) {
+            UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
+            ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
+        this.especialidadeRepository = especialidadeRepository;
+        this.profissionalRepository = profissionalRepository;
+        this.procedimentoRepository = procedimentoRepository;
     }
 
     /**
@@ -115,8 +125,12 @@ public class AgendamentoController {
 
     private void aplicar(Agendamento agendamento, AgendamentoRequest request) {
         agendamento.setDataHora(request.dataHora());
-        agendamento.setEspecialidade(request.especialidade());
-        agendamento.setProfissionalSaude(request.profissionalSaude());
+        agendamento.setEspecialidade(especialidadeRepository.findById(request.especialidadeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
+        agendamento.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional não encontrado")));
+        agendamento.setProcedimento(procedimentoRepository.findById(request.procedimentoId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Procedimento não encontrado")));
         agendamento.setPaciente(pacienteRepository.findById(request.pacienteId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
         agendamento.setUnidadeSaude(unidadeRepository.findById(request.unidadeSaudeId())

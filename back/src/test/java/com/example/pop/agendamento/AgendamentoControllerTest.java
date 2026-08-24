@@ -37,10 +37,11 @@ class AgendamentoControllerTest {
     void novoAgendamentoNasceAguardandoConfirmacao() {
         AgendamentoRequest request = new AgendamentoRequest(
                 LocalDateTime.of(2026, 10, 1, 9, 0),
-                "Cardiologia",
-                "Dr. Teste",
-                1L,
-                1L,
+                1L, // especialidadeId
+                1L, // profissionalSaudeId
+                1L, // procedimentoId
+                1L, // pacienteId
+                1L, // unidadeSaudeId
                 StatusAgendamento.PRESENCA_PACIENTE); // deve ser ignorado na criação
         AgendamentoResponse criado = controller.criar(request);
         assertEquals(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, criado.statusAgendamento());

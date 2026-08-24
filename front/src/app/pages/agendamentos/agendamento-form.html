@@ -36,31 +36,49 @@
 
       <div class="form-field">
         <label class="label" for="especialidade">Especialidade <span class="req" aria-hidden="true">*</span></label>
-        <input
-          id="especialidade"
-          class="input"
-          formControlName="especialidade"
-          placeholder="Ex.: Cardiologia"
-          autocomplete="off"
-          [class.input--error]="invalido('especialidade')"
-        />
-        @if (invalido('especialidade')) {
-          <span class="field-error">Informe a especialidade.</span>
+        <ng-select
+          labelForId="especialidade"
+          formControlName="especialidadeId"
+          [items]="especialidades()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione a especialidade"
+          notFoundText="Nenhuma especialidade encontrada"
+        ></ng-select>
+        @if (invalido('especialidadeId')) {
+          <span class="field-error">Selecione a especialidade.</span>
         }
       </div>
 
       <div class="form-field">
-        <label class="label" for="profissionalSaude">Profissional de saúde <span class="req" aria-hidden="true">*</span></label>
-        <input
-          id="profissionalSaude"
-          class="input"
-          formControlName="profissionalSaude"
-          placeholder="Ex.: Dr. Rafael Lima"
-          autocomplete="off"
-          [class.input--error]="invalido('profissionalSaude')"
-        />
-        @if (invalido('profissionalSaude')) {
-          <span class="field-error">Informe o profissional.</span>
+        <label class="label" for="profissional">Profissional de saúde <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="profissional"
+          formControlName="profissionalSaudeId"
+          [items]="profissionais()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione o profissional"
+          notFoundText="Nenhum profissional encontrado"
+        ></ng-select>
+        @if (invalido('profissionalSaudeId')) {
+          <span class="field-error">Selecione o profissional.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="procedimento">Procedimento <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="procedimento"
+          formControlName="procedimentoId"
+          [items]="procedimentos()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione o procedimento"
+          notFoundText="Nenhum procedimento encontrado"
+        ></ng-select>
+        @if (invalido('procedimentoId')) {
+          <span class="field-error">Selecione o procedimento.</span>
         }
       </div>
 

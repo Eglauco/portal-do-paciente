@@ -75,6 +75,7 @@
               <th>Paciente</th>
               <th>Especialidade</th>
               <th>Profissional</th>
+              <th>Procedimento</th>
               <th>Unidade</th>
               <th>Status</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
@@ -91,8 +92,9 @@
               >
                 <td class="cell-data">{{ a.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
                 <td><b>{{ a.paciente.nome }}</b></td>
-                <td class="muted-cell">{{ a.especialidade }}</td>
-                <td class="muted-cell">{{ a.profissionalSaude }}</td>
+                <td class="muted-cell">{{ a.especialidade.nome }}</td>
+                <td class="muted-cell">{{ a.profissionalSaude.nome }}</td>
+                <td class="muted-cell">{{ a.procedimento.nome }}</td>
                 <td class="muted-cell">{{ a.unidadeSaude.nome }}</td>
                 <td>
                   <span class="status-pill" [attr.data-st]="a.statusAgendamento">

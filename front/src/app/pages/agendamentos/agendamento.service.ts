@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -6,7 +7,7 @@ import { Agendamento, AgendamentoRequest, Pagina, StatusAgendamento } from './ag
 @Injectable({ providedIn: 'root' })
 export class AgendamentoService {
   private readonly http = inject(HttpClient);
-  private readonly base = 'http://localhost:8080/agendamento';
+  private readonly base = `${environment.apiUrl}/agendamento`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;

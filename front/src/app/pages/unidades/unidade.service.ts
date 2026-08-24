@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -7,7 +8,7 @@ import { Pagina, Unidade, UnidadeFiltro } from './unidade.model';
 export class UnidadeService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = 'http://localhost:8080/unidade';
+  private readonly base = `${environment.apiUrl}/unidade`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];

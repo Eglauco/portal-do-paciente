@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -7,7 +8,7 @@ import { Pagina, Paciente, PacienteFiltro } from './paciente.model';
 export class PacienteService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = 'http://localhost:8080/paciente';
+  private readonly base = `${environment.apiUrl}/paciente`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];

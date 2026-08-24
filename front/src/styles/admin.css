@@ -1594,3 +1594,14 @@
 .filters__agenda { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
 .filters__agenda .field-inline { flex: 1; min-width: 220px; max-width: 360px; }
 @media (max-width: 900px) { .filters__agenda .field-inline { max-width: none; } }
+
+/* Textarea e dica de campo */
+.input--area {
+  height: auto;
+  min-height: 6rem;
+  padding: 0.75rem 1rem;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+.field-hint { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); }

@@ -4,14 +4,26 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { Especialidade } from '../especialidades/especialidade.model';
+import { EspecialidadeService } from '../especialidades/especialidade.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
+import { Procedimento } from '../procedimentos/procedimento.model';
+import { ProcedimentoService } from '../procedimentos/procedimento.service';
+import { ProfissionalSaude } from '../profissionais/profissional.model';
+import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
 import { AgendamentoRequest, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
 import { AgendamentoService } from './agendamento.service';
 
-type Campo = 'dataHora' | 'especialidade' | 'profissionalSaude' | 'pacienteId' | 'unidadeSaudeId';
+type Campo =
+  | 'dataHora'
+  | 'especialidadeId'
+  | 'profissionalSaudeId'
+  | 'procedimentoId'
+  | 'pacienteId'
+  | 'unidadeSaudeId';
 
 @Component({
   selector: 'app-agendamento-form',
@@ -20,6 +32,9 @@ type Campo = 'dataHora' | 'especialidade' | 'profissionalSaude' | 'pacienteId' |
 })
 export class AgendamentoForm implements PodeSair {
   private readonly service = inject(AgendamentoService);
+  private readonly especialidadeService = inject(EspecialidadeService);
+  private readonly profissionalService = inject(ProfissionalSaudeService);
+  private readonly procedimentoService = inject(ProcedimentoService);
   private readonly pacienteService = inject(PacienteService);
   private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
@@ -27,13 +42,17 @@ export class AgendamentoForm implements PodeSair {
   private readonly toastr = inject(ToastrService);
 
   protected readonly statusOpcoes = STATUS_OPTIONS;
+  protected readonly especialidades = signal<Especialidade[]>([]);
+  protected readonly profissionais = signal<ProfissionalSaude[]>([]);
+  protected readonly procedimentos = signal<Procedimento[]>([]);
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly unidades = signal<Unidade[]>([]);
 
   protected readonly form = new FormGroup({
     dataHora: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    especialidade: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(2)] }),
-    profissionalSaude: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(2)] }),
+    especialidadeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    profissionalSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    procedimentoId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     pacienteId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     statusAgendamento: new FormControl<StatusAgendamento | null>(null),
@@ -81,8 +100,9 @@ export class AgendamentoForm implements PodeSair {
     const v = this.form.getRawValue();
     const dados: AgendamentoRequest = {
       dataHora: v.dataHora,
-      especialidade: v.especialidade,
-      profissionalSaude: v.profissionalSaude,
+      especialidadeId: v.especialidadeId!,
+      profissionalSaudeId: v.profissionalSaudeId!,
+      procedimentoId: v.procedimentoId!,
       pacienteId: v.pacienteId!,
       unidadeSaudeId: v.unidadeSaudeId!,
     };
@@ -129,6 +149,15 @@ export class AgendamentoForm implements PodeSair {
   }
 
   private carregarOpcoes(): void {
+    this.especialidadeService.listar({}, 0, 100).subscribe({
+      next: (p) => this.especialidades.set(p.content),
+    });
+    this.profissionalService.listar({}, 0, 100).subscribe({
+      next: (p) => this.profissionais.set(p.content),
+    });
+    this.procedimentoService.listar({}, 0, 100).subscribe({
+      next: (p) => this.procedimentos.set(p.content),
+    });
     this.pacienteService.listar({}, 0, 100).subscribe({
       next: (p) => this.pacientes.set(p.content),
     });
@@ -142,8 +171,9 @@ export class AgendamentoForm implements PodeSair {
       next: (a) =>
         this.form.patchValue({
           dataHora: a.dataHora?.slice(0, 16),
-          especialidade: a.especialidade,
-          profissionalSaude: a.profissionalSaude,
+          especialidadeId: a.especialidade.id,
+          profissionalSaudeId: a.profissionalSaude.id,
+          procedimentoId: a.procedimento.id,
           pacienteId: a.paciente.id,
           unidadeSaudeId: a.unidadeSaude.id,
           statusAgendamento: a.statusAgendamento,

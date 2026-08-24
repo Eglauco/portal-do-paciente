@@ -2,7 +2,10 @@ package com.example.pop.agendamento;
 
 import java.time.LocalDateTime;
 
+import com.example.pop.especialidade.Especialidade;
 import com.example.pop.paciente.Paciente;
+import com.example.pop.procedimento.Procedimento;
+import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.unidade.Unidade;
 
 import jakarta.persistence.Column;
@@ -36,11 +39,17 @@ public class Agendamento {
     @Column(name = "data_hora", nullable = false)
     private LocalDateTime dataHora;
 
-    @Column(name = "especialidade", nullable = false, length = 120)
-    private String especialidade;
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "especialidade_id", nullable = false)
+    private Especialidade especialidade;
 
-    @Column(name = "profissional_saude", nullable = false, length = 120)
-    private String profissionalSaude;
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "profissional_saude_id", nullable = false)
+    private ProfissionalSaude profissionalSaude;
+
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @JoinColumn(name = "procedimento_id", nullable = false)
+    private Procedimento procedimento;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "paciente_id", nullable = false)

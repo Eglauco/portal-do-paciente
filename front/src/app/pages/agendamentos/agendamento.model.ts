@@ -15,8 +15,9 @@ export interface Ref {
 export interface Agendamento {
   id?: number;
   dataHora: string;
-  especialidade: string;
-  profissionalSaude: string;
+  especialidade: Ref;
+  profissionalSaude: Ref;
+  procedimento: Ref;
   paciente: Ref;
   unidadeSaude: Ref;
   statusAgendamento: StatusAgendamento;
@@ -26,8 +27,9 @@ export interface Agendamento {
 /** Formato de envio (criação/edição). */
 export interface AgendamentoRequest {
   dataHora: string;
-  especialidade: string;
-  profissionalSaude: string;
+  especialidadeId: number;
+  profissionalSaudeId: number;
+  procedimentoId: number;
   pacienteId: number;
   unidadeSaudeId: number;
   statusAgendamento?: StatusAgendamento;

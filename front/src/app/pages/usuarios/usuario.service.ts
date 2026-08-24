@@ -1,3 +1,4 @@
+import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -8,7 +9,7 @@ export class UsuarioService {
   private readonly http = inject(HttpClient);
 
   // Base da API. Em produção viria de environment; aqui aponta para o backend local.
-  private readonly base = 'http://localhost:8080/usuario';
+  private readonly base = `${environment.apiUrl}/usuario`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
