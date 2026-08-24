@@ -32,7 +32,7 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": [".railway.app", "portal-do-paciente-production.up.railway.app"]
             },
             "ssr": {
               "entry": "src/server.ts"
