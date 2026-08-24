@@ -1480,3 +1480,117 @@
     display: none;
   }
 }
+
+/* ---------- Filtros com 2 campos (ex.: Unidades) ---------- */
+.filters__row2 {
+  display: grid;
+  grid-template-columns: 160px 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .filters__row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Ícone dentro do avatar da tabela (quando não há iniciais) */
+.avatar svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: var(--brand-deep);
+}
+
+/* ============================================================
+   Agendamentos — ng-select, status e utilitários
+   ============================================================ */
+
+/* ng-select alinhado ao tema (inputs teal) */
+.ng-select .ng-select-container {
+  min-height: 3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: #f7faf9;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.ng-select.ng-select-focused:not(.ng-select-opened) > .ng-select-container {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.ng-select .ng-select-container .ng-value-container .ng-placeholder {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+.ng-select.ng-invalid.ng-touched .ng-select-container {
+  border-color: #d5566a;
+}
+
+.ng-select .ng-clear-wrapper,
+.ng-select .ng-arrow-wrapper .ng-arrow {
+  color: var(--muted);
+}
+
+.ng-dropdown-panel {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  box-shadow: 0 18px 40px -22px rgba(7, 46, 43, 0.45);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option {
+  color: var(--ink);
+  font-size: 0.92rem;
+  padding: 0.55rem 0.85rem;
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-marked {
+  background: color-mix(in srgb, var(--brand) 10%, white);
+  color: var(--brand-deep);
+}
+
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected,
+.ng-dropdown-panel .ng-dropdown-panel-items .ng-option.ng-option-selected.ng-option-marked {
+  background: color-mix(in srgb, var(--brand) 15%, white);
+  color: var(--brand-deep);
+  font-weight: 600;
+}
+
+/* Pills de status */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.62rem;
+  border-radius: 2rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-pill[data-st='AGUARDANDO_CONFIRMACAO_PACIENTE'] { color: #a5741a; background: #fbf0d6; }
+.status-pill[data-st='PACIENTE_CONFIRMOU'] { color: #0a7d5a; background: #e3f6ec; }
+.status-pill[data-st='CANCELADO_PELA_UNIDADE'] { color: #b23b4e; background: #fbe4e7; }
+.status-pill[data-st='CANCELADO_PELO_PACIENTE'] { color: #b23b4e; background: #fbe4e7; }
+.status-pill[data-st='FALTA_PACIENTE'] { color: #8a5a00; background: #fbe9cf; }
+.status-pill[data-st='PRESENCA_PACIENTE'] { color: #2f6df6; background: #e9f0fe; }
+
+.cell-data { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+/* Filtro em linha (rótulo + select) */
+.field-inline { display: flex; flex-direction: column; gap: 0.4rem; }
+.field-inline__label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+.select--full select { width: 100%; }
+.select--full { display: flex; }
+
+/* Status automático no cadastro */
+.status-auto { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; padding-top: 0.35rem; }
+.status-auto small { color: var(--muted); font-size: 0.8rem; }
+
+.filters__agenda { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+.filters__agenda .field-inline { flex: 1; min-width: 220px; max-width: 360px; }
+@media (max-width: 900px) { .filters__agenda .field-inline { max-width: none; } }

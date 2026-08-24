@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AgendamentoModal } from '@/components/agendamento-modal';
@@ -20,6 +21,19 @@ export default function AgendamentosScreen() {
   const [lista, setLista] = useState<Agendamento[]>(AGENDAMENTOS);
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [selecionado, setSelecionado] = useState<Agendamento | null>(null);
+  const entradaMostrada = useRef(false);
+
+  // Pop-up de entrada: abre ao focar a aba pela primeira vez (após o login),
+  // e não durante a pré-montagem das abas.
+  useFocusEffect(
+    useCallback(() => {
+      if (!entradaMostrada.current) {
+        entradaMostrada.current = true;
+        const primeiroPendente = AGENDAMENTOS.find((a) => a.status === 'aguardando');
+        if (primeiroPendente) setSelecionado(primeiroPendente);
+      }
+    }, []),
+  );
 
   const pendentes = useMemo(() => lista.filter((a) => a.status === 'aguardando'), [lista]);
   const demais = useMemo(() => lista.filter((a) => a.status !== 'aguardando'), [lista]);

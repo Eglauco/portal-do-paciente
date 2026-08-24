@@ -1,9 +1,21 @@
 import { RenderMode, ServerRoute } from '@angular/ssr';
 
 export const serverRoutes: ServerRoute[] = [
-  // Rota com parâmetro: renderizada sob demanda no servidor (não pré-renderizada).
+  // Rotas com parâmetro: renderizadas sob demanda no servidor (não pré-renderizadas).
   {
     path: 'usuarios/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'unidades/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'pacientes/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'agendamentos/:id',
     renderMode: RenderMode.Server,
   },
   {

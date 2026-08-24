@@ -1,20 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AgendamentoModal } from '@/components/agendamento-modal';
 import { HapticTab } from '@/components/haptic-tab';
 import { TopBar } from '@/components/top-bar';
-import { AGENDAMENTOS } from '@/constants/agendamentos';
 import { Brand } from '@/constants/theme';
 
 export default function TabLayout() {
-  // Pop-up de entrada: primeiro agendamento aguardando confirmação.
-  const pendente = AGENDAMENTOS.find((a) => a.status === 'aguardando') ?? null;
-  const [entradaVisivel, setEntradaVisivel] = useState(true);
+  const insets = useSafeAreaInsets();
 
   return (
-    <>
     <Tabs
       screenOptions={{
         header: () => <TopBar />,
@@ -25,8 +21,9 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: Brand.surface,
           borderTopColor: Brand.line,
-          height: 62,
+          height: 62 + insets.bottom,
           paddingTop: 6,
+          paddingBottom: insets.bottom,
         },
       }}>
       <Tabs.Screen
@@ -66,14 +63,5 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
-
-    <AgendamentoModal
-      visivel={entradaVisivel}
-      agendamento={pendente}
-      onConfirmar={() => setEntradaVisivel(false)}
-      onCancelar={() => setEntradaVisivel(false)}
-      onFechar={() => setEntradaVisivel(false)}
-    />
-    </>
   );
 }

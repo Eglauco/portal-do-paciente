@@ -1,0 +1,78 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar paciente' : 'Cadastro de paciente' }}</h1>
+      <p class="page-sub">
+        {{ editando()
+          ? 'Atualize os dados deste paciente.'
+          : 'Preencha os dados para cadastrar um novo paciente.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+        </svg>
+        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+      </button>
+    }
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    @if (editando()) {
+      <div class="form-field form-field--sm">
+        <label class="label" for="codigo">Código</label>
+        <input id="codigo" class="input input--readonly" [value]="codigo()" readonly tabindex="-1" />
+      </div>
+    }
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="nome"
+          class="input"
+          formControlName="nome"
+          placeholder="Nome do paciente"
+          autocomplete="off"
+          [class.input--error]="invalido('nome')"
+        />
+        @if (invalido('nome')) {
+          <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+        {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </form>
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div
+      class="modal"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-msg"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

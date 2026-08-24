@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "pop",
-    "slug": "pop",
+    "name": "Portal do Paciente",
+    "slug": "portal-do-paciente",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.eglauco.portaldopaciente",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -43,6 +44,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "25a1f10d-c314-474c-b7d5-3d36be8fd568"
+      }
     }
   }
 }

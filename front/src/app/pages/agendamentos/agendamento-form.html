@@ -1,0 +1,149 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar agendamento' : 'Novo agendamento' }}</h1>
+      <p class="page-sub">
+        {{ editando()
+          ? 'Atualize os dados deste agendamento.'
+          : 'Preencha os dados para criar um novo agendamento.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+        </svg>
+        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+      </button>
+    }
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="label" for="dataHora">Data e hora <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="dataHora"
+          type="datetime-local"
+          class="input"
+          formControlName="dataHora"
+          [class.input--error]="invalido('dataHora')"
+        />
+        @if (invalido('dataHora')) {
+          <span class="field-error">Informe a data e a hora.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="especialidade">Especialidade <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="especialidade"
+          class="input"
+          formControlName="especialidade"
+          placeholder="Ex.: Cardiologia"
+          autocomplete="off"
+          [class.input--error]="invalido('especialidade')"
+        />
+        @if (invalido('especialidade')) {
+          <span class="field-error">Informe a especialidade.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="profissionalSaude">Profissional de saúde <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="profissionalSaude"
+          class="input"
+          formControlName="profissionalSaude"
+          placeholder="Ex.: Dr. Rafael Lima"
+          autocomplete="off"
+          [class.input--error]="invalido('profissionalSaude')"
+        />
+        @if (invalido('profissionalSaude')) {
+          <span class="field-error">Informe o profissional.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="paciente">Paciente <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="paciente"
+          formControlName="pacienteId"
+          [items]="pacientes()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione o paciente"
+          notFoundText="Nenhum paciente encontrado"
+        ></ng-select>
+        @if (invalido('pacienteId')) {
+          <span class="field-error">Selecione o paciente.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="unidade">Unidade de saúde <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="unidade"
+          formControlName="unidadeSaudeId"
+          [items]="unidades()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione a unidade"
+          notFoundText="Nenhuma unidade encontrada"
+        ></ng-select>
+        @if (invalido('unidadeSaudeId')) {
+          <span class="field-error">Selecione a unidade.</span>
+        }
+      </div>
+
+      @if (editando()) {
+        <div class="form-field">
+          <label class="label" for="status">Status <span class="req" aria-hidden="true">*</span></label>
+          <ng-select
+            labelForId="status"
+            formControlName="statusAgendamento"
+            [items]="statusOpcoes"
+            bindLabel="label"
+            bindValue="value"
+            [clearable]="false"
+            placeholder="Selecione o status"
+          ></ng-select>
+        </div>
+      } @else {
+        <div class="form-field">
+          <span class="label">Status</span>
+          <div class="status-auto">
+            <span class="status-pill" data-st="AGUARDANDO_CONFIRMACAO_PACIENTE">Aguardando confirmação do paciente</span>
+            <small>Definido automaticamente ao criar o agendamento.</small>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+        {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </form>
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-msg" (click)="$event.stopPropagation()">
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

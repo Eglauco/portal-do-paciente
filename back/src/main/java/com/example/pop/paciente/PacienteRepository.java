@@ -1,0 +1,22 @@
+package com.example.pop.paciente;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface PacienteRepository extends JpaRepository<Paciente, Long> {
+
+    @Query(value = """
+            select p from Paciente p
+            where (:id is null or p.id = :id)
+              and lower(p.nome) like lower(concat('%', :nome, '%'))
+            """,
+            countQuery = """
+            select count(p) from Paciente p
+            where (:id is null or p.id = :id)
+              and lower(p.nome) like lower(concat('%', :nome, '%'))
+            """)
+    Page<Paciente> search(@Param("id") Long id, @Param("nome") String nome, Pageable pageable);
+}
