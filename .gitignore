@@ -1,0 +1,40 @@
+# ============================================================
+# Portal do Paciente — monorepo (back / front / app)
+# ============================================================
+
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+front/.angular/
+back/target/
+back/!.mvn/wrapper/maven-wrapper.jar
+app/.expo/
+app/web-build/
+app/expo-env.d.ts
+
+# Native (Expo)
+app/ios/
+app/android/
+
+# IDEs / editors
+.idea/
+**/.idea/
+*.iml
+*.iws
+*.ipr
+
+# Environment
+**/.env
+**/.env*.local
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+Thumbs.db

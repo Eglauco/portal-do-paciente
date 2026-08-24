@@ -1,0 +1,562 @@
+/* You can add global styles to this file, and also import other style files */
+
+@import 'tailwindcss';
+@import '../node_modules/ngx-toastr/toastr.css';
+
+/* ============================================================
+   Portal do Paciente — Design tokens
+   Direção: "cuidado sereno" — verde-pinho/teal, calor humano.
+   ============================================================ */
+:root {
+  --bg: #f5f8f6;
+  --surface: #ffffff;
+  --ink: #0c1f1c;
+  --muted: #566863;
+  --line: #e2eae6;
+
+  --brand: #0e8c7f;
+  --brand-deep: #0a5f57;
+  --brand-pine: #072e2b;
+  --glow: #7fe0c3;
+  --accent: #f2b705; /* toque humano/caloroso, usado com muita parcimônia */
+
+  --ring: color-mix(in srgb, var(--brand) 45%, transparent);
+  --shadow: 0 18px 40px -24px rgba(7, 46, 43, 0.45);
+
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================
+   LOGIN — split screen
+   ============================================================ */
+.login {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+}
+
+/* ---------- Painel de marca ---------- */
+.login__brand {
+  position: relative;
+  overflow: hidden;
+  padding: 3.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #eafaf4;
+  background:
+    radial-gradient(120% 90% at 12% 8%, rgba(127, 224, 195, 0.22), transparent 55%),
+    linear-gradient(155deg, var(--brand-deep) 0%, var(--brand-pine) 100%);
+}
+
+.login__brand-glow {
+  position: absolute;
+  width: 42rem;
+  height: 42rem;
+  right: -14rem;
+  bottom: -18rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 140, 127, 0.55), transparent 62%);
+  pointer-events: none;
+}
+
+.wordmark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 2;
+}
+
+.wordmark__mark {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(234, 250, 244, 0.28);
+  backdrop-filter: blur(4px);
+}
+
+.wordmark__mark svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  stroke: var(--glow);
+}
+
+.wordmark__name {
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.wordmark__namerow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wordmark__sub {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  color: rgba(234, 250, 244, 0.62);
+  font-weight: 450;
+  margin-top: 0.15rem;
+}
+
+.badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 0.42rem;
+  line-height: 1;
+}
+
+.badge--dark {
+  color: var(--glow);
+  background: rgba(127, 224, 195, 0.12);
+  border: 1px solid rgba(127, 224, 195, 0.38);
+}
+
+.badge--light {
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 12%, white);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, white);
+}
+
+.login__pitch {
+  position: relative;
+  z-index: 2;
+  max-width: 26rem;
+}
+
+.login__headline {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 500;
+  font-size: clamp(2.4rem, 3.4vw, 3.4rem);
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+  margin: 0 0 1.1rem;
+}
+
+.login__headline em {
+  font-style: italic;
+  color: var(--glow);
+}
+
+.login__lead {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(234, 250, 244, 0.78);
+}
+
+/* Assinatura: linha de pulso (ECG) */
+.pulse {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 3.5rem;
+  overflow: hidden;
+}
+
+.pulse svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pulse__trace {
+  fill: none;
+  stroke: var(--glow);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(127, 224, 195, 0.55));
+  stroke-dasharray: 1400;
+  stroke-dashoffset: 1400;
+  animation: pulse-draw 3.2s ease-out 0.3s forwards;
+}
+
+.pulse__base {
+  fill: none;
+  stroke: rgba(234, 250, 244, 0.16);
+  stroke-width: 1;
+}
+
+@keyframes pulse-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.login__trust {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  color: rgba(234, 250, 244, 0.66);
+}
+
+.login__trust svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  stroke: var(--glow);
+}
+
+/* ---------- Painel do formulário ---------- */
+.login__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  background: var(--surface);
+}
+
+.login__form {
+  width: 100%;
+  max-width: 25rem;
+}
+
+.login__mobilemark {
+  display: none;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+}
+
+.login__mobilemark .m {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--brand) 12%, white);
+}
+
+.login__mobilemark svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: var(--brand-deep);
+}
+
+.login__mobilemark span {
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.9rem;
+  color: var(--brand-deep);
+}
+
+.login__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 2rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+}
+
+.login__subtitle {
+  margin: 0 0 2rem;
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+.field {
+  margin-bottom: 1.15rem;
+}
+
+.field__label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.45rem;
+  color: var(--ink);
+}
+
+.field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field__icon {
+  position: absolute;
+  left: 0.9rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  stroke: var(--muted);
+  pointer-events: none;
+}
+
+.field input {
+  width: 100%;
+  height: 3.1rem;
+  padding: 0 1rem 0 2.85rem;
+  font-family: inherit;
+  font-size: 0.98rem;
+  color: var(--ink);
+  background: #f7faf9;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.field input::placeholder {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+.field input:focus {
+  border-color: var(--brand);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.field__toggle {
+  position: absolute;
+  right: 0.6rem;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.field__toggle:hover {
+  background: #eef4f1;
+  color: var(--ink);
+}
+
+.field__toggle svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  stroke: currentColor;
+}
+
+.login__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.25rem 0 1.6rem;
+}
+
+.remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.remember__box {
+  display: grid;
+  place-items: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border: 1.5px solid var(--line);
+  border-radius: 0.4rem;
+  background: #fff;
+  transition: all 0.15s ease;
+}
+
+.remember__box svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  stroke: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.remember input:checked + .remember__box {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+
+.remember input:checked + .remember__box svg {
+  opacity: 1;
+}
+
+.remember input:focus-visible + .remember__box {
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+.linkbtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--brand-deep);
+  cursor: pointer;
+  border-radius: 0.3rem;
+}
+
+.linkbtn:hover {
+  text-decoration: underline;
+}
+
+.btn {
+  width: 100%;
+  height: 3.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 0.85rem;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn--primary {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(150deg, var(--brand) 0%, var(--brand-deep) 100%);
+  box-shadow: var(--shadow);
+}
+
+.btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 44px -22px rgba(10, 95, 87, 0.7);
+}
+
+.btn--primary:active {
+  transform: translateY(0);
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.6rem 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.btn--gov {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.btn--gov:hover {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--line));
+  background: #f7faf9;
+}
+
+.govbr {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.govbr b {
+  color: #1351b4;
+}
+
+.govbr i {
+  font-style: normal;
+  color: #f2b705;
+}
+
+.login__foot {
+  margin: 1.8rem 0 0;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.login__foot .linkbtn {
+  font-size: 0.92rem;
+}
+
+/* Foco visível global */
+:where(a, button, input):focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Responsivo ---------- */
+@media (max-width: 900px) {
+  .login {
+    grid-template-columns: 1fr;
+  }
+
+  .login__brand {
+    display: none;
+  }
+
+  .login__mobilemark {
+    display: flex;
+  }
+
+  .login__panel {
+    min-height: 100dvh;
+    padding: 2rem 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse__trace {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+
+  .btn,
+  .btn--primary:hover {
+    transition: none;
+    transform: none;
+  }
+}

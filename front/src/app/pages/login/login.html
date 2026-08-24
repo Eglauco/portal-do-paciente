@@ -1,0 +1,146 @@
+<main class="login">
+  <!-- Painel de marca -->
+  <section class="login__brand">
+    <span class="login__brand-glow" aria-hidden="true"></span>
+
+    <div class="wordmark">
+      <span class="wordmark__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h4l2 5 4-12 2 7h6" />
+        </svg>
+      </span>
+      <span>
+        <span class="wordmark__namerow">
+          <span class="wordmark__name">Portal do Paciente</span>
+          <span class="badge badge--dark">Admin</span>
+        </span>
+        <span class="wordmark__sub">Área administrativa</span>
+      </span>
+    </div>
+
+    <div class="login__pitch">
+      <h1 class="login__headline">A gestão do cuidado<br /><em>começa aqui.</em></h1>
+      <p class="login__lead">
+        Cadastre e acompanhe exames, consultas e informações dos pacientes — com
+        segurança e agilidade no dia a dia da equipe.
+      </p>
+    </div>
+
+    <div class="pulse" aria-hidden="true">
+      <svg viewBox="0 0 600 60" preserveAspectRatio="none">
+        <path class="pulse__base" d="M0 30 H600" />
+        <path
+          class="pulse__trace"
+          d="M0 30 H190 L206 30 216 8 232 52 244 30 L262 30 272 18 282 42 290 30 H600"
+        />
+      </svg>
+    </div>
+
+    <p class="login__trust">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+      Acesso restrito à equipe autorizada
+    </p>
+  </section>
+
+  <!-- Painel do formulário -->
+  <section class="login__panel">
+    <form class="login__form" (submit)="onSubmit($event)" novalidate>
+      <div class="login__mobilemark">
+        <span class="m" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h4l2 5 4-12 2 7h6" />
+          </svg>
+        </span>
+        <span>Portal do Paciente</span>
+        <span class="badge badge--light">Admin</span>
+      </div>
+
+      <h2 class="login__title">Bem-vindo de volta</h2>
+      <p class="login__subtitle">Acesse o painel administrativo.</p>
+
+      <!-- E-mail -->
+      <div class="field">
+        <label class="field__label" for="email">E-mail corporativo</label>
+        <div class="field__control">
+          <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="m3 7 9 6 9-6" />
+          </svg>
+          <input
+            id="email"
+            type="email"
+            name="email"
+            autocomplete="email"
+            inputmode="email"
+            placeholder="voce@empresa.com"
+            [value]="email()"
+            (input)="updateEmail($event)"
+          />
+        </div>
+      </div>
+
+      <!-- Senha -->
+      <div class="field">
+        <label class="field__label" for="password">Senha</label>
+        <div class="field__control">
+          <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="10" width="16" height="11" rx="2" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+          </svg>
+          <input
+            id="password"
+            [type]="showPassword() ? 'text' : 'password'"
+            name="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            [value]="password()"
+            (input)="updatePassword($event)"
+          />
+          <button
+            type="button"
+            class="field__toggle"
+            (click)="togglePassword()"
+            [attr.aria-label]="showPassword() ? 'Ocultar senha' : 'Mostrar senha'"
+            [attr.aria-pressed]="showPassword()"
+          >
+            @if (showPassword()) {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                <path d="M9.4 5.2A9.5 9.5 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6.3 6.3A17 17 0 0 0 2 12s4 7 10 7a9.3 9.3 0 0 0 4-.9" />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            }
+          </button>
+        </div>
+      </div>
+
+      <div class="login__row">
+        <label class="remember">
+          <input type="checkbox" [checked]="remember()" (change)="updateRemember($event)" />
+          <span class="remember__box" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 12 5 5L20 7" />
+            </svg>
+          </span>
+          Lembrar de mim
+        </label>
+        <button type="button" class="linkbtn">Esqueci minha senha</button>
+      </div>
+
+      <button type="submit" class="btn btn--primary">Entrar</button>
+
+      <p class="login__foot">
+        Precisa de acesso?
+        <button type="button" class="linkbtn">Fale com o administrador</button>
+      </p>
+    </form>
+  </section>
+</main>

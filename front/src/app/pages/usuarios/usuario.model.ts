@@ -1,0 +1,21 @@
+export interface Usuario {
+  id?: number;
+  nome: string;
+  email: string;
+}
+
+export interface UsuarioFiltro {
+  codigo?: string;
+  nome?: string;
+  email?: string;
+}
+
+export interface Pagina<T> {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
