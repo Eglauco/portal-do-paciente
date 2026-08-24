@@ -1,0 +1,123 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <button type="button" class="btn btn--ghost" (click)="voltar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="m15 6-6 6 6 6" />
+        </svg>
+        Voltar
+      </button>
+      <h1 class="page-title">Detalhe da avaliação</h1>
+      <p class="page-sub">NPS vinculado ao atendimento do paciente.</p>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <section class="panel">
+      <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando avaliação…</p></div>
+    </section>
+  } @else if (error()) {
+    <section class="panel">
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--ghost" (click)="voltar()">Voltar à lista</button>
+      </div>
+    </section>
+  } @else if (detalhe(); as d) {
+    <div class="nps-grid">
+      <!-- Resposta / nota -->
+      <section class="panel nps-resposta">
+        <div class="panel__head">
+          <h2 class="panel__title">Avaliação</h2>
+          <span class="status-pill" [attr.data-nps]="d.status">{{ rotuloStatus(d.status) }}</span>
+        </div>
+
+        @if (d.status === 'RESPONDIDO' && d.nota !== null && d.nota !== undefined) {
+          <div class="nps-score">
+            <span class="nps-score__nota" [attr.data-cls]="d.classificacao">{{ d.nota }}</span>
+            <span class="nps-score__de">de 10</span>
+            <span class="cls-pill cls-pill--lg" [attr.data-cls]="d.classificacao">{{ d.classificacao }}</span>
+          </div>
+
+          <div class="nps-obs">
+            <p class="section-label">Observação do paciente</p>
+            @if (d.observacao) {
+              <p class="nps-obs__texto">{{ d.observacao }}</p>
+            } @else {
+              <p class="nps-obs__vazio">O paciente não deixou observação.</p>
+            }
+          </div>
+
+          <p class="nps-quando">Respondido em {{ d.respondidoEm | date: 'dd/MM/yyyy HH:mm' }}</p>
+        } @else if (d.status === 'PENDENTE') {
+          <div class="state state--inset">
+            <span class="state__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+              </svg>
+            </span>
+            <h3>Aguardando resposta</h3>
+            <p>O paciente ainda não respondeu a esta avaliação.</p>
+            <button type="button" class="btn btn--ghost" [disabled]="processando()" (click)="expirar()">
+              Marcar como expirada
+            </button>
+          </div>
+        } @else {
+          <div class="state state--inset">
+            <span class="state__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9" /><path d="m15 9-6 6M9 9l6 6" />
+              </svg>
+            </span>
+            <h3>Avaliação expirada</h3>
+            <p>O prazo de resposta se encerrou sem retorno do paciente.</p>
+          </div>
+        }
+      </section>
+
+      <!-- Dados do atendimento -->
+      <section class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Atendimento</h2>
+        </div>
+
+        <div class="nps-paciente">
+          <span class="nps-paciente__avatar">{{ iniciais(d.paciente.nome) }}</span>
+          <div>
+            <b class="nps-paciente__nome">{{ d.paciente.nome }}</b>
+            <span class="nps-paciente__unidade">{{ d.unidadeSaude.nome }}</span>
+          </div>
+        </div>
+
+        <dl class="def-list">
+          <div class="def-list__row">
+            <dt>Data / Hora</dt>
+            <dd>{{ d.dataHora | date: 'dd/MM/yyyy HH:mm' }}</dd>
+          </div>
+          <div class="def-list__row">
+            <dt>Especialidade</dt>
+            <dd>{{ d.especialidade.nome }}</dd>
+          </div>
+          <div class="def-list__row">
+            <dt>Profissional</dt>
+            <dd>{{ d.profissionalSaude.nome }}</dd>
+          </div>
+          <div class="def-list__row">
+            <dt>Procedimento</dt>
+            <dd>{{ d.procedimento.nome }}</dd>
+          </div>
+          <div class="def-list__row">
+            <dt>Unidade</dt>
+            <dd>{{ d.unidadeSaude.nome }}</dd>
+          </div>
+          <div class="def-list__row">
+            <dt>Avaliação gerada em</dt>
+            <dd>{{ d.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  }
+</section>

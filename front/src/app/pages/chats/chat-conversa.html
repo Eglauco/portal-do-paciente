@@ -1,0 +1,107 @@
+<section class="wa">
+  <!-- Coluna esquerda: lista de conversas -->
+  <aside class="wa__lista">
+    <div class="wa__lista-topo">
+      <button type="button" class="wa__voltar" (click)="voltar()" aria-label="Voltar para a pesquisa">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+      </button>
+      <span class="wa__lista-titulo">Conversas</span>
+    </div>
+    <ul class="wa__conversas">
+      @for (c of chats(); track c.id) {
+        <li>
+          <button type="button" class="wa__item" [class.is-active]="c.id === idAtual()" (click)="abrir(c.id)">
+            <span class="convo__avatar">{{ iniciais(c.paciente.nome) }}</span>
+            <span class="convo__body">
+              <span class="convo__top">
+                <b class="convo__nome">{{ c.paciente.nome }}</b>
+                <span class="convo__hora">{{ c.ultimaMensagemEm | date: 'dd/MM HH:mm' }}</span>
+              </span>
+              <span class="convo__linha">
+                <span class="convo__previa">
+                  @if (c.ultimaMensagemDe === 'UNIDADE') { <span class="convo__voce">Você: </span> }
+                  {{ c.ultimaMensagem }}
+                </span>
+                @if (c.naoLidas > 0) { <span class="convo__badge">{{ c.naoLidas }}</span> }
+              </span>
+              <span class="wa__item-unidade">{{ c.unidadeSaude.nome }}</span>
+            </span>
+          </button>
+        </li>
+      }
+    </ul>
+  </aside>
+
+  <!-- Coluna direita: conversa -->
+  <div class="wa__conversa">
+    @if (detalhe(); as chat) {
+      <header class="wa__cabecalho">
+        <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
+        <div class="wa__cabecalho-info">
+          <b class="wa__cabecalho-nome">{{ chat.paciente.nome }}</b>
+          <span class="wa__cabecalho-sub">{{ chat.unidadeSaude.nome }}</span>
+        </div>
+        <span class="status-pill" [attr.data-st]="chat.status">{{ chat.statusDescricao }}</span>
+        @if (chat.status === 'RESOLVIDO') {
+          <button type="button" class="btn btn--ghost wa__acao" (click)="reabrir()">Reabrir</button>
+        } @else {
+          <button type="button" class="btn btn--ghost wa__acao" (click)="resolver()">Resolver</button>
+        }
+      </header>
+
+      <div class="wa__mensagens" #mensagens>
+        <div class="wa__aviso">🔒 Conversa entre o paciente e a unidade</div>
+        @for (m of chat.mensagens; track m.id; let i = $index) {
+          @if (mostraSeparador(i)) {
+            <div class="wa__dia">{{ m.enviadaEm | date: 'dd/MM/yyyy' }}</div>
+          }
+          <div class="wa__bolha-wrap" [class.wa--dir]="m.remetente === 'UNIDADE'" [class.wa--esq]="m.remetente === 'PACIENTE'">
+            <div class="wa__bolha" [class.wa__bolha--unidade]="m.remetente === 'UNIDADE'">
+              <span class="wa__texto">{{ m.texto }}</span>
+              <span class="wa__rodape">
+                {{ m.enviadaEm | date: 'HH:mm' }}
+                @if (m.remetente === 'UNIDADE') {
+                  <svg class="wa__tick" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m2 13 4 4L14 7" /><path d="m10 13 1 1M14 17 22 7" />
+                  </svg>
+                }
+              </span>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (chat.status !== 'RESOLVIDO') {
+        <div class="wa__input">
+          <textarea
+            class="wa__campo"
+            rows="1"
+            placeholder="Escreva uma mensagem"
+            [value]="texto()"
+            (input)="aoDigitar($event)"
+            (keydown)="aoTeclar($event)"
+          ></textarea>
+          <button type="button" class="wa__enviar" (click)="enviar()" [disabled]="enviando()" aria-label="Enviar">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+          </button>
+        </div>
+      } @else {
+        <div class="wa__resolvido">Conversa resolvida — reabra para enviar novas mensagens.</div>
+      }
+    } @else {
+      <div class="wa__vazio">
+        @if (carregandoDetalhe()) {
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Carregando conversa…</p>
+        } @else {
+          <span class="wa__vazio-icone" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+            </svg>
+          </span>
+          <p>Selecione uma conversa para começar.</p>
+        }
+      </div>
+    }
+  </div>
+</section>

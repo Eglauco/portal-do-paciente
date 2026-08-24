@@ -19,6 +19,14 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'chats/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'nps/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'especialidades/:id',
     renderMode: RenderMode.Server,
   },

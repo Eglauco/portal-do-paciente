@@ -68,8 +68,26 @@ export const routes: Routes = [
         canDeactivate: [pendingChangesGuard],
         title: 'Editar agendamento — Portal do Paciente · Admin',
       },
-      { path: 'chats', ...secao('Chats ao vivo', 'Atenda pacientes em tempo real.') },
-      { path: 'nps', ...secao('NPS', 'Acompanhe a satisfação dos pacientes.') },
+      {
+        path: 'chats',
+        loadComponent: () => import('./pages/chats/chats-list').then((m) => m.ChatsList),
+        title: 'Chats ao vivo — Portal do Paciente · Admin',
+      },
+      {
+        path: 'chats/:id',
+        loadComponent: () => import('./pages/chats/chat-conversa').then((m) => m.ChatConversa),
+        title: 'Conversa — Portal do Paciente · Admin',
+      },
+      {
+        path: 'nps',
+        loadComponent: () => import('./pages/nps/nps-list').then((m) => m.NpsList),
+        title: 'NPS — Portal do Paciente · Admin',
+      },
+      {
+        path: 'nps/:id',
+        loadComponent: () => import('./pages/nps/nps-detalhe').then((m) => m.NpsDetalheComponent),
+        title: 'Avaliação — Portal do Paciente · Admin',
+      },
       {
         path: 'pacientes',
         loadComponent: () => import('./pages/pacientes/pacientes-list').then((m) => m.PacientesList),

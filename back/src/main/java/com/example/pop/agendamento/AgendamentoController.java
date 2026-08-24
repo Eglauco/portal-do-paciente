@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
+import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.procedimento.ProcedimentoRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
@@ -42,16 +43,19 @@ public class AgendamentoController {
     private final EspecialidadeRepository especialidadeRepository;
     private final ProfissionalSaudeRepository profissionalRepository;
     private final ProcedimentoRepository procedimentoRepository;
+    private final NpsService npsService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
-            ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository) {
+            ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
+            NpsService npsService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.profissionalRepository = profissionalRepository;
         this.procedimentoRepository = procedimentoRepository;
+        this.npsService = npsService;
     }
 
     /**
@@ -109,7 +113,10 @@ public class AgendamentoController {
                     if (request.statusAgendamento() != null) {
                         agendamento.setStatusAgendamento(request.statusAgendamento());
                     }
-                    return ResponseEntity.ok(AgendamentoResponse.from(repository.save(agendamento)));
+                    Agendamento salvo = repository.save(agendamento);
+                    // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
+                    npsService.gerarSeNecessario(salvo);
+                    return ResponseEntity.ok(AgendamentoResponse.from(salvo));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
