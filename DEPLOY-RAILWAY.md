@@ -6,7 +6,7 @@ O projeto sobe como **3 recursos** no mesmo projeto Railway:
 |---|---|---|
 | **PostgreSQL** | — (plugin do Railway) | gerenciado |
 | **Backend** (Spring Boot) | `back` | Dockerfile |
-| **Frontend** (Angular SSR) | `front` | Nixpacks (`railway.json`) |
+| **Frontend** (Angular SSR) | `front` | Dockerfile (Node 24) |
 
 > O `app/` (Expo) é um aplicativo **mobile** — não vai para o Railway. Ele é distribuído via build APK/EAS.
 
@@ -39,7 +39,7 @@ O projeto sobe como **3 recursos** no mesmo projeto Railway:
    ```
    API_URL=https://SEU-BACK.up.railway.app
    ```
-   (URL pública do backend, gerada no passo 2 — é embutida no build do Angular.)
+   (URL pública do backend, gerada no passo 2 — o Railway a injeta como *build arg* no Dockerfile e ela é embutida no build do Angular. Se alterar depois, faça **Redeploy** para reconstruir.)
 
 ### 4. Amarrar CORS e publicar
 1. Confirme no **Backend** que `APP_CORS_ALLOWED_ORIGINS` está com a URL do **front**.
