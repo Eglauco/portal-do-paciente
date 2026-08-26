@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.eglauco.portaldopaciente",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -40,7 +41,13 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#0E8C7F"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

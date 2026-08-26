@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "564591688396",
+    "project_id": "portal-do-paciente-63ac3",
+    "storage_bucket": "portal-do-paciente-63ac3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564591688396:android:5db60819fd27e017ce6069",
+        "android_client_info": {
+          "package_name": "com.eglauco.portaldopaciente"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSsK4qvUtmLScvpsqURmgX0OmPoXuC1AM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

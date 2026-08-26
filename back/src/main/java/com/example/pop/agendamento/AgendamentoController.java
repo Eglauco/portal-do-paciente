@@ -26,6 +26,7 @@ import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.procedimento.ProcedimentoRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
+import com.example.pop.push.PushService;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
@@ -44,11 +45,12 @@ public class AgendamentoController {
     private final ProfissionalSaudeRepository profissionalRepository;
     private final ProcedimentoRepository procedimentoRepository;
     private final NpsService npsService;
+    private final PushService pushService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
-            NpsService npsService) {
+            NpsService npsService, PushService pushService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
@@ -56,6 +58,7 @@ public class AgendamentoController {
         this.profissionalRepository = profissionalRepository;
         this.procedimentoRepository = procedimentoRepository;
         this.npsService = npsService;
+        this.pushService = pushService;
     }
 
     /**
@@ -101,7 +104,10 @@ public class AgendamentoController {
         aplicar(agendamento, request);
         // Regra de negócio: todo novo agendamento nasce aguardando confirmação do paciente.
         agendamento.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
-        return AgendamentoResponse.from(repository.save(agendamento));
+        Agendamento salvo = repository.save(agendamento);
+        // Notifica o paciente (push) para confirmar/cancelar o novo agendamento.
+        pushService.notificarNovoAgendamento(salvo);
+        return AgendamentoResponse.from(salvo);
     }
 
     @PutMapping("/{id}")
