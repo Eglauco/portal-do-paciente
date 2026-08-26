@@ -25,8 +25,11 @@ class ChatControllerTest {
 
     @Test
     void filtraPorStatusNaoLida() {
+        // Garante o cenário: paciente envia e o chat fica NAO_LIDA (independe do seed).
+        controller.enviarComoPaciente(2L, new MensagemRequest("Tenho uma dúvida sobre o resultado."));
+
         Pagina<ChatResponse> pagina = controller.listar(null, null, StatusChat.NAO_LIDA, false, 0, 50);
-        assertTrue(pagina.totalElements() >= 2);
+        assertTrue(pagina.totalElements() >= 1);
         assertTrue(pagina.content().stream().allMatch(c -> c.status() == StatusChat.NAO_LIDA));
         assertTrue(pagina.content().stream().anyMatch(c -> c.naoLidas() > 0));
     }
@@ -44,5 +47,22 @@ class ChatControllerTest {
         assertNotNull(detalhe);
         assertEquals(3, detalhe.mensagens().size());
         assertEquals(RemetenteMensagem.PACIENTE, detalhe.mensagens().get(0).remetente());
+    }
+
+    @Test
+    void pacienteEnviaMensagemEChatFicaNaoLida() {
+        ChatDetalheResponse antes = controller.buscar(4L).getBody();
+        assertNotNull(antes);
+        int qtdAntes = antes.mensagens().size();
+
+        ChatDetalheResponse depois = controller
+                .enviarComoPaciente(4L, new MensagemRequest("Olá, tenho uma dúvida sobre o exame.")).getBody();
+        assertNotNull(depois);
+        assertEquals(qtdAntes + 1, depois.mensagens().size());
+
+        MensagemResponse ultima = depois.mensagens().get(depois.mensagens().size() - 1);
+        assertEquals(RemetenteMensagem.PACIENTE, ultima.remetente());
+        assertFalse(ultima.lida());
+        assertEquals(StatusChat.NAO_LIDA, depois.status());
     }
 }

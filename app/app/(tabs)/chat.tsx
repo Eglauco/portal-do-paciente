@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRef, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
+  ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,208 +13,247 @@ import {
 } from 'react-native';
 
 import { Brand } from '@/constants/theme';
+import { ChatItem, listarChats } from '@/services/chat';
 
-type De = 'paciente' | 'unidade';
-interface Mensagem {
-  id: string;
-  de: De;
-  texto: string;
-  hora: string;
-  dia: string;
+const doisDigitos = (n: number) => String(n).padStart(2, '0');
+
+/** Rótulo curto de tempo para a lista (estilo WhatsApp). */
+function horaLista(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const agora = new Date();
+  const mesmoDia = d.toDateString() === agora.toDateString();
+  if (mesmoDia) return `${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
+
+  const ontem = new Date(agora);
+  ontem.setDate(agora.getDate() - 1);
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem';
+
+  return `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}`;
 }
 
-const INICIAIS: Mensagem[] = [
-  { id: '1', de: 'paciente', dia: 'Ontem', hora: '09:12', texto: 'Bom dia! Gostaria de remarcar minha consulta de cardiologia.' },
-  { id: '2', de: 'unidade', dia: 'Ontem', hora: '09:15', texto: 'Bom dia, Mariana! Claro, temos horário no dia 02/09 às 10:15. Fica bom para você?' },
-  { id: '3', de: 'paciente', dia: 'Ontem', hora: '09:16', texto: 'Perfeito, pode confirmar 😊' },
-  { id: '4', de: 'unidade', dia: 'Ontem', hora: '09:17', texto: 'Consulta remarcada com sucesso! Enviamos a confirmação para o seu app.' },
-  { id: '5', de: 'paciente', dia: 'Hoje', hora: '08:02', texto: 'Meu exame de sangue já está disponível?' },
-  { id: '6', de: 'unidade', dia: 'Hoje', hora: '08:05', texto: 'Sim! O laudo já está no seu Prontuário, na aba de documentos. Qualquer dúvida estamos por aqui. 🩺' },
-];
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const a = partes[0]?.charAt(0) ?? '';
+  const b = partes.length > 1 ? partes[partes.length - 1].charAt(0) : '';
+  return (a + b).toUpperCase();
+}
 
 export default function ChatScreen() {
-  const [mensagens, setMensagens] = useState<Mensagem[]>(INICIAIS);
-  const [texto, setTexto] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const router = useRouter();
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [busca, setBusca] = useState('');
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+  const jaCarregou = useRef(false);
 
-  const enviar = () => {
-    const limpo = texto.trim();
-    if (!limpo) return;
-    setMensagens((atual) => [
-      ...atual,
-      { id: String(atual.length + 1), de: 'paciente', dia: 'Hoje', hora: 'agora', texto: limpo },
-    ]);
-    setTexto('');
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+  const carregar = useCallback(async (mostrarSpinner: boolean) => {
+    try {
+      if (mostrarSpinner) setCarregando(true);
+      setErro(false);
+      const dados = await listarChats();
+      setChats(dados);
+      jaCarregou.current = true;
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar(!jaCarregou.current);
+    }, [carregar]),
+  );
+
+  const aoAtualizar = () => {
+    setAtualizando(true);
+    carregar(false);
+  };
+
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return chats;
+    return chats.filter(
+      (c) =>
+        c.unidadeSaude.nome.toLowerCase().includes(termo) ||
+        (c.ultimaMensagem ?? '').toLowerCase().includes(termo),
+    );
+  }, [chats, busca]);
+
+  const abrir = (chat: ChatItem) => {
+    router.push({ pathname: '/conversa/[id]', params: { id: String(chat.id) } });
   };
 
   return (
     <View style={styles.screen}>
-      {/* Cabeçalho do contato (unidade) */}
-      <View style={styles.contato}>
-        <View style={styles.contatoAvatar}>
-          <Ionicons name="medical" size={20} color={Brand.glow} />
+      {/* Busca */}
+      <View style={styles.buscaWrap}>
+        <View style={styles.busca}>
+          <Ionicons name="search" size={18} color={Brand.muted} />
+          <TextInput
+            style={styles.buscaInput}
+            value={busca}
+            onChangeText={setBusca}
+            placeholder="Pesquisar conversa"
+            placeholderTextColor="#9AAAA5"
+            returnKeyType="search"
+          />
+          {busca.length > 0 && (
+            <Pressable onPress={() => setBusca('')} accessibilityLabel="Limpar busca">
+              <Ionicons name="close-circle" size={18} color={Brand.muted} />
+            </Pressable>
+          )}
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.contatoNome}>Unidade de Saúde 01</Text>
-          <View style={styles.online}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.contatoStatus}>Atendimento • responde em minutos</Text>
-          </View>
-        </View>
-        <Ionicons name="call-outline" size={20} color={Brand.brandDeep} />
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          ref={scrollRef}
-          style={styles.mensagens}
-          contentContainerStyle={styles.mensagensContent}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}>
-          <View style={styles.avisoWrap}>
-            <Text style={styles.aviso}>
-              🔒 Conversa protegida com a sua unidade de saúde
+      <ScrollView
+        style={styles.lista}
+        contentContainerStyle={filtrados.length === 0 && styles.listaVaziaContent}
+        refreshControl={
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+        }>
+        {carregando ? (
+          <View style={styles.estado}>
+            <ActivityIndicator color={Brand.brand} />
+            <Text style={styles.estadoTxt}>Carregando conversas…</Text>
+          </View>
+        ) : erro ? (
+          <View style={styles.estado}>
+            <View style={styles.estadoIcone}>
+              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+            </View>
+            <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
+            <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
+            <Pressable style={styles.estadoBtn} onPress={() => carregar(true)}>
+              <Ionicons name="refresh" size={16} color="#fff" />
+              <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
+            </Pressable>
+          </View>
+        ) : filtrados.length === 0 ? (
+          <View style={styles.estado}>
+            <View style={styles.estadoIcone}>
+              <Ionicons name="chatbubbles-outline" size={26} color={Brand.muted} />
+            </View>
+            <Text style={styles.estadoTitulo}>{busca ? 'Nada encontrado' : 'Nenhuma conversa'}</Text>
+            <Text style={styles.estadoTxt}>
+              {busca ? 'Tente outro termo de busca.' : 'Suas conversas com as unidades aparecerão aqui.'}
             </Text>
           </View>
-
-          {mensagens.map((m, i) => {
-            const mostrarDia = i === 0 || mensagens[i - 1].dia !== m.dia;
-            const daUnidade = m.de === 'unidade';
+        ) : (
+          filtrados.map((c) => {
+            const novaResposta = c.ultimaMensagemDe === 'UNIDADE' && c.status !== 'RESOLVIDO';
+            const prefixo = c.ultimaMensagemDe === 'PACIENTE' ? 'Você: ' : '';
             return (
-              <View key={m.id}>
-                {mostrarDia && (
-                  <View style={styles.diaWrap}>
-                    <Text style={styles.dia}>{m.dia}</Text>
+              <Pressable
+                key={c.id}
+                onPress={() => abrir(c)}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarTxt}>{iniciais(c.unidadeSaude.nome)}</Text>
+                </View>
+                <View style={styles.rowBody}>
+                  <View style={styles.rowTop}>
+                    <Text style={[styles.nome, novaResposta && styles.nomeForte]} numberOfLines={1}>
+                      {c.unidadeSaude.nome}
+                    </Text>
+                    <Text style={[styles.hora, novaResposta && styles.horaForte]}>
+                      {horaLista(c.ultimaMensagemEm ?? c.atualizadoEm)}
+                    </Text>
                   </View>
-                )}
-                <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
-                  <View style={[styles.bolha, daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente]}>
-                    <Text style={styles.texto}>{m.texto}</Text>
-                    <View style={styles.rodape}>
-                      <Text style={styles.hora}>{m.hora}</Text>
-                      {!daUnidade && <Ionicons name="checkmark-done" size={14} color="#3FA9F5" />}
-                    </View>
+                  <View style={styles.rowBottom}>
+                    <Text style={[styles.previa, novaResposta && styles.previaForte]} numberOfLines={1}>
+                      {prefixo}
+                      {c.ultimaMensagem ?? 'Iniciar conversa'}
+                    </Text>
+                    {novaResposta && <View style={styles.dot} />}
                   </View>
                 </View>
-              </View>
+              </Pressable>
             );
-          })}
-        </ScrollView>
-
-        {/* Barra de digitação */}
-        <View style={styles.inputBar}>
-          <View style={styles.inputWrap}>
-            <Ionicons name="happy-outline" size={22} color={Brand.muted} />
-            <TextInput
-              style={styles.input}
-              value={texto}
-              onChangeText={setTexto}
-              placeholder="Mensagem"
-              placeholderTextColor="#9AAAA5"
-              multiline
-            />
-            <Ionicons name="attach-outline" size={22} color={Brand.muted} />
-          </View>
-          <Pressable style={styles.enviar} onPress={enviar} accessibilityLabel="Enviar mensagem">
-            <Ionicons name="send" size={19} color="#fff" />
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
+          })
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#EEF3F1' },
-  contato: {
+  screen: { flex: 1, backgroundColor: Brand.surface },
+
+  buscaWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, backgroundColor: Brand.surface },
+  busca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Brand.bg,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    paddingHorizontal: 14,
+    height: 42,
+  },
+  buscaInput: { flex: 1, fontSize: 15, color: Brand.ink },
+
+  lista: { flex: 1 },
+  listaVaziaContent: { flexGrow: 1 },
+
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: Brand.surface,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: '#F0F4F2',
   },
-  contatoAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  rowPressed: { backgroundColor: '#EEF3F1' },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Brand.brandDeep,
   },
-  contatoNome: { fontSize: 15, fontWeight: '700', color: Brand.ink },
-  online: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2FBF71' },
-  contatoStatus: { fontSize: 12, color: Brand.muted },
-  mensagens: { flex: 1 },
-  mensagensContent: { padding: 14, paddingBottom: 8 },
-  avisoWrap: { alignItems: 'center', marginBottom: 12 },
-  aviso: {
-    fontSize: 11.5,
-    color: '#6A7B76',
-    backgroundColor: '#FCF6E3',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  diaWrap: { alignItems: 'center', marginVertical: 10 },
-  dia: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#6A7B76',
-    backgroundColor: '#DDE7E3',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  bolhaWrap: { marginBottom: 8, maxWidth: '82%' },
-  esquerda: { alignSelf: 'flex-start' },
-  direita: { alignSelf: 'flex-end' },
-  bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  bolhaUnidade: {
-    backgroundColor: Brand.surface,
-    borderTopLeftRadius: 4,
+  avatarTxt: { color: Brand.onBrand, fontSize: 16, fontWeight: '800' },
+  rowBody: { flex: 1, justifyContent: 'center', gap: 4 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  nome: { flex: 1, fontSize: 15.5, fontWeight: '600', color: Brand.ink },
+  nomeForte: { fontWeight: '800' },
+  hora: { fontSize: 12, color: Brand.muted },
+  horaForte: { color: Brand.brand, fontWeight: '700' },
+  rowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  previa: { flex: 1, fontSize: 13.5, color: Brand.muted },
+  previaForte: { color: '#40514C', fontWeight: '600' },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Brand.brand },
+
+  // Estados
+  estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
+  estadoIcone: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: Brand.bg,
     borderWidth: 1,
     borderColor: Brand.line,
-  },
-  bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
-  texto: { fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
-  rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
-  hora: { fontSize: 10.5, color: '#7C8C87' },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#EEF3F1',
-  },
-  inputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: Brand.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
-    minHeight: 46,
-  },
-  input: { flex: 1, fontSize: 15, color: Brand.ink, maxHeight: 100 },
-  enviar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 6,
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 14,
     backgroundColor: Brand.brand,
   },
+  estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

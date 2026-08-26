@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
+        <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

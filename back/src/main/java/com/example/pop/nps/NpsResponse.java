@@ -15,7 +15,6 @@ public record NpsResponse(
         StatusNps status,
         String statusDescricao,
         Integer nota,
-        String classificacao,
         LocalDateTime criadoEm) {
 
     public static NpsResponse from(Nps nps) {
@@ -29,21 +28,6 @@ public record NpsResponse(
                 nps.getStatus(),
                 nps.getStatus().getDescricao(),
                 nps.getNota(),
-                classificacao(nps.getNota()),
                 nps.getCriadoEm());
-    }
-
-    /** Classificação NPS a partir da nota (nula se ainda não respondido). */
-    public static String classificacao(Integer nota) {
-        if (nota == null) {
-            return null;
-        }
-        if (nota >= 9) {
-            return "Promotor";
-        }
-        if (nota >= 7) {
-            return "Neutro";
-        }
-        return "Detrator";
     }
 }

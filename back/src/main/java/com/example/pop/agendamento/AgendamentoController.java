@@ -121,6 +121,27 @@ public class AgendamentoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** Confirmação do paciente (app): move o status para PACIENTE_CONFIRMOU. */
+    @PostMapping("/{id}/confirmar")
+    public ResponseEntity<AgendamentoResponse> confirmar(@PathVariable Long id) {
+        return alterarStatus(id, StatusAgendamento.PACIENTE_CONFIRMOU);
+    }
+
+    /** Cancelamento pelo paciente (app): move o status para CANCELADO_PELO_PACIENTE. */
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<AgendamentoResponse> cancelar(@PathVariable Long id) {
+        return alterarStatus(id, StatusAgendamento.CANCELADO_PELO_PACIENTE);
+    }
+
+    private ResponseEntity<AgendamentoResponse> alterarStatus(Long id, StatusAgendamento status) {
+        return repository.findById(id)
+                .map(agendamento -> {
+                    agendamento.setStatusAgendamento(status);
+                    return ResponseEntity.ok(AgendamentoResponse.from(repository.save(agendamento)));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
         if (!repository.existsById(id)) {

@@ -53,13 +53,6 @@ export const Status: Record<string, { fg: string; bg: string }> = {
   reagendado: { fg: '#7A5AF5', bg: '#EFEAFE' },
 };
 
-/** Classificação NPS por faixa de nota. */
-export const Nps = {
-  promotor: { fg: '#0A7D5A', bg: '#E3F6EC' },
-  neutro: { fg: '#A5741A', bg: '#FBF0D6' },
-  detrator: { fg: '#B23B4E', bg: '#FBE4E7' },
-};
-
 /** Cores por tipo de documento do prontuário. */
 export const DocTipo: Record<string, { fg: string; bg: string; icon: string }> = {
   exame: { fg: '#2F6DF6', bg: '#E9F0FE', icon: 'flask-outline' },

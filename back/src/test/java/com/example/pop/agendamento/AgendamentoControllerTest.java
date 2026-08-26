@@ -34,6 +34,22 @@ class AgendamentoControllerTest {
     }
 
     @Test
+    void confirmarECancelarAlteramOStatus() {
+        AgendamentoRequest request = new AgendamentoRequest(
+                LocalDateTime.of(2026, 10, 2, 9, 0), 1L, 1L, 1L, 1L, 1L, null);
+        AgendamentoResponse criado = controller.criar(request);
+        assertEquals(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, criado.statusAgendamento());
+
+        AgendamentoResponse confirmado = controller.confirmar(criado.id()).getBody();
+        assertEquals(StatusAgendamento.PACIENTE_CONFIRMOU, confirmado.statusAgendamento());
+
+        AgendamentoResponse cancelado = controller.cancelar(criado.id()).getBody();
+        assertEquals(StatusAgendamento.CANCELADO_PELO_PACIENTE, cancelado.statusAgendamento());
+
+        controller.excluir(criado.id());
+    }
+
+    @Test
     void novoAgendamentoNasceAguardandoConfirmacao() {
         AgendamentoRequest request = new AgendamentoRequest(
                 LocalDateTime.of(2026, 10, 1, 9, 0),

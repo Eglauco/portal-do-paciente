@@ -1,0 +1,168 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar prontuário' : 'Novo prontuário' }}</h1>
+      <p class="page-sub">
+        {{ editando()
+          ? 'Atualize os dados deste prontuário.'
+          : 'Preencha os dados para criar um novo prontuário.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+        </svg>
+        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+      </button>
+    }
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="label" for="agendamento">Agendamento <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="agendamento"
+          formControlName="agendamentoId"
+          [items]="agendamentos()"
+          bindLabel="rotulo"
+          bindValue="id"
+          placeholder="Selecione o agendamento"
+          notFoundText="Nenhum agendamento encontrado"
+        ></ng-select>
+        @if (agendamentoInvalido()) {
+          <span class="field-error">Selecione o agendamento.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="numero">Número do atendimento <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="numero"
+          type="text"
+          class="input"
+          formControlName="numeroAtendimento"
+          placeholder="Ex.: ATD-2026-0001"
+          [class.input--error]="numeroInvalido()"
+        />
+        @if (numeroInvalido()) {
+          <span class="field-error">Informe o número do atendimento.</span>
+        }
+      </div>
+    </div>
+
+    <!-- Documentos -->
+    <div class="doc-section">
+      <div class="doc-section__head">
+        <div>
+          <p class="section-label">Documentos</p>
+          <p class="doc-section__hint">Anexe os documentos deste atendimento.</p>
+        </div>
+        <button type="button" class="btn btn--ghost" (click)="adicionarDocumento()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Adicionar documento
+        </button>
+      </div>
+
+      @if (documentos.length === 0) {
+        <p class="doc-empty">Nenhum documento adicionado.</p>
+      } @else {
+        <div class="doc-list" formArrayName="documentos">
+          @for (doc of documentos.controls; track $index) {
+            <div class="doc-row" [formGroupName]="$index">
+              <span class="doc-row__num">{{ $index + 1 }}</span>
+              <div class="doc-row__field">
+                <input
+                  type="text"
+                  class="input"
+                  formControlName="nome"
+                  placeholder="Nome do documento"
+                  [attr.aria-label]="'Nome do documento ' + ($index + 1)"
+                  [class.input--error]="documentoInvalido($index)"
+                />
+                @if (documentoInvalido($index)) {
+                  <span class="field-error">Informe o nome do documento.</span>
+                }
+
+                <!-- Upload: fica em memória e só vai ao S3 ao salvar -->
+                <div class="doc-file">
+                  @if (arquivoPendente($index); as arq) {
+                    <span class="doc-file__pend">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
+                      </svg>
+                      {{ arq.name }} · pendente de envio
+                    </span>
+                    <button type="button" class="doc-file__link" (click)="verArquivo($index)">Pré-visualizar</button>
+                    <label class="doc-file__btn">
+                      Trocar
+                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                    </label>
+                  } @else if (temUrlSalva($index)) {
+                    <button type="button" class="doc-file__link" (click)="verArquivo($index)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+                      </svg>
+                      Ver arquivo
+                    </button>
+                    <label class="doc-file__btn">
+                      Trocar
+                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                    </label>
+                  } @else {
+                    <label class="doc-file__btn">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
+                      </svg>
+                      Anexar arquivo
+                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                    </label>
+                  }
+                </div>
+              </div>
+              <button
+                type="button"
+                class="doc-row__remove"
+                (click)="removerDocumento($index)"
+                [attr.aria-label]="'Remover documento ' + ($index + 1)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+                </svg>
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+        {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </form>
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-msg" (click)="$event.stopPropagation()">
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

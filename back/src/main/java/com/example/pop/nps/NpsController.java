@@ -64,6 +64,10 @@ public class NpsController {
     public ResponseEntity<NpsDetalheResponse> responder(@PathVariable Long id,
             @Valid @RequestBody ResponderNpsRequest request) {
         Nps nps = obter(id);
+        // Regra: uma vez respondido, a avaliação não pode ser alterada.
+        if (nps.getStatus() == StatusNps.RESPONDIDO) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta avaliação já foi respondida");
+        }
         nps.setNota(request.nota());
         nps.setObservacao(request.observacao());
         nps.setStatus(StatusNps.RESPONDIDO);

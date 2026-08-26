@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Agendamento } from '@/constants/agendamentos';
 import { Brand } from '@/constants/theme';
@@ -7,12 +7,20 @@ import { Brand } from '@/constants/theme';
 interface Props {
   visivel: boolean;
   agendamento: Agendamento | null;
+  processando?: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
   onFechar: () => void;
 }
 
-export function AgendamentoModal({ visivel, agendamento, onConfirmar, onCancelar, onFechar }: Props) {
+export function AgendamentoModal({
+  visivel,
+  agendamento,
+  processando = false,
+  onConfirmar,
+  onCancelar,
+  onFechar,
+}: Props) {
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
       <View style={styles.backdrop}>
@@ -20,6 +28,7 @@ export function AgendamentoModal({ visivel, agendamento, onConfirmar, onCancelar
           <Pressable
             style={styles.fechar}
             onPress={onFechar}
+            disabled={processando}
             accessibilityRole="button"
             accessibilityLabel="Fechar">
             <Ionicons name="close" size={20} color={Brand.muted} />
@@ -55,15 +64,23 @@ export function AgendamentoModal({ visivel, agendamento, onConfirmar, onCancelar
           )}
 
           <Pressable
-            style={({ pressed }) => [styles.btnConfirmar, pressed && styles.pressed]}
-            onPress={onConfirmar}>
-            <Ionicons name="checkmark-circle" size={20} color="#fff" />
-            <Text style={styles.btnConfirmarTxt}>Confirmar agendamento</Text>
+            style={({ pressed }) => [styles.btnConfirmar, pressed && styles.pressed, processando && styles.pressed]}
+            onPress={onConfirmar}
+            disabled={processando}>
+            {processando ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <Text style={styles.btnConfirmarTxt}>Confirmar agendamento</Text>
+              </>
+            )}
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [styles.btnCancelar, pressed && styles.btnCancelarPressed]}
-            onPress={onCancelar}>
+            onPress={onCancelar}
+            disabled={processando}>
             <Text style={styles.btnCancelarTxt}>Cancelar agendamento</Text>
           </Pressable>
         </View>

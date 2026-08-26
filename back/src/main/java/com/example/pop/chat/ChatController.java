@@ -100,6 +100,29 @@ public class ChatController {
         return ResponseEntity.ok(toDetalhe(chat));
     }
 
+    /** Envia uma mensagem em nome do paciente (app). */
+    @PostMapping("/{id}/mensagem-paciente")
+    @Transactional
+    public ResponseEntity<ChatDetalheResponse> enviarComoPaciente(@PathVariable Long id,
+            @Valid @RequestBody MensagemRequest request) {
+        Chat chat = obter(id);
+
+        Mensagem mensagem = new Mensagem();
+        mensagem.setChat(chat);
+        mensagem.setRemetente(RemetenteMensagem.PACIENTE);
+        mensagem.setTexto(request.texto().trim());
+        mensagem.setEnviadaEm(LocalDateTime.now());
+        mensagem.setLida(false);
+        mensagemRepository.save(mensagem);
+
+        // O paciente enviou: a unidade ainda não visualizou.
+        chat.setStatus(StatusChat.NAO_LIDA);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        repository.save(chat);
+
+        return ResponseEntity.ok(toDetalhe(chat));
+    }
+
     @PostMapping("/{id}/resolver")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> resolver(@PathVariable Long id) {

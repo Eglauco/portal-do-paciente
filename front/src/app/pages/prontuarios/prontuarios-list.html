@@ -1,0 +1,180 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Prontuários</h1>
+      <p class="page-sub">Registre o atendimento e os documentos do paciente.</p>
+    </div>
+    <a class="btn btn--solid" routerLink="/prontuarios/novo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Novo prontuário
+    </a>
+  </header>
+
+  <!-- Filtros -->
+  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+    <p class="section-label">Filtros</p>
+    <div class="filters__chat">
+      <div class="form-field">
+        <label class="label" for="f-numero">Número do atendimento</label>
+        <input id="f-numero" type="text" class="input" formControlName="numero" placeholder="Ex.: ATD-2026-0001" />
+      </div>
+      <div class="form-field">
+        <label class="label">Paciente</label>
+        <ng-select
+          formControlName="pacienteId"
+          [items]="pacientes()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Todos os pacientes"
+        ></ng-select>
+      </div>
+    </div>
+    <div class="filters__actions">
+      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+      <button type="submit" class="btn btn--solid">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <!-- Dados -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Dados</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} registro(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Carregando prontuários…</p>
+      </div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (registros().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2M9 3h6v3H9z" />
+          </svg>
+        </span>
+        <h3>Nenhum prontuário encontrado</h3>
+        <p>Ajuste os filtros ou cadastre um novo prontuário.</p>
+        <a class="btn btn--ghost" routerLink="/prontuarios/novo">Cadastrar prontuário</a>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nº atendimento</th>
+              <th>Paciente</th>
+              <th>Especialidade</th>
+              <th>Unidade</th>
+              <th>Atendimento</th>
+              <th>Documentos</th>
+              <th class="col-act"><span class="sr-only">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of registros(); track p.id) {
+              <tr
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Editar prontuário ' + p.numeroAtendimento"
+                (click)="editar(p)"
+                (keydown.enter)="editar(p)"
+              >
+                <td><b>{{ p.numeroAtendimento }}</b></td>
+                <td>{{ p.paciente.nome }}</td>
+                <td class="muted-cell">{{ p.especialidade.nome }}</td>
+                <td class="muted-cell">{{ p.unidadeSaude.nome }}</td>
+                <td class="cell-data">{{ p.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>
+                  <span class="doc-count">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+                    </svg>
+                    {{ p.documentos }}
+                  </span>
+                </td>
+                <td class="col-act">
+                  <span class="row-go" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação -->
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Registros por página">
+                @for (t of tamanhos; track t) {
+                  <option [value]="t" [selected]="t === size()">{{ t }}</option>
+                }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">
+            Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}
+          </span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 6-6 6 6 6" />
+              </svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') {
+                <span class="pager__ellipsis" aria-hidden="true">…</span>
+              } @else {
+                <button
+                  type="button"
+                  class="pager__btn"
+                  [class.is-active]="item === page()"
+                  [attr.aria-current]="item === page() ? 'page' : null"
+                  (click)="irParaPagina(item)"
+                >
+                  {{ item + 1 }}
+                </button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+</section>

@@ -15,7 +15,6 @@ export interface Nps {
   status: StatusNps;
   statusDescricao: string;
   nota?: number | null;
-  classificacao?: string | null;
   criadoEm: string;
 }
 
@@ -31,7 +30,6 @@ export interface NpsDetalhe {
   status: StatusNps;
   statusDescricao: string;
   nota?: number | null;
-  classificacao?: string | null;
   observacao?: string | null;
   criadoEm: string;
   respondidoEm?: string | null;

@@ -15,6 +15,8 @@ export interface Agendamento {
   hora: string;
   unidade: string;
   status: StatusAgendamento;
+  /** Rótulo do status vindo do back-end (ex.: "Aguardando confirmação do paciente"). */
+  statusLabel?: string;
   grupo: 'proximos' | 'concluidos';
 }
 

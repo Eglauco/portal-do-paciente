@@ -17,7 +17,6 @@ public record NpsDetalheResponse(
         StatusNps status,
         String statusDescricao,
         Integer nota,
-        String classificacao,
         String observacao,
         LocalDateTime criadoEm,
         LocalDateTime respondidoEm) {
@@ -35,7 +34,6 @@ public record NpsDetalheResponse(
                 nps.getStatus(),
                 nps.getStatus().getDescricao(),
                 nps.getNota(),
-                NpsResponse.classificacao(nps.getNota()),
                 nps.getObservacao(),
                 nps.getCriadoEm(),
                 nps.getRespondidoEm());

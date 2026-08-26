@@ -93,7 +93,6 @@
               <th>Especialidade</th>
               <th>Unidade</th>
               <th>Nota</th>
-              <th>Classificação</th>
               <th>Status</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
@@ -113,14 +112,7 @@
                 <td class="muted-cell">{{ n.unidadeSaude.nome }}</td>
                 <td>
                   @if (n.nota !== null && n.nota !== undefined) {
-                    <span class="nota-badge" [attr.data-cls]="n.classificacao">{{ n.nota }}</span>
-                  } @else {
-                    <span class="muted-cell">—</span>
-                  }
-                </td>
-                <td>
-                  @if (n.classificacao) {
-                    <span class="cls-pill" [attr.data-cls]="n.classificacao">{{ n.classificacao }}</span>
+                    <span class="nota-badge">{{ n.nota }}</span>
                   } @else {
                     <span class="muted-cell">—</span>
                   }

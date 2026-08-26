@@ -36,9 +36,8 @@
 
         @if (d.status === 'RESPONDIDO' && d.nota !== null && d.nota !== undefined) {
           <div class="nps-score">
-            <span class="nps-score__nota" [attr.data-cls]="d.classificacao">{{ d.nota }}</span>
+            <span class="nps-score__nota">{{ d.nota }}</span>
             <span class="nps-score__de">de 10</span>
-            <span class="cls-pill cls-pill--lg" [attr.data-cls]="d.classificacao">{{ d.classificacao }}</span>
           </div>
 
           <div class="nps-obs">

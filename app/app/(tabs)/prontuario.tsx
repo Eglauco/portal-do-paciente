@@ -1,22 +1,48 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Directory, File, Paths } from 'expo-file-system';
+import { useFocusEffect } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
+import { DocumentoModal } from '@/components/documento-modal';
 import { Brand, DocTipo } from '@/constants/theme';
+import { DocumentoApi, listarProntuarios, ProntuarioDetalhe } from '@/services/prontuario';
+import { urlDownload } from '@/services/storage';
 
-interface Documento {
-  tipo: keyof typeof DocTipo;
-  titulo: string;
-}
-interface Atendimento {
-  id: string;
-  data: string;
-  especialidade: string;
-  profissional: string;
-  unidade: string;
-  documentos: Documento[];
+/** Deriva um nome de arquivo limpo a partir da URL (remove query e o prefixo uuid). */
+function nomeArquivoDe(url: string, fallback = 'documento'): string {
+  try {
+    const semQuery = url.split('?')[0];
+    const seg = decodeURIComponent(semQuery.substring(semQuery.lastIndexOf('/') + 1));
+    return seg.replace(/^[0-9a-fA-F-]{36}-/, '') || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-const ROTULO_TIPO: Record<keyof typeof DocTipo, string> = {
+function mimeDe(nome: string): string {
+  const ext = nome.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
+}
+
+type TipoDoc = keyof typeof DocTipo;
+
+const ROTULO_TIPO: Record<TipoDoc, string> = {
   exame: 'Resultado de exame',
   receita: 'Receita médica',
   atestado: 'Atestado',
@@ -24,89 +50,244 @@ const ROTULO_TIPO: Record<keyof typeof DocTipo, string> = {
   laudo: 'Laudo',
 };
 
-// Ordenado por data de atendimento — o primeiro é o mais recente.
-const ATENDIMENTOS: Atendimento[] = [
-  {
-    id: '1',
-    data: '18 ago 2026',
-    especialidade: 'Clínico Geral',
-    profissional: 'Dr. Paulo Nunes',
-    unidade: 'Unidade de Saúde 01',
-    documentos: [
-      { tipo: 'ficha', titulo: 'Ficha de atendimento clínico' },
-      { tipo: 'exame', titulo: 'Hemograma completo' },
-      { tipo: 'receita', titulo: 'Receita — Losartana 50mg' },
-    ],
-  },
-  {
-    id: '2',
-    data: '11 ago 2026',
-    especialidade: 'Ortopedia',
-    profissional: 'Dra. Mariana Duarte',
-    unidade: 'Unidade de Saúde 02',
-    documentos: [
-      { tipo: 'laudo', titulo: 'Laudo de Raio-X — Joelho D.' },
-      { tipo: 'atestado', titulo: 'Atestado de afastamento (3 dias)' },
-    ],
-  },
-  {
-    id: '3',
-    data: '29 jul 2026',
-    especialidade: 'Cardiologia',
-    profissional: 'Dr. Rafael Lima',
-    unidade: 'Unidade de Saúde 01',
-    documentos: [
-      { tipo: 'ficha', titulo: 'Ficha de atendimento' },
-      { tipo: 'exame', titulo: 'Eletrocardiograma (ECG)' },
-      { tipo: 'laudo', titulo: 'Laudo cardiológico' },
-      { tipo: 'receita', titulo: 'Receita — AAS 100mg' },
-    ],
-  },
-];
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+function dataLonga(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** Infere o tipo do documento a partir do nome (para manter ícones/cores). */
+function inferirTipo(nome: string): TipoDoc {
+  const n = nome.toLowerCase();
+  if (n.includes('receita')) return 'receita';
+  if (n.includes('atestado')) return 'atestado';
+  if (n.includes('laudo')) return 'laudo';
+  if (n.includes('ficha') || n.includes('anamnese') || n.includes('solicit') || n.includes('encaminh'))
+    return 'ficha';
+  if (
+    n.includes('exame') ||
+    n.includes('hemograma') ||
+    n.includes('raio') ||
+    n.includes('eletro') ||
+    n.includes('ecg') ||
+    n.includes('ultrass') ||
+    n.includes('tomografia') ||
+    n.includes('resultado')
+  )
+    return 'exame';
+  return 'ficha';
+}
 
 export default function ProntuarioScreen() {
+  const [atendimentos, setAtendimentos] = useState<ProntuarioDetalhe[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+  const [baixando, setBaixando] = useState<number[]>([]);
+  const [menu, setMenu] = useState<{ doc: DocumentoApi; link: string } | null>(null);
+  const jaCarregou = useRef(false);
+
+  const carregar = useCallback(async (mostrarSpinner: boolean) => {
+    try {
+      if (mostrarSpinner) setCarregando(true);
+      setErro(false);
+      const dados = await listarProntuarios();
+      setAtendimentos(dados);
+      jaCarregou.current = true;
+    } catch {
+      setErro(true);
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar(!jaCarregou.current);
+    }, [carregar]),
+  );
+
+  const aoAtualizar = () => {
+    setAtualizando(true);
+    carregar(false);
+  };
+
+  /** Abre o documento num visualizador in-app (renderiza o PDF). */
+  const abrirNoVisualizador = async (link: string) => {
+    try {
+      await WebBrowser.openBrowserAsync(link);
+    } catch {
+      try {
+        await Linking.openURL(link);
+      } catch {
+        Alert.alert('Ops', 'Não foi possível abrir o documento.');
+      }
+    }
+  };
+
+  /** Baixa o arquivo e abre a folha nativa de salvar/compartilhar. */
+  const baixarECompartilhar = async (doc: DocumentoApi, link: string) => {
+    setBaixando((l) => [...l, doc.id]);
+    try {
+      const nome = nomeArquivoDe(doc.url ?? '', `${doc.nome}.pdf`);
+      const pasta = new Directory(Paths.cache, 'prontuarios');
+      if (!pasta.exists) pasta.create();
+      const destino = new File(pasta, nome);
+      if (destino.exists) destino.delete();
+      const arquivo = await File.downloadFileAsync(link, destino);
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(arquivo.uri, {
+          mimeType: mimeDe(nome),
+          dialogTitle: doc.nome,
+          UTI: 'public.item',
+        });
+      } else {
+        await Linking.openURL(link);
+      }
+    } catch {
+      Alert.alert('Ops', 'Não foi possível baixar o documento. Tente novamente.');
+    } finally {
+      setBaixando((l) => l.filter((id) => id !== doc.id));
+    }
+  };
+
+  /** Gera a URL assinada e abre o pop-up com as opções. */
+  const baixar = async (doc: DocumentoApi) => {
+    if (!doc.url || baixando.includes(doc.id)) return;
+    setBaixando((l) => [...l, doc.id]);
+    try {
+      const link = await urlDownload(doc.url);
+      setMenu({ doc, link });
+    } catch {
+      Alert.alert('Ops', 'Não foi possível gerar o link do documento.');
+    } finally {
+      setBaixando((l) => l.filter((id) => id !== doc.id));
+    }
+  };
+
+  const aoAbrir = () => {
+    const atual = menu;
+    setMenu(null);
+    if (atual) abrirNoVisualizador(atual.link);
+  };
+
+  const aoBaixar = () => {
+    const atual = menu;
+    setMenu(null);
+    if (atual) baixarECompartilhar(atual.doc, atual.link);
+  };
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+      }>
       <Text style={styles.title}>Prontuário</Text>
       <Text style={styles.subtitle}>Seus documentos, organizados por atendimento.</Text>
 
-      {ATENDIMENTOS.map((at) => (
-        <View key={at.id} style={styles.grupo}>
-          <View style={styles.grupoHeader}>
-            <View style={styles.dataTag}>
-              <Ionicons name="calendar-clear-outline" size={13} color={Brand.brandDeep} />
-              <Text style={styles.dataTxt}>{at.data}</Text>
-            </View>
-            <Text style={styles.docCount}>{at.documentos.length} docs</Text>
-          </View>
-
-          <Text style={styles.especialidade}>{at.especialidade}</Text>
-          <Text style={styles.profissional}>
-            {at.profissional} · {at.unidade}
-          </Text>
-
-          <View style={styles.docs}>
-            {at.documentos.map((doc, i) => {
-              const cor = DocTipo[doc.tipo];
-              return (
-                <View key={i} style={[styles.docRow, i > 0 && styles.docRowBorder]}>
-                  <View style={[styles.docIcon, { backgroundColor: cor.bg }]}>
-                    <Ionicons name={cor.icon as any} size={18} color={cor.fg} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.docTitulo} numberOfLines={1}>
-                      {doc.titulo}
-                    </Text>
-                    <Text style={styles.docTipo}>{ROTULO_TIPO[doc.tipo]}</Text>
-                  </View>
-                  <Ionicons name="download-outline" size={20} color={Brand.muted} />
-                </View>
-              );
-            })}
-          </View>
+      {carregando && (
+        <View style={styles.estado}>
+          <ActivityIndicator color={Brand.brand} />
+          <Text style={styles.estadoTxt}>Carregando prontuário…</Text>
         </View>
-      ))}
+      )}
+
+      {!carregando && erro && (
+        <View style={styles.estado}>
+          <View style={styles.estadoIcone}>
+            <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+          </View>
+          <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
+          <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
+          <Pressable style={styles.estadoBtn} onPress={() => carregar(true)}>
+            <Ionicons name="refresh" size={16} color="#fff" />
+            <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {!carregando && !erro && atendimentos.length === 0 && (
+        <View style={styles.estado}>
+          <View style={styles.estadoIcone}>
+            <Ionicons name="document-text-outline" size={26} color={Brand.muted} />
+          </View>
+          <Text style={styles.estadoTitulo}>Nenhum documento</Text>
+          <Text style={styles.estadoTxt}>Seus atendimentos e documentos aparecerão aqui.</Text>
+        </View>
+      )}
+
+      {!carregando &&
+        !erro &&
+        atendimentos.map((at) => (
+          <View key={at.id} style={styles.grupo}>
+            <View style={styles.grupoHeader}>
+              <View style={styles.dataTag}>
+                <Ionicons name="calendar-clear-outline" size={13} color={Brand.brandDeep} />
+                <Text style={styles.dataTxt}>{dataLonga(at.dataHora)}</Text>
+              </View>
+              <Text style={styles.docCount}>{at.documentos.length} docs</Text>
+            </View>
+
+            <Text style={styles.especialidade}>{at.especialidade.nome}</Text>
+            <Text style={styles.profissional}>
+              {at.profissionalSaude.nome} · {at.unidadeSaude.nome}
+            </Text>
+
+            <View style={styles.docs}>
+              {at.documentos.map((doc, i) => {
+                const tipo = inferirTipo(doc.nome);
+                const cor = DocTipo[tipo];
+                const emDownload = baixando.includes(doc.id);
+                return (
+                  <View key={doc.id} style={[styles.docRow, i > 0 && styles.docRowBorder]}>
+                    <View style={[styles.docIcon, { backgroundColor: cor.bg }]}>
+                      <Ionicons name={cor.icon as any} size={18} color={cor.fg} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.docTitulo} numberOfLines={1}>
+                        {doc.nome}
+                      </Text>
+                      <Text style={styles.docTipo}>{ROTULO_TIPO[tipo]}</Text>
+                    </View>
+                    {doc.url ? (
+                      <Pressable
+                        onPress={() => baixar(doc)}
+                        disabled={emDownload}
+                        hitSlop={10}
+                        style={styles.docBaixar}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Baixar ${doc.nome}`}>
+                        {emDownload ? (
+                          <ActivityIndicator size="small" color={Brand.brand} />
+                        ) : (
+                          <Ionicons name="download-outline" size={20} color={Brand.brand} />
+                        )}
+                      </Pressable>
+                    ) : (
+                      <Ionicons name="document-outline" size={20} color={Brand.line} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))}
     </ScrollView>
+
+      <DocumentoModal
+        visivel={menu !== null}
+        nome={menu?.doc.nome ?? null}
+        onAbrir={aoAbrir}
+        onBaixar={aoBaixar}
+        onFechar={() => setMenu(null)}
+      />
+    </>
   );
 }
 
@@ -154,4 +335,31 @@ const styles = StyleSheet.create({
   },
   docTitulo: { fontSize: 14.5, fontWeight: '600', color: Brand.ink },
   docTipo: { fontSize: 12, color: Brand.muted, marginTop: 1 },
+  docBaixar: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+
+  // Estados (carregando / erro / vazio)
+  estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
+  estadoIcone: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: Brand.surface,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
+  estadoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: 6,
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 14,
+    backgroundColor: Brand.brand,
+  },
+  estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

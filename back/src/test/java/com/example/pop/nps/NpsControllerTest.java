@@ -3,6 +3,7 @@ package com.example.pop.nps;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.agendamento.AgendamentoController;
 import com.example.pop.agendamento.AgendamentoRequest;
@@ -46,17 +48,6 @@ class NpsControllerTest {
     }
 
     @Test
-    void classificacaoDerivadaDaNota() {
-        assertEquals("Promotor", NpsResponse.classificacao(10));
-        assertEquals("Promotor", NpsResponse.classificacao(9));
-        assertEquals("Neutro", NpsResponse.classificacao(8));
-        assertEquals("Neutro", NpsResponse.classificacao(7));
-        assertEquals("Detrator", NpsResponse.classificacao(6));
-        assertEquals("Detrator", NpsResponse.classificacao(0));
-        assertNull(NpsResponse.classificacao(null));
-    }
-
-    @Test
     void presencaDoPacienteGeraNpsEPermiteResponder() {
         // Cria um agendamento (nasce AGUARDANDO) e o move para PRESENCA_PACIENTE.
         AgendamentoRequest novo = new AgendamentoRequest(
@@ -79,8 +70,11 @@ class NpsControllerTest {
         assertNotNull(corpo);
         assertEquals(StatusNps.RESPONDIDO, corpo.status());
         assertEquals(9, corpo.nota());
-        assertEquals("Promotor", corpo.classificacao());
         assertNotNull(corpo.respondidoEm());
+
+        // Regra: não pode responder de novo (já respondido).
+        assertThrows(ResponseStatusException.class,
+                () -> controller.responder(gerado.getId(), new ResponderNpsRequest(3, "mudei de ideia")));
 
         // Limpa os registros criados no teste.
         repository.deleteById(gerado.getId());
