@@ -1,7 +1,11 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { API_URL } from '@/constants/api';
-import { Mensagem } from './chat';
+import { Mensagem, Remetente } from './chat';
+
+export interface DigitandoEvento {
+  de: Remetente;
+}
 
 interface Assinatura {
   destino: string;
@@ -63,7 +67,20 @@ export function observarMensagens(chatId: number | string, callback: (mensagem: 
   return inscrever(`/topic/chat/${chatId}`, (msg) => callback(JSON.parse(msg.body) as Mensagem));
 }
 
+/** Observa o evento "digitando…" de uma conversa. */
+export function observarDigitando(chatId: number | string, callback: (e: DigitandoEvento) => void): () => void {
+  return inscrever(`/topic/chat/${chatId}/digitando`, (msg) => callback(JSON.parse(msg.body) as DigitandoEvento));
+}
+
 /** Observa alterações na lista de conversas (qualquer nova mensagem). */
 export function observarLista(callback: () => void): () => void {
   return inscrever('/topic/chats', () => callback());
+}
+
+/** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */
+export function sinalizarDigitando(chatId: number | string, de: Remetente): void {
+  const cliente = garantirCliente();
+  if (cliente.connected) {
+    cliente.publish({ destination: `/app/chat/${chatId}/digitando`, body: JSON.stringify({ de }) });
+  }
 }

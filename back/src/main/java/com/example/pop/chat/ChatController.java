@@ -69,7 +69,7 @@ public class ChatController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Marca as mensagens do paciente como lidas ao abrir a conversa. */
+    /** Unidade abriu a conversa: marca as mensagens do paciente como lidas. */
     @PostMapping("/{id}/visualizar")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> visualizar(@PathVariable Long id) {

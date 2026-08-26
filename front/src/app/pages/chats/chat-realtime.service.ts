@@ -1,7 +1,11 @@
 import { Injectable } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { environment } from '../../../environments/environment';
-import { Mensagem } from './chat.model';
+import { Mensagem, Remetente } from './chat.model';
+
+export interface DigitandoEvento {
+  de: Remetente;
+}
 
 interface Assinatura {
   destino: string;
@@ -63,8 +67,23 @@ export class ChatRealtimeService {
     return this.inscrever(`/topic/chat/${chatId}`, (msg) => callback(JSON.parse(msg.body) as Mensagem));
   }
 
+  /** Observa o evento "digitando…" da conversa. */
+  observarDigitando(chatId: number, callback: (evento: DigitandoEvento) => void): () => void {
+    return this.inscrever(`/topic/chat/${chatId}/digitando`, (msg) =>
+      callback(JSON.parse(msg.body) as DigitandoEvento),
+    );
+  }
+
   /** Observa alterações na lista de conversas (qualquer nova mensagem). */
   observarLista(callback: () => void): () => void {
     return this.inscrever('/topic/chats', () => callback());
+  }
+
+  /** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */
+  sinalizarDigitando(chatId: number, de: Remetente): void {
+    const cliente = this.garantirCliente();
+    if (cliente.connected) {
+      cliente.publish({ destination: `/app/chat/${chatId}/digitando`, body: JSON.stringify({ de }) });
+    }
   }
 }

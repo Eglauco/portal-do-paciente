@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chat, ChatDetalhe, Mensagem } from './chat.model';
-import { ChatRealtimeService } from './chat-realtime.service';
+import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
 @Component({
@@ -16,7 +16,10 @@ export class ChatConversa {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  private cancelarRealtime: (() => void) | null = null;
+  protected readonly digitando = signal(false);
+  private cancelamentos: (() => void)[] = [];
+  private timerDigitando: ReturnType<typeof setTimeout> | null = null;
+  private ultimoSinalDigitando = 0;
 
   protected readonly chats = signal<Chat[]>([]);
   protected readonly detalhe = signal<ChatDetalhe | null>(null);
@@ -36,7 +39,7 @@ export class ChatConversa {
       if (this.idAtual()) this.abrir(this.idAtual()!);
     });
 
-    inject(DestroyRef).onDestroy(() => this.cancelarRealtime?.());
+    inject(DestroyRef).onDestroy(() => this.cancelarTudo());
   }
 
   protected abrir(id: number): void {
@@ -55,14 +58,25 @@ export class ChatConversa {
     this.observarTempoReal(id);
   }
 
-  /** Inscreve na conversa para receber novas mensagens em tempo real. */
+  /** Inscreve na conversa: mensagens, "digitando…" e recibo de leitura. */
   private observarTempoReal(id: number): void {
-    this.cancelarRealtime?.();
-    this.cancelarRealtime = this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m));
+    this.cancelarTudo();
+    this.cancelamentos = [
+      this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m)),
+      this.realtime.observarDigitando(id, (e) => this.aoDigitandoRecebido(e)),
+    ];
+  }
+
+  private cancelarTudo(): void {
+    this.cancelamentos.forEach((c) => c());
+    this.cancelamentos = [];
+    if (this.timerDigitando) clearTimeout(this.timerDigitando);
+    this.digitando.set(false);
   }
 
   private aoReceberMensagem(mensagem: Mensagem): void {
     if (this.idAtual() == null) return;
+    this.digitando.set(false); // chegou mensagem: parou de digitar
     this.detalhe.update((d) => {
       if (!d) return d;
       if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
@@ -70,6 +84,13 @@ export class ChatConversa {
     });
     this.rolarParaFim();
     this.carregarLista();
+  }
+
+  private aoDigitandoRecebido(evento: DigitandoEvento): void {
+    if (evento.de !== 'PACIENTE') return; // só mostra quando o outro lado digita
+    this.digitando.set(true);
+    if (this.timerDigitando) clearTimeout(this.timerDigitando);
+    this.timerDigitando = setTimeout(() => this.digitando.set(false), 3000);
   }
 
   protected enviar(): void {
@@ -117,6 +138,13 @@ export class ChatConversa {
 
   protected aoDigitar(event: Event): void {
     this.texto.set((event.target as HTMLTextAreaElement).value);
+    const id = this.idAtual();
+    if (id == null) return;
+    const agora = Date.now();
+    if (agora - this.ultimoSinalDigitando > 1500) {
+      this.ultimoSinalDigitando = agora;
+      this.realtime.sinalizarDigitando(id, 'UNIDADE');
+    }
   }
 
   protected aoTeclar(event: KeyboardEvent): void {

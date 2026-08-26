@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { buscarConversa, ChatDetalhe, enviarMensagemPaciente, Mensagem } from '@/services/chat';
-import { observarMensagens } from '@/services/chat-realtime';
+import { observarDigitando, observarMensagens, sinalizarDigitando } from '@/services/chat-realtime';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -52,8 +52,11 @@ export default function ConversaScreen() {
   const [erro, setErro] = useState(false);
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [digitando, setDigitando] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
+  const ultimoSinalDigitando = useRef(0);
+  const timerDigitando = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rolarParaFim = (animado = true) =>
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: animado }));
@@ -80,10 +83,11 @@ export default function ConversaScreen() {
     }, [carregar]),
   );
 
-  // Recebe novas mensagens em tempo real (WebSocket/STOMP).
+  // Tempo real (WebSocket/STOMP): mensagens, "digitando…" e recibo de leitura.
   useEffect(() => {
     if (!id) return;
-    const cancelar = observarMensagens(id, (m) => {
+    const cancelarMsg = observarMensagens(id, (m) => {
+      setDigitando(false); // chegou mensagem: parou de digitar
       setDetalhe((d) => {
         if (!d) return d;
         if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
@@ -91,8 +95,28 @@ export default function ConversaScreen() {
       });
       rolarParaFim();
     });
-    return cancelar;
+    const cancelarDig = observarDigitando(id, (e) => {
+      if (e.de !== 'UNIDADE') return; // só mostra quando o outro lado digita
+      setDigitando(true);
+      if (timerDigitando.current) clearTimeout(timerDigitando.current);
+      timerDigitando.current = setTimeout(() => setDigitando(false), 3000);
+    });
+    return () => {
+      cancelarMsg();
+      cancelarDig();
+      if (timerDigitando.current) clearTimeout(timerDigitando.current);
+    };
   }, [id]);
+
+  const aoDigitar = (valor: string) => {
+    setTexto(valor);
+    if (!id) return;
+    const agora = Date.now();
+    if (agora - ultimoSinalDigitando.current > 1500) {
+      ultimoSinalDigitando.current = agora;
+      sinalizarDigitando(id, 'PACIENTE');
+    }
+  };
 
   const enviar = async () => {
     const limpo = texto.trim();
@@ -136,9 +160,15 @@ export default function ConversaScreen() {
           <Text style={styles.contatoNome} numberOfLines={1}>
             {detalhe?.unidadeSaude.nome ?? 'Conversa'}
           </Text>
-          <Text style={styles.contatoStatus} numberOfLines={1}>
-            {detalhe?.statusDescricao ?? 'Carregando…'}
-          </Text>
+          {digitando ? (
+            <Text style={styles.digitando} numberOfLines={1}>
+              digitando…
+            </Text>
+          ) : (
+            <Text style={styles.contatoStatus} numberOfLines={1}>
+              {detalhe?.statusDescricao ?? 'Carregando…'}
+            </Text>
+          )}
         </View>
       </View>
 
@@ -182,13 +212,6 @@ export default function ConversaScreen() {
                       <Text style={styles.texto}>{m.texto}</Text>
                       <View style={styles.rodape}>
                         <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
-                        {!daUnidade && (
-                          <Ionicons
-                            name={m.lida ? 'checkmark-done' : 'checkmark'}
-                            size={14}
-                            color={m.lida ? '#3FA9F5' : '#7C8C87'}
-                          />
-                        )}
                       </View>
                     </View>
                   </View>
@@ -202,16 +225,14 @@ export default function ConversaScreen() {
         {!carregando && !erro && (
           <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             <View style={styles.inputWrap}>
-              <Ionicons name="happy-outline" size={22} color={Brand.muted} />
               <TextInput
                 style={styles.input}
                 value={texto}
-                onChangeText={setTexto}
+                onChangeText={aoDigitar}
                 placeholder="Mensagem"
                 placeholderTextColor="#9AAAA5"
                 multiline
               />
-              <Ionicons name="attach-outline" size={22} color={Brand.muted} />
             </View>
             <Pressable
               style={[styles.enviar, (enviando || !texto.trim()) && styles.enviarDesativado]}
@@ -255,6 +276,7 @@ const styles = StyleSheet.create({
   avatarTxt: { color: Brand.onBrand, fontSize: 14, fontWeight: '800' },
   contatoNome: { fontSize: 15.5, fontWeight: '700', color: Brand.ink },
   contatoStatus: { fontSize: 12, color: Brand.muted, marginTop: 1 },
+  digitando: { fontSize: 12, color: Brand.brand, fontWeight: '700', fontStyle: 'italic', marginTop: 1 },
 
   mensagens: { flex: 1 },
   mensagensContent: { padding: 14, paddingBottom: 8 },

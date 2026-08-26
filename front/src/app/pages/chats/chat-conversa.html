@@ -39,7 +39,11 @@
         <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
         <div class="wa__cabecalho-info">
           <b class="wa__cabecalho-nome">{{ chat.paciente.nome }}</b>
-          <span class="wa__cabecalho-sub">{{ chat.unidadeSaude.nome }}</span>
+          @if (digitando()) {
+            <span class="wa__cabecalho-sub wa__digitando">digitando…</span>
+          } @else {
+            <span class="wa__cabecalho-sub">{{ chat.unidadeSaude.nome }}</span>
+          }
         </div>
         <span class="status-pill" [attr.data-st]="chat.status">{{ chat.statusDescricao }}</span>
         @if (chat.status === 'RESOLVIDO') {
@@ -60,11 +64,6 @@
               <span class="wa__texto">{{ m.texto }}</span>
               <span class="wa__rodape">
                 {{ m.enviadaEm | date: 'HH:mm' }}
-                @if (m.remetente === 'UNIDADE') {
-                  <svg class="wa__tick" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="m2 13 4 4L14 7" /><path d="m10 13 1 1M14 17 22 7" />
-                  </svg>
-                }
               </span>
             </div>
           </div>
