@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -14,6 +14,7 @@ import {
 
 import { Brand } from '@/constants/theme';
 import { ChatItem, listarChats } from '@/services/chat';
+import { observarLista } from '@/services/chat-realtime';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -68,6 +69,12 @@ export default function ChatScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Atualiza a lista em tempo real quando chega qualquer mensagem nova.
+  useEffect(() => {
+    const cancelar = observarLista(() => carregar(false));
+    return cancelar;
+  }, [carregar]);
 
   const aoAtualizar = () => {
     setAtualizando(true);

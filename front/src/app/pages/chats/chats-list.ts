@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
@@ -9,6 +9,7 @@ import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
 import { Chat, STATUS_OPTIONS, StatusChat, statusLabel } from './chat.model';
 import { ChatBuscaStore } from './chat-busca.store';
+import { ChatRealtimeService } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
 export type PaginaItem = number | 'ellipsis';
@@ -24,6 +25,8 @@ export class ChatsList {
   private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly store = inject(ChatBuscaStore);
+  private readonly realtime = inject(ChatRealtimeService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly tamanhos = ChatService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -75,6 +78,9 @@ export class ChatsList {
       this.pacienteService.listar({}, 0, 100).subscribe({ next: (p) => this.pacientes.set(p.content) });
       this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
       this.carregar();
+      // Recarrega a lista quando chega qualquer mensagem nova (tempo real).
+      const cancelar = this.realtime.observarLista(() => this.carregar());
+      this.destroyRef.onDestroy(cancelar);
     });
   }
 

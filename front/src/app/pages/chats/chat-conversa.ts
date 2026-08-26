@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
-import { Component, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Chat, ChatDetalhe } from './chat.model';
+import { Chat, ChatDetalhe, Mensagem } from './chat.model';
+import { ChatRealtimeService } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
 @Component({
@@ -11,8 +12,11 @@ import { ChatService } from './chat.service';
 })
 export class ChatConversa {
   private readonly service = inject(ChatService);
+  private readonly realtime = inject(ChatRealtimeService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  private cancelarRealtime: (() => void) | null = null;
 
   protected readonly chats = signal<Chat[]>([]);
   protected readonly detalhe = signal<ChatDetalhe | null>(null);
@@ -31,6 +35,8 @@ export class ChatConversa {
       this.carregarLista();
       if (this.idAtual()) this.abrir(this.idAtual()!);
     });
+
+    inject(DestroyRef).onDestroy(() => this.cancelarRealtime?.());
   }
 
   protected abrir(id: number): void {
@@ -46,6 +52,24 @@ export class ChatConversa {
       },
       error: () => this.carregandoDetalhe.set(false),
     });
+    this.observarTempoReal(id);
+  }
+
+  /** Inscreve na conversa para receber novas mensagens em tempo real. */
+  private observarTempoReal(id: number): void {
+    this.cancelarRealtime?.();
+    this.cancelarRealtime = this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m));
+  }
+
+  private aoReceberMensagem(mensagem: Mensagem): void {
+    if (this.idAtual() == null) return;
+    this.detalhe.update((d) => {
+      if (!d) return d;
+      if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
+      return { ...d, mensagens: [...d.mensagens, mensagem] };
+    });
+    this.rolarParaFim();
+    this.carregarLista();
   }
 
   protected enviar(): void {

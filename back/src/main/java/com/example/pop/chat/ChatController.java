@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -32,10 +33,13 @@ public class ChatController {
 
     private final ChatRepository repository;
     private final MensagemRepository mensagemRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public ChatController(ChatRepository repository, MensagemRepository mensagemRepository) {
+    public ChatController(ChatRepository repository, MensagemRepository mensagemRepository,
+            SimpMessagingTemplate messagingTemplate) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @GetMapping
@@ -91,12 +95,13 @@ public class ChatController {
         mensagem.setTexto(request.texto().trim());
         mensagem.setEnviadaEm(LocalDateTime.now());
         mensagem.setLida(true);
-        mensagemRepository.save(mensagem);
+        Mensagem salva = mensagemRepository.save(mensagem);
 
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
 
+        publicar(chat.getId(), salva);
         return ResponseEntity.ok(toDetalhe(chat));
     }
 
@@ -113,14 +118,25 @@ public class ChatController {
         mensagem.setTexto(request.texto().trim());
         mensagem.setEnviadaEm(LocalDateTime.now());
         mensagem.setLida(false);
-        mensagemRepository.save(mensagem);
+        Mensagem salva = mensagemRepository.save(mensagem);
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
 
+        publicar(chat.getId(), salva);
         return ResponseEntity.ok(toDetalhe(chat));
+    }
+
+    /** Publica a nova mensagem em tempo real (conversa + lista). */
+    private void publicar(Long chatId, Mensagem mensagem) {
+        messagingTemplate.convertAndSend("/topic/chat/" + chatId, MensagemResponse.from(mensagem));
+        messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
+    }
+
+    /** Sinal leve para as telas de lista recarregarem. */
+    public record ChatEvento(Long chatId) {
     }
 
     @PostMapping("/{id}/resolver")

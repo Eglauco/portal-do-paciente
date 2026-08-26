@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { buscarConversa, ChatDetalhe, enviarMensagemPaciente, Mensagem } from '@/services/chat';
+import { observarMensagens } from '@/services/chat-realtime';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -78,6 +79,20 @@ export default function ConversaScreen() {
       carregar();
     }, [carregar]),
   );
+
+  // Recebe novas mensagens em tempo real (WebSocket/STOMP).
+  useEffect(() => {
+    if (!id) return;
+    const cancelar = observarMensagens(id, (m) => {
+      setDetalhe((d) => {
+        if (!d) return d;
+        if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
+        return { ...d, mensagens: [...d.mensagens, m] };
+      });
+      rolarParaFim();
+    });
+    return cancelar;
+  }, [id]);
 
   const enviar = async () => {
     const limpo = texto.trim();

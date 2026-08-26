@@ -1,3 +1,5 @@
+import '@/constants/polyfills';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { router, Stack } from 'expo-router';
