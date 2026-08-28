@@ -171,9 +171,9 @@
         <span class="topbar__divider" aria-hidden="true"></span>
 
         <button type="button" class="user">
-          <span class="user__avatar" aria-hidden="true">AD</span>
+          <span class="user__avatar" aria-hidden="true">{{ usuario() ? iniciais(usuario()!.nome) : 'US' }}</span>
           <span class="user__meta">
-            <span class="user__name">Usuário Logado</span>
+            <span class="user__name">{{ usuario()?.nome ?? 'Usuário' }}</span>
             <span class="user__role">Administrador</span>
           </span>
           <svg class="user__caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

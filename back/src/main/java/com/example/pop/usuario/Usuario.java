@@ -1,5 +1,7 @@
 package com.example.pop.usuario;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -28,4 +30,9 @@ public class Usuario {
 
     @Column(nullable = false, length = 160)
     private String email;
+
+    /** Hash BCrypt da senha. Nunca é serializado nas respostas da API. */
+    @JsonIgnore
+    @Column(name = "senha_hash", length = 100)
+    private String senhaHash;
 }

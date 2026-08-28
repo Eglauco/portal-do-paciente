@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/auth.guard';
 import { pendingChangesGuard } from './core/pending-changes.guard';
 
 export const routes: Routes = [
@@ -7,10 +8,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login').then((m) => m.Login),
     title: 'Entrar — Portal do Paciente · Admin',
   },
-  { path: '', redirectTo: 'login', pathMatch: 'full' },
   {
     path: '',
     loadComponent: () => import('./pages/shell/shell').then((m) => m.Shell),
+    canActivate: [authGuard],
     children: [
       {
         path: 'inicio',
