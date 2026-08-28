@@ -145,6 +145,30 @@
       </button>
     </div>
   </form>
+
+  @if (editando() && faltaJustificada()) {
+    <section class="panel falta-panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Motivo da falta informado pelo paciente</h2>
+      </div>
+
+      @if (motivosFalta().length) {
+        <p class="section-label">Motivos selecionados</p>
+        <div class="falta-motivos">
+          @for (m of motivosFalta(); track m.id) {
+            <span class="falta-chip">{{ m.nome }}</span>
+          }
+        </div>
+      }
+
+      @if (justificativaFalta()) {
+        <p class="section-label falta-just-label">Observação do paciente</p>
+        <p class="falta-just">{{ justificativaFalta() }}</p>
+      } @else {
+        <p class="falta-just falta-just--vazio">O paciente não escreveu uma observação.</p>
+      }
+    </section>
+  }
 </section>
 
 <!-- Diálogo de confirmação (Sim / Não) -->

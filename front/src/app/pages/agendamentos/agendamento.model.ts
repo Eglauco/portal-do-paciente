@@ -22,6 +22,10 @@ export interface Agendamento {
   unidadeSaude: Ref;
   statusAgendamento: StatusAgendamento;
   statusDescricao?: string;
+  /** Justificativa da falta (preenchida pelo paciente no app). */
+  faltaJustificada?: boolean;
+  justificativaFalta?: string | null;
+  motivosFalta?: Ref[];
 }
 
 /** Formato de envio (criação/edição). */

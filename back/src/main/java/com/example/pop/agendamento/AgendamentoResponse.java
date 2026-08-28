@@ -1,6 +1,7 @@
 package com.example.pop.agendamento;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record AgendamentoResponse(
         Long id,
@@ -11,7 +12,10 @@ public record AgendamentoResponse(
         RefResponse paciente,
         RefResponse unidadeSaude,
         StatusAgendamento statusAgendamento,
-        String statusDescricao) {
+        String statusDescricao,
+        boolean faltaJustificada,
+        String justificativaFalta,
+        List<RefResponse> motivosFalta) {
 
     public static AgendamentoResponse from(Agendamento a) {
         return new AgendamentoResponse(
@@ -23,6 +27,11 @@ public record AgendamentoResponse(
                 new RefResponse(a.getPaciente().getId(), a.getPaciente().getNome()),
                 new RefResponse(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 a.getStatusAgendamento(),
-                a.getStatusAgendamento().getDescricao());
+                a.getStatusAgendamento().getDescricao(),
+                a.getFaltaJustificadaEm() != null,
+                a.getJustificativaFalta(),
+                a.getMotivosFalta().stream()
+                        .map(m -> new RefResponse(m.getId(), m.getMotivo()))
+                        .toList());
     }
 }

@@ -1,14 +1,5 @@
 import { API_URL } from '@/constants/api';
-import { Agendamento, StatusAgendamento } from '@/constants/agendamentos';
-
-/** Status do agendamento no back-end (enum Java). */
-type StatusBackend =
-  | 'AGUARDANDO_CONFIRMACAO_PACIENTE'
-  | 'PACIENTE_CONFIRMOU'
-  | 'CANCELADO_PELA_UNIDADE'
-  | 'CANCELADO_PELO_PACIENTE'
-  | 'FALTA_PACIENTE'
-  | 'PRESENCA_PACIENTE';
+import { Agendamento, MotivoFalta, StatusAgendamento, StatusBackend } from '@/constants/agendamentos';
 
 interface Ref {
   id: number;
@@ -25,6 +16,15 @@ interface AgendamentoBackend {
   unidadeSaude: Ref;
   statusAgendamento: StatusBackend;
   statusDescricao: string;
+  faltaJustificada: boolean;
+  justificativaFalta: string | null;
+  motivosFalta: Ref[];
+}
+
+interface MotivoFaltaBackend {
+  id: number;
+  motivo: string;
+  ativo: boolean;
 }
 
 interface Pagina<T> {
@@ -70,6 +70,10 @@ function paraViewModel(b: AgendamentoBackend): Agendamento {
     status,
     statusLabel: b.statusDescricao,
     grupo,
+    statusBackend: b.statusAgendamento,
+    faltaJustificada: b.faltaJustificada,
+    justificativaFalta: b.justificativaFalta,
+    motivosFalta: (b.motivosFalta ?? []).map((m) => ({ id: m.id, motivo: m.nome })),
   };
 }
 
@@ -96,5 +100,26 @@ export async function confirmarAgendamento(id: string): Promise<Agendamento> {
 /** Cancela o agendamento (paciente). */
 export async function cancelarAgendamento(id: string): Promise<Agendamento> {
   const resposta = await fetch(`${API_URL}/agendamento/${id}/cancelar`, { method: 'POST' });
+  return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
+}
+
+/** Motivos de falta ativos, para o paciente selecionar ao justificar. */
+export async function listarMotivosFalta(): Promise<MotivoFalta[]> {
+  const resposta = await fetch(`${API_URL}/motivo-falta/ativos`);
+  const lista = await comoJson<MotivoFaltaBackend[]>(resposta);
+  return lista.map((m) => ({ id: m.id, motivo: m.motivo }));
+}
+
+/** Registra a justificativa da falta (motivos selecionados + texto livre). */
+export async function justificarFalta(
+  id: string,
+  motivoIds: number[],
+  justificativa: string,
+): Promise<Agendamento> {
+  const resposta = await fetch(`${API_URL}/agendamento/${id}/justificar-falta`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ motivoIds, justificativa }),
+  });
   return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
 }

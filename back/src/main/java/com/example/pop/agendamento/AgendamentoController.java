@@ -1,5 +1,6 @@
 package com.example.pop.agendamento;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -8,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
+import com.example.pop.motivofalta.MotivoFalta;
+import com.example.pop.motivofalta.MotivoFaltaRepository;
 import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.procedimento.ProcedimentoRepository;
@@ -44,19 +48,21 @@ public class AgendamentoController {
     private final EspecialidadeRepository especialidadeRepository;
     private final ProfissionalSaudeRepository profissionalRepository;
     private final ProcedimentoRepository procedimentoRepository;
+    private final MotivoFaltaRepository motivoFaltaRepository;
     private final NpsService npsService;
     private final PushService pushService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
-            NpsService npsService, PushService pushService) {
+            MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.profissionalRepository = profissionalRepository;
         this.procedimentoRepository = procedimentoRepository;
+        this.motivoFaltaRepository = motivoFaltaRepository;
         this.npsService = npsService;
         this.pushService = pushService;
     }
@@ -137,6 +143,30 @@ public class AgendamentoController {
     @PostMapping("/{id}/cancelar")
     public ResponseEntity<AgendamentoResponse> cancelar(@PathVariable Long id) {
         return alterarStatus(id, StatusAgendamento.CANCELADO_PELO_PACIENTE);
+    }
+
+    /**
+     * Justificativa da falta pelo paciente (app): registra os motivos selecionados e o
+     * texto livre. Só permitido quando o agendamento está em FALTA_PACIENTE.
+     */
+    @PostMapping("/{id}/justificar-falta")
+    @Transactional
+    public ResponseEntity<AgendamentoResponse> justificarFalta(@PathVariable Long id,
+            @Valid @RequestBody JustificarFaltaRequest request) {
+        return repository.findById(id)
+                .map(agendamento -> {
+                    if (agendamento.getStatusAgendamento() != StatusAgendamento.FALTA_PACIENTE) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "O agendamento não está marcado como falta do paciente");
+                    }
+                    List<MotivoFalta> motivos = motivoFaltaRepository.findAllById(request.motivoIds());
+                    agendamento.setMotivosFalta(motivos);
+                    String texto = request.justificativa() == null ? null : request.justificativa().trim();
+                    agendamento.setJustificativaFalta(texto == null || texto.isBlank() ? null : texto);
+                    agendamento.setFaltaJustificadaEm(LocalDateTime.now());
+                    return ResponseEntity.ok(AgendamentoResponse.from(repository.save(agendamento)));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     private ResponseEntity<AgendamentoResponse> alterarStatus(Long id, StatusAgendamento status) {

@@ -123,6 +123,23 @@ export const routes: Routes = [
         title: 'Editar especialidade — Portal do Paciente · Admin',
       },
       {
+        path: 'motivos-falta',
+        loadComponent: () => import('./pages/motivos-falta/motivos-falta-list').then((m) => m.MotivosFaltaList),
+        title: 'Motivos de falta — Portal do Paciente · Admin',
+      },
+      {
+        path: 'motivos-falta/novo',
+        loadComponent: () => import('./pages/motivos-falta/motivo-falta-form').then((m) => m.MotivoFaltaForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Novo motivo de falta — Portal do Paciente · Admin',
+      },
+      {
+        path: 'motivos-falta/:id',
+        loadComponent: () => import('./pages/motivos-falta/motivo-falta-form').then((m) => m.MotivoFaltaForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar motivo de falta — Portal do Paciente · Admin',
+      },
+      {
         path: 'profissionais',
         loadComponent: () => import('./pages/profissionais/profissionais-list').then((m) => m.ProfissionalSaudesList),
         title: 'Profissionais — Portal do Paciente · Admin',

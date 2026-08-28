@@ -1,8 +1,11 @@
 package com.example.pop.agendamento;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.example.pop.especialidade.Especialidade;
+import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.procedimento.Procedimento;
 import com.example.pop.profissional.ProfissionalSaude;
@@ -17,6 +20,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -62,4 +67,19 @@ public class Agendamento {
     @Enumerated(EnumType.STRING)
     @Column(name = "status_agendamento", nullable = false, length = 40)
     private StatusAgendamento statusAgendamento;
+
+    /** Texto livre com o porquê da falta, informado pelo paciente no app. */
+    @Column(name = "justificativa_falta", columnDefinition = "TEXT")
+    private String justificativaFalta;
+
+    /** Momento em que o paciente justificou a falta (nulo = ainda não justificada). */
+    @Column(name = "falta_justificada_em")
+    private LocalDateTime faltaJustificadaEm;
+
+    /** Motivos da falta selecionados pelo paciente. */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "agendamento_motivo_falta",
+            joinColumns = @JoinColumn(name = "agendamento_id"),
+            inverseJoinColumns = @JoinColumn(name = "motivo_falta_id"))
+    private List<MotivoFalta> motivosFalta = new ArrayList<>();
 }

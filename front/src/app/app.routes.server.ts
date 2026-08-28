@@ -39,6 +39,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'motivos-falta/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'prontuarios/:id',
     renderMode: RenderMode.Server,
   },

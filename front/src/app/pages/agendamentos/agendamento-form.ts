@@ -14,7 +14,7 @@ import { ProfissionalSaude } from '../profissionais/profissional.model';
 import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
-import { AgendamentoRequest, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
+import { AgendamentoRequest, Ref, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
 import { AgendamentoService } from './agendamento.service';
 
 type Campo =
@@ -63,6 +63,11 @@ export class AgendamentoForm implements PodeSair {
   protected readonly salvando = signal(false);
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
+
+  // Justificativa da falta (somente leitura, preenchida pelo paciente no app).
+  protected readonly faltaJustificada = signal(false);
+  protected readonly justificativaFalta = signal<string | null>(null);
+  protected readonly motivosFalta = signal<Ref[]>([]);
 
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
@@ -168,7 +173,7 @@ export class AgendamentoForm implements PodeSair {
 
   private carregarAgendamento(): void {
     this.service.buscarPorId(this.codigo()!).subscribe({
-      next: (a) =>
+      next: (a) => {
         this.form.patchValue({
           dataHora: a.dataHora?.slice(0, 16),
           especialidadeId: a.especialidade.id,
@@ -177,7 +182,11 @@ export class AgendamentoForm implements PodeSair {
           pacienteId: a.paciente.id,
           unidadeSaudeId: a.unidadeSaude.id,
           statusAgendamento: a.statusAgendamento,
-        }),
+        });
+        this.faltaJustificada.set(a.faltaJustificada ?? false);
+        this.justificativaFalta.set(a.justificativaFalta ?? null);
+        this.motivosFalta.set(a.motivosFalta ?? []);
+      },
       error: () => this.erroCarregar.set(true),
     });
   }

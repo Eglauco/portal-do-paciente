@@ -4,9 +4,16 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AgendamentoModal } from '@/components/agendamento-modal';
-import { Agendamento } from '@/constants/agendamentos';
+import { FaltaModal } from '@/components/falta-modal';
+import { Agendamento, MotivoFalta } from '@/constants/agendamentos';
 import { Brand, Status } from '@/constants/theme';
-import { cancelarAgendamento, confirmarAgendamento, listarAgendamentos } from '@/services/agendamentos';
+import {
+  cancelarAgendamento,
+  confirmarAgendamento,
+  justificarFalta,
+  listarAgendamentos,
+  listarMotivosFalta,
+} from '@/services/agendamentos';
 
 type Filtro = 'todos' | 'proximos' | 'concluidos';
 
@@ -26,6 +33,11 @@ export default function AgendamentosScreen() {
   const [erro, setErro] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [faltaSelecionada, setFaltaSelecionada] = useState<Agendamento | null>(null);
+  const [motivosFalta, setMotivosFalta] = useState<MotivoFalta[]>([]);
+  const [carregandoMotivos, setCarregandoMotivos] = useState(false);
+  const [processandoFalta, setProcessandoFalta] = useState(false);
+  const motivosCarregados = useRef(false);
   const entradaMostrada = useRef(false);
   const jaCarregou = useRef(false);
 
@@ -63,7 +75,18 @@ export default function AgendamentosScreen() {
   };
 
   const pendentes = useMemo(() => lista.filter((a) => a.status === 'aguardando'), [lista]);
-  const demais = useMemo(() => lista.filter((a) => a.status !== 'aguardando'), [lista]);
+  const faltasPendentes = useMemo(
+    () => lista.filter((a) => a.statusBackend === 'FALTA_PACIENTE' && !a.faltaJustificada),
+    [lista],
+  );
+  // A lista normal exclui os que já estão em destaque (aguardando / falta a justificar).
+  const demais = useMemo(
+    () =>
+      lista.filter(
+        (a) => a.status !== 'aguardando' && !(a.statusBackend === 'FALTA_PACIENTE' && !a.faltaJustificada),
+      ),
+    [lista],
+  );
   const filtrados = useMemo(
     () => (filtro === 'todos' ? demais : demais.filter((a) => a.grupo === filtro)),
     [demais, filtro],
@@ -96,6 +119,36 @@ export default function AgendamentosScreen() {
       Alert.alert('Ops', 'Não foi possível cancelar o agendamento. Tente novamente.');
     } finally {
       setProcessando(false);
+    }
+  };
+
+  const abrirFalta = useCallback(async (a: Agendamento) => {
+    setFaltaSelecionada(a);
+    if (motivosCarregados.current) return;
+    setCarregandoMotivos(true);
+    try {
+      const ms = await listarMotivosFalta();
+      setMotivosFalta(ms);
+      motivosCarregados.current = true;
+    } catch {
+      // deixa vazio; a modal mostra "nenhum motivo disponível"
+    } finally {
+      setCarregandoMotivos(false);
+    }
+  }, []);
+
+  const justificar = async (motivoIds: number[], justificativa: string) => {
+    const alvo = faltaSelecionada;
+    if (!alvo || processandoFalta) return;
+    setProcessandoFalta(true);
+    try {
+      const atualizado = await justificarFalta(alvo.id, motivoIds, justificativa);
+      setLista((l) => l.map((a) => (a.id === atualizado.id ? atualizado : a)));
+      setFaltaSelecionada(null);
+    } catch {
+      Alert.alert('Ops', 'Não foi possível enviar a justificativa. Tente novamente.');
+    } finally {
+      setProcessandoFalta(false);
     }
   };
 
@@ -193,6 +246,55 @@ export default function AgendamentosScreen() {
           </View>
         )}
 
+        {/* Destaque: falta do paciente aguardando justificativa */}
+        {!carregando && !erro && faltasPendentes.length > 0 && (
+          <View style={styles.destaqueFalta}>
+            <View style={styles.destaqueHeader}>
+              <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+              <Text style={styles.destaqueFaltaTitulo}>Justifique sua falta</Text>
+              <View style={styles.destaqueFaltaBadge}>
+                <Text style={styles.destaqueBadgeTxt}>{faltasPendentes.length}</Text>
+              </View>
+            </View>
+
+            {faltasPendentes.map((a) => (
+              <Pressable
+                key={a.id}
+                onPress={() => abrirFalta(a)}
+                style={({ pressed }) => [styles.faltaCard, pressed && styles.faltaCardPressed]}>
+                <View style={styles.pendenteTopo}>
+                  <View style={styles.faltaTag}>
+                    <Ionicons name="close-circle" size={12} color="#fff" />
+                    <Text style={styles.faltaTagTxt}>Falta registrada</Text>
+                  </View>
+                  <View style={styles.pendenteData}>
+                    <Text style={styles.pendenteDataTxt}>
+                      {a.dia} {a.mes}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.pendenteEsp}>{a.especialidade}</Text>
+                <Text style={styles.pendenteProf}>{a.profissional}</Text>
+                <View style={styles.pendenteMeta}>
+                  <Ionicons name="time-outline" size={14} color={Brand.onBrand} />
+                  <Text style={styles.pendenteMetaTxt}>{a.hora}</Text>
+                  <Text style={styles.pendenteDot}>·</Text>
+                  <Ionicons name="location-outline" size={14} color={Brand.onBrand} />
+                  <Text style={styles.pendenteMetaTxt} numberOfLines={1}>
+                    {a.unidade}
+                  </Text>
+                </View>
+
+                <View style={styles.pendenteCta}>
+                  <Text style={styles.faltaCtaTxt}>Toque para informar o motivo</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#fff" />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
         {!carregando && !erro && lista.length > 0 && (
           <>
             <View style={styles.segment}>
@@ -259,6 +361,16 @@ export default function AgendamentosScreen() {
         onConfirmar={confirmar}
         onCancelar={cancelar}
         onFechar={() => setSelecionado(null)}
+      />
+
+      <FaltaModal
+        visivel={!!faltaSelecionada}
+        agendamento={faltaSelecionada}
+        motivos={motivosFalta}
+        carregandoMotivos={carregandoMotivos}
+        processando={processandoFalta}
+        onJustificar={justificar}
+        onFechar={() => setFaltaSelecionada(null)}
       />
     </>
   );
@@ -350,6 +462,39 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.14)',
   },
   pendenteCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: Brand.glow },
+
+  // Destaque de falta (aguardando justificativa)
+  destaqueFalta: {
+    backgroundColor: '#FDECEE',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F4C9CF',
+    padding: 12,
+    marginBottom: 22,
+  },
+  destaqueFaltaTitulo: { flex: 1, fontSize: 13.5, fontWeight: '800', color: '#8A2531', letterSpacing: 0.2 },
+  destaqueFaltaBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#B23B4E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  faltaCard: { backgroundColor: '#8A2F3B', borderRadius: 16, padding: 16, marginTop: 8 },
+  faltaCardPressed: { backgroundColor: '#752530' },
+  faltaTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  faltaTagTxt: { fontSize: 11, fontWeight: '800', color: '#fff' },
+  faltaCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: '#fff' },
 
   // Segmented
   segment: { flexDirection: 'row', backgroundColor: '#EAF1EE', borderRadius: 12, padding: 4, marginBottom: 18 },
