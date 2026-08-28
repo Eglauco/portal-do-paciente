@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth.guard';
+import { authGuard, selecionarUnidadeGuard } from './core/auth.guard';
 import { pendingChangesGuard } from './core/pending-changes.guard';
 
 export const routes: Routes = [
@@ -7,6 +7,13 @@ export const routes: Routes = [
     path: 'login',
     loadComponent: () => import('./pages/login/login').then((m) => m.Login),
     title: 'Entrar — Portal do Paciente · Admin',
+  },
+  {
+    path: 'selecionar-unidade',
+    loadComponent: () =>
+      import('./pages/selecionar-unidade/selecionar-unidade').then((m) => m.SelecionarUnidade),
+    canActivate: [selecionarUnidadeGuard],
+    title: 'Selecione a unidade — Portal do Paciente · Admin',
   },
   {
     path: '',

@@ -1,0 +1,124 @@
+<main class="login">
+  <!-- Painel de marca (mesma identidade do login) -->
+  <section class="login__brand">
+    <span class="login__brand-glow" aria-hidden="true"></span>
+
+    <div class="wordmark">
+      <span class="wordmark__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h4l2 5 4-12 2 7h6" />
+        </svg>
+      </span>
+      <span>
+        <span class="wordmark__namerow">
+          <span class="wordmark__name">Portal do Paciente</span>
+          <span class="badge badge--dark">Admin</span>
+        </span>
+        <span class="wordmark__sub">Área administrativa</span>
+      </span>
+    </div>
+
+    <div class="login__pitch">
+      <h1 class="login__headline">Escolha por onde<br /><em>vamos começar.</em></h1>
+      <p class="login__lead">
+        Selecione a unidade de saúde em que você vai trabalhar. Você pode trocar
+        de unidade a qualquer momento pelo menu do topo.
+      </p>
+    </div>
+
+    <p class="login__trust">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" /><path d="M14 10h4a2 2 0 0 1 2 2v9" /><path d="M3 21h18" />
+      </svg>
+      Cada unidade tem seus próprios pacientes e agendamentos
+    </p>
+  </section>
+
+  <!-- Painel de seleção -->
+  <section class="login__panel">
+    <div class="pick">
+      <div class="login__mobilemark">
+        <span class="m" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h4l2 5 4-12 2 7h6" />
+          </svg>
+        </span>
+        <span>Portal do Paciente</span>
+        <span class="badge badge--light">Admin</span>
+      </div>
+
+      <p class="pick__ola">Olá, {{ usuario()?.nome ?? 'bem-vindo(a)' }} 👋</p>
+      <h2 class="login__title">Selecione sua unidade</h2>
+      <p class="login__subtitle">Escolha a unidade de saúde para trabalhar — é necessário para continuar.</p>
+
+      @if (!carregando() && !erro() && unidades().length > 6) {
+        <label class="pick__busca">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Buscar unidade…"
+            aria-label="Buscar unidade"
+            [value]="busca()"
+            (input)="atualizarBusca($event)"
+          />
+        </label>
+      }
+
+      @if (carregando()) {
+        <div class="pick__estado">
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Carregando unidades…</p>
+        </div>
+      } @else if (erro()) {
+        <div class="pick__estado">
+          <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+          <p>Não foi possível carregar as unidades.</p>
+          <button type="button" class="btn btn--solid" (click)="carregar()">Tentar novamente</button>
+        </div>
+      } @else if (filtradas().length === 0) {
+        <div class="pick__estado">
+          <span class="state__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" /><path d="M14 10h4a2 2 0 0 1 2 2v9" /><path d="M3 21h18" />
+            </svg>
+          </span>
+          <p>Nenhuma unidade encontrada{{ busca() ? ' para "' + busca() + '"' : '' }}.</p>
+        </div>
+      } @else {
+        <ul class="pick__lista" role="list">
+          @for (u of filtradas(); track u.id) {
+            <li>
+              <button
+                type="button"
+                class="pick__item"
+                [class.is-loading]="selecionadaId() === u.id"
+                [disabled]="selecionadaId() !== null"
+                (click)="selecionar(u)"
+                [attr.aria-label]="'Trabalhar na ' + u.nome"
+              >
+                <span class="pick__avatar" aria-hidden="true">{{ iniciais(u.nome) }}</span>
+                <span class="pick__nome">{{ u.nome }}</span>
+                @if (selecionadaId() === u.id) {
+                  <span class="spinner spinner--sm" aria-hidden="true"></span>
+                } @else {
+                  <svg class="pick__seta" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m9 6 6 6-6 6" />
+                  </svg>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <button type="button" class="pick__sair" (click)="sair()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" />
+        </svg>
+        Sair da conta
+      </button>
+    </div>
+  </section>
+</main>
