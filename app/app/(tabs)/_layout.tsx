@@ -27,6 +27,15 @@ export default function TabLayout() {
         },
       }}>
       <Tabs.Screen
+        name="novidades"
+        options={{
+          title: 'Novidades',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="agendamentos"
         options={{
           title: 'Agenda',

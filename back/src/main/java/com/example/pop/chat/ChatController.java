@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.push.PushService;
 
 import jakarta.validation.Valid;
 
@@ -34,12 +35,14 @@ public class ChatController {
     private final ChatRepository repository;
     private final MensagemRepository mensagemRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PushService pushService;
 
     public ChatController(ChatRepository repository, MensagemRepository mensagemRepository,
-            SimpMessagingTemplate messagingTemplate) {
+            SimpMessagingTemplate messagingTemplate, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.messagingTemplate = messagingTemplate;
+        this.pushService = pushService;
     }
 
     @GetMapping
@@ -102,6 +105,8 @@ public class ChatController {
         repository.save(chat);
 
         publicar(chat.getId(), salva);
+        // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
+        pushService.notificarNovaMensagem(chat);
         return ResponseEntity.ok(toDetalhe(chat));
     }
 

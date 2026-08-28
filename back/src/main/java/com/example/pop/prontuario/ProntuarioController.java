@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.agendamento.AgendamentoRepository;
 import com.example.pop.common.Pagina;
+import com.example.pop.push.PushService;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -36,12 +37,14 @@ public class ProntuarioController {
     private final ProntuarioRepository repository;
     private final AgendamentoRepository agendamentoRepository;
     private final StorageService storageService;
+    private final PushService pushService;
 
     public ProntuarioController(ProntuarioRepository repository, AgendamentoRepository agendamentoRepository,
-            StorageService storageService) {
+            StorageService storageService, PushService pushService) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.storageService = storageService;
+        this.pushService = pushService;
     }
 
     @GetMapping
@@ -76,7 +79,10 @@ public class ProntuarioController {
         }
         Prontuario prontuario = new Prontuario();
         aplicar(prontuario, request);
-        return ProntuarioDetalheResponse.from(repository.save(prontuario));
+        ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(repository.save(prontuario));
+        // Notifica o paciente sobre o novo prontuário.
+        pushService.notificarProntuario(true);
+        return resposta;
     }
 
     @PutMapping("/{id}")
@@ -87,8 +93,14 @@ public class ProntuarioController {
                     if (repository.existsByNumeroAtendimentoAndIdNot(request.numeroAtendimento().trim(), id)) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Número do atendimento já cadastrado");
                     }
+                    int documentosAntes = prontuario.getDocumentos().size();
                     aplicar(prontuario, request);
-                    return ResponseEntity.ok(ProntuarioDetalheResponse.from(repository.save(prontuario)));
+                    ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(repository.save(prontuario));
+                    // Notifica o paciente se novos documentos foram adicionados.
+                    if (request.documentos().size() > documentosAntes) {
+                        pushService.notificarProntuario(false);
+                    }
+                    return ResponseEntity.ok(resposta);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

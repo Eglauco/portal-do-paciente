@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { buscarConversa, ChatDetalhe, enviarMensagemPaciente, Mensagem } from '@/services/chat';
+import { limparChatAtivo, setChatAtivo } from '@/services/chat-ativo';
 import { observarDigitando, observarMensagens, sinalizarDigitando } from '@/services/chat-realtime';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
@@ -80,7 +81,11 @@ export default function ConversaScreen() {
   useFocusEffect(
     useCallback(() => {
       carregar();
-    }, [carregar]),
+      if (id) setChatAtivo(id);
+      return () => {
+        if (id) limparChatAtivo(id);
+      };
+    }, [carregar, id]),
   );
 
   // Tempo real (WebSocket/STOMP): mensagens, "digitando…" e recibo de leitura.

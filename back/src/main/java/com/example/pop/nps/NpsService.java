@@ -6,14 +6,17 @@ import org.springframework.stereotype.Service;
 
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.agendamento.StatusAgendamento;
+import com.example.pop.push.PushService;
 
 @Service
 public class NpsService {
 
     private final NpsRepository repository;
+    private final PushService pushService;
 
-    public NpsService(NpsRepository repository) {
+    public NpsService(NpsRepository repository, PushService pushService) {
         this.repository = repository;
+        this.pushService = pushService;
     }
 
     /**
@@ -31,6 +34,8 @@ public class NpsService {
         nps.setAgendamento(agendamento);
         nps.setStatus(StatusNps.PENDENTE);
         nps.setCriadoEm(LocalDateTime.now());
-        repository.save(nps);
+        Nps salvo = repository.save(nps);
+        // Notifica o paciente para avaliar o atendimento.
+        pushService.notificarNpsPendente(salvo);
     }
 }
