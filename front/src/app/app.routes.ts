@@ -173,6 +173,23 @@ export const routes: Routes = [
         canDeactivate: [pendingChangesGuard],
         title: 'Editar prontuário — Portal do Paciente · Admin',
       },
+      {
+        path: 'postagens',
+        loadComponent: () => import('./pages/postagens/postagens-list').then((m) => m.PostagensList),
+        title: 'Rede Social — Portal do Paciente · Admin',
+      },
+      {
+        path: 'postagens/novo',
+        loadComponent: () => import('./pages/postagens/postagem-form').then((m) => m.PostagemForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Nova postagem — Portal do Paciente · Admin',
+      },
+      {
+        path: 'postagens/:id',
+        loadComponent: () => import('./pages/postagens/postagem-form').then((m) => m.PostagemForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar postagem — Portal do Paciente · Admin',
+      },
       { path: 'configuracoes', ...secao('Configurações', 'Ajuste as preferências do sistema.') },
       { path: 'perfis', ...secao('Perfis', 'Defina perfis de acesso e níveis de permissão.') },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },

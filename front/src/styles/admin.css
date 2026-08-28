@@ -1934,3 +1934,122 @@
   background: #fbf0d6;
 }
 .doc-file__pend svg { width: 0.95rem; height: 0.95rem; stroke: currentColor; }
+
+/* ==================================================================
+   Rede Social (Postagens)
+   ================================================================== */
+.col-thumb { width: 56px; }
+.post-thumb {
+  width: 44px;
+  height: 55px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  border: 1px solid var(--line);
+  display: block;
+}
+.pill-off {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: #eceef1;
+}
+
+/* Formulário */
+.post-layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
+@media (max-width: 800px) { .post-layout { grid-template-columns: 1fr; } }
+.post-imagem { display: flex; flex-direction: column; gap: 0.7rem; align-items: flex-start; }
+.post-imagem__btn { align-self: stretch; justify-content: center; }
+.post-imagem__hint { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.post-campos { display: flex; flex-direction: column; gap: 1.1rem; }
+.post-toggles { display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.25rem; }
+
+/* Engajamento da postagem (curtidas + comentários) */
+.post-engajamento { margin-top: 1.25rem; }
+.post-stats { display: flex; align-items: center; gap: 1.25rem; }
+.post-stat { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+.post-stat svg { width: 1.05rem; height: 1.05rem; }
+.post-stat:first-child svg { color: #e0245e; }
+.post-stat:last-child svg { color: var(--brand-deep); }
+
+.coment-vazio { margin: 0; padding: 1rem 0 0.25rem; color: var(--muted); font-size: 0.9rem; }
+.coment-list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-direction: column; }
+.coment { padding: 0.85rem 0; border-top: 1px solid var(--line); }
+.coment:first-child { border-top: 0; }
+.coment__row { display: flex; align-items: flex-start; gap: 0.75rem; }
+.coment__avatar {
+  flex-shrink: 0;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 14%, white);
+}
+.coment__body { flex: 1; min-width: 0; }
+.coment__texto { margin: 0; font-size: 0.9rem; color: var(--ink); line-height: 1.4; }
+.coment__texto b { font-weight: 700; }
+.coment__meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.3rem; }
+.coment__data { font-size: 0.75rem; color: var(--muted); }
+.coment__responder {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand-deep);
+  cursor: pointer;
+}
+.coment__responder:hover { text-decoration: underline; }
+.coment__excluir {
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: #b23b4e;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.coment__excluir:hover { background: #fdf2f3; border-color: #f3d6db; }
+.coment__excluir:disabled { opacity: 0.5; cursor: default; }
+.coment__excluir svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; }
+.coment-mais { margin-top: 0.9rem; display: flex; justify-content: center; }
+
+/* Respostas aninhadas (1 nível) */
+.coment-respostas {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0 0 0 2.85rem; /* alinha com o corpo do comentário-raiz */
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.coment-respostas::before {
+  content: '';
+  position: absolute;
+  left: 1.05rem;
+  top: 0.2rem;
+  bottom: 0.6rem;
+  width: 1px;
+  background: var(--line);
+}
+.coment--resposta { padding: 0.55rem 0; border-top: 0; }
+.coment--resposta .coment__avatar { width: 1.75rem; height: 1.75rem; font-size: 0.65rem; }
+.coment--resposta .coment__texto { font-size: 0.86rem; }
+
+/* Caixa de resposta da administração */
+.coment-resposta-box { margin: 0.5rem 0 0.2rem 2.85rem; }
+.coment-resposta-campo { min-height: 3.4rem; }
+.coment-resposta-acoes { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem; }
+.coment-resposta-acoes .btn { height: 2.2rem; padding: 0 0.9rem; font-size: 0.82rem; }

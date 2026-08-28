@@ -1,0 +1,244 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar postagem' : 'Nova postagem' }}</h1>
+      <p class="page-sub">
+        {{ editando() ? 'Atualize os dados desta postagem.' : 'Publique uma novidade no feed dos pacientes.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+        </svg>
+        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+      </button>
+    }
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    <div class="post-layout">
+      <!-- Imagem 4:5 -->
+      <div class="post-imagem">
+        <p class="section-label">Imagem (4:5)</p>
+        <app-imagem-45 [src]="previewUrl()" />
+        <label class="doc-file__btn post-imagem__btn">
+          @if (processandoImagem()) {
+            <span class="spinner-sm" aria-hidden="true"></span> Processando…
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
+            </svg>
+            {{ temImagem() ? 'Trocar imagem' : 'Selecionar imagem' }}
+          }
+          <input type="file" accept="image/*" hidden (change)="aoSelecionarImagem($event)" />
+        </label>
+        <p class="post-imagem__hint">A imagem é recortada automaticamente para a proporção 4:5.</p>
+        @if (imagemTocada() && !temImagem()) {
+          <span class="field-error">Selecione uma imagem para a postagem.</span>
+        }
+      </div>
+
+      <!-- Campos -->
+      <div class="post-campos">
+        <div class="form-field">
+          <label class="label" for="titulo">Título <span class="req" aria-hidden="true">*</span></label>
+          <input
+            id="titulo"
+            type="text"
+            class="input"
+            formControlName="titulo"
+            placeholder="Ex.: Campanha de vacinação"
+            [class.input--error]="invalido('titulo')"
+          />
+          @if (invalido('titulo')) {
+            <span class="field-error">Informe o título.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="unidade">Unidade de saúde <span class="req" aria-hidden="true">*</span></label>
+          <ng-select
+            labelForId="unidade"
+            formControlName="unidadeSaudeId"
+            [items]="unidades()"
+            bindLabel="nome"
+            bindValue="id"
+            placeholder="Selecione a unidade"
+            notFoundText="Nenhuma unidade encontrada"
+          ></ng-select>
+          @if (invalido('unidadeSaudeId')) {
+            <span class="field-error">Selecione a unidade.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="descricao">Descrição</label>
+          <textarea
+            id="descricao"
+            class="input input--area"
+            formControlName="descricao"
+            placeholder="Escreva a legenda da postagem…"
+          ></textarea>
+        </div>
+
+        <div class="post-toggles">
+          <label class="check">
+            <input type="checkbox" formControlName="mostrarTotalCurtidas" />
+            <span class="check__box" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+            </span>
+            Mostrar total de curtidas
+          </label>
+          <label class="check">
+            <input type="checkbox" formControlName="habilitarComentarios" />
+            <span class="check__box" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+            </span>
+            Habilitar comentários
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+        {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </form>
+
+  @if (editando()) {
+    <section class="panel post-engajamento">
+      <div class="panel__head">
+        <h2 class="panel__title">Engajamento</h2>
+        <div class="post-stats">
+          <span class="post-stat">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
+              <path d="M12 21s-6.7-4.35-9.33-8.03C1.1 10.5 1.5 7.5 3.6 6.1c1.8-1.2 4.2-.6 5.4 1l3 3 3-3c1.2-1.6 3.6-2.2 5.4-1 2.1 1.4 2.5 4.4.93 6.87C18.7 16.65 12 21 12 21z" />
+            </svg>
+            {{ totalCurtidas() }} curtida(s)
+          </span>
+          <span class="post-stat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-9 8.4 9.5 9.5 0 0 1-4-.9L3 21l1.9-4.1A8.38 8.38 0 0 1 12 3.1a8.5 8.5 0 0 1 9 8.4z" />
+            </svg>
+            {{ totalComentarios() }} comentário(s)
+          </span>
+        </div>
+      </div>
+
+      @if (comentarios().length === 0 && !carregandoComentarios()) {
+        <p class="coment-vazio">Esta postagem ainda não tem comentários.</p>
+      } @else {
+        <ul class="coment-list">
+          @for (c of comentarios(); track c.id) {
+            <li class="coment">
+              <div class="coment__row">
+                <span class="coment__avatar">{{ iniciais(c.autor) }}</span>
+                <div class="coment__body">
+                  <p class="coment__texto"><b>{{ c.autor }}</b> {{ c.texto }}</p>
+                  <div class="coment__meta">
+                    <span class="coment__data">{{ c.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+                    <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="coment__excluir"
+                  (click)="excluirComentario(c)"
+                  [disabled]="excluindoComentario() === c.id"
+                  aria-label="Excluir comentário"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+                  </svg>
+                </button>
+              </div>
+
+              @if (c.respostas.length) {
+                <ul class="coment-respostas">
+                  @for (r of c.respostas; track r.id) {
+                    <li class="coment coment--resposta">
+                      <div class="coment__row">
+                        <span class="coment__avatar">{{ iniciais(r.autor) }}</span>
+                        <div class="coment__body">
+                          <p class="coment__texto"><b>{{ r.autor }}</b> {{ r.texto }}</p>
+                          <div class="coment__meta">
+                            <span class="coment__data">{{ r.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+                            <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          class="coment__excluir"
+                          (click)="excluirResposta(c, r)"
+                          [disabled]="excluindoComentario() === r.id"
+                          aria-label="Excluir resposta"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+                          </svg>
+                        </button>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+
+              @if (respondendoId() === c.id) {
+                <div class="coment-resposta-box">
+                  <textarea
+                    class="input input--area coment-resposta-campo"
+                    [value]="textoResposta()"
+                    (input)="aoDigitarResposta($event)"
+                    placeholder="Escreva uma resposta como administração…"
+                  ></textarea>
+                  <div class="coment-resposta-acoes">
+                    <button type="button" class="btn btn--ghost" (click)="cancelarResposta()">Cancelar</button>
+                    <button
+                      type="button"
+                      class="btn btn--solid"
+                      (click)="enviarResposta(c)"
+                      [disabled]="enviandoResposta() || !textoResposta().trim()"
+                    >
+                      {{ enviandoResposta() ? 'Enviando…' : 'Responder' }}
+                    </button>
+                  </div>
+                </div>
+              }
+            </li>
+          }
+        </ul>
+
+        @if (temMaisComentarios()) {
+          <div class="coment-mais">
+            <button type="button" class="btn btn--ghost" (click)="carregarMaisComentarios()" [disabled]="carregandoComentarios()">
+              {{ carregandoComentarios() ? 'Carregando…' : 'Carregar mais comentários' }}
+            </button>
+          </div>
+        }
+      }
+    </section>
+  }
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-msg" (click)="$event.stopPropagation()">
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

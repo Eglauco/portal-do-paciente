@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import com.example.pop.agendamento.Agendamento;
+import com.example.pop.chat.Chat;
+import com.example.pop.nps.Nps;
+import com.example.pop.postagem.Postagem;
 
 /**
  * Envia notificações push pela Expo Push API.
@@ -49,6 +52,36 @@ public class PushService {
                 + ". Toque para confirmar ou cancelar.";
         Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId());
         notificarTodos("Novo agendamento", corpo, data);
+    }
+
+    /** Nova mensagem da unidade no chat. */
+    public void notificarNovaMensagem(Chat chat) {
+        String corpo = "Você recebeu uma nova mensagem de " + chat.getUnidadeSaude().getNome() + ".";
+        Map<String, Object> data = Map.of("tipo", "CHAT", "chatId", chat.getId());
+        notificarTodos("Nova mensagem", corpo, data);
+    }
+
+    /** Nova avaliação NPS pendente. */
+    public void notificarNpsPendente(Nps nps) {
+        String especialidade = nps.getAgendamento().getEspecialidade().getNome();
+        String corpo = "Como foi seu atendimento de " + especialidade + "? Toque para avaliar.";
+        notificarTodos("Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
+    }
+
+    /** Nova publicação (postagem) no feed das unidades. */
+    public void notificarNovaPostagem(Postagem p) {
+        String corpo = p.getUnidadeSaude().getNome() + " publicou: " + p.getTitulo();
+        Map<String, Object> data = Map.of("tipo", "POSTAGEM", "postagemId", p.getId());
+        notificarTodos("Nova publicação", corpo, data);
+    }
+
+    /** Novo prontuário (novo=true) ou novo documento em um prontuário (novo=false). */
+    public void notificarProntuario(boolean novo) {
+        String titulo = novo ? "Novo prontuário" : "Novo documento";
+        String corpo = novo
+                ? "Seu atendimento foi registrado. Confira os documentos no prontuário."
+                : "Um novo documento foi adicionado ao seu prontuário.";
+        notificarTodos(titulo, corpo, Map.of("tipo", "PRONTUARIO"));
     }
 
     /** Envia uma notificação para todos os dispositivos registrados. */

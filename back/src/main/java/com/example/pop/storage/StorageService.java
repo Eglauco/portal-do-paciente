@@ -134,6 +134,29 @@ public class StorageService {
         return presigned.url().toString();
     }
 
+    /**
+     * URL de visualização (GET pré-assinada) com validade configurável.
+     * Não lança erro se o armazenamento não estiver configurado: devolve a URL
+     * recebida (útil em ambientes sem S3, como testes).
+     */
+    public String urlVisualizacao(String url, Duration duracao) {
+        if (!StringUtils.hasText(url) || !configurado()) {
+            return url;
+        }
+        String chave = chaveDaUrl(url);
+        if (chave == null) {
+            return url;
+        }
+        try {
+            GetObjectRequest get = GetObjectRequest.builder().bucket(bucket).key(chave).build();
+            PresignedGetObjectRequest presigned = presigner().presignGetObject(
+                    GetObjectPresignRequest.builder().signatureDuration(duracao).getObjectRequest(get).build());
+            return presigned.url().toString();
+        } catch (RuntimeException e) {
+            return url;
+        }
+    }
+
     /** Remove o objeto no S3 a partir da URL salva no documento. */
     public void excluirPorUrl(String url) {
         if (!StringUtils.hasText(url) || !configurado()) {
