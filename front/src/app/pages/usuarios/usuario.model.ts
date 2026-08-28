@@ -4,6 +4,13 @@ export interface Usuario {
   email: string;
 }
 
+/** Dados de criação/edição. `senha` é obrigatória na criação e opcional na edição. */
+export interface UsuarioRequest {
+  nome: string;
+  email: string;
+  senha?: string;
+}
+
 export interface UsuarioFiltro {
   codigo?: string;
   nome?: string;

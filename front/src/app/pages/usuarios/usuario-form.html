@@ -57,6 +57,46 @@
           <span class="field-error">Informe um e-mail válido.</span>
         }
       </div>
+
+      <div class="form-field">
+        <label class="label" for="senha">
+          Senha @if (!editando()) { <span class="req" aria-hidden="true">*</span> }
+        </label>
+        <div class="pass-field">
+          <input
+            id="senha"
+            [type]="mostrarSenha() ? 'text' : 'password'"
+            class="input"
+            formControlName="senha"
+            [placeholder]="editando() ? 'Deixe em branco para manter a atual' : 'Mínimo de 6 caracteres'"
+            autocomplete="new-password"
+            [class.input--error]="invalido('senha')"
+          />
+          <button
+            type="button"
+            class="pass-toggle"
+            (click)="alternarSenha()"
+            [attr.aria-label]="mostrarSenha() ? 'Ocultar senha' : 'Mostrar senha'"
+            [attr.aria-pressed]="mostrarSenha()"
+          >
+            @if (mostrarSenha()) {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" /><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                <path d="M9.4 5.2A9.5 9.5 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6.3 6.3A17 17 0 0 0 2 12s4 7 10 7a9.3 9.3 0 0 0 4-.9" />
+              </svg>
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+            }
+          </button>
+        </div>
+        @if (invalido('senha')) {
+          <span class="field-error">A senha deve ter ao menos 6 caracteres.</span>
+        } @else if (editando()) {
+          <span class="field-hint">Deixe em branco para manter a senha atual.</span>
+        }
+      </div>
     </div>
 
     <div class="form-actions">

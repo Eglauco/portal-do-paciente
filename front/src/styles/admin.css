@@ -2100,3 +2100,22 @@
   background: var(--surface);
 }
 .nps-cat__nome { font-size: 0.92rem; font-weight: 600; color: var(--ink); }
+
+/* Campo de senha com botão mostrar/ocultar (cadastro de usuário) */
+.pass-field { position: relative; }
+.pass-field .input { padding-right: 2.8rem; }
+.pass-toggle {
+  position: absolute;
+  top: 0;
+  right: 0.4rem;
+  height: 100%;
+  width: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pass-toggle:hover { color: var(--ink); }
+.pass-toggle svg { width: 1.15rem; height: 1.15rem; stroke: currentColor; }

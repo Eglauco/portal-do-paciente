@@ -2,11 +2,15 @@ package com.example.pop.usuario;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 
@@ -15,6 +19,9 @@ class UsuarioControllerTest {
 
     @Autowired
     private UsuarioController controller;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Test
     void paginaPadraoTraz10Registros() {
@@ -46,6 +53,35 @@ class UsuarioControllerTest {
         Pagina<Usuario> pagina = controller.listar(null, null, null, 1, 50);
         assertEquals(1, pagina.page());
         assertFalse(pagina.first());
+    }
+
+    @Test
+    void criaComSenhaEValidaRegras() {
+        Usuario novo = controller.criar(
+                new UsuarioRequest("Teste Senha", "teste.senha@unidadesaude.com.br", "segredo123"));
+        Long id = novo.getId();
+        assertNotNull(id);
+        assertTrue(passwordEncoder.matches("segredo123", novo.getSenhaHash()), "a senha deve ser guardada com hash");
+
+        // E-mail duplicado → 409
+        ResponseStatusException dup = assertThrows(ResponseStatusException.class, () -> controller
+                .criar(new UsuarioRequest("Outro", "teste.senha@unidadesaude.com.br", "segredo123")));
+        assertEquals(409, dup.getStatusCode().value());
+
+        // Senha curta → 400
+        ResponseStatusException curta = assertThrows(ResponseStatusException.class,
+                () -> controller.criar(new UsuarioRequest("Curta", "curta@unidadesaude.com.br", "123")));
+        assertEquals(400, curta.getStatusCode().value());
+
+        // Editar sem senha mantém o hash; com senha, troca.
+        String hashAntigo = novo.getSenhaHash();
+        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", ""));
+        assertEquals(hashAntigo, controller.buscar(id).getBody().getSenhaHash());
+
+        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "novaSenha123"));
+        assertTrue(passwordEncoder.matches("novaSenha123", controller.buscar(id).getBody().getSenhaHash()));
+
+        controller.excluir(id);
     }
 
     @Test

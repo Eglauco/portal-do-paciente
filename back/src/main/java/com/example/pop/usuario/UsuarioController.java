@@ -1,11 +1,13 @@
 package com.example.pop.usuario;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,8 +18,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/usuario")
@@ -25,11 +30,15 @@ public class UsuarioController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
+    /** Tamanho mínimo da senha. */
+    private static final int SENHA_MIN = 6;
 
     private final UsuarioRepository repository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UsuarioController(UsuarioRepository repository) {
+    public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -70,20 +79,66 @@ public class UsuarioController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Usuario criar(@RequestBody Usuario usuario) {
-        usuario.setId(null);
-        return repository.save(usuario);
+    public Usuario criar(@Valid @RequestBody UsuarioRequest request) {
+        String email = request.email().trim();
+        if (repository.existsByEmailIgnoreCase(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com este e-mail");
+        }
+        String senha = validarSenhaObrigatoria(request.senha());
+
+        Usuario usuario = new Usuario();
+        usuario.setNome(request.nome().trim());
+        usuario.setEmail(email);
+        usuario.setSenhaHash(passwordEncoder.encode(senha));
+        return salvarUnico(usuario);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Usuario> atualizar(@PathVariable Long id, @RequestBody Usuario usuario) {
+    public ResponseEntity<Usuario> atualizar(@PathVariable Long id, @Valid @RequestBody UsuarioRequest request) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(usuario.getNome());
-                    existente.setEmail(usuario.getEmail());
-                    return ResponseEntity.ok(repository.save(existente));
+                    String email = request.email().trim();
+                    boolean emailDeOutro = repository.findByEmailIgnoreCase(email)
+                            .map(outro -> !outro.getId().equals(id))
+                            .orElse(false);
+                    if (emailDeOutro) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com este e-mail");
+                    }
+                    existente.setNome(request.nome().trim());
+                    existente.setEmail(email);
+                    // Senha em branco na edição = mantém a atual. Não normalizamos a senha
+                    // (é comparada crua no login), só validamos o tamanho.
+                    String senha = request.senha();
+                    if (senha != null && !senha.isBlank()) {
+                        existente.setSenhaHash(passwordEncoder.encode(validarTamanhoSenha(senha)));
+                    }
+                    return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Salva tratando a violação do índice único de e-mail como 409 (fecha a corrida TOCTOU). */
+    private Usuario salvarUnico(Usuario usuario) {
+        try {
+            return repository.save(usuario);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com este e-mail");
+        }
+    }
+
+    private String validarSenhaObrigatoria(String senha) {
+        if (senha == null || senha.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a senha");
+        }
+        return validarTamanhoSenha(senha);
+    }
+
+    private String validarTamanhoSenha(String senha) {
+        if (senha.length() < SENHA_MIN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A senha deve ter ao menos " + SENHA_MIN + " caracteres");
+        }
+        return senha;
     }
 
     @DeleteMapping("/{id}")

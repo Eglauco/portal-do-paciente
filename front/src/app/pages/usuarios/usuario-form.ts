@@ -25,6 +25,10 @@ export class UsuarioForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.required, Validators.email],
     }),
+    senha: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.minLength(6)],
+    }),
   });
 
   protected readonly editando = signal(false);
@@ -32,6 +36,7 @@ export class UsuarioForm implements PodeSair {
   protected readonly salvando = signal(false);
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
+  protected readonly mostrarSenha = signal(false);
 
   // Diálogo de confirmação
   protected readonly confirmacao = signal<string | null>(null);
@@ -50,7 +55,15 @@ export class UsuarioForm implements PodeSair {
         next: (usuario) => this.form.patchValue({ nome: usuario.nome, email: usuario.email }),
         error: () => this.erroCarregar.set(true),
       });
+    } else {
+      // Na criação a senha é obrigatória (na edição, em branco = mantém a atual).
+      this.form.controls.senha.addValidators(Validators.required);
+      this.form.controls.senha.updateValueAndValidity();
     }
+  }
+
+  protected alternarSenha(): void {
+    this.mostrarSenha.update((v) => !v);
   }
 
   /** Chamado pelo guard de rota antes de sair. */
@@ -59,7 +72,7 @@ export class UsuarioForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome' | 'email'): boolean {
+  protected invalido(campo: 'nome' | 'email' | 'senha'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
   }
@@ -71,9 +84,13 @@ export class UsuarioForm implements PodeSair {
       return;
     }
     this.salvando.set(true);
+    // Senha vai crua (sem trim) para bater com a validação/verificação do backend.
+    const senhaBruta = this.form.controls.senha.value;
     const dados = {
-      nome: this.form.controls.nome.value,
-      email: this.form.controls.email.value,
+      nome: this.form.controls.nome.value.trim(),
+      email: this.form.controls.email.value.trim(),
+      // Só envia quando preenchida; em branco na edição = mantém a atual.
+      ...(senhaBruta.trim() ? { senha: senhaBruta } : {}),
     };
     const requisicao = this.editando()
       ? this.service.atualizar(this.codigo()!, dados)
@@ -84,9 +101,15 @@ export class UsuarioForm implements PodeSair {
         this.toastr.success('Usuário salvo');
         this.router.navigate(['/usuarios']);
       },
-      error: () => {
+      error: (e) => {
         this.salvando.set(false);
-        this.toastr.error('Não foi possível salvar o usuário.');
+        if (e?.status === 409) {
+          this.toastr.error('Já existe um usuário com este e-mail.');
+        } else if (e?.status === 400) {
+          this.toastr.error('Verifique os dados: a senha precisa ter ao menos 6 caracteres.');
+        } else {
+          this.toastr.error('Não foi possível salvar o usuário.');
+        }
       },
     });
   }
