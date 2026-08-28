@@ -1,11 +1,12 @@
 package com.example.pop.nps;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.common.Ref;
 
-/** Detalhamento do NPS (inclui os dados do atendimento). */
+/** Detalhamento do NPS (inclui os dados do atendimento e as notas por categoria). */
 public record NpsDetalheResponse(
         Long id,
         Ref paciente,
@@ -16,13 +17,18 @@ public record NpsDetalheResponse(
         LocalDateTime dataHora,
         StatusNps status,
         String statusDescricao,
-        Integer nota,
+        Double media,
+        List<CategoriaNotaResponse> notas,
         String observacao,
         LocalDateTime criadoEm,
         LocalDateTime respondidoEm) {
 
     public static NpsDetalheResponse from(Nps nps) {
         Agendamento a = nps.getAgendamento();
+        List<CategoriaNotaResponse> notas = nps.getNotasCategorias().stream()
+                .sorted((x, y) -> x.getCategoria().getNome().compareToIgnoreCase(y.getCategoria().getNome()))
+                .map(CategoriaNotaResponse::from)
+                .toList();
         return new NpsDetalheResponse(
                 nps.getId(),
                 new Ref(a.getPaciente().getId(), a.getPaciente().getNome()),
@@ -33,7 +39,8 @@ public record NpsDetalheResponse(
                 a.getDataHora(),
                 nps.getStatus(),
                 nps.getStatus().getDescricao(),
-                nps.getNota(),
+                nps.getMedia(),
+                notas,
                 nps.getObservacao(),
                 nps.getCriadoEm(),
                 nps.getRespondidoEm());

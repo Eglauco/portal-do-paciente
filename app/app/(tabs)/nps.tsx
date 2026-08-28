@@ -5,7 +5,15 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { NpsModal, NpsModalDados } from '@/components/nps-modal';
 import { Brand } from '@/constants/theme';
-import { buscarNps, listarNps, NpsDetalhe, NpsItem, responderNps } from '@/services/nps';
+import {
+  buscarNps,
+  CategoriaNps,
+  listarCategoriasNps,
+  listarNps,
+  NpsDetalhe,
+  NpsItem,
+  responderNps,
+} from '@/services/nps';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -26,6 +34,9 @@ export default function NpsScreen() {
   const [selecionado, setSelecionado] = useState<NpsItem | null>(null);
   const [detalhe, setDetalhe] = useState<NpsDetalhe | null>(null);
   const [processando, setProcessando] = useState(false);
+  const [categorias, setCategorias] = useState<CategoriaNps[]>([]);
+  const [carregandoCategorias, setCarregandoCategorias] = useState(false);
+  const categoriasCarregadas = useRef(false);
 
   const carregar = useCallback(async (mostrarSpinner: boolean) => {
     try {
@@ -58,18 +69,30 @@ export default function NpsScreen() {
 
   const media = useMemo(() => {
     if (avaliados.length === 0) return '—';
-    const soma = avaliados.reduce((s, a) => s + (a.nota ?? 0), 0);
+    const soma = avaliados.reduce((s, a) => s + (a.media ?? 0), 0);
     return (soma / avaliados.length).toFixed(1);
   }, [avaliados]);
 
-  const abrirAvaliar = (item: NpsItem) => {
+  const abrirAvaliar = async (item: NpsItem) => {
     setSelecionado(item);
     setDetalhe(null);
     setModo('avaliar');
+    if (categoriasCarregadas.current) return;
+    setCarregandoCategorias(true);
+    try {
+      const cats = await listarCategoriasNps();
+      setCategorias(cats);
+      categoriasCarregadas.current = true;
+    } catch {
+      // deixa vazio; a modal mostra "nenhuma categoria disponível"
+    } finally {
+      setCarregandoCategorias(false);
+    }
   };
 
   const abrirVer = async (item: NpsItem) => {
     setSelecionado(item);
+    setDetalhe(null);
     setModo('ver');
     try {
       const d = await buscarNps(item.id);
@@ -85,11 +108,11 @@ export default function NpsScreen() {
     setDetalhe(null);
   };
 
-  const enviar = async (nota: number, observacao: string) => {
+  const enviar = async (notas: { categoriaId: number; nota: number }[], observacao: string) => {
     if (!selecionado || processando) return;
     setProcessando(true);
     try {
-      await responderNps(selecionado.id, nota, observacao);
+      await responderNps(selecionado.id, notas, observacao);
       fechar();
       await carregar(false);
     } catch {
@@ -209,7 +232,7 @@ export default function NpsScreen() {
                   onPress={() => abrirVer(n)}
                   style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
                   <View style={styles.nota}>
-                    <Text style={styles.notaNum}>{n.nota}</Text>
+                    <Text style={styles.notaNum}>{n.media != null ? n.media.toFixed(1) : '—'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.especialidade}>{n.especialidade.nome}</Text>
@@ -229,7 +252,10 @@ export default function NpsScreen() {
         visivel={modo !== null}
         modo={modo ?? 'ver'}
         dados={dadosModal}
-        notaAtual={detalhe?.nota ?? selecionado?.nota}
+        categorias={categorias}
+        carregandoCategorias={carregandoCategorias}
+        mediaAtual={detalhe?.media ?? selecionado?.media}
+        notasRespondidas={detalhe?.notas}
         observacaoAtual={detalhe?.observacao}
         respondidoEm={detalhe?.respondidoEm}
         processando={processando}
@@ -365,7 +391,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: Brand.brand,
   },
-  notaNum: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  notaNum: { fontSize: 18, fontWeight: '800', color: '#fff' },
   especialidade: { fontSize: 15, fontWeight: '700', color: Brand.ink },
   meta: { fontSize: 12.5, color: Brand.muted, marginTop: 3 },
 });

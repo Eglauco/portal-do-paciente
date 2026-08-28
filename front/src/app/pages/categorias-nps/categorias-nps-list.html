@@ -1,61 +1,52 @@
 <section class="dash">
   <header class="page-head">
     <div>
-      <h1 class="page-title">NPS</h1>
-      <p class="page-sub">Acompanhe a satisfação dos pacientes após o atendimento.</p>
+      <h1 class="page-title">Categorias de NPS</h1>
+      <p class="page-sub">Cadastre as categorias que o paciente avalia (uma nota de 0 a 10 para cada).</p>
     </div>
+    <a class="btn btn--solid" routerLink="/categorias-nps/novo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Nova categoria
+    </a>
   </header>
 
   <!-- Filtros -->
-  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+  <form class="filters" (submit)="buscar($event)">
     <p class="section-label">Filtros</p>
-    <div class="filters__chat">
-      <div class="form-field">
-        <label class="label">Status</label>
-        <ng-select
-          formControlName="status"
-          [items]="statusOpcoes"
-          bindLabel="label"
-          bindValue="value"
-          placeholder="Todos os status"
-        ></ng-select>
+    <div class="filters__row2">
+      <input
+        class="input"
+        placeholder="Código"
+        inputmode="numeric"
+        aria-label="Código"
+        [value]="codigo()"
+        (input)="updateCodigo($event)"
+      />
+      <input
+        class="input"
+        placeholder="Nome"
+        aria-label="Nome"
+        [value]="nome()"
+        (input)="updateNome($event)"
+      />
+      <div class="filters__actions">
+        <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+        <button type="submit" class="btn btn--solid">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          Pesquisar
+        </button>
       </div>
-      <div class="form-field">
-        <label class="label">Paciente</label>
-        <ng-select
-          formControlName="pacienteId"
-          [items]="pacientes()"
-          bindLabel="nome"
-          bindValue="id"
-          placeholder="Todos os pacientes"
-        ></ng-select>
-      </div>
-      <div class="form-field">
-        <label class="label">Unidade</label>
-        <ng-select
-          formControlName="unidadeId"
-          [items]="unidades()"
-          bindLabel="nome"
-          bindValue="id"
-          placeholder="Todas as unidades"
-        ></ng-select>
-      </div>
-    </div>
-    <div class="filters__actions">
-      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
-      <button type="submit" class="btn btn--solid">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-        </svg>
-        Pesquisar
-      </button>
     </div>
   </form>
 
   <!-- Dados -->
   <section class="panel">
     <div class="panel__head">
-      <h2 class="panel__title">Avaliações</h2>
+      <h2 class="panel__title">Dados</h2>
       @if (carregado() && !error() && !loading()) {
         <span class="result-count">{{ totalElements() }} registro(s)</span>
       }
@@ -64,7 +55,7 @@
     @if (loading()) {
       <div class="state">
         <span class="spinner" aria-hidden="true"></span>
-        <p>Carregando avaliações…</p>
+        <p>Carregando categorias…</p>
       </div>
     } @else if (error()) {
       <div class="state">
@@ -73,52 +64,50 @@
         <p>Verifique se o servidor está disponível e tente novamente.</p>
         <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
       </div>
-    } @else if (registros().length === 0) {
+    } @else if (categorias().length === 0) {
       <div class="state">
         <span class="state__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 17.3 6.2 20.6l1.1-6.5-4.7-4.6 6.5-.9L12 2.7l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z" />
           </svg>
         </span>
-        <h3>Nenhuma avaliação encontrada</h3>
-        <p>As avaliações são geradas quando o paciente comparece ao atendimento.</p>
+        <h3>Nenhuma categoria encontrada</h3>
+        <p>Ajuste os filtros ou cadastre uma nova categoria de NPS.</p>
+        <a class="btn btn--ghost" routerLink="/categorias-nps/novo">Cadastrar categoria</a>
       </div>
     } @else {
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Atendimento</th>
-              <th>Paciente</th>
-              <th>Especialidade</th>
-              <th>Unidade</th>
-              <th>Média</th>
-              <th>Status</th>
+              <th class="col-cod">Código</th>
+              <th>Nome</th>
+              <th class="col-sit">Situação</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
           <tbody>
-            @for (n of registros(); track n.id) {
+            @for (c of categorias(); track c.id) {
               <tr
                 tabindex="0"
                 role="button"
-                [attr.aria-label]="'Ver avaliação de ' + n.paciente.nome"
-                (click)="abrir(n)"
-                (keydown.enter)="abrir(n)"
+                [attr.aria-label]="'Editar ' + c.nome"
+                (click)="editar(c)"
+                (keydown.enter)="editar(c)"
               >
-                <td class="cell-data">{{ n.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td><b>{{ n.paciente.nome }}</b></td>
-                <td class="muted-cell">{{ n.especialidade.nome }}</td>
-                <td class="muted-cell">{{ n.unidadeSaude.nome }}</td>
+                <td class="mono">{{ c.id }}</td>
                 <td>
-                  @if (n.media !== null && n.media !== undefined) {
-                    <span class="nota-badge">{{ n.media | number: '1.1-1' }}</span>
-                  } @else {
-                    <span class="muted-cell">—</span>
-                  }
+                  <span class="user-cell">
+                    <span class="avatar" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 17.3 6.2 20.6l1.1-6.5-4.7-4.6 6.5-.9L12 2.7l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5z" />
+                      </svg>
+                    </span>
+                    <b>{{ c.nome }}</b>
+                  </span>
                 </td>
-                <td>
-                  <span class="status-pill" [attr.data-nps]="n.status">{{ rotuloStatus(n.status) }}</span>
+                <td class="col-sit">
+                  <span class="sit" [class.sit--off]="!c.ativo">{{ c.ativo ? 'Ativo' : 'Inativo' }}</span>
                 </td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">
@@ -162,6 +151,7 @@
                 <path d="m15 6-6 6 6 6" />
               </svg>
             </button>
+
             @for (item of paginasVisiveis(); track $index) {
               @if (item === 'ellipsis') {
                 <span class="pager__ellipsis" aria-hidden="true">…</span>
@@ -177,6 +167,7 @@
                 </button>
               }
             }
+
             <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="m9 6 6 6-6 6" />

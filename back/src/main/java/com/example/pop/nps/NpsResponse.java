@@ -14,7 +14,7 @@ public record NpsResponse(
         LocalDateTime dataHora,
         StatusNps status,
         String statusDescricao,
-        Integer nota,
+        Double media,
         LocalDateTime criadoEm) {
 
     public static NpsResponse from(Nps nps) {
@@ -27,7 +27,7 @@ public record NpsResponse(
                 a.getDataHora(),
                 nps.getStatus(),
                 nps.getStatus().getDescricao(),
-                nps.getNota(),
+                nps.getMedia(),
                 nps.getCriadoEm());
     }
 }

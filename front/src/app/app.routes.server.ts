@@ -27,6 +27,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'categorias-nps/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'especialidades/:id',
     renderMode: RenderMode.Server,
   },

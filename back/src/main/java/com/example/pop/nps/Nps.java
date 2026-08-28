@@ -1,9 +1,12 @@
 package com.example.pop.nps;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.example.pop.agendamento.Agendamento;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +16,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -40,9 +44,17 @@ public class Nps {
     @Column(nullable = false, length = 20)
     private StatusNps status;
 
-    /** Nota de 0 a 10 (nula enquanto não respondido). */
+    /** Nota única (legado). As avaliações novas usam notas por categoria + média. */
     @Column
     private Integer nota;
+
+    /** Média das notas por categoria (nula enquanto não respondido). */
+    @Column
+    private Double media;
+
+    /** Notas dadas pelo paciente a cada categoria de NPS (carregadas sob demanda, no detalhe). */
+    @OneToMany(mappedBy = "nps", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<NpsCategoriaNota> notasCategorias = new ArrayList<>();
 
     /** Observação opcional do paciente. */
     @Column(columnDefinition = "TEXT")

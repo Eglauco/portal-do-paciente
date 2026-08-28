@@ -34,10 +34,26 @@
           <span class="status-pill" [attr.data-nps]="d.status">{{ rotuloStatus(d.status) }}</span>
         </div>
 
-        @if (d.status === 'RESPONDIDO' && d.nota !== null && d.nota !== undefined) {
+        @if (d.status === 'RESPONDIDO' && d.media !== null && d.media !== undefined) {
           <div class="nps-score">
-            <span class="nps-score__nota">{{ d.nota }}</span>
-            <span class="nps-score__de">de 10</span>
+            <span class="nps-score__nota">{{ d.media | number: '1.1-1' }}</span>
+            <span class="nps-score__de">média</span>
+          </div>
+
+          <div class="nps-notas">
+            <p class="section-label">Notas por categoria</p>
+            @if (d.notas.length) {
+              <ul class="nps-cat-list">
+                @for (n of d.notas; track n.categoriaId) {
+                  <li class="nps-cat">
+                    <span class="nps-cat__nome">{{ n.categoria }}</span>
+                    <span class="nota-badge">{{ n.nota }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="nps-obs__vazio">Sem notas por categoria.</p>
+            }
           </div>
 
           <div class="nps-obs">

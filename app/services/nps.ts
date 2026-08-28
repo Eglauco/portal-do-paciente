@@ -16,11 +16,24 @@ export interface NpsItem {
   dataHora: string;
   status: StatusNps;
   statusDescricao: string;
-  nota?: number | null;
+  media?: number | null;
   criadoEm: string;
 }
 
-/** Detalhe do NPS (inclui dados do atendimento). */
+/** Categoria de NPS ativa (o paciente dá uma nota 0 a 10 para cada). */
+export interface CategoriaNps {
+  id: number;
+  nome: string;
+}
+
+/** Nota dada a uma categoria dentro de uma avaliação. */
+export interface CategoriaNota {
+  categoriaId: number;
+  categoria: string;
+  nota: number;
+}
+
+/** Detalhe do NPS (inclui dados do atendimento e notas por categoria). */
 export interface NpsDetalhe {
   id: number;
   paciente: Ref;
@@ -31,7 +44,8 @@ export interface NpsDetalhe {
   dataHora: string;
   status: StatusNps;
   statusDescricao: string;
-  nota?: number | null;
+  media?: number | null;
+  notas: CategoriaNota[];
   observacao?: string | null;
   criadoEm: string;
   respondidoEm?: string | null;
@@ -67,16 +81,22 @@ export async function buscarNps(id: number | string): Promise<NpsDetalhe> {
   return comoJson<NpsDetalhe>(resposta);
 }
 
-/** Responde uma avaliação (nota 0 a 10 + observação opcional). */
+/** Categorias de NPS ativas (para o paciente avaliar). */
+export async function listarCategoriasNps(): Promise<CategoriaNps[]> {
+  const resposta = await fetch(`${API_URL}/categoria-nps/ativos`);
+  return comoJson<CategoriaNps[]>(resposta);
+}
+
+/** Responde uma avaliação (uma nota 0 a 10 por categoria + observação opcional). */
 export async function responderNps(
   id: number | string,
-  nota: number,
+  notas: { categoriaId: number; nota: number }[],
   observacao?: string | null,
 ): Promise<NpsDetalhe> {
   const resposta = await fetch(`${API_URL}/nps/${id}/responder`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nota, observacao: observacao?.trim() || null }),
+    body: JSON.stringify({ notas, observacao: observacao?.trim() || null }),
   });
   return comoJson<NpsDetalhe>(resposta);
 }

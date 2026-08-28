@@ -1,10 +1,12 @@
 package com.example.pop.nps;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
+import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+
+/** Resposta do NPS: uma nota (0 a 10) por categoria + observação opcional. */
 public record ResponderNpsRequest(
-        @NotNull @Min(0) @Max(10) Integer nota,
+        @NotEmpty @Valid List<CategoriaNotaRequest> notas,
         String observacao) {
 }

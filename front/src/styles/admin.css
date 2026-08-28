@@ -2085,3 +2085,18 @@
 .falta-just-label { margin-top: 1.1rem; }
 .falta-just { margin: 0.35rem 0 0; font-size: 0.92rem; color: var(--ink); line-height: 1.5; white-space: pre-wrap; }
 .falta-just--vazio { color: var(--muted); font-style: italic; }
+
+/* Notas por categoria no detalhe do NPS */
+.nps-notas { margin-top: 1.25rem; }
+.nps-cat-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.nps-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+.nps-cat__nome { font-size: 0.92rem; font-weight: 600; color: var(--ink); }

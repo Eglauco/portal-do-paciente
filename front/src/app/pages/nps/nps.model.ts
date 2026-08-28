@@ -14,11 +14,18 @@ export interface Nps {
   dataHora: string;
   status: StatusNps;
   statusDescricao: string;
-  nota?: number | null;
+  media?: number | null;
   criadoEm: string;
 }
 
-/** Detalhamento do NPS (inclui os dados do atendimento). */
+/** Nota de uma categoria dentro de uma avaliação. */
+export interface CategoriaNota {
+  categoriaId: number;
+  categoria: string;
+  nota: number;
+}
+
+/** Detalhamento do NPS (inclui os dados do atendimento e as notas por categoria). */
 export interface NpsDetalhe {
   id: number;
   paciente: Ref;
@@ -29,7 +36,8 @@ export interface NpsDetalhe {
   dataHora: string;
   status: StatusNps;
   statusDescricao: string;
-  nota?: number | null;
+  media?: number | null;
+  notas: CategoriaNota[];
   observacao?: string | null;
   criadoEm: string;
   respondidoEm?: string | null;

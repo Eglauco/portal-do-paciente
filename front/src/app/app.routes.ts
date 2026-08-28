@@ -89,6 +89,23 @@ export const routes: Routes = [
         title: 'Avaliação — Portal do Paciente · Admin',
       },
       {
+        path: 'categorias-nps',
+        loadComponent: () => import('./pages/categorias-nps/categorias-nps-list').then((m) => m.CategoriasNpsList),
+        title: 'Categorias de NPS — Portal do Paciente · Admin',
+      },
+      {
+        path: 'categorias-nps/novo',
+        loadComponent: () => import('./pages/categorias-nps/categoria-nps-form').then((m) => m.CategoriaNpsForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Nova categoria de NPS — Portal do Paciente · Admin',
+      },
+      {
+        path: 'categorias-nps/:id',
+        loadComponent: () => import('./pages/categorias-nps/categoria-nps-form').then((m) => m.CategoriaNpsForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar categoria de NPS — Portal do Paciente · Admin',
+      },
+      {
         path: 'pacientes',
         loadComponent: () => import('./pages/pacientes/pacientes-list').then((m) => m.PacientesList),
         title: 'Pacientes — Portal do Paciente · Admin',

@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -15,7 +15,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-nps-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe],
   templateUrl: './nps-list.html',
 })
 export class NpsList {

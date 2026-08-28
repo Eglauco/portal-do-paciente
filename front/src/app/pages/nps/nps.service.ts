@@ -24,10 +24,6 @@ export class NpsService {
     return this.http.get<NpsDetalhe>(`${this.base}/${id}`);
   }
 
-  responder(id: number, nota: number, observacao?: string | null): Observable<NpsDetalhe> {
-    return this.http.post<NpsDetalhe>(`${this.base}/${id}/responder`, { nota, observacao });
-  }
-
   expirar(id: number): Observable<NpsDetalhe> {
     return this.http.post<NpsDetalhe>(`${this.base}/${id}/expirar`, {});
   }

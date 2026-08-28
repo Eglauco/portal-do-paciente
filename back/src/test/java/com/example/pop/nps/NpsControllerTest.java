@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,9 +43,10 @@ class NpsControllerTest {
 
     @Test
     void filtraPorStatus() {
-        Pagina<NpsResponse> pagina = controller.listar(StatusNps.RESPONDIDO, null, null, 0, 50);
+        // As respostas semeadas foram reiniciadas para PENDENTE na V19 (nova rotina por categoria).
+        Pagina<NpsResponse> pagina = controller.listar(StatusNps.PENDENTE, null, null, 0, 50);
         assertTrue(pagina.totalElements() >= 1);
-        pagina.content().forEach(r -> assertEquals(StatusNps.RESPONDIDO, r.status()));
+        pagina.content().forEach(r -> assertEquals(StatusNps.PENDENTE, r.status()));
     }
 
     @Test
@@ -63,18 +65,42 @@ class NpsControllerTest {
         assertEquals(StatusNps.PENDENTE, gerado.getStatus());
         assertNull(gerado.getNota());
 
-        // Responde o NPS.
+        // Responde o NPS com uma nota por categoria (categorias semeadas 1 e 2).
         ResponseEntity<NpsDetalheResponse> resposta = controller.responder(
-                gerado.getId(), new ResponderNpsRequest(9, "Muito bom!"));
+                gerado.getId(),
+                new ResponderNpsRequest(
+                        List.of(new CategoriaNotaRequest(1L, 9), new CategoriaNotaRequest(2L, 8)),
+                        "Muito bom!"));
         NpsDetalheResponse corpo = resposta.getBody();
         assertNotNull(corpo);
         assertEquals(StatusNps.RESPONDIDO, corpo.status());
-        assertEquals(9, corpo.nota());
+        assertEquals(8.5, corpo.media(), 0.0001);
+        assertEquals(2, corpo.notas().size());
         assertNotNull(corpo.respondidoEm());
 
         // Regra: não pode responder de novo (já respondido).
         assertThrows(ResponseStatusException.class,
-                () -> controller.responder(gerado.getId(), new ResponderNpsRequest(3, "mudei de ideia")));
+                () -> controller.responder(gerado.getId(),
+                        new ResponderNpsRequest(List.of(new CategoriaNotaRequest(1L, 3)), "mudei de ideia")));
+
+        repository.deleteById(gerado.getId());
+        agendamentoController.excluir(criado.id());
+    }
+
+    @Test
+    void naoAceitaCategoriaRepetida() {
+        AgendamentoRequest novo = new AgendamentoRequest(
+                LocalDateTime.of(2026, 11, 7, 9, 0), 1L, 1L, 1L, 1L, 1L, null);
+        AgendamentoResponse criado = agendamentoController.criar(novo);
+        agendamentoController.atualizar(criado.id(), new AgendamentoRequest(
+                LocalDateTime.of(2026, 11, 7, 9, 0), 1L, 1L, 1L, 1L, 1L,
+                StatusAgendamento.PRESENCA_PACIENTE));
+        Nps gerado = repository.findByAgendamentoId(criado.id()).orElseThrow();
+
+        // Duas notas para a mesma categoria devem ser recusadas com 400 (e não estourar 500).
+        assertThrows(ResponseStatusException.class,
+                () -> controller.responder(gerado.getId(), new ResponderNpsRequest(
+                        List.of(new CategoriaNotaRequest(1L, 8), new CategoriaNotaRequest(1L, 6)), null)));
 
         // Limpa os registros criados no teste.
         repository.deleteById(gerado.getId());
