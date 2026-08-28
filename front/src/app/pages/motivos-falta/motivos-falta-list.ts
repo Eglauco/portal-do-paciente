@@ -125,7 +125,10 @@ export class MotivosFaltaList {
   }
 
   protected updateCodigo(event: Event): void {
-    this.codigo.set((event.target as HTMLInputElement).value);
+    const input = event.target as HTMLInputElement;
+    const apenasDigitos = input.value.replace(/\D/g, '');
+    if (input.value !== apenasDigitos) input.value = apenasDigitos;
+    this.codigo.set(apenasDigitos);
   }
 
   protected updateMotivo(event: Event): void {
