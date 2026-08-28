@@ -9,12 +9,23 @@ interface LoginResponse {
   token: string;
   nome: string;
   email: string;
+  unidadeSaudeId: number | null;
+  unidadeSaudeNome: string | null;
   expiraEm: string;
+}
+
+interface UsuarioLogadoResponse {
+  nome: string;
+  email: string;
+  unidadeSaudeId: number | null;
+  unidadeSaudeNome: string | null;
 }
 
 export interface UsuarioLogado {
   nome: string;
   email: string;
+  unidadeSaudeId: number | null;
+  unidadeSaudeNome: string | null;
 }
 
 const CHAVE_TOKEN = 'pop.token';
@@ -30,11 +41,30 @@ export class AuthService {
   private readonly _usuario = signal<UsuarioLogado | null>(this.lerUsuarioArmazenado());
   readonly usuario = this._usuario.asReadonly();
   readonly logado = computed(() => this._usuario() !== null);
+  /** Unidade de saúde ativa do usuário (usada como filtro/valor fixo nos CRUDs). */
+  readonly unidadeId = computed(() => this._usuario()?.unidadeSaudeId ?? null);
+  readonly unidadeNome = computed(() => this._usuario()?.unidadeSaudeNome ?? null);
 
   login(email: string, senha: string, lembrar: boolean): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${this.base}/login`, { email, senha })
       .pipe(tap((r) => this.armazenarSessao(r, lembrar)));
+  }
+
+  /** Troca a unidade ativa (persiste no backend) e atualiza a sessão local. */
+  trocarUnidade(unidadeSaudeId: number): Observable<UsuarioLogadoResponse> {
+    return this.http.put<UsuarioLogadoResponse>(`${this.base}/unidade`, { unidadeSaudeId }).pipe(
+      tap((u) => {
+        const atualizado: UsuarioLogado = {
+          nome: u.nome,
+          email: u.email,
+          unidadeSaudeId: u.unidadeSaudeId,
+          unidadeSaudeNome: u.unidadeSaudeNome,
+        };
+        this._usuario.set(atualizado);
+        this.gravarUsuario(atualizado);
+      }),
+    );
   }
 
   logout(): void {
@@ -55,7 +85,13 @@ export class AuthService {
   }
 
   private armazenarSessao(r: LoginResponse, lembrar: boolean): void {
-    this._usuario.set({ nome: r.nome, email: r.email });
+    const usuario: UsuarioLogado = {
+      nome: r.nome,
+      email: r.email,
+      unidadeSaudeId: r.unidadeSaudeId,
+      unidadeSaudeNome: r.unidadeSaudeNome,
+    };
+    this._usuario.set(usuario);
     if (!this.ehNavegador) return;
     const usar = lembrar ? localStorage : sessionStorage;
     const outro = lembrar ? sessionStorage : localStorage;
@@ -63,9 +99,24 @@ export class AuthService {
       outro.removeItem(CHAVE_TOKEN);
       outro.removeItem(CHAVE_USUARIO);
       usar.setItem(CHAVE_TOKEN, r.token);
-      usar.setItem(CHAVE_USUARIO, JSON.stringify({ nome: r.nome, email: r.email }));
+      usar.setItem(CHAVE_USUARIO, JSON.stringify(usuario));
     } catch {
       /* storage indisponível — mantém a sessão em memória */
+    }
+  }
+
+  /** Regrava o usuário no mesmo storage onde está o token. */
+  private gravarUsuario(usuario: UsuarioLogado): void {
+    if (!this.ehNavegador) return;
+    try {
+      const store = localStorage.getItem(CHAVE_TOKEN)
+        ? localStorage
+        : sessionStorage.getItem(CHAVE_TOKEN)
+          ? sessionStorage
+          : null;
+      store?.setItem(CHAVE_USUARIO, JSON.stringify(usuario));
+    } catch {
+      /* ignore */
     }
   }
 

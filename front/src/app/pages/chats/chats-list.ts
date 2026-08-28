@@ -3,10 +3,9 @@ import { Component, DestroyRef, afterNextRender, computed, inject, signal } from
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
-import { Unidade } from '../unidades/unidade.model';
-import { UnidadeService } from '../unidades/unidade.service';
 import { Chat, STATUS_OPTIONS, StatusChat, statusLabel } from './chat.model';
 import { ChatBuscaStore } from './chat-busca.store';
 import { ChatRealtimeService } from './chat-realtime.service';
@@ -22,22 +21,20 @@ export type PaginaItem = number | 'ellipsis';
 export class ChatsList {
   private readonly service = inject(ChatService);
   private readonly pacienteService = inject(PacienteService);
-  private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly store = inject(ChatBuscaStore);
   private readonly realtime = inject(ChatRealtimeService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
 
   protected readonly tamanhos = ChatService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly rotuloStatus = statusLabel;
 
   protected readonly pacientes = signal<Paciente[]>([]);
-  protected readonly unidades = signal<Unidade[]>([]);
 
   protected readonly filtro = new FormGroup({
     pacienteId: new FormControl<number | null>(this.store.pacienteId),
-    unidadeId: new FormControl<number | null>(this.store.unidadeId),
     status: new FormControl<StatusChat | null>(this.store.status),
     naoResolvidas: new FormControl<boolean>(this.store.naoResolvidas, { nonNullable: true }),
   });
@@ -76,7 +73,6 @@ export class ChatsList {
   constructor() {
     afterNextRender(() => {
       this.pacienteService.listar({}, 0, 100).subscribe({ next: (p) => this.pacientes.set(p.content) });
-      this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
       this.carregar();
       // Recarrega a lista quando chega qualquer mensagem nova (tempo real).
       const cancelar = this.realtime.observarLista(() => this.carregar());
@@ -90,7 +86,7 @@ export class ChatsList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ pacienteId: null, unidadeId: null, status: null, naoResolvidas: false });
+    this.filtro.reset({ pacienteId: null, status: null, naoResolvidas: false });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -119,7 +115,6 @@ export class ChatsList {
   private carregar(): void {
     const f = this.filtro.getRawValue();
     this.store.pacienteId = f.pacienteId;
-    this.store.unidadeId = f.unidadeId;
     this.store.status = f.status;
     this.store.naoResolvidas = f.naoResolvidas;
     this.store.size = this.size();
@@ -129,7 +124,7 @@ export class ChatsList {
     this.error.set(false);
     this.service
       .listar(
-        { pacienteId: f.pacienteId, unidadeId: f.unidadeId, status: f.status, naoResolvidas: f.naoResolvidas },
+        { pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId(), status: f.status, naoResolvidas: f.naoResolvidas },
         this.page(),
         this.size(),
       )

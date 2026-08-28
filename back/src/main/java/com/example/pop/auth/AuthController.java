@@ -15,11 +15,14 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.unidade.Unidade;
+import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.Usuario;
 import com.example.pop.usuario.UsuarioRepository;
 
@@ -30,15 +33,18 @@ import jakarta.validation.Valid;
 public class AuthController {
 
     private final UsuarioRepository usuarioRepository;
+    private final UnidadeRepository unidadeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
     private final long expiracaoHoras;
     /** Hash de referência (mesmo custo dos reais) para igualar o tempo quando a conta não existe. */
     private final String hashFicticio;
 
-    public AuthController(UsuarioRepository usuarioRepository, PasswordEncoder passwordEncoder,
-            JwtEncoder jwtEncoder, @Value("${app.jwt.expiration-hours:8}") long expiracaoHoras) {
+    public AuthController(UsuarioRepository usuarioRepository, UnidadeRepository unidadeRepository,
+            PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder,
+            @Value("${app.jwt.expiration-hours:8}") long expiracaoHoras) {
         this.usuarioRepository = usuarioRepository;
+        this.unidadeRepository = unidadeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
         this.expiracaoHoras = expiracaoHoras;
@@ -70,12 +76,30 @@ public class AuthController {
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 
-        return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), expira);
+        Long unidadeId = usuario.getUnidade() == null ? null : usuario.getUnidade().getId();
+        String unidadeNome = usuario.getUnidade() == null ? null : usuario.getUnidade().getNome();
+        return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira);
     }
 
-    /** Dados do usuário autenticado (usado pelo front para reidratar a sessão). */
+    /** Dados do usuário autenticado (recarrega do banco para refletir a unidade atual). */
     @GetMapping("/me")
     public UsuarioLogadoResponse me(@AuthenticationPrincipal Jwt jwt) {
-        return new UsuarioLogadoResponse(jwt.getClaimAsString("nome"), jwt.getSubject());
+        return UsuarioLogadoResponse.from(usuarioLogado(jwt));
+    }
+
+    /** Troca a unidade de saúde ativa do usuário logado (persistida no banco). */
+    @PutMapping("/unidade")
+    public UsuarioLogadoResponse trocarUnidade(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody TrocarUnidadeRequest request) {
+        Usuario usuario = usuarioLogado(jwt);
+        Unidade unidade = unidadeRepository.findById(request.unidadeSaudeId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade de saúde não encontrada"));
+        usuario.setUnidade(unidade);
+        return UsuarioLogadoResponse.from(usuarioRepository.save(usuario));
+    }
+
+    private Usuario usuarioLogado(Jwt jwt) {
+        return usuarioRepository.findByEmailIgnoreCase(jwt.getSubject())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida"));
     }
 }

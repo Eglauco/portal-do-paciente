@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.unidade.Unidade;
+import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
 
@@ -35,10 +37,13 @@ public class UsuarioController {
 
     private final UsuarioRepository repository;
     private final PasswordEncoder passwordEncoder;
+    private final UnidadeRepository unidadeRepository;
 
-    public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder) {
+    public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder,
+            UnidadeRepository unidadeRepository) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+        this.unidadeRepository = unidadeRepository;
     }
 
     /**
@@ -90,6 +95,7 @@ public class UsuarioController {
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
         usuario.setSenhaHash(passwordEncoder.encode(senha));
+        usuario.setUnidade(resolverUnidade(request.unidadeSaudeId()));
         return salvarUnico(usuario);
     }
 
@@ -106,6 +112,7 @@ public class UsuarioController {
                     }
                     existente.setNome(request.nome().trim());
                     existente.setEmail(email);
+                    existente.setUnidade(resolverUnidade(request.unidadeSaudeId()));
                     // Senha em branco na edição = mantém a atual. Não normalizamos a senha
                     // (é comparada crua no login), só validamos o tamanho.
                     String senha = request.senha();
@@ -115,6 +122,14 @@ public class UsuarioController {
                     return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private Unidade resolverUnidade(Long unidadeSaudeId) {
+        if (unidadeSaudeId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe a unidade de saúde");
+        }
+        return unidadeRepository.findById(unidadeSaudeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade de saúde não encontrada"));
     }
 
     /** Salva tratando a violação do índice único de e-mail como 409 (fecha a corrida TOCTOU). */

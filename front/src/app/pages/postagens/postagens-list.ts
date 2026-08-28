@@ -3,8 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
-import { Unidade } from '../unidades/unidade.model';
-import { UnidadeService } from '../unidades/unidade.service';
+import { AuthService } from '../../core/auth.service';
 import { Postagem } from './postagem.model';
 import { PostagemBuscaStore } from './postagem-busca.store';
 import { PostagemService } from './postagem.service';
@@ -23,17 +22,15 @@ const COMENTARIOS_OPCOES = [
 })
 export class PostagensList {
   private readonly service = inject(PostagemService);
-  private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly store = inject(PostagemBuscaStore);
+  private readonly auth = inject(AuthService);
 
   protected readonly tamanhos = PostagemService.TAMANHOS;
   protected readonly comentariosOpcoes = COMENTARIOS_OPCOES;
-  protected readonly unidades = signal<Unidade[]>([]);
 
   protected readonly filtro = new FormGroup({
     titulo: new FormControl<string>(this.store.titulo, { nonNullable: true }),
-    unidadeId: new FormControl<number | null>(this.store.unidadeId),
     comentarios: new FormControl<boolean | null>(this.store.comentarios),
   });
 
@@ -69,10 +66,7 @@ export class PostagensList {
   });
 
   constructor() {
-    afterNextRender(() => {
-      this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
-      this.carregar();
-    });
+    afterNextRender(() => this.carregar());
   }
 
   protected buscar(): void {
@@ -81,7 +75,7 @@ export class PostagensList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ titulo: '', unidadeId: null, comentarios: null });
+    this.filtro.reset({ titulo: '', comentarios: null });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -110,7 +104,6 @@ export class PostagensList {
   private carregar(): void {
     const f = this.filtro.getRawValue();
     this.store.titulo = f.titulo;
-    this.store.unidadeId = f.unidadeId;
     this.store.comentarios = f.comentarios;
     this.store.size = this.size();
     this.store.page = this.page();
@@ -118,7 +111,7 @@ export class PostagensList {
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ titulo: f.titulo, unidadeId: f.unidadeId, comentarios: f.comentarios }, this.page(), this.size())
+      .listar({ titulo: f.titulo, unidadeId: this.auth.unidadeId(), comentarios: f.comentarios }, this.page(), this.size())
       .subscribe({
         next: (pagina) => {
           this.registros.set(pagina.content);

@@ -51,13 +51,14 @@ public class ProntuarioController {
     public Pagina<ProntuarioResponse> listar(
             @RequestParam(required = false) String numero,
             @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) Long unidadeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "id"));
-        Page<Prontuario> resultado = repository.search(numero == null ? "" : numero, pacienteId, pageable);
+        Page<Prontuario> resultado = repository.search(numero == null ? "" : numero, pacienteId, unidadeId, pageable);
         List<ProntuarioResponse> content = resultado.getContent().stream().map(ProntuarioResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),

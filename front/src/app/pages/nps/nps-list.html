@@ -30,16 +30,6 @@
           placeholder="Todos os pacientes"
         ></ng-select>
       </div>
-      <div class="form-field">
-        <label class="label">Unidade</label>
-        <ng-select
-          formControlName="unidadeId"
-          [items]="unidades()"
-          bindLabel="nome"
-          bindValue="id"
-          placeholder="Todas as unidades"
-        ></ng-select>
-      </div>
     </div>
     <div class="filters__actions">
       <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>

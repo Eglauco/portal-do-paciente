@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
 import { Agendamento, STATUS_OPTIONS, StatusAgendamento, statusLabel } from './agendamento.model';
 import { AgendamentoBuscaStore } from './agendamento-busca.store';
 import { AgendamentoService } from './agendamento.service';
@@ -16,6 +17,7 @@ export class AgendamentosList {
   private readonly service = inject(AgendamentoService);
   private readonly router = inject(Router);
   private readonly store = inject(AgendamentoBuscaStore);
+  private readonly auth = inject(AuthService);
 
   protected readonly tamanhos = AgendamentoService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -101,7 +103,7 @@ export class AgendamentosList {
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar(this.status(), this.page(), this.size()).subscribe({
+    this.service.listar(this.status(), this.auth.unidadeId(), this.page(), this.size()).subscribe({
       next: (pagina) => {
         this.agendamentos.set(pagina.content);
         this.totalElements.set(pagina.totalElements);

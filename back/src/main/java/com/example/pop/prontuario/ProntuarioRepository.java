@@ -16,9 +16,11 @@ public interface ProntuarioRepository extends JpaRepository<Prontuario, Long> {
             select p from Prontuario p
             where (:numero = '' or lower(p.numeroAtendimento) like lower(concat('%', :numero, '%')))
               and (:pacienteId is null or p.agendamento.paciente.id = :pacienteId)
+              and (:unidadeId is null or p.agendamento.unidadeSaude.id = :unidadeId)
             """)
     Page<Prontuario> search(
             @Param("numero") String numero,
             @Param("pacienteId") Long pacienteId,
+            @Param("unidadeId") Long unidadeId,
             Pageable pageable);
 }

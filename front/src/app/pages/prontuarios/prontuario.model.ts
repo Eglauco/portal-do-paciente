@@ -44,6 +44,7 @@ export interface ProntuarioRequest {
 export interface ProntuarioFiltro {
   numero?: string | null;
   pacienteId?: number | null;
+  unidadeId?: number | null;
 }
 
 export interface Pagina<T> {

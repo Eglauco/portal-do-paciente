@@ -3,6 +3,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { Especialidade } from '../especialidades/especialidade.model';
 import { EspecialidadeService } from '../especialidades/especialidade.service';
@@ -40,6 +41,10 @@ export class AgendamentoForm implements PodeSair {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+  private readonly auth = inject(AuthService);
+
+  /** Unidade logada — o agendamento é sempre criado/editado na unidade ativa. */
+  protected readonly unidadeNome = this.auth.unidadeNome;
 
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly especialidades = signal<Especialidade[]>([]);
@@ -81,6 +86,9 @@ export class AgendamentoForm implements PodeSair {
     }
     afterNextRender(() => {
       this.carregarOpcoes();
+      // Unidade travada na unidade logada (não editável).
+      this.form.controls.unidadeSaudeId.setValue(this.auth.unidadeId());
+      this.form.controls.unidadeSaudeId.disable();
       if (this.editando()) this.carregarAgendamento();
     });
   }
@@ -180,7 +188,6 @@ export class AgendamentoForm implements PodeSair {
           profissionalSaudeId: a.profissionalSaude.id,
           procedimentoId: a.procedimento.id,
           pacienteId: a.paciente.id,
-          unidadeSaudeId: a.unidadeSaude.id,
           statusAgendamento: a.statusAgendamento,
         });
         this.faltaJustificada.set(a.faltaJustificada ?? false);

@@ -75,13 +75,14 @@ public class AgendamentoController {
     public Pagina<AgendamentoResponse> listar(
             @RequestParam(required = false) StatusAgendamento status,
             @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) Long unidadeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "dataHora"));
-        Page<Agendamento> resultado = repository.search(status, pacienteId, pageable);
+        Page<Agendamento> resultado = repository.search(status, pacienteId, unidadeId, pageable);
         List<AgendamentoResponse> content = resultado.getContent().stream()
                 .map(AgendamentoResponse::from)
                 .toList();

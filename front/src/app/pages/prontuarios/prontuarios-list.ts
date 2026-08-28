@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Prontuario } from './prontuario.model';
@@ -21,6 +22,7 @@ export class ProntuariosList {
   private readonly pacienteService = inject(PacienteService);
   private readonly router = inject(Router);
   private readonly store = inject(ProntuarioBuscaStore);
+  private readonly auth = inject(AuthService);
 
   protected readonly tamanhos = ProntuarioService.TAMANHOS;
   protected readonly pacientes = signal<Paciente[]>([]);
@@ -109,7 +111,9 @@ export class ProntuariosList {
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ numero: f.numero, pacienteId: f.pacienteId }, this.page(), this.size()).subscribe({
+    this.service
+      .listar({ numero: f.numero, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, this.page(), this.size())
+      .subscribe({
       next: (pagina) => {
         this.registros.set(pagina.content);
         this.totalElements.set(pagina.totalElements);

@@ -32,7 +32,7 @@ class ProntuarioControllerTest {
 
     @Test
     void listaProntuariosSemeados() {
-        Pagina<ProntuarioResponse> pagina = controller.listar(null, null, 0, 10);
+        Pagina<ProntuarioResponse> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 3, "esperado ao menos os prontuários semeados");
         assertNotNull(pagina.content().get(0).paciente());
         assertNotNull(pagina.content().get(0).numeroAtendimento());
@@ -40,7 +40,7 @@ class ProntuarioControllerTest {
 
     @Test
     void filtraPorNumero() {
-        Pagina<ProntuarioResponse> pagina = controller.listar("ATD-2026-0001", null, 0, 10);
+        Pagina<ProntuarioResponse> pagina = controller.listar("ATD-2026-0001", null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 1);
         assertTrue(pagina.content().stream().anyMatch(p -> p.numeroAtendimento().equals("ATD-2026-0001")));
     }

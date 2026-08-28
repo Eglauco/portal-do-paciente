@@ -109,9 +109,7 @@
           placeholder="Selecione a unidade"
           notFoundText="Nenhuma unidade encontrada"
         ></ng-select>
-        @if (invalido('unidadeSaudeId')) {
-          <span class="field-error">Selecione a unidade.</span>
-        }
+        <span class="field-hint">Vinculado à sua unidade ativa. Para mudar, troque a unidade no topo.</span>
       </div>
 
       @if (editando()) {

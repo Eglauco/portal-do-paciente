@@ -59,6 +59,22 @@
       </div>
 
       <div class="form-field">
+        <label class="label" for="unidade">Unidade de saúde <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="unidade"
+          formControlName="unidadeSaudeId"
+          [items]="unidades()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Selecione a unidade"
+          notFoundText="Nenhuma unidade encontrada"
+        ></ng-select>
+        @if (invalido('unidadeSaudeId')) {
+          <span class="field-error">Selecione a unidade de saúde.</span>
+        }
+      </div>
+
+      <div class="form-field">
         <label class="label" for="senha">
           Senha @if (!editando()) { <span class="req" aria-hidden="true">*</span> }
         </label>

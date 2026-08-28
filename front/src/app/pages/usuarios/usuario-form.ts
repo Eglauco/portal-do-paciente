@@ -1,20 +1,26 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { Unidade } from '../unidades/unidade.model';
+import { UnidadeService } from '../unidades/unidade.service';
 import { UsuarioService } from './usuario.service';
 
 @Component({
   selector: 'app-usuario-form',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, NgSelectModule],
   templateUrl: './usuario-form.html',
 })
 export class UsuarioForm implements PodeSair {
   private readonly service = inject(UsuarioService);
+  private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+
+  protected readonly unidades = signal<Unidade[]>([]);
 
   protected readonly form = new FormGroup({
     nome: new FormControl('', {
@@ -29,6 +35,7 @@ export class UsuarioForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.minLength(6)],
     }),
+    unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
   });
 
   protected readonly editando = signal(false);
@@ -46,13 +53,20 @@ export class UsuarioForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
+    this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
+
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       const id = Number(idParam);
       this.editando.set(true);
       this.codigo.set(id);
       this.service.buscarPorId(id).subscribe({
-        next: (usuario) => this.form.patchValue({ nome: usuario.nome, email: usuario.email }),
+        next: (usuario) =>
+          this.form.patchValue({
+            nome: usuario.nome,
+            email: usuario.email,
+            unidadeSaudeId: usuario.unidade?.id ?? null,
+          }),
         error: () => this.erroCarregar.set(true),
       });
     } else {
@@ -72,7 +86,7 @@ export class UsuarioForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome' | 'email' | 'senha'): boolean {
+  protected invalido(campo: 'nome' | 'email' | 'senha' | 'unidadeSaudeId'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
   }
@@ -89,6 +103,7 @@ export class UsuarioForm implements PodeSair {
     const dados = {
       nome: this.form.controls.nome.value.trim(),
       email: this.form.controls.email.value.trim(),
+      unidadeSaudeId: this.form.controls.unidadeSaudeId.value!,
       // Só envia quando preenchida; em branco na edição = mantém a atual.
       ...(senhaBruta.trim() ? { senha: senhaBruta } : {}),
     };

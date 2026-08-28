@@ -16,6 +16,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     @Query(value = """
             select u from Usuario u
+            left join fetch u.unidade
             where (:id is null or u.id = :id)
               and lower(u.nome) like lower(concat('%', :nome, '%'))
               and lower(u.email) like lower(concat('%', :email, '%'))

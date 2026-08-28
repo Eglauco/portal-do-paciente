@@ -3,10 +3,9 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
-import { Unidade } from '../unidades/unidade.model';
-import { UnidadeService } from '../unidades/unidade.service';
 import { Nps, STATUS_OPTIONS, StatusNps, statusLabel } from './nps.model';
 import { NpsBuscaStore } from './nps-busca.store';
 import { NpsService } from './nps.service';
@@ -21,21 +20,19 @@ export type PaginaItem = number | 'ellipsis';
 export class NpsList {
   private readonly service = inject(NpsService);
   private readonly pacienteService = inject(PacienteService);
-  private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly store = inject(NpsBuscaStore);
+  private readonly auth = inject(AuthService);
 
   protected readonly tamanhos = NpsService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly rotuloStatus = statusLabel;
 
   protected readonly pacientes = signal<Paciente[]>([]);
-  protected readonly unidades = signal<Unidade[]>([]);
 
   protected readonly filtro = new FormGroup({
     status: new FormControl<StatusNps | null>(this.store.status),
     pacienteId: new FormControl<number | null>(this.store.pacienteId),
-    unidadeId: new FormControl<number | null>(this.store.unidadeId),
   });
 
   protected readonly size = signal(this.store.size);
@@ -72,7 +69,6 @@ export class NpsList {
   constructor() {
     afterNextRender(() => {
       this.pacienteService.listar({}, 0, 100).subscribe({ next: (p) => this.pacientes.set(p.content) });
-      this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
       this.carregar();
     });
   }
@@ -83,7 +79,7 @@ export class NpsList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ status: null, pacienteId: null, unidadeId: null });
+    this.filtro.reset({ status: null, pacienteId: null });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -113,14 +109,13 @@ export class NpsList {
     const f = this.filtro.getRawValue();
     this.store.status = f.status;
     this.store.pacienteId = f.pacienteId;
-    this.store.unidadeId = f.unidadeId;
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ status: f.status, pacienteId: f.pacienteId, unidadeId: f.unidadeId }, this.page(), this.size())
+      .listar({ status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, this.page(), this.size())
       .subscribe({
         next: (pagina) => {
           this.registros.set(pagina.content);

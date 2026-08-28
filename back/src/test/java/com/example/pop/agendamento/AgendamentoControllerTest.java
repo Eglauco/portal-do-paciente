@@ -23,7 +23,7 @@ class AgendamentoControllerTest {
 
     @Test
     void listaOrdenadaPorDataDesc() {
-        Pagina<AgendamentoResponse> pagina = controller.listar(null, null, 0, 10);
+        Pagina<AgendamentoResponse> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 6, "esperado ao menos os agendamentos semeados");
         assertNotNull(pagina.content().get(0).paciente());
         assertNotNull(pagina.content().get(0).unidadeSaude());
@@ -31,7 +31,7 @@ class AgendamentoControllerTest {
 
     @Test
     void filtraPorStatus() {
-        Pagina<AgendamentoResponse> pagina = controller.listar(StatusAgendamento.FALTA_PACIENTE, null, 0, 10);
+        Pagina<AgendamentoResponse> pagina = controller.listar(StatusAgendamento.FALTA_PACIENTE, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 1);
         assertEquals(StatusAgendamento.FALTA_PACIENTE, pagina.content().get(0).statusAgendamento());
     }

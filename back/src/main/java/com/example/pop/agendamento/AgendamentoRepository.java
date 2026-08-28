@@ -12,12 +12,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
             select a from Agendamento a
             where (:status is null or a.statusAgendamento = :status)
               and (:pacienteId is null or a.paciente.id = :pacienteId)
+              and (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
             """,
             countQuery = """
             select count(a) from Agendamento a
             where (:status is null or a.statusAgendamento = :status)
               and (:pacienteId is null or a.paciente.id = :pacienteId)
+              and (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
             """)
     Page<Agendamento> search(@Param("status") StatusAgendamento status, @Param("pacienteId") Long pacienteId,
-            Pageable pageable);
+            @Param("unidadeId") Long unidadeId, Pageable pageable);
 }

@@ -154,12 +154,55 @@
       </div>
 
       <div class="topbar__right">
-        <button type="button" class="unit-chip">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 7h13l-2-2M20 17H7l2 2" />
-          </svg>
-          Unidade de Saúde 01
-        </button>
+        <div class="unit-switch">
+          <button
+            type="button"
+            class="unit-chip"
+            [class.is-open]="menuUnidadeAberto()"
+            (click)="abrirMenuUnidade()"
+            [attr.aria-expanded]="menuUnidadeAberto()"
+            aria-haspopup="menu"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 7h13l-2-2M20 17H7l2 2" />
+            </svg>
+            <span class="unit-chip__nome">{{ unidadeNome() ?? 'Selecione a unidade' }}</span>
+            <svg class="unit-chip__caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          @if (menuUnidadeAberto()) {
+            <button type="button" class="unit-backdrop" aria-label="Fechar" (click)="fecharMenuUnidade()"></button>
+            <div class="unit-menu" role="menu">
+              <p class="unit-menu__titulo">Trocar de unidade</p>
+              @if (carregandoUnidades()) {
+                <div class="unit-menu__estado">Carregando…</div>
+              } @else if (unidades().length === 0) {
+                <div class="unit-menu__estado">Nenhuma unidade cadastrada.</div>
+              } @else {
+                @for (u of unidades(); track u.id) {
+                  <button
+                    type="button"
+                    class="unit-menu__item"
+                    role="menuitemradio"
+                    [attr.aria-checked]="u.id === unidadeAtualId()"
+                    [class.is-active]="u.id === unidadeAtualId()"
+                    [disabled]="trocandoUnidade()"
+                    (click)="selecionarUnidade(u)"
+                  >
+                    <span>{{ u.nome }}</span>
+                    @if (u.id === unidadeAtualId()) {
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m5 12 5 5L20 7" />
+                      </svg>
+                    }
+                  </button>
+                }
+              }
+            </div>
+          }
+        </div>
 
         <button type="button" class="icon-btn" aria-label="Notificações">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

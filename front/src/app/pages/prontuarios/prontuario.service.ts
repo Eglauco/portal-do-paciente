@@ -26,6 +26,7 @@ export class ProntuarioService {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.numero) params = params.set('numero', filtro.numero);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
+    if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
     return this.http.get<Pagina<Prontuario>>(this.base, { params });
   }
 

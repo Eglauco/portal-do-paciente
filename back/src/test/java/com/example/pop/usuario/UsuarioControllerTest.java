@@ -58,27 +58,30 @@ class UsuarioControllerTest {
     @Test
     void criaComSenhaEValidaRegras() {
         Usuario novo = controller.criar(
-                new UsuarioRequest("Teste Senha", "teste.senha@unidadesaude.com.br", "segredo123"));
+                new UsuarioRequest("Teste Senha", "teste.senha@unidadesaude.com.br", "segredo123", 1L));
         Long id = novo.getId();
         assertNotNull(id);
         assertTrue(passwordEncoder.matches("segredo123", novo.getSenhaHash()), "a senha deve ser guardada com hash");
+        assertNotNull(novo.getUnidade(), "o usuário deve ficar vinculado à unidade");
+        assertEquals(1L, novo.getUnidade().getId());
 
         // E-mail duplicado → 409
         ResponseStatusException dup = assertThrows(ResponseStatusException.class, () -> controller
-                .criar(new UsuarioRequest("Outro", "teste.senha@unidadesaude.com.br", "segredo123")));
+                .criar(new UsuarioRequest("Outro", "teste.senha@unidadesaude.com.br", "segredo123", 1L)));
         assertEquals(409, dup.getStatusCode().value());
 
         // Senha curta → 400
         ResponseStatusException curta = assertThrows(ResponseStatusException.class,
-                () -> controller.criar(new UsuarioRequest("Curta", "curta@unidadesaude.com.br", "123")));
+                () -> controller.criar(new UsuarioRequest("Curta", "curta@unidadesaude.com.br", "123", 1L)));
         assertEquals(400, curta.getStatusCode().value());
 
         // Editar sem senha mantém o hash; com senha, troca.
         String hashAntigo = novo.getSenhaHash();
-        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", ""));
+        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "", 1L));
         assertEquals(hashAntigo, controller.buscar(id).getBody().getSenhaHash());
 
-        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "novaSenha123"));
+        controller.atualizar(id,
+                new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "novaSenha123", 1L));
         assertTrue(passwordEncoder.matches("novaSenha123", controller.buscar(id).getBody().getSenhaHash()));
 
         controller.excluir(id);

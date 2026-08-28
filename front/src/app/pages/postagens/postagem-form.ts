@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { StorageService } from '../prontuarios/storage.service';
 import { Unidade } from '../unidades/unidade.model';
@@ -56,8 +57,11 @@ export class PostagemForm implements PodeSair {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+  private readonly auth = inject(AuthService);
 
   protected readonly unidades = signal<Unidade[]>([]);
+  /** Unidade logada — a postagem é sempre publicada na unidade ativa. */
+  protected readonly unidadeNome = this.auth.unidadeNome;
 
   protected readonly form = new FormGroup({
     titulo: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -106,6 +110,9 @@ export class PostagemForm implements PodeSair {
     }
     afterNextRender(() => {
       this.carregarOpcoes();
+      // Unidade travada na unidade logada (não editável).
+      this.form.controls.unidadeSaudeId.setValue(this.auth.unidadeId());
+      this.form.controls.unidadeSaudeId.disable();
       if (this.editando()) this.carregarPostagem();
     });
   }
@@ -230,7 +237,6 @@ export class PostagemForm implements PodeSair {
           descricao: p.descricao ?? '',
           mostrarTotalCurtidas: p.mostrarTotalCurtidas,
           habilitarComentarios: p.habilitarComentarios,
-          unidadeSaudeId: p.unidadeSaude.id,
         });
         this.urlAtual = p.url;
         this.previewUrl.set(p.url);

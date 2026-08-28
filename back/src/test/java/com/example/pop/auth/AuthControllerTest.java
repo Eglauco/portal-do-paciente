@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,27 +14,49 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.usuario.UsuarioController;
+import com.example.pop.usuario.UsuarioRequest;
+
+/**
+ * Usa um usuário de teste próprio (com senha conhecida) para não depender da
+ * senha do admin semeado, que pode ser trocada no ambiente de desenvolvimento.
+ */
 @SpringBootTest
 class AuthControllerTest {
 
-    private static final String EMAIL_ADMIN = "adm@unidadesaude.com.br";
-    private static final String SENHA_ADMIN = "Admin@123";
+    private static final String EMAIL = "auth.controller.test@unidadesaude.com.br";
+    private static final String SENHA = "Teste-Auth-123";
 
     @Autowired
     private AuthController controller;
 
     @Autowired
+    private UsuarioController usuarioController;
+
+    @Autowired
     private JwtDecoder jwtDecoder;
+
+    private Long usuarioId;
+
+    @BeforeEach
+    void criarUsuario() {
+        usuarioId = usuarioController.criar(new UsuarioRequest("Auth Controller Test", EMAIL, SENHA, 1L)).getId();
+    }
+
+    @AfterEach
+    void limpar() {
+        usuarioController.excluir(usuarioId);
+    }
 
     @Test
     void loginComCredenciaisValidasEmiteJwt() {
-        LoginResponse resposta = controller.login(new LoginRequest(EMAIL_ADMIN, SENHA_ADMIN));
+        LoginResponse resposta = controller.login(new LoginRequest(EMAIL, SENHA));
         assertNotNull(resposta.token());
-        assertEquals(EMAIL_ADMIN, resposta.email());
+        assertEquals(EMAIL, resposta.email());
+        assertNotNull(resposta.unidadeSaudeId(), "o usuário deve ter uma unidade");
 
-        // O token é válido e carrega o e-mail no subject + o nome como claim.
         Jwt jwt = jwtDecoder.decode(resposta.token());
-        assertEquals(EMAIL_ADMIN, jwt.getSubject());
+        assertEquals(EMAIL, jwt.getSubject());
         assertNotNull(jwt.getClaimAsString("nome"));
         assertTrue(jwt.getExpiresAt().isAfter(jwt.getIssuedAt()));
     }
@@ -40,7 +64,7 @@ class AuthControllerTest {
     @Test
     void loginComSenhaErradaRetorna401() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.login(new LoginRequest(EMAIL_ADMIN, "senha-errada")));
+                () -> controller.login(new LoginRequest(EMAIL, "senha-errada")));
         assertEquals(401, ex.getStatusCode().value());
     }
 

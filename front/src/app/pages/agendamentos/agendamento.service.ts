@@ -14,11 +14,13 @@ export class AgendamentoService {
 
   listar(
     status: StatusAgendamento | null,
+    unidadeId: number | null = null,
     page = 0,
     size = AgendamentoService.TAMANHO_PADRAO,
   ): Observable<Pagina<Agendamento>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (status) params = params.set('status', status);
+    if (unidadeId != null) params = params.set('unidadeId', unidadeId);
     return this.http.get<Pagina<Agendamento>>(this.base, { params });
   }
 
