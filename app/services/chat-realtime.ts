@@ -2,6 +2,7 @@ import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { API_URL } from '@/constants/api';
 import { Mensagem, Remetente } from './chat';
+import { authHeaders } from './sessao';
 
 export interface DigitandoEvento {
   de: Remetente;
@@ -26,6 +27,11 @@ function garantirCliente(): Client {
   client = new Client({
     brokerURL: urlWs(),
     reconnectDelay: 4000,
+    // Token do paciente no CONNECT (o backend autoriza a assinatura por conversa).
+    connectHeaders: authHeaders(),
+    beforeConnect: () => {
+      if (client) client.connectHeaders = authHeaders();
+    },
     // Correções necessárias no React Native: o RN altera o byte NULL que
     // termina cada frame STOMP, então forçamos frames binários no envio e
     // recompomos o NULL no recebimento.

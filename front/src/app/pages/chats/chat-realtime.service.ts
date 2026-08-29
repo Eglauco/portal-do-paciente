@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../core/auth.service';
 import { Mensagem, Remetente } from './chat.model';
 
 export interface DigitandoEvento {
@@ -19,6 +20,7 @@ interface Assinatura {
  */
 @Injectable({ providedIn: 'root' })
 export class ChatRealtimeService {
+  private readonly auth = inject(AuthService);
   private client: Client | null = null;
   private readonly assinaturas = new Map<string, Assinatura>();
   private seq = 0;
@@ -27,11 +29,21 @@ export class ChatRealtimeService {
     return environment.apiUrl.replace(/^http/, 'ws').replace(/\/+$/, '') + '/ws';
   }
 
+  private cabecalhos(): Record<string, string> {
+    const token = this.auth.token();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
   private garantirCliente(): Client {
     if (this.client) return this.client;
     this.client = new Client({
       brokerURL: this.urlWs(),
       reconnectDelay: 4000,
+      // Token do admin no CONNECT (o backend exige autenticação no WebSocket).
+      connectHeaders: this.cabecalhos(),
+      beforeConnect: () => {
+        if (this.client) this.client.connectHeaders = this.cabecalhos();
+      },
       onConnect: () => {
         // Ao conectar (inclusive reconexão), reinscreve tudo.
         this.assinaturas.forEach((a) => {
