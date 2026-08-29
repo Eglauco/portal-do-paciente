@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { API_URL } from '@/constants/api';
@@ -16,17 +15,43 @@ export interface SessaoPaciente {
 /** Cache em memória para leitura síncrona do token (cabeçalhos das requisições). */
 let cache: SessaoPaciente | null = null;
 
-// SecureStore não existe na web; lá usamos AsyncStorage (o app real roda no aparelho).
+/**
+ * expo-secure-store é um módulo nativo (guarda o token cifrado). Existe no dev
+ * build / app standalone, mas pode não estar disponível no Expo Go — e o import
+ * dele avalia código nativo no topo do módulo, o que quebraria o app no arranque.
+ * Por isso carregamos sob demanda e, se não houver, caímos no AsyncStorage.
+ * Na web também usamos AsyncStorage (o app real roda no aparelho).
+ */
+type SecureStoreModulo = typeof import('expo-secure-store');
+let secureStorePromise: Promise<SecureStoreModulo | null> | undefined;
+
+function carregarSecureStore(): Promise<SecureStoreModulo | null> {
+  if (!secureStorePromise) {
+    secureStorePromise = (async () => {
+      if (Platform.OS === 'web') return null;
+      try {
+        return await import('expo-secure-store');
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return secureStorePromise;
+}
+
 async function lerBruto(): Promise<string | null> {
-  return Platform.OS === 'web' ? AsyncStorage.getItem(CHAVE) : SecureStore.getItemAsync(CHAVE);
+  const ss = await carregarSecureStore();
+  return ss ? ss.getItemAsync(CHAVE) : AsyncStorage.getItem(CHAVE);
 }
 async function gravarBruto(valor: string): Promise<void> {
-  if (Platform.OS === 'web') await AsyncStorage.setItem(CHAVE, valor);
-  else await SecureStore.setItemAsync(CHAVE, valor);
+  const ss = await carregarSecureStore();
+  if (ss) await ss.setItemAsync(CHAVE, valor);
+  else await AsyncStorage.setItem(CHAVE, valor);
 }
 async function apagarBruto(): Promise<void> {
-  if (Platform.OS === 'web') await AsyncStorage.removeItem(CHAVE);
-  else await SecureStore.deleteItemAsync(CHAVE);
+  const ss = await carregarSecureStore();
+  if (ss) await ss.deleteItemAsync(CHAVE);
+  else await AsyncStorage.removeItem(CHAVE);
 }
 
 /** Lê a sessão guardada no aparelho (chamada uma vez ao abrir o app). */
