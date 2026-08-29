@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.pop.common.Pagina;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/motivo-falta")
 public class MotivoFaltaController {
@@ -72,17 +74,21 @@ public class MotivoFaltaController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public MotivoFalta criar(@RequestBody MotivoFalta motivo) {
-        motivo.setId(null);
+    public MotivoFalta criar(@Valid @RequestBody MotivoFaltaRequest dados) {
+        MotivoFalta motivo = new MotivoFalta();
+        motivo.setMotivo(dados.motivo());
+        motivo.setAtivo(dados.ativo() == null || dados.ativo());
         return repository.save(motivo);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<MotivoFalta> atualizar(@PathVariable Long id, @RequestBody MotivoFalta dados) {
+    public ResponseEntity<MotivoFalta> atualizar(@PathVariable Long id, @Valid @RequestBody MotivoFaltaRequest dados) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setMotivo(dados.getMotivo());
-                    existente.setAtivo(dados.isAtivo());
+                    existente.setMotivo(dados.motivo());
+                    if (dados.ativo() != null) {
+                        existente.setAtivo(dados.ativo());
+                    }
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

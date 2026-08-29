@@ -21,6 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/paciente")
 public class PacienteController {
@@ -72,19 +74,20 @@ public class PacienteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Paciente criar(@RequestBody Paciente paciente) {
-        paciente.setId(null);
-        paciente.setTelefone(PacienteAcessoService.normalizarTelefone(paciente.getTelefone()));
+    public Paciente criar(@Valid @RequestBody PacienteRequest dados) {
+        Paciente paciente = new Paciente();
+        paciente.setNome(dados.nome());
+        paciente.setTelefone(PacienteAcessoService.normalizarTelefone(dados.telefone()));
         paciente.setAtivo(false); // a liberação é feita depois, via "gerar código"
         return salvarUnico(paciente);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @RequestBody Paciente paciente) {
+    public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @Valid @RequestBody PacienteRequest dados) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(paciente.getNome());
-                    existente.setTelefone(PacienteAcessoService.normalizarTelefone(paciente.getTelefone()));
+                    existente.setNome(dados.nome());
+                    existente.setTelefone(PacienteAcessoService.normalizarTelefone(dados.telefone()));
                     // ativo/código/aparelho são geridos por gerar-codigo/revogar, não pelo corpo.
                     return ResponseEntity.ok(salvarUnico(existente));
                 })

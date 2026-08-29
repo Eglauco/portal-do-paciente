@@ -35,12 +35,12 @@ class CategoriaNpsControllerTest {
 
     @Test
     void criaAtualizaExclui() {
-        CategoriaNps novo = controller.criar(new CategoriaNps(null, "Categoria de teste", true));
+        CategoriaNps novo = controller.criar(new CategoriaNpsRequest("Categoria de teste", true));
         Long id = novo.getId();
         assertNotNull(id);
 
         CategoriaNps atualizado = controller
-                .atualizar(id, new CategoriaNps(null, "Categoria de teste editada", false)).getBody();
+                .atualizar(id, new CategoriaNpsRequest("Categoria de teste editada", false)).getBody();
         assertNotNull(atualizado);
         assertEquals("Categoria de teste editada", atualizado.getNome());
         assertFalse(atualizado.isAtivo());

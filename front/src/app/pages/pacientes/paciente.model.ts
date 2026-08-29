@@ -6,6 +6,9 @@ export interface Paciente {
   ativo?: boolean;
 }
 
+/** Campos aceitos ao criar/editar (ativo/código são geridos pelo backend). */
+export type PacienteEntrada = Pick<Paciente, 'nome' | 'telefone'>;
+
 /** Código de ativação gerado para o paciente (mostrado uma única vez). */
 export interface CodigoAtivacao {
   codigo: string;

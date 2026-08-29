@@ -17,9 +17,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.paciente.PacienteRequest;
 
 import jakarta.servlet.Filter;
 
@@ -46,10 +46,7 @@ class PacienteAuthMvcTest {
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
-        Paciente p = new Paciente();
-        p.setNome("Paciente MVC");
-        p.setTelefone(TEL);
-        pacienteId = pacienteController.criar(p).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL)).getId();
         codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
     }
 
@@ -74,5 +71,22 @@ class PacienteAuthMvcTest {
         MvcResult me = mvc.perform(get("/paciente-auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andReturn();
         assertTrue(me.getResponse().getContentAsString().contains("Paciente MVC"));
+    }
+
+    /**
+     * Regressão: salvar paciente com "ativo": null no corpo não pode quebrar a
+     * desserialização (o DTO ignora ativo). Reproduz o erro relatado pelo admin.
+     */
+    @Test
+    void salvarComAtivoNuloNaoQuebra() throws Exception {
+        String tel = "11966665555";
+        repository.findByTelefone(tel).ifPresent(p -> repository.deleteById(p.getId()));
+        try {
+            String corpo = "{\"nome\":\"Teste Ativo Nulo\",\"telefone\":\"" + tel + "\",\"ativo\":null}";
+            mvc.perform(post("/paciente").contentType(MediaType.APPLICATION_JSON).content(corpo))
+                    .andExpect(status().isCreated());
+        } finally {
+            repository.findByTelefone(tel).ifPresent(p -> repository.deleteById(p.getId()));
+        }
     }
 }

@@ -4,12 +4,13 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { switchMap } from 'rxjs';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
 import { CodigoAtivacao } from './paciente.model';
 import { PacienteService } from './paciente.service';
 
 @Component({
   selector: 'app-paciente-form',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TelefoneBrDirective],
   templateUrl: './paciente-form.html',
 })
 export class PacienteForm implements PodeSair {

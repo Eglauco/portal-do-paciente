@@ -2,7 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CodigoAtivacao, Pagina, Paciente, PacienteFiltro } from './paciente.model';
+import { CodigoAtivacao, Pagina, Paciente, PacienteEntrada, PacienteFiltro } from './paciente.model';
 
 @Injectable({ providedIn: 'root' })
 export class PacienteService {
@@ -27,11 +27,11 @@ export class PacienteService {
     return this.http.get<Paciente>(`${this.base}/${id}`);
   }
 
-  criar(paciente: Paciente): Observable<Paciente> {
+  criar(paciente: PacienteEntrada): Observable<Paciente> {
     return this.http.post<Paciente>(this.base, paciente);
   }
 
-  atualizar(id: number, paciente: Paciente): Observable<Paciente> {
+  atualizar(id: number, paciente: PacienteEntrada): Observable<Paciente> {
     return this.http.put<Paciente>(`${this.base}/${id}`, paciente);
   }
 

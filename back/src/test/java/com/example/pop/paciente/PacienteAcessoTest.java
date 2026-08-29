@@ -39,10 +39,7 @@ class PacienteAcessoTest {
     @BeforeEach
     void criar() {
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
-        Paciente p = new Paciente();
-        p.setNome("Paciente Teste");
-        p.setTelefone(TEL);
-        pacienteId = pacienteController.criar(p).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Teste", TEL)).getId();
     }
 
     @AfterEach

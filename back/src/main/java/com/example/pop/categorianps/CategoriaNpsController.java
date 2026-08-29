@@ -23,6 +23,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/categoria-nps")
 public class CategoriaNpsController {
@@ -74,17 +76,21 @@ public class CategoriaNpsController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public CategoriaNps criar(@RequestBody CategoriaNps categoria) {
-        categoria.setId(null);
+    public CategoriaNps criar(@Valid @RequestBody CategoriaNpsRequest dados) {
+        CategoriaNps categoria = new CategoriaNps();
+        categoria.setNome(dados.nome());
+        categoria.setAtivo(dados.ativo() == null || dados.ativo());
         return repository.save(categoria);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CategoriaNps> atualizar(@PathVariable Long id, @RequestBody CategoriaNps dados) {
+    public ResponseEntity<CategoriaNps> atualizar(@PathVariable Long id, @Valid @RequestBody CategoriaNpsRequest dados) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(dados.getNome());
-                    existente.setAtivo(dados.isAtivo());
+                    existente.setNome(dados.nome());
+                    if (dados.ativo() != null) {
+                        existente.setAtivo(dados.ativo());
+                    }
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

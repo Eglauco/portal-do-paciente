@@ -35,12 +35,12 @@ class MotivoFaltaControllerTest {
 
     @Test
     void criaAtualizaExclui() {
-        MotivoFalta novo = controller.criar(new MotivoFalta(null, "Motivo de teste", true));
+        MotivoFalta novo = controller.criar(new MotivoFaltaRequest("Motivo de teste", true));
         Long id = novo.getId();
         assertNotNull(id);
 
         MotivoFalta atualizado = controller
-                .atualizar(id, new MotivoFalta(null, "Motivo de teste editado", false)).getBody();
+                .atualizar(id, new MotivoFaltaRequest("Motivo de teste editado", false)).getBody();
         assertNotNull(atualizado);
         assertEquals("Motivo de teste editado", atualizado.getMotivo());
         assertFalse(atualizado.isAtivo());
