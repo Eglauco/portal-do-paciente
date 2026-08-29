@@ -15,7 +15,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
-import { buscarConversa, ChatDetalhe, enviarMensagemPaciente, Mensagem } from '@/services/chat';
+import {
+  buscarConversa,
+  ChatDetalhe,
+  confirmarEntrega,
+  enviarMensagemPaciente,
+  Mensagem,
+} from '@/services/chat';
 import { limparChatAtivo, setChatAtivo } from '@/services/chat-ativo';
 import { observarDigitando, observarMensagens, sinalizarDigitando } from '@/services/chat-realtime';
 
@@ -71,6 +77,8 @@ export default function ConversaScreen() {
       setDetalhe(dados);
       jaCarregou.current = true;
       rolarParaFim(false);
+      // Confirma a entrega das mensagens da unidade que chegaram neste aparelho.
+      confirmarEntrega(id);
     } catch {
       setErro(true);
     } finally {
@@ -96,8 +104,15 @@ export default function ConversaScreen() {
       setDetalhe((d) => {
         if (!d) return d;
         if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
-        return { ...d, mensagens: [...d.mensagens, m] };
+        // Reconcilia o eco da própria mensagem otimista (mesmo texto, ainda pendente).
+        const base =
+          m.remetente === 'PACIENTE'
+            ? d.mensagens.filter((x) => !(x.pendente && x.texto === m.texto))
+            : d.mensagens;
+        return { ...d, mensagens: [...base, m] };
       });
+      // Recibo de entrega: a mensagem da unidade chegou neste aparelho.
+      if (m.remetente === 'UNIDADE') confirmarEntrega(id);
       rolarParaFim();
     });
     const cancelarDig = observarDigitando(id, (e) => {
@@ -127,13 +142,28 @@ export default function ConversaScreen() {
     const limpo = texto.trim();
     if (!limpo || !id || enviando) return;
     setEnviando(true);
+
+    // Otimista: mostra a mensagem na hora com o "relógio" (pendente) até o servidor confirmar.
+    const otimista: Mensagem = {
+      id: -Date.now(),
+      remetente: 'PACIENTE',
+      texto: limpo,
+      enviadaEm: new Date().toISOString(),
+      lida: false,
+      entregue: false,
+      pendente: true,
+    };
+    setDetalhe((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
+    setTexto('');
+    rolarParaFim();
+
     try {
       const atualizado = await enviarMensagemPaciente(id, limpo);
+      // Servidor confirmou: substitui a lista pela do servidor (mensagem já persistida = 2 checks).
       setDetalhe(atualizado);
-      setTexto('');
       rolarParaFim();
     } catch {
-      // mantém o texto para o usuário tentar novamente
+      // Falha (conexão ruim): a mensagem otimista continua com o relógio até chegar ao servidor.
     } finally {
       setEnviando(false);
     }
@@ -217,6 +247,12 @@ export default function ConversaScreen() {
                       <Text style={styles.texto}>{m.texto}</Text>
                       <View style={styles.rodape}>
                         <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
+                        {!daUnidade &&
+                          (m.pendente ? (
+                            <Ionicons name="time-outline" size={13} color="#7C8C87" />
+                          ) : (
+                            <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
+                          ))}
                       </View>
                     </View>
                   </View>

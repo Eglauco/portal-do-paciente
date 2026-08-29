@@ -64,7 +64,21 @@ export class ChatConversa {
     this.cancelamentos = [
       this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m)),
       this.realtime.observarDigitando(id, (e) => this.aoDigitandoRecebido(e)),
+      this.realtime.observarEntrega(id, () => this.aoEntregaConfirmada()),
     ];
+  }
+
+  /** O app do paciente recebeu as mensagens: marca as da unidade como entregues (2º check). */
+  private aoEntregaConfirmada(): void {
+    this.detalhe.update((d) => {
+      if (!d) return d;
+      return {
+        ...d,
+        mensagens: d.mensagens.map((m) =>
+          m.remetente === 'UNIDADE' && !m.entregue ? { ...m, entregue: true } : m,
+        ),
+      };
+    });
   }
 
   private cancelarTudo(): void {
@@ -80,7 +94,12 @@ export class ChatConversa {
     this.detalhe.update((d) => {
       if (!d) return d;
       if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
-      return { ...d, mensagens: [...d.mensagens, mensagem] };
+      // Reconcilia o eco da própria mensagem otimista (mesmo texto, ainda pendente).
+      const base =
+        mensagem.remetente === 'UNIDADE'
+          ? d.mensagens.filter((x) => !(x.pendente && x.texto === mensagem.texto))
+          : d.mensagens;
+      return { ...d, mensagens: [...base, mensagem] };
     });
     this.rolarParaFim();
     this.carregarLista();
@@ -98,14 +117,30 @@ export class ChatConversa {
     const id = this.idAtual();
     if (!conteudo || id == null || this.enviando()) return;
     this.enviando.set(true);
+
+    // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
+    const otimista: Mensagem = {
+      id: -Date.now(),
+      remetente: 'UNIDADE',
+      texto: conteudo,
+      enviadaEm: new Date().toISOString(),
+      lida: true,
+      entregue: false,
+      pendente: true,
+    };
+    this.detalhe.update((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
+    this.texto.set('');
+    this.rolarParaFim();
+
     this.service.enviar(id, conteudo).subscribe({
       next: (d) => {
+        // Back confirmou (1 check); o 2º check chega pelo evento de entrega.
         this.detalhe.set(d);
-        this.texto.set('');
         this.enviando.set(false);
         this.carregarLista();
         this.rolarParaFim();
       },
+      // Falha: mantém a mensagem otimista com o relógio.
       error: () => this.enviando.set(false),
     });
   }

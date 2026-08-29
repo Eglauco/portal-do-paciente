@@ -26,6 +26,9 @@ export interface Mensagem {
   texto: string;
   enviadaEm: string;
   lida: boolean;
+  entregue: boolean;
+  /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
+  pendente?: boolean;
 }
 
 export interface ChatDetalhe {

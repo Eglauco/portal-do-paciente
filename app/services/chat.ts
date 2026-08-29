@@ -28,6 +28,9 @@ export interface Mensagem {
   texto: string;
   enviadaEm: string;
   lida: boolean;
+  entregue: boolean;
+  /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
+  pendente?: boolean;
 }
 
 export interface ChatDetalhe {
@@ -77,4 +80,13 @@ export async function enviarMensagemPaciente(id: number | string, texto: string)
     body: JSON.stringify({ texto }),
   });
   return comoJson<ChatDetalhe>(resposta);
+}
+
+/** Confirma ao servidor que as mensagens da unidade chegaram neste aparelho (2º "check" no admin). */
+export async function confirmarEntrega(id: number | string): Promise<void> {
+  try {
+    await fetchMeu(`/meu/chats/${id}/entregue`, { method: 'POST' });
+  } catch {
+    // entrega é best-effort; não deve quebrar a conversa
+  }
 }

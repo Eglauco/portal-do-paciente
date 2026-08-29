@@ -13,4 +13,7 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     long countByChatIdAndRemetenteAndLidaFalse(Long chatId, RemetenteMensagem remetente);
 
     List<Mensagem> findByChatIdAndRemetenteAndLidaFalse(Long chatId, RemetenteMensagem remetente);
+
+    /** Mensagens de um remetente ainda não entregues ao destinatário (para os "checks"). */
+    List<Mensagem> findByChatIdAndRemetenteAndEntregueFalse(Long chatId, RemetenteMensagem remetente);
 }

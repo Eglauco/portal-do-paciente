@@ -91,6 +91,11 @@ export class ChatRealtimeService {
     return this.inscrever('/topic/chats', () => callback());
   }
 
+  /** Observa a confirmação de entrega (o app do paciente recebeu as mensagens). */
+  observarEntrega(chatId: number, callback: () => void): () => void {
+    return this.inscrever(`/topic/chat/${chatId}/entregue`, () => callback());
+  }
+
   /** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */
   sinalizarDigitando(chatId: number, de: Remetente): void {
     const cliente = this.garantirCliente();

@@ -1715,6 +1715,10 @@
 .wa__bolha--unidade { background: #d6f0e7; border-color: #cdeae1; border-top-left-radius: 14px; border-top-right-radius: 4px; }
 .wa__texto { display: block; font-size: 14.5px; color: var(--ink); line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
 .wa__rodape { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 3px; font-size: 10.5px; color: #7c8c87; }
+/* Checks de entrega (relógio -> 1 check no back -> 2 checks no app do paciente) */
+.wa__tick { width: 15px; height: 15px; stroke: #8a9b96; fill: none; flex-shrink: 0; }
+.wa__checks { display: inline-flex; align-items: center; }
+.wa__tick--2 { margin-left: -9px; }
 
 .wa__input { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
 .wa__campo { flex: 1; resize: none; max-height: 120px; min-height: 44px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 22px; font: inherit; font-size: 0.95rem; color: var(--ink); background: #f7faf9; outline: none; }

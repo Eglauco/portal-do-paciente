@@ -51,6 +51,26 @@ public class ChatService {
         messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
     }
 
+    /**
+     * Marca como ENTREGUES as mensagens da unidade que ainda não haviam chegado
+     * ao paciente (chamado quando o app do paciente recebe/abre a conversa) e
+     * avisa o back-office em tempo real (2º "check").
+     */
+    public void marcarEntregue(Long chatId) {
+        List<Mensagem> pendentes = mensagemRepository
+                .findByChatIdAndRemetenteAndEntregueFalse(chatId, RemetenteMensagem.UNIDADE);
+        if (pendentes.isEmpty()) {
+            return;
+        }
+        pendentes.forEach(m -> m.setEntregue(true));
+        mensagemRepository.saveAll(pendentes);
+        messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", new EntregaEvento(chatId));
+    }
+
+    /** Sinal de que as mensagens da conversa foram entregues ao paciente. */
+    public record EntregaEvento(Long chatId) {
+    }
+
     /** Marca as mensagens do paciente como lidas (lado da unidade). */
     public void marcarMensagensDoPacienteComoLidas(Long chatId) {
         List<Mensagem> naoLidas = mensagemRepository

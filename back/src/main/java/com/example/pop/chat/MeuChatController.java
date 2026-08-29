@@ -78,6 +78,14 @@ public class MeuChatController {
         return chatService.toDetalhe(chat);
     }
 
+    /** Confirma que as mensagens da unidade chegaram no aparelho do paciente (2º "check"). */
+    @PostMapping("/{id}/entregue")
+    @Transactional
+    public void confirmarEntrega(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        Chat chat = minhaConversa(jwt, id);
+        chatService.marcarEntregue(chat.getId());
+    }
+
     /** Carrega a conversa garantindo que é do paciente logado (404 caso contrário). */
     private Chat minhaConversa(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();

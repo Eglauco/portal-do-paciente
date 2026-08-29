@@ -7,9 +7,11 @@ public record MensagemResponse(
         RemetenteMensagem remetente,
         String texto,
         LocalDateTime enviadaEm,
-        boolean lida) {
+        boolean lida,
+        boolean entregue) {
 
     public static MensagemResponse from(Mensagem m) {
-        return new MensagemResponse(m.getId(), m.getRemetente(), m.getTexto(), m.getEnviadaEm(), m.isLida());
+        return new MensagemResponse(m.getId(), m.getRemetente(), m.getTexto(), m.getEnviadaEm(),
+                m.isLida(), m.isEntregue());
     }
 }

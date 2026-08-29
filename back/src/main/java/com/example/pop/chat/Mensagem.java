@@ -44,6 +44,11 @@ public class Mensagem {
     @Column(name = "enviada_em", nullable = false)
     private LocalDateTime enviadaEm;
 
+    /** A unidade já visualizou a mensagem do paciente (recibo de leitura interno). */
     @Column(nullable = false)
     private boolean lida;
+
+    /** A mensagem já chegou no aparelho do destinatário (entrega — os "checks"). */
+    @Column(nullable = false)
+    private boolean entregue;
 }

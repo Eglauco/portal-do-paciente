@@ -16,6 +16,10 @@ class ChatControllerTest {
 
     @Autowired
     private ChatController controller;
+    @Autowired
+    private ChatService chatService;
+    @Autowired
+    private MensagemRepository mensagemRepository;
 
     @Test
     void listaChatsSemeados() {
@@ -50,6 +54,19 @@ class ChatControllerTest {
         // do paciente) e trazer ao menos as mensagens semeadas.
         assertTrue(detalhe.mensagens().size() >= 3, "esperado ao menos as mensagens semeadas");
         assertEquals(RemetenteMensagem.PACIENTE, detalhe.mensagens().get(0).remetente());
+    }
+
+    @Test
+    void marcarEntregueMarcaMensagensDaUnidade() {
+        // Garante ao menos uma mensagem da unidade no chat.
+        controller.enviar(1L, new MensagemRequest("Resposta da unidade"));
+
+        chatService.marcarEntregue(1L);
+
+        boolean todasEntregues = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(1L).stream()
+                .filter(m -> m.getRemetente() == RemetenteMensagem.UNIDADE)
+                .allMatch(Mensagem::isEntregue);
+        assertTrue(todasEntregues, "todas as mensagens da unidade deveriam ficar entregues");
     }
 
     @Test
