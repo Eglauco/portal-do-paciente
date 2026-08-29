@@ -74,7 +74,15 @@ export default function ConversaScreen() {
       if (!jaCarregou.current) setCarregando(true);
       setErro(false);
       const dados = await buscarConversa(id);
-      setDetalhe(dados);
+      // Preserva mensagens otimistas em voo (pendentes/falha) ao recarregar o servidor.
+      setDetalhe((prev) => {
+        if (!prev || prev.id !== dados.id) return dados;
+        const noServidor = new Set(dados.mensagens.map((mm) => mm.clienteId).filter(Boolean));
+        const otimistas = prev.mensagens.filter(
+          (mm) => mm.id < 0 && (mm.pendente || mm.falha) && (!mm.clienteId || !noServidor.has(mm.clienteId)),
+        );
+        return { ...dados, mensagens: [...dados.mensagens, ...otimistas] };
+      });
       jaCarregou.current = true;
       rolarParaFim(false);
       // Confirma a entrega das mensagens da unidade que chegaram neste aparelho.
@@ -104,11 +112,11 @@ export default function ConversaScreen() {
       setDetalhe((d) => {
         if (!d) return d;
         if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
-        // Reconcilia o eco da própria mensagem otimista (temporária, id < 0, mesmo texto).
-        const base =
-          m.remetente === 'PACIENTE'
-            ? d.mensagens.filter((x) => !(x.id < 0 && x.texto === m.texto))
-            : d.mensagens;
+        // Reconcilia o eco da própria mensagem otimista (temporária, id < 0) pelo clienteId
+        // (1-para-1; cai no texto só se o eco não trouxer clienteId).
+        const ehOtimista = (x: Mensagem) =>
+          x.id < 0 && (m.clienteId ? x.clienteId === m.clienteId : x.texto === m.texto);
+        const base = m.remetente === 'PACIENTE' ? d.mensagens.filter((x) => !ehOtimista(x)) : d.mensagens;
         return { ...d, mensagens: [...base, m] };
       });
       // Recibo de entrega: a mensagem da unidade chegou neste aparelho.

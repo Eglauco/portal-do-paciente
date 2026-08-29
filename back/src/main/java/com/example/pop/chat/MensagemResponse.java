@@ -8,10 +8,11 @@ public record MensagemResponse(
         String texto,
         LocalDateTime enviadaEm,
         boolean lida,
-        boolean entregue) {
+        boolean entregue,
+        String clienteId) {
 
     public static MensagemResponse from(Mensagem m) {
         return new MensagemResponse(m.getId(), m.getRemetente(), m.getTexto(), m.getEnviadaEm(),
-                m.isLida(), m.isEntregue());
+                m.isLida(), m.isEntregue(), m.getClienteId());
     }
 }

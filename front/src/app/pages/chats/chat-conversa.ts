@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { retry, timer } from 'rxjs';
 import { Chat, ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
@@ -16,6 +17,7 @@ export class ChatConversa {
   private readonly realtime = inject(ChatRealtimeService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly digitando = signal(false);
   private cancelamentos: (() => void)[] = [];
@@ -42,7 +44,7 @@ export class ChatConversa {
       if (this.idAtual()) this.abrir(this.idAtual()!);
     });
 
-    inject(DestroyRef).onDestroy(() => this.cancelarTudo());
+    this.destroyRef.onDestroy(() => this.cancelarTudo());
   }
 
   protected abrir(id: number): void {
@@ -51,7 +53,7 @@ export class ChatConversa {
     // visualizar marca as mensagens do paciente como lidas ao abrir.
     this.service.visualizar(id).subscribe({
       next: (d) => {
-        this.detalhe.set(d);
+        this.aplicarDetalhe(d);
         this.carregandoDetalhe.set(false);
         this.carregarLista();
         this.rolarParaFim();
@@ -97,10 +99,14 @@ export class ChatConversa {
     this.detalhe.update((d) => {
       if (!d) return d;
       if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
-      // Reconcilia o eco da própria mensagem (substitui a otimista temporária, id < 0),
+      // Reconcilia o eco da própria mensagem (substitui a otimista temporária, id < 0)
+      // pelo clienteId (1-para-1; cai no texto só se o eco não trouxer clienteId),
       // preservando o "entregue" que já possa ter sido confirmado enquanto era otimista.
       const ehTemp = (x: Mensagem) =>
-        x.id < 0 && x.remetente === mensagem.remetente && x.texto === mensagem.texto;
+        x.id < 0 &&
+        (mensagem.clienteId
+          ? x.clienteId === mensagem.clienteId
+          : x.remetente === mensagem.remetente && x.texto === mensagem.texto);
       const jaEntregue = d.mensagens.some((x) => ehTemp(x) && x.entregue);
       const base = d.mensagens.filter((x) => !ehTemp(x));
       return { ...d, mensagens: [...base, { ...mensagem, entregue: mensagem.entregue || jaEntregue }] };
@@ -152,9 +158,14 @@ export class ChatConversa {
 
     this.service
       .enviar(id, conteudo, clienteId)
-      .pipe(retry({ count: this.ATRASOS.length, delay: (_e, n) => timer(this.ATRASOS[n - 1] ?? 16000) }))
+      .pipe(
+        retry({ count: this.ATRASOS.length, delay: (_e, n) => timer(this.ATRASOS[n - 1] ?? 16000) }),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
         next: (d) => {
+          // Ignora a resposta se o operador já trocou de conversa (não contamina o status).
+          if (this.idAtual() !== id) return;
           // Chegou no back (1 check). NÃO substitui a lista inteira (a resposta é um
           // retrato do envio, com entregue=false, e reverteria o 2º check que pode já
           // ter chegado). Só marca a otimista como enviada e atualiza o status.
@@ -173,8 +184,10 @@ export class ChatConversa {
           this.carregarLista();
           this.rolarParaFim();
         },
-        // Esgotou as tentativas: marca falha (mostra "reenviar").
-        error: () => this.marcarMensagem(tempId, { pendente: false, falha: true }),
+        // Esgotou as tentativas: marca falha (mostra "reenviar"), se ainda na mesma conversa.
+        error: () => {
+          if (this.idAtual() === id) this.marcarMensagem(tempId, { pendente: false, falha: true });
+        },
       });
   }
 
@@ -184,12 +197,27 @@ export class ChatConversa {
     );
   }
 
+  /**
+   * Aplica o retrato do servidor preservando mensagens otimistas em voo (pendentes/falha)
+   * da MESMA conversa que ainda não estão no servidor — evita que a bolha "suma" numa recarga.
+   */
+  private aplicarDetalhe(d: ChatDetalhe): void {
+    this.detalhe.update((prev) => {
+      if (!prev || prev.id !== d.id) return d; // conversa diferente: substitui
+      const noServidor = new Set(d.mensagens.map((m) => m.clienteId).filter(Boolean));
+      const otimistas = prev.mensagens.filter(
+        (m) => m.id < 0 && (m.pendente || m.falha) && (!m.clienteId || !noServidor.has(m.clienteId)),
+      );
+      return { ...d, mensagens: [...d.mensagens, ...otimistas] };
+    });
+  }
+
   protected resolver(): void {
     const id = this.idAtual();
     if (id == null) return;
     this.service.resolver(id).subscribe({
       next: (d) => {
-        this.detalhe.set(d);
+        this.aplicarDetalhe(d);
         this.carregarLista();
       },
     });
@@ -200,7 +228,7 @@ export class ChatConversa {
     if (id == null) return;
     this.service.reabrir(id).subscribe({
       next: (d) => {
-        this.detalhe.set(d);
+        this.aplicarDetalhe(d);
         this.carregarLista();
       },
     });
