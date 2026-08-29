@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 
 const FOTO_PACIENTE = 'https://i.pravatar.cc/240?img=47';
 
@@ -57,6 +59,15 @@ const SECOES: Secao[] = [
 
 export default function PerfilScreen() {
   const router = useRouter();
+  const { sessao, sair } = useSessao();
+  const [saindo, setSaindo] = useState(false);
+
+  async function sairDaConta() {
+    if (saindo) return;
+    setSaindo(true);
+    await sair();
+    router.replace('/');
+  }
 
   return (
     <View style={styles.screen}>
@@ -70,7 +81,7 @@ export default function PerfilScreen() {
           <View style={styles.avatarRing}>
             <Image source={FOTO_PACIENTE} style={styles.avatar} contentFit="cover" transition={200} />
           </View>
-          <Text style={styles.nome}>Mariana Duarte</Text>
+          <Text style={styles.nome}>{sessao?.nome ?? 'Paciente'}</Text>
           <Text style={styles.sub}>Paciente · Unidade de Saúde 01</Text>
           <View style={styles.codigo}>
             <Ionicons name="finger-print-outline" size={13} color={Brand.brandDeep} />
@@ -99,9 +110,10 @@ export default function PerfilScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.sair, pressed && styles.sairPressed]}
-          onPress={() => router.replace('/')}>
+          onPress={sairDaConta}
+          disabled={saindo}>
           <Ionicons name="log-out-outline" size={20} color="#B23B4E" />
-          <Text style={styles.sairTxt}>Sair da conta</Text>
+          <Text style={styles.sairTxt}>{saindo ? 'Saindo…' : 'Sair da conta'}</Text>
         </Pressable>
       </ScrollView>
     </View>

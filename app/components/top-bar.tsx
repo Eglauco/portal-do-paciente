@@ -5,12 +5,15 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 
 const FOTO_PACIENTE = 'https://i.pravatar.cc/160?img=47';
 
 export function TopBar() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { sessao } = useSessao();
+  const primeiroNome = sessao?.nome?.trim().split(/\s+/)[0] ?? 'Paciente';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -30,7 +33,7 @@ export function TopBar() {
         </View>
         <View>
           <Text style={styles.hello}>Olá,</Text>
-          <Text style={styles.name}>Mariana Duarte</Text>
+          <Text style={styles.name}>{primeiroNome}</Text>
         </View>
       </Pressable>
 

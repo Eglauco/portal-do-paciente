@@ -2,15 +2,20 @@ import '@/constants/polyfills';
 
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
 import { ehChatAtivo } from '@/services/chat-ativo';
 import { registrarParaPush } from '@/services/notificacoes';
+
+// Mantém a splash nativa até sabermos se o paciente já está logado (sem piscar o login).
+SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
   initialRouteName: 'index',
@@ -75,6 +80,39 @@ function tratarToque(resposta: Notifications.NotificationResponse) {
   }
 }
 
+/**
+ * Redireciona conforme a sessão: sem login só a tela inicial (index); com login,
+ * pula direto para o app. A splash só some quando já sabemos onde levar o paciente.
+ */
+function Navegacao() {
+  const { sessao, carregando } = useSessao();
+  const segments = useSegments();
+  const roteador = useRouter();
+
+  useEffect(() => {
+    if (carregando) return;
+    SplashScreen.hideAsync();
+    const naTelaDeLogin = (segments as string[]).length === 0; // rota "/" (index)
+    if (!sessao && !naTelaDeLogin) {
+      roteador.replace('/');
+    } else if (sessao && naTelaDeLogin) {
+      roteador.replace('/(tabs)/agendamentos');
+    }
+  }, [sessao, carregando, segments, roteador]);
+
+  return (
+    <Stack>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
+      <Stack.Screen name="perfil" options={{ headerShown: false }} />
+      <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
@@ -96,15 +134,9 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
-        <Stack.Screen name="perfil" options={{ headerShown: false }} />
-        <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
+      <SessaoProvider>
+        <Navegacao />
+      </SessaoProvider>
       <StatusBar style="auto" />
     </ThemeProvider>
   );
