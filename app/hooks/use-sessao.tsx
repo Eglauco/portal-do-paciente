@@ -39,10 +39,14 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Vincula o token de push a este paciente sempre que há sessão (login novo ou
+  // sessão restaurada no arranque).
+  useEffect(() => {
+    if (sessao) registrarParaPush().catch(() => {});
+  }, [sessao?.pacienteId]);
+
   async function ativar(telefone: string, codigo: string) {
     setSessao(await ativarServico(telefone, codigo));
-    // Revincula o token de push a este paciente (agora que há sessão).
-    registrarParaPush().catch(() => {});
   }
 
   async function sair() {
