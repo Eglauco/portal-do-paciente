@@ -94,12 +94,13 @@ export class ChatConversa {
     this.detalhe.update((d) => {
       if (!d) return d;
       if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
-      // Reconcilia o eco da própria mensagem otimista (mesmo texto, ainda pendente).
-      const base =
-        mensagem.remetente === 'UNIDADE'
-          ? d.mensagens.filter((x) => !(x.pendente && x.texto === mensagem.texto))
-          : d.mensagens;
-      return { ...d, mensagens: [...base, mensagem] };
+      // Reconcilia o eco da própria mensagem (substitui a otimista temporária, id < 0),
+      // preservando o "entregue" que já possa ter sido confirmado enquanto era otimista.
+      const ehTemp = (x: Mensagem) =>
+        x.id < 0 && x.remetente === mensagem.remetente && x.texto === mensagem.texto;
+      const jaEntregue = d.mensagens.some((x) => ehTemp(x) && x.entregue);
+      const base = d.mensagens.filter((x) => !ehTemp(x));
+      return { ...d, mensagens: [...base, { ...mensagem, entregue: mensagem.entregue || jaEntregue }] };
     });
     this.rolarParaFim();
     this.carregarLista();
@@ -119,8 +120,9 @@ export class ChatConversa {
     this.enviando.set(true);
 
     // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
+    const tempId = -Date.now();
     const otimista: Mensagem = {
-      id: -Date.now(),
+      id: tempId,
       remetente: 'UNIDADE',
       texto: conteudo,
       enviadaEm: new Date().toISOString(),
@@ -134,8 +136,19 @@ export class ChatConversa {
 
     this.service.enviar(id, conteudo).subscribe({
       next: (d) => {
-        // Back confirmou (1 check); o 2º check chega pelo evento de entrega.
-        this.detalhe.set(d);
+        // Chegou no back (1 check). NÃO substitui a lista inteira (a resposta é um
+        // retrato do envio, com entregue=false, e reverteria o 2º check que pode já
+        // ter chegado). Só marca a otimista como enviada e atualiza o status.
+        this.detalhe.update((atual) =>
+          atual
+            ? {
+                ...atual,
+                status: d.status,
+                statusDescricao: d.statusDescricao,
+                mensagens: atual.mensagens.map((m) => (m.id === tempId ? { ...m, pendente: false } : m)),
+              }
+            : atual,
+        );
         this.enviando.set(false);
         this.carregarLista();
         this.rolarParaFim();
