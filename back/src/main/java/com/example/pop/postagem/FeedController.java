@@ -11,6 +11,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -37,13 +41,16 @@ public class FeedController {
     private final CurtidaRepository curtidaRepository;
     private final ComentarioRepository comentarioRepository;
     private final StorageService storageService;
+    private final PacienteAcessoService acessoService;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
-            ComentarioRepository comentarioRepository, StorageService storageService) {
+            ComentarioRepository comentarioRepository, StorageService storageService,
+            PacienteAcessoService acessoService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
         this.storageService = storageService;
+        this.acessoService = acessoService;
     }
 
     @GetMapping("/feed")
@@ -118,14 +125,18 @@ public class FeedController {
     }
 
     @PostMapping("/postagem/{id}/comentarios")
-    public ComentarioResponse comentar(@PathVariable Long id, @Valid @RequestBody ComentarRequest request) {
+    public ComentarioResponse comentar(@PathVariable Long id, @Valid @RequestBody ComentarRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
         Postagem postagem = obter(id);
         if (!postagem.isHabilitarComentarios()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Comentários desativados para esta postagem");
         }
+        // Revalida a sessão (ativo + aparelho vinculado) e usa o nome do paciente
+        // validado — autor confiável, nunca vindo do corpo.
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
         Comentario comentario = new Comentario();
         comentario.setPostagem(postagem);
-        comentario.setAutor(request.autor().trim());
+        comentario.setAutor(nomeExibicao(paciente.getNome()));
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
         return ComentarioResponse.from(comentarioRepository.save(comentario));
@@ -135,7 +146,7 @@ public class FeedController {
     @PostMapping("/postagem/{id}/comentarios/{comentarioId}/responder")
     @Transactional
     public ComentarioResponse responder(@PathVariable Long id, @PathVariable Long comentarioId,
-            @Valid @RequestBody ComentarRequest request) {
+            @Valid @RequestBody ComentarRequest request, @AuthenticationPrincipal Jwt jwt) {
         Postagem postagem = obter(id);
         if (!postagem.isHabilitarComentarios()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Comentários desativados para esta postagem");
@@ -145,18 +156,35 @@ public class FeedController {
         if (!pai.getPostagem().getId().equals(id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comentário não pertence à postagem");
         }
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
         // Threading de 1 nível: a resposta se ancora sempre no comentário-raiz.
         Comentario raiz = pai.getComentarioPai() != null ? pai.getComentarioPai() : pai;
         Comentario resposta = new Comentario();
         resposta.setPostagem(postagem);
         resposta.setComentarioPai(raiz);
-        resposta.setAutor(request.autor().trim());
+        resposta.setAutor(nomeExibicao(paciente.getNome()));
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
         return ComentarioResponse.from(comentarioRepository.save(resposta));
     }
 
     // ---------- helpers ----------
+
+    /**
+     * Nome exibido no comentário: primeiro nome + inicial do sobrenome
+     * (ex.: "Mariana D."), por privacidade no feed público.
+     */
+    private String nomeExibicao(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return "Paciente";
+        }
+        String[] partes = nome.trim().split("\\s+");
+        if (partes.length == 1) {
+            return partes[0];
+        }
+        String sobrenome = partes[partes.length - 1];
+        return partes[0] + " " + Character.toUpperCase(sobrenome.charAt(0)) + ".";
+    }
 
     private Postagem obter(Long id) {
         return repository.findById(id)

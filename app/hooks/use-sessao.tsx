@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
+import { registrarParaPush } from '@/services/notificacoes';
 import {
   ativar as ativarServico,
   carregarSessao,
@@ -40,6 +41,8 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   async function ativar(telefone: string, codigo: string) {
     setSessao(await ativarServico(telefone, codigo));
+    // Revincula o token de push a este paciente (agora que há sessão).
+    registrarParaPush().catch(() => {});
   }
 
   async function sair() {

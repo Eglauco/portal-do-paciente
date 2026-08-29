@@ -15,10 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 import { comentar, Comentario, listarComentarios, responder } from '@/services/feed';
 
-// Nome fixo por enquanto; depois virá do paciente logado.
-const AUTOR = 'Mariana Duarte';
 const TAMANHO = 20;
 
 function iniciais(nome: string): string {
@@ -46,6 +45,8 @@ interface Props {
 
 export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentario }: Props) {
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  const AUTOR = sessao?.nome ?? 'Paciente';
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [carregandoMais, setCarregandoMais] = useState(false);

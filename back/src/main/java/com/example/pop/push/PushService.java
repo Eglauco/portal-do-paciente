@@ -45,48 +45,61 @@ public class PushService {
         return restClient;
     }
 
-    /** Notifica todos os dispositivos sobre um novo agendamento aguardando confirmação. */
+    /** Novo agendamento aguardando confirmação — só o paciente dono. */
     public void notificarNovoAgendamento(Agendamento a) {
         String corpo = "Consulta de " + a.getEspecialidade().getNome()
                 + " em " + a.getDataHora().format(DATA_FMT)
                 + ". Toque para confirmar ou cancelar.";
         Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId());
-        notificarTodos("Novo agendamento", corpo, data);
+        notificarPaciente(a.getPaciente().getId(), "Novo agendamento", corpo, data);
     }
 
-    /** Nova mensagem da unidade no chat. */
+    /** Nova mensagem da unidade no chat — só o paciente da conversa. */
     public void notificarNovaMensagem(Chat chat) {
         String corpo = "Você recebeu uma nova mensagem de " + chat.getUnidadeSaude().getNome() + ".";
         Map<String, Object> data = Map.of("tipo", "CHAT", "chatId", chat.getId());
-        notificarTodos("Nova mensagem", corpo, data);
+        notificarPaciente(chat.getPaciente().getId(), "Nova mensagem", corpo, data);
     }
 
-    /** Nova avaliação NPS pendente. */
+    /** Nova avaliação NPS pendente — só o paciente do atendimento. */
     public void notificarNpsPendente(Nps nps) {
         String especialidade = nps.getAgendamento().getEspecialidade().getNome();
         String corpo = "Como foi seu atendimento de " + especialidade + "? Toque para avaliar.";
-        notificarTodos("Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
+        notificarPaciente(nps.getAgendamento().getPaciente().getId(),
+                "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
     }
 
-    /** Nova publicação (postagem) no feed das unidades. */
+    /** Nova publicação (postagem) no feed das unidades — broadcast (todos os aparelhos). */
     public void notificarNovaPostagem(Postagem p) {
         String corpo = p.getUnidadeSaude().getNome() + " publicou: " + p.getTitulo();
         Map<String, Object> data = Map.of("tipo", "POSTAGEM", "postagemId", p.getId());
         notificarTodos("Nova publicação", corpo, data);
     }
 
-    /** Novo prontuário (novo=true) ou novo documento em um prontuário (novo=false). */
-    public void notificarProntuario(boolean novo) {
+    /** Novo prontuário (novo=true) ou novo documento (novo=false) — só o paciente dono. */
+    public void notificarProntuario(Long pacienteId, boolean novo) {
         String titulo = novo ? "Novo prontuário" : "Novo documento";
         String corpo = novo
                 ? "Seu atendimento foi registrado. Confira os documentos no prontuário."
                 : "Um novo documento foi adicionado ao seu prontuário.";
-        notificarTodos(titulo, corpo, Map.of("tipo", "PRONTUARIO"));
+        notificarPaciente(pacienteId, titulo, corpo, Map.of("tipo", "PRONTUARIO"));
+    }
+
+    /** Envia uma notificação só para os aparelhos de um paciente (push direcionado). */
+    public void notificarPaciente(Long pacienteId, String titulo, String corpo, Map<String, Object> data) {
+        if (pacienteId == null) {
+            return;
+        }
+        enviar(repository.findByPacienteId(pacienteId).stream().map(Dispositivo::getToken).toList(),
+                titulo, corpo, data);
     }
 
     /** Envia uma notificação para todos os dispositivos registrados. */
     public void notificarTodos(String titulo, String corpo, Map<String, Object> data) {
-        List<String> tokens = repository.findAll().stream().map(Dispositivo::getToken).toList();
+        enviar(repository.findAll().stream().map(Dispositivo::getToken).toList(), titulo, corpo, data);
+    }
+
+    private void enviar(List<String> tokens, String titulo, String corpo, Map<String, Object> data) {
         if (tokens.isEmpty()) {
             return;
         }

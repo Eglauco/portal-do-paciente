@@ -99,7 +99,7 @@ class ChatWebSocketAuthTest {
     void pacienteNaoAssinaConversaDeOutro() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId);
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, "dev-ws");
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }
@@ -108,8 +108,16 @@ class ChatWebSocketAuthTest {
     void adminAssinaQualquerConversa() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L);
+        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L, null);
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, admin);
         assertDoesNotThrow(() -> interceptor.preSend(m, null));
+    }
+
+    @Test
+    void pacienteNaoPublicaEmDestinoDeBroker() {
+        // SEND direto a /topic/** é proibido (impede forjar mensagem/impersonar a unidade).
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, "dev-ws");
+        Message<byte[]> m = frame(StompCommand.SEND, "/topic/chat/" + pacienteId, null, paciente);
+        assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }
 }

@@ -16,11 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 import { buscarPostagem, comentar, Comentario, curtir, listarComentarios, Postagem, responder } from '@/services/feed';
 import { obterDispositivoId } from '@/services/identidade';
 
-// Nome fixo por enquanto; depois virá do paciente logado.
-const AUTOR = 'Mariana Duarte';
 const TAMANHO = 20;
 
 function iniciais(nome: string): string {
@@ -43,6 +42,8 @@ export default function PostagemDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  const AUTOR = sessao?.nome ?? 'Paciente';
 
   const [post, setPost] = useState<Postagem | null>(null);
   const [carregando, setCarregando] = useState(true);

@@ -96,6 +96,16 @@ export async function ativar(telefone: string, codigo: string): Promise<SessaoPa
 
 /** Encerra a sessão (o paciente precisará de um novo código para voltar). */
 export async function sair(): Promise<void> {
+  // Desvincula o push deste aparelho ANTES de limpar a sessão (enquanto há token),
+  // para não receber notificações privadas do paciente anterior num aparelho compartilhado.
+  const cabecalhos = authHeaders();
+  if (cabecalhos.Authorization) {
+    try {
+      await fetch(`${API_URL}/dispositivo/desvincular`, { method: 'POST', headers: cabecalhos });
+    } catch {
+      // falha de rede não deve impedir o logout local
+    }
+  }
   cache = null;
   try {
     await apagarBruto();

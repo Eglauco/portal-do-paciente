@@ -27,6 +27,10 @@ public class Dispositivo {
     @Column(nullable = false, unique = true, length = 255)
     private String token;
 
+    /** Paciente dono do aparelho (para push direcionado). Null antes do login. */
+    @Column(name = "paciente_id")
+    private Long pacienteId;
+
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 }

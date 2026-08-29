@@ -1,4 +1,5 @@
 import { API_URL } from '@/constants/api';
+import { fetchMeu } from '@/services/sessao';
 
 interface Ref {
   id: number;
@@ -91,7 +92,8 @@ export async function listarComentarios(
 }
 
 export async function comentar(postagemId: number | string, autor: string, texto: string): Promise<Comentario> {
-  const resposta = await fetch(`${API_URL}/postagem/${postagemId}/comentarios`, {
+  // Autenticado: o backend define o autor pelo token (o nome enviado é ignorado).
+  const resposta = await fetchMeu(`/postagem/${postagemId}/comentarios`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ autor, texto }),
@@ -106,8 +108,8 @@ export async function responder(
   autor: string,
   texto: string,
 ): Promise<Comentario> {
-  const resposta = await fetch(
-    `${API_URL}/postagem/${postagemId}/comentarios/${comentarioId}/responder`,
+  const resposta = await fetchMeu(
+    `/postagem/${postagemId}/comentarios/${comentarioId}/responder`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

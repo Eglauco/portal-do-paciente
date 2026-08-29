@@ -71,12 +71,13 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         String papel = jwt.getClaimAsString("role");
         if ("PACIENTE".equals(papel)) {
             Paciente paciente = acessoService.pacienteDoToken(jwt); // valida sessão (ativo + aparelho vinculado)
-            return new ChatPrincipal("PACIENTE:" + paciente.getId(), "PACIENTE", paciente.getId());
+            return new ChatPrincipal("PACIENTE:" + paciente.getId(), "PACIENTE", paciente.getId(),
+                    jwt.getClaimAsString("dev"));
         }
         if ("ADMIN".equals(papel)) {
             Object uid = jwt.getClaim("uid");
             Long id = uid instanceof Number numero ? numero.longValue() : null;
-            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id);
+            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id, null);
         }
         throw new MessagingException("Chat: papel inválido");
     }
@@ -87,6 +88,12 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
             throw new MessagingException("Chat: não autenticado");
         }
         String destino = accessor.getDestination();
+        // Clientes só publicam em /app/** (ex.: /app/chat/{id}/digitando). SEND para
+        // destinos de broker (/topic/**) é proibido — impede forjar mensagem/impersonar
+        // a unidade e spam no sinal de lista.
+        if (StompCommand.SEND.equals(accessor.getCommand()) && (destino == null || !destino.startsWith("/app/"))) {
+            throw new MessagingException("Chat: publicação só é permitida em /app");
+        }
         if (destino == null) {
             return;
         }
@@ -97,6 +104,9 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         if ("ADMIN".equals(principal.role())) {
             return; // back-office enxerga todas as conversas
         }
+        // Paciente: revalida a sessão a cada assinatura (respeita revogação/troca de aparelho)
+        // e confere a posse da conversa.
+        acessoService.validarSessao(principal.id(), principal.dev());
         Long chatId = Long.valueOf(m.group(1));
         Long dono = chatRepository.findPacienteIdById(chatId).orElse(null);
         if (dono == null || !dono.equals(principal.id())) {

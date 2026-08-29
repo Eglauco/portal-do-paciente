@@ -6,23 +6,58 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.paciente.PacienteController;
+import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.paciente.PacienteRequest;
+import com.example.pop.pacienteauth.AtivarPacienteRequest;
+import com.example.pop.pacienteauth.PacienteAuthController;
 
 @SpringBootTest
 class PostagemControllerTest {
 
     private static final String IMG = "http://s3/portal-paciente/prontuarios/teste-postagem.jpg";
+    private static final String TEL = "11922221111";
 
     @Autowired
     private PostagemController controller;
-
     @Autowired
     private FeedController feedController;
+    @Autowired
+    private PacienteController pacienteController;
+    @Autowired
+    private PacienteAuthController authController;
+    @Autowired
+    private PacienteRepository pacienteRepository;
+    @Autowired
+    private JwtDecoder jwtDecoder;
+
+    private Long pacienteId;
+    /** Token do paciente logado — comentar/responder derivam o autor dele. */
+    private Jwt jwt;
+
+    @BeforeEach
+    void setup() {
+        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL)).getId();
+        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
+        String token = authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-post")).token();
+        jwt = jwtDecoder.decode(token);
+    }
+
+    @AfterEach
+    void limpar() {
+        pacienteRepository.deleteById(pacienteId);
+    }
 
     @Test
     void fluxoCriarFeedCurtirComentar() {
@@ -56,9 +91,9 @@ class PostagemControllerTest {
         assertTrue(meu.curtidoPorMim());
         assertEquals(1, meu.totalCurtidas());
 
-        // Comentar
-        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "Muito bom!"));
-        assertEquals("João", c.autor());
+        // Comentar — o autor vem do token do paciente (primeiro nome + inicial), não do corpo
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "Muito bom!"), jwt);
+        assertEquals("Joao T.", c.autor());
         assertEquals(1, feedController.comentarios(id, 0, 20).totalElements());
 
         // Excluir (cascade remove curtidas/comentários)
@@ -74,20 +109,20 @@ class PostagemControllerTest {
 
         // Comentário-raiz do paciente
         ComentarioResponse raiz = feedController.comentar(id,
-                new ComentarRequest("Mariana Duarte", "Que dia será esse evento?"));
+                new ComentarRequest("Mariana Duarte", "Que dia será esse evento?"), jwt);
         assertTrue(raiz.respostas().isEmpty());
 
-        // Administração responde
+        // Administração responde (lado admin: autor vem do corpo)
         ComentarioResponse respAdmin = controller
                 .responderComentario(raiz.id(), new ComentarRequest("Administração", "Será dia 10")).getBody();
         assertNotNull(respAdmin);
         assertEquals("Administração", respAdmin.autor());
 
-        // Outro paciente responde no mesmo comentário-raiz
-        feedController.responder(id, raiz.id(), new ComentarRequest("João", "Também quero saber"));
+        // Paciente responde no mesmo comentário-raiz
+        feedController.responder(id, raiz.id(), new ComentarRequest("João", "Também quero saber"), jwt);
 
         // Responder a uma resposta continua ancorado na raiz (threading de 1 nível)
-        feedController.responder(id, respAdmin.id(), new ComentarRequest("Mariana Duarte", "Qual horário?"));
+        feedController.responder(id, respAdmin.id(), new ComentarRequest("Mariana Duarte", "Qual horário?"), jwt);
 
         // Listagem: 1 comentário-raiz com 3 respostas
         Pagina<ComentarioResponse> pagina = feedController.comentarios(id, 0, 20);
@@ -108,7 +143,7 @@ class PostagemControllerTest {
                 "Aviso importante", "Sem comentários", true, false, 1L, IMG));
         Long id = criada.id();
         assertThrows(ResponseStatusException.class,
-                () -> feedController.comentar(id, new ComentarRequest("Ana", "oi")));
+                () -> feedController.comentar(id, new ComentarRequest("Ana", "oi"), jwt));
         controller.excluir(id);
     }
 

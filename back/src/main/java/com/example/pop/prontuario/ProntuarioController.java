@@ -80,9 +80,10 @@ public class ProntuarioController {
         }
         Prontuario prontuario = new Prontuario();
         aplicar(prontuario, request);
-        ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(repository.save(prontuario));
-        // Notifica o paciente sobre o novo prontuário.
-        pushService.notificarProntuario(true);
+        Prontuario salvo = repository.save(prontuario);
+        ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(salvo);
+        // Notifica o paciente dono sobre o novo prontuário.
+        pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), true);
         return resposta;
     }
 
@@ -96,10 +97,11 @@ public class ProntuarioController {
                     }
                     int documentosAntes = prontuario.getDocumentos().size();
                     aplicar(prontuario, request);
-                    ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(repository.save(prontuario));
-                    // Notifica o paciente se novos documentos foram adicionados.
+                    Prontuario salvo = repository.save(prontuario);
+                    ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(salvo);
+                    // Notifica o paciente dono se novos documentos foram adicionados.
                     if (request.documentos().size() > documentosAntes) {
-                        pushService.notificarProntuario(false);
+                        pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), false);
                     }
                     return ResponseEntity.ok(resposta);
                 })

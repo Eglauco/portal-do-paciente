@@ -53,14 +53,19 @@ public class SecurityConfig {
                         // Públicos (sem token).
                         .requestMatchers("/auth/login", "/paciente-auth/ativar").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
-                        .requestMatchers("/feed/**", "/postagem/**", "/dispositivo").permitAll()
+                        .requestMatchers("/feed/**", "/dispositivo").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/postagem/*/curtir").permitAll()
                         // App do paciente logado.
+                        .requestMatchers(HttpMethod.POST, "/postagem/*/comentarios", "/postagem/*/comentarios/*/responder")
+                        .hasRole("PACIENTE")
                         .requestMatchers("/meu/**").hasRole("PACIENTE")
                         .requestMatchers("/paciente-auth/**").authenticated() // /me
                         // Back-office (admin): o front do admin envia o token em todas as chamadas.
                         .requestMatchers("/auth/**", "/paciente/**", "/prontuario/**", "/storage/**", "/usuario/**",
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
-                                "/procedimento/**", "/profissional/**", "/motivo-falta/**", "/categoria-nps/**")
+                                "/procedimento/**", "/profissional/**", "/motivo-falta/**", "/categoria-nps/**",
+                                "/postagem/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())

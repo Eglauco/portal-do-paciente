@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { API_URL } from '@/constants/api';
+import { authHeaders } from './sessao';
 
 /**
  * Registra o aparelho para receber notificações push:
@@ -48,11 +49,12 @@ export async function registrarParaPush(): Promise<string | null> {
     return null;
   }
 
-  // Registra no backend (idempotente).
+  // Registra no backend (idempotente). Se houver sessão, o Bearer vincula o
+  // token a este paciente (push direcionado); sem sessão, fica sem dono.
   try {
     await fetch(`${API_URL}/dispositivo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ token }),
     });
   } catch {
