@@ -7,6 +7,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.example.pop.common.Ref;
+import com.example.pop.push.PushService;
 
 /**
  * Regras e mapeamentos de chat compartilhados entre o lado da unidade
@@ -18,23 +19,22 @@ public class ChatService {
     private final ChatRepository repository;
     private final MensagemRepository mensagemRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final PushService pushService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
-            SimpMessagingTemplate messagingTemplate) {
+            SimpMessagingTemplate messagingTemplate, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.messagingTemplate = messagingTemplate;
+        this.pushService = pushService;
     }
 
     /** Registra uma mensagem do paciente na conversa e publica em tempo real. */
-    public Chat enviarComoPaciente(Chat chat, String texto) {
-        Mensagem mensagem = new Mensagem();
-        mensagem.setChat(chat);
-        mensagem.setRemetente(RemetenteMensagem.PACIENTE);
-        mensagem.setTexto(texto.trim());
-        mensagem.setEnviadaEm(LocalDateTime.now());
-        mensagem.setLida(false);
-        Mensagem salva = mensagemRepository.save(mensagem);
+    public Chat enviarComoPaciente(Chat chat, String texto, String clienteId) {
+        if (jaEnviada(chat.getId(), clienteId)) {
+            return chat; // idempotente: reenvio da mesma mensagem não duplica
+        }
+        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false);
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
@@ -43,6 +43,41 @@ public class ChatService {
 
         publicar(chat.getId(), salva);
         return chat;
+    }
+
+    /** Registra uma mensagem da unidade (operador), publica e notifica o paciente. */
+    public Chat enviarComoUnidade(Chat chat, String texto, String clienteId) {
+        if (jaEnviada(chat.getId(), clienteId)) {
+            return chat; // idempotente
+        }
+        marcarMensagensDoPacienteComoLidas(chat.getId());
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true);
+
+        chat.setStatus(StatusChat.EM_ATENDIMENTO);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        repository.save(chat);
+
+        publicar(chat.getId(), salva);
+        // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
+        pushService.notificarNovaMensagem(chat);
+        return chat;
+    }
+
+    /** true se já existe uma mensagem com este clienteId no chat (evita duplicar em reenvios). */
+    private boolean jaEnviada(Long chatId, String clienteId) {
+        return clienteId != null && !clienteId.isBlank()
+                && mensagemRepository.findByChatIdAndClienteId(chatId, clienteId).isPresent();
+    }
+
+    private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida) {
+        Mensagem mensagem = new Mensagem();
+        mensagem.setChat(chat);
+        mensagem.setRemetente(remetente);
+        mensagem.setTexto(texto.trim());
+        mensagem.setEnviadaEm(LocalDateTime.now());
+        mensagem.setLida(lida);
+        mensagem.setClienteId(clienteId != null && !clienteId.isBlank() ? clienteId.trim() : null);
+        return mensagemRepository.save(mensagem);
     }
 
     /** Publica a nova mensagem em tempo real (conversa + sinal de lista). */

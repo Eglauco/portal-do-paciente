@@ -1708,9 +1708,9 @@
 .wa__mensagens { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; background: #eef3f1; display: flex; flex-direction: column; }
 .wa__aviso { align-self: center; font-size: 11.5px; color: #6a7b76; background: #fcf6e3; padding: 6px 12px; border-radius: 10px; margin-bottom: 12px; }
 .wa__dia { align-self: center; font-size: 11.5px; font-weight: 600; color: #6a7b76; background: #dde7e3; padding: 4px 12px; border-radius: 10px; margin: 10px 0; }
-.wa__bolha-wrap { max-width: 72%; margin-bottom: 8px; }
-.wa--esq { align-self: flex-start; }
-.wa--dir { align-self: flex-end; }
+.wa__bolha-wrap { display: flex; flex-direction: column; max-width: 72%; margin-bottom: 8px; }
+.wa--esq { align-self: flex-start; align-items: flex-start; }
+.wa--dir { align-self: flex-end; align-items: flex-end; }
 .wa__bolha { border-radius: 14px; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-top-left-radius: 4px; }
 .wa__bolha--unidade { background: #d6f0e7; border-color: #cdeae1; border-top-left-radius: 14px; border-top-right-radius: 4px; }
 .wa__texto { display: block; font-size: 14.5px; color: var(--ink); line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
@@ -1719,6 +1719,14 @@
 .wa__tick { width: 15px; height: 15px; stroke: #8a9b96; fill: none; flex-shrink: 0; }
 .wa__checks { display: inline-flex; align-items: center; }
 .wa__tick--2 { margin-left: -9px; }
+.wa__tick--erro { stroke: #d9534f; }
+.wa__reenviar {
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-end;
+  margin-top: 4px; padding: 2px 4px; background: none; border: 0; cursor: pointer;
+  font: inherit; font-size: 11.5px; font-weight: 600; color: #d9534f;
+}
+.wa__reenviar svg { width: 13px; height: 13px; stroke: #d9534f; fill: none; }
+.wa__reenviar:hover { text-decoration: underline; }
 
 .wa__input { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); background: var(--surface); }
 .wa__campo { flex: 1; resize: none; max-height: 120px; min-height: 44px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 22px; font: inherit; font-size: 0.95rem; color: var(--ink); background: #f7faf9; outline: none; }

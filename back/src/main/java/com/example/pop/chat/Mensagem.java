@@ -51,4 +51,8 @@ public class Mensagem {
     /** A mensagem já chegou no aparelho do destinatário (entrega — os "checks"). */
     @Column(nullable = false)
     private boolean entregue;
+
+    /** Id gerado pelo cliente (idempotência): evita duplicar em reenvios. */
+    @Column(name = "cliente_id", length = 60)
+    private String clienteId;
 }

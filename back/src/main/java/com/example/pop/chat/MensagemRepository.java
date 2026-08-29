@@ -1,10 +1,14 @@
 package com.example.pop.chat;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
+
+    /** Idempotência: encontra a mensagem já gravada com este clienteId (evita duplicar em reenvios). */
+    Optional<Mensagem> findByChatIdAndClienteId(Long chatId, String clienteId);
 
     List<Mensagem> findByChatIdOrderByEnviadaEmAsc(Long chatId);
 

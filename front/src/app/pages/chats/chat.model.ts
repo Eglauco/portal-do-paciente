@@ -29,6 +29,15 @@ export interface Mensagem {
   entregue: boolean;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
   pendente?: boolean;
+  /** Só no cliente: o envio falhou depois das retentativas (mostra "reenviar"). */
+  falha?: boolean;
+  /** Id gerado pelo cliente (idempotência do reenvio). */
+  clienteId?: string;
+}
+
+/** Id único gerado pelo cliente para tornar o reenvio idempotente. */
+export function novoClienteId(): string {
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export interface ChatDetalhe {

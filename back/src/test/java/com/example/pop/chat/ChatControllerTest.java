@@ -30,7 +30,7 @@ class ChatControllerTest {
     @Test
     void filtraPorStatusNaoLida() {
         // Garante o cenário: paciente envia e o chat fica NAO_LIDA (independe do seed).
-        controller.enviarComoPaciente(2L, new MensagemRequest("Tenho uma dúvida sobre o resultado."));
+        controller.enviarComoPaciente(2L, new MensagemRequest("Tenho uma dúvida sobre o resultado.", null));
 
         Pagina<ChatResponse> pagina = controller.listar(null, null, StatusChat.NAO_LIDA, false, 0, 50);
         assertTrue(pagina.totalElements() >= 1);
@@ -59,7 +59,7 @@ class ChatControllerTest {
     @Test
     void marcarEntregueMarcaMensagensDaUnidade() {
         // Garante ao menos uma mensagem da unidade no chat.
-        controller.enviar(1L, new MensagemRequest("Resposta da unidade"));
+        controller.enviar(1L, new MensagemRequest("Resposta da unidade", null));
 
         chatService.marcarEntregue(1L);
 
@@ -70,13 +70,25 @@ class ChatControllerTest {
     }
 
     @Test
+    void reenvioComMesmoClienteIdNaoDuplica() {
+        String clienteId = java.util.UUID.randomUUID().toString();
+        int antes = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(2L).size();
+
+        controller.enviarComoPaciente(2L, new MensagemRequest("mensagem idempotente", clienteId));
+        controller.enviarComoPaciente(2L, new MensagemRequest("mensagem idempotente", clienteId)); // reenvio
+
+        int depois = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(2L).size();
+        assertEquals(antes + 1, depois, "reenvio com o mesmo clienteId nao deve duplicar");
+    }
+
+    @Test
     void pacienteEnviaMensagemEChatFicaNaoLida() {
         ChatDetalheResponse antes = controller.buscar(4L).getBody();
         assertNotNull(antes);
         int qtdAntes = antes.mensagens().size();
 
         ChatDetalheResponse depois = controller
-                .enviarComoPaciente(4L, new MensagemRequest("Olá, tenho uma dúvida sobre o exame.")).getBody();
+                .enviarComoPaciente(4L, new MensagemRequest("Olá, tenho uma dúvida sobre o exame.", null)).getBody();
         assertNotNull(depois);
         assertEquals(qtdAntes + 1, depois.mensagens().size());
 

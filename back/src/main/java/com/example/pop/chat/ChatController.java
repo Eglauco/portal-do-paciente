@@ -20,7 +20,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
-import com.example.pop.push.PushService;
 
 import jakarta.validation.Valid;
 
@@ -32,16 +31,11 @@ public class ChatController {
     private static final int TAMANHO_MAXIMO = 100;
 
     private final ChatRepository repository;
-    private final MensagemRepository mensagemRepository;
     private final ChatService chatService;
-    private final PushService pushService;
 
-    public ChatController(ChatRepository repository, MensagemRepository mensagemRepository,
-            ChatService chatService, PushService pushService) {
+    public ChatController(ChatRepository repository, ChatService chatService) {
         this.repository = repository;
-        this.mensagemRepository = mensagemRepository;
         this.chatService = chatService;
-        this.pushService = pushService;
     }
 
     @GetMapping
@@ -88,24 +82,7 @@ public class ChatController {
     @PostMapping("/{id}/mensagem")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviar(@PathVariable Long id, @Valid @RequestBody MensagemRequest request) {
-        Chat chat = obter(id);
-        chatService.marcarMensagensDoPacienteComoLidas(chat.getId());
-
-        Mensagem mensagem = new Mensagem();
-        mensagem.setChat(chat);
-        mensagem.setRemetente(RemetenteMensagem.UNIDADE);
-        mensagem.setTexto(request.texto().trim());
-        mensagem.setEnviadaEm(LocalDateTime.now());
-        mensagem.setLida(true);
-        Mensagem salva = mensagemRepository.save(mensagem);
-
-        chat.setStatus(StatusChat.EM_ATENDIMENTO);
-        chat.setAtualizadoEm(LocalDateTime.now());
-        repository.save(chat);
-
-        chatService.publicar(chat.getId(), salva);
-        // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
-        pushService.notificarNovaMensagem(chat);
+        Chat chat = chatService.enviarComoUnidade(obter(id), request.texto(), request.clienteId());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
@@ -114,8 +91,7 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviarComoPaciente(@PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
-        Chat chat = obter(id);
-        chatService.enviarComoPaciente(chat, request.texto());
+        Chat chat = chatService.enviarComoPaciente(obter(id), request.texto(), request.clienteId());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 

@@ -21,6 +21,7 @@ import {
   confirmarEntrega,
   enviarMensagemPaciente,
   Mensagem,
+  novoClienteId,
 } from '@/services/chat';
 import { limparChatAtivo, setChatAtivo } from '@/services/chat-ativo';
 import { observarDigitando, observarMensagens, sinalizarDigitando } from '@/services/chat-realtime';
@@ -58,7 +59,6 @@ export default function ConversaScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [texto, setTexto] = useState('');
-  const [enviando, setEnviando] = useState(false);
   const [digitando, setDigitando] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
@@ -104,10 +104,10 @@ export default function ConversaScreen() {
       setDetalhe((d) => {
         if (!d) return d;
         if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
-        // Reconcilia o eco da própria mensagem otimista (mesmo texto, ainda pendente).
+        // Reconcilia o eco da própria mensagem otimista (temporária, id < 0, mesmo texto).
         const base =
           m.remetente === 'PACIENTE'
-            ? d.mensagens.filter((x) => !(x.pendente && x.texto === m.texto))
+            ? d.mensagens.filter((x) => !(x.id < 0 && x.texto === m.texto))
             : d.mensagens;
         return { ...d, mensagens: [...base, m] };
       });
@@ -138,35 +138,86 @@ export default function ConversaScreen() {
     }
   };
 
-  const enviar = async () => {
-    const limpo = texto.trim();
-    if (!limpo || !id || enviando) return;
-    setEnviando(true);
+  // Tenta enviar com retentativas (conexão ruim); após esgotar, marca "falha" (reenviar).
+  const tentarEnviar = useCallback(
+    async (tempId: number, clienteId: string, conteudo: string) => {
+      if (!id) return;
+      const ATRASOS = [2000, 4000, 8000, 16000]; // tentativa inicial + 4 retentativas ≈ 30s
+      setDetalhe((d) =>
+        d
+          ? {
+              ...d,
+              mensagens: d.mensagens.map((m) =>
+                m.id === tempId ? { ...m, pendente: true, falha: false } : m,
+              ),
+            }
+          : d,
+      );
+      for (let i = 0; i <= ATRASOS.length; i++) {
+        try {
+          // clienteId torna o reenvio idempotente (não duplica se a resposta se perdeu).
+          const atualizado = await enviarMensagemPaciente(id, conteudo, clienteId);
+          // Não substitui a lista inteira (preservaria outras mensagens ainda pendentes);
+          // só marca ESTA como enviada (2 checks) e atualiza o status.
+          setDetalhe((d) =>
+            d
+              ? {
+                  ...d,
+                  status: atualizado.status,
+                  statusDescricao: atualizado.statusDescricao,
+                  mensagens: d.mensagens.map((m) =>
+                    m.id === tempId ? { ...m, pendente: false, falha: false } : m,
+                  ),
+                }
+              : d,
+          );
+          rolarParaFim();
+          return;
+        } catch {
+          if (i === ATRASOS.length) {
+            setDetalhe((d) =>
+              d
+                ? {
+                    ...d,
+                    mensagens: d.mensagens.map((m) =>
+                      m.id === tempId ? { ...m, pendente: false, falha: true } : m,
+                    ),
+                  }
+                : d,
+            );
+            return;
+          }
+          await new Promise((r) => setTimeout(r, ATRASOS[i]));
+        }
+      }
+    },
+    [id],
+  );
 
+  const enviar = () => {
+    const limpo = texto.trim();
+    if (!limpo || !id) return;
     // Otimista: mostra a mensagem na hora com o "relógio" (pendente) até o servidor confirmar.
+    const tempId = -Date.now();
+    const clienteId = novoClienteId();
     const otimista: Mensagem = {
-      id: -Date.now(),
+      id: tempId,
       remetente: 'PACIENTE',
       texto: limpo,
       enviadaEm: new Date().toISOString(),
       lida: false,
       entregue: false,
       pendente: true,
+      clienteId,
     };
     setDetalhe((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
     setTexto('');
     rolarParaFim();
+    tentarEnviar(tempId, clienteId, limpo);
+  };
 
-    try {
-      const atualizado = await enviarMensagemPaciente(id, limpo);
-      // Servidor confirmou: substitui a lista pela do servidor (mensagem já persistida = 2 checks).
-      setDetalhe(atualizado);
-      rolarParaFim();
-    } catch {
-      // Falha (conexão ruim): a mensagem otimista continua com o relógio até chegar ao servidor.
-    } finally {
-      setEnviando(false);
-    }
+  const reenviar = (m: Mensagem) => {
+    if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto);
   };
 
   const mensagens = detalhe?.mensagens ?? [];
@@ -248,13 +299,26 @@ export default function ConversaScreen() {
                       <View style={styles.rodape}>
                         <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
                         {!daUnidade &&
-                          (m.pendente ? (
+                          (m.falha ? (
+                            <Ionicons name="alert-circle" size={14} color="#E0524D" />
+                          ) : m.pendente ? (
                             <Ionicons name="time-outline" size={13} color="#7C8C87" />
                           ) : (
                             <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
                           ))}
                       </View>
                     </View>
+                    {!daUnidade && m.falha && (
+                      <Pressable
+                        style={styles.reenviar}
+                        onPress={() => reenviar(m)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel="Reenviar mensagem">
+                        <Ionicons name="refresh" size={12} color="#E0524D" />
+                        <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               );
@@ -276,15 +340,11 @@ export default function ConversaScreen() {
               />
             </View>
             <Pressable
-              style={[styles.enviar, (enviando || !texto.trim()) && styles.enviarDesativado]}
+              style={[styles.enviar, !texto.trim() && styles.enviarDesativado]}
               onPress={enviar}
-              disabled={enviando || !texto.trim()}
+              disabled={!texto.trim()}
               accessibilityLabel="Enviar mensagem">
-              {enviando ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name="send" size={19} color="#fff" />
-              )}
+              <Ionicons name="send" size={19} color="#fff" />
             </Pressable>
           </View>
         )}
@@ -356,6 +416,8 @@ const styles = StyleSheet.create({
   texto: { fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
   hora: { fontSize: 10.5, color: '#7C8C87' },
+  reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
+  reenviarTxt: { fontSize: 11, color: '#E0524D', fontWeight: '600' },
 
   inputBar: {
     flexDirection: 'row',

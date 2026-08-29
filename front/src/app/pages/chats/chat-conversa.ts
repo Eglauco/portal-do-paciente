@@ -1,7 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Chat, ChatDetalhe, Mensagem } from './chat.model';
+import { retry, timer } from 'rxjs';
+import { Chat, ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
@@ -21,11 +22,13 @@ export class ChatConversa {
   private timerDigitando: ReturnType<typeof setTimeout> | null = null;
   private ultimoSinalDigitando = 0;
 
+  /** Atrasos entre as retentativas de envio (tentativa inicial + 4 ≈ 30s). */
+  private readonly ATRASOS = [2000, 4000, 8000, 16000];
+
   protected readonly chats = signal<Chat[]>([]);
   protected readonly detalhe = signal<ChatDetalhe | null>(null);
   protected readonly idAtual = signal<number | null>(null);
   protected readonly carregandoDetalhe = signal(false);
-  protected readonly enviando = signal(false);
   protected readonly texto = signal('');
 
   private readonly mensagensRef = viewChild<ElementRef<HTMLElement>>('mensagens');
@@ -116,11 +119,11 @@ export class ChatConversa {
   protected enviar(): void {
     const conteudo = this.texto().trim();
     const id = this.idAtual();
-    if (!conteudo || id == null || this.enviando()) return;
-    this.enviando.set(true);
+    if (!conteudo || id == null) return;
 
     // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
     const tempId = -Date.now();
+    const clienteId = novoClienteId();
     const otimista: Mensagem = {
       id: tempId,
       remetente: 'UNIDADE',
@@ -129,33 +132,56 @@ export class ChatConversa {
       lida: true,
       entregue: false,
       pendente: true,
+      clienteId,
     };
     this.detalhe.update((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
     this.texto.set('');
     this.rolarParaFim();
+    this.tentarEnviar(tempId, clienteId, conteudo);
+  }
 
-    this.service.enviar(id, conteudo).subscribe({
-      next: (d) => {
-        // Chegou no back (1 check). NÃO substitui a lista inteira (a resposta é um
-        // retrato do envio, com entregue=false, e reverteria o 2º check que pode já
-        // ter chegado). Só marca a otimista como enviada e atualiza o status.
-        this.detalhe.update((atual) =>
-          atual
-            ? {
-                ...atual,
-                status: d.status,
-                statusDescricao: d.statusDescricao,
-                mensagens: atual.mensagens.map((m) => (m.id === tempId ? { ...m, pendente: false } : m)),
-              }
-            : atual,
-        );
-        this.enviando.set(false);
-        this.carregarLista();
-        this.rolarParaFim();
-      },
-      // Falha: mantém a mensagem otimista com o relógio.
-      error: () => this.enviando.set(false),
-    });
+  protected reenviar(m: Mensagem): void {
+    if (m.clienteId) this.tentarEnviar(m.id, m.clienteId, m.texto);
+  }
+
+  /** Envia com retentativas (conexão ruim); após esgotar, marca "falha" (reenviar). */
+  private tentarEnviar(tempId: number, clienteId: string, conteudo: string): void {
+    const id = this.idAtual();
+    if (id == null) return;
+    this.marcarMensagem(tempId, { pendente: true, falha: false });
+
+    this.service
+      .enviar(id, conteudo, clienteId)
+      .pipe(retry({ count: this.ATRASOS.length, delay: (_e, n) => timer(this.ATRASOS[n - 1] ?? 16000) }))
+      .subscribe({
+        next: (d) => {
+          // Chegou no back (1 check). NÃO substitui a lista inteira (a resposta é um
+          // retrato do envio, com entregue=false, e reverteria o 2º check que pode já
+          // ter chegado). Só marca a otimista como enviada e atualiza o status.
+          this.detalhe.update((atual) =>
+            atual
+              ? {
+                  ...atual,
+                  status: d.status,
+                  statusDescricao: d.statusDescricao,
+                  mensagens: atual.mensagens.map((m) =>
+                    m.id === tempId ? { ...m, pendente: false, falha: false } : m,
+                  ),
+                }
+              : atual,
+          );
+          this.carregarLista();
+          this.rolarParaFim();
+        },
+        // Esgotou as tentativas: marca falha (mostra "reenviar").
+        error: () => this.marcarMensagem(tempId, { pendente: false, falha: true }),
+      });
+  }
+
+  private marcarMensagem(id: number, patch: Partial<Mensagem>): void {
+    this.detalhe.update((d) =>
+      d ? { ...d, mensagens: d.mensagens.map((m) => (m.id === id ? { ...m, ...patch } : m)) } : d,
+    );
   }
 
   protected resolver(): void {

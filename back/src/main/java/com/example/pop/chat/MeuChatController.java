@@ -74,7 +74,7 @@ public class MeuChatController {
     @Transactional
     public ChatDetalheResponse enviar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
-        Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto());
+        Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId());
         return chatService.toDetalhe(chat);
     }
 
