@@ -1675,6 +1675,8 @@
 .wa {
   display: grid;
   grid-template-columns: 1fr;
+  max-width: 1280px;
+  margin-inline: auto;
   height: calc(100dvh - 68px - 4rem);
   min-height: 460px;
   background: var(--surface);
