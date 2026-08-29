@@ -1,4 +1,5 @@
 import { API_URL } from '@/constants/api';
+import { fetchMeu } from '@/services/sessao';
 
 export type StatusNps = 'PENDENTE' | 'RESPONDIDO' | 'EXPIRADO';
 
@@ -68,16 +69,16 @@ async function comoJson<T>(resposta: Response): Promise<T> {
   return resposta.json() as Promise<T>;
 }
 
-/** Lista todas as avaliações disponíveis (mais recentes primeiro). */
+/** Lista as avaliações do paciente logado (mais recentes primeiro). */
 export async function listarNps(): Promise<NpsItem[]> {
-  const resposta = await fetch(`${API_URL}/nps?page=0&size=100`);
+  const resposta = await fetchMeu('/meu/nps?page=0&size=100');
   const pagina = await comoJson<Pagina<NpsItem>>(resposta);
   return pagina.content;
 }
 
-/** Detalha uma avaliação. */
+/** Detalha uma avaliação do paciente logado. */
 export async function buscarNps(id: number | string): Promise<NpsDetalhe> {
-  const resposta = await fetch(`${API_URL}/nps/${id}`);
+  const resposta = await fetchMeu(`/meu/nps/${id}`);
   return comoJson<NpsDetalhe>(resposta);
 }
 
@@ -93,7 +94,7 @@ export async function responderNps(
   notas: { categoriaId: number; nota: number }[],
   observacao?: string | null,
 ): Promise<NpsDetalhe> {
-  const resposta = await fetch(`${API_URL}/nps/${id}/responder`, {
+  const resposta = await fetchMeu(`/meu/nps/${id}/responder`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ notas, observacao: observacao?.trim() || null }),

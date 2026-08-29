@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -17,7 +16,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
@@ -51,7 +49,7 @@ public class PacienteAuthController {
     /** Reidrata a sessão (valida token + aparelho ativo). */
     @GetMapping("/me")
     public PacienteSessaoResponse me(@AuthenticationPrincipal Jwt jwt) {
-        Paciente paciente = pacienteDoToken(jwt);
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
         return new PacienteSessaoResponse(null, paciente.getId(), paciente.getNome());
     }
 
@@ -68,13 +66,5 @@ public class PacienteAuthController {
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
-    }
-
-    private Paciente pacienteDoToken(Jwt jwt) {
-        Object pid = jwt.getClaim("pid");
-        if (!(pid instanceof Number numero)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida");
-        }
-        return acessoService.validarSessao(numero.longValue(), jwt.getClaimAsString("dev"));
     }
 }

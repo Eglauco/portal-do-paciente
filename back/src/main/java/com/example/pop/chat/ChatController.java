@@ -9,7 +9,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,11 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
-import com.example.pop.common.Ref;
 import com.example.pop.push.PushService;
 
 import jakarta.validation.Valid;
 
+/** Lado da UNIDADE (back-office). O lado do paciente está em {@link MeuChatController}. */
 @RestController
 @RequestMapping("/chat")
 public class ChatController {
@@ -34,14 +33,14 @@ public class ChatController {
 
     private final ChatRepository repository;
     private final MensagemRepository mensagemRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ChatService chatService;
     private final PushService pushService;
 
     public ChatController(ChatRepository repository, MensagemRepository mensagemRepository,
-            SimpMessagingTemplate messagingTemplate, PushService pushService) {
+            ChatService chatService, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
-        this.messagingTemplate = messagingTemplate;
+        this.chatService = chatService;
         this.pushService = pushService;
     }
 
@@ -59,7 +58,7 @@ public class ChatController {
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "atualizadoEm"));
         Page<Chat> resultado = repository.search(pacienteId, unidadeId, status, naoResolvidas,
                 StatusChat.RESOLVIDO, pageable);
-        List<ChatResponse> content = resultado.getContent().stream().map(this::toResponse).toList();
+        List<ChatResponse> content = resultado.getContent().stream().map(chatService::toResponse).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -68,7 +67,7 @@ public class ChatController {
     @GetMapping("/{id}")
     public ResponseEntity<ChatDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(chat -> ResponseEntity.ok(toDetalhe(chat)))
+                .map(chat -> ResponseEntity.ok(chatService.toDetalhe(chat)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -77,12 +76,12 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> visualizar(@PathVariable Long id) {
         Chat chat = obter(id);
-        marcarMensagensDoPacienteComoLidas(chat.getId());
+        chatService.marcarMensagensDoPacienteComoLidas(chat.getId());
         if (chat.getStatus() == StatusChat.NAO_LIDA) {
             chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
             repository.save(chat);
         }
-        return ResponseEntity.ok(toDetalhe(chat));
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
     /** Envia uma mensagem em nome da unidade (operador). */
@@ -90,7 +89,7 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviar(@PathVariable Long id, @Valid @RequestBody MensagemRequest request) {
         Chat chat = obter(id);
-        marcarMensagensDoPacienteComoLidas(chat.getId());
+        chatService.marcarMensagensDoPacienteComoLidas(chat.getId());
 
         Mensagem mensagem = new Mensagem();
         mensagem.setChat(chat);
@@ -104,44 +103,20 @@ public class ChatController {
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
 
-        publicar(chat.getId(), salva);
+        chatService.publicar(chat.getId(), salva);
         // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
         pushService.notificarNovaMensagem(chat);
-        return ResponseEntity.ok(toDetalhe(chat));
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
-    /** Envia uma mensagem em nome do paciente (app). */
+    /** Envia uma mensagem em nome do paciente (compat.; o app usa /meu/chats/{id}/mensagem). */
     @PostMapping("/{id}/mensagem-paciente")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviarComoPaciente(@PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
         Chat chat = obter(id);
-
-        Mensagem mensagem = new Mensagem();
-        mensagem.setChat(chat);
-        mensagem.setRemetente(RemetenteMensagem.PACIENTE);
-        mensagem.setTexto(request.texto().trim());
-        mensagem.setEnviadaEm(LocalDateTime.now());
-        mensagem.setLida(false);
-        Mensagem salva = mensagemRepository.save(mensagem);
-
-        // O paciente enviou: a unidade ainda não visualizou.
-        chat.setStatus(StatusChat.NAO_LIDA);
-        chat.setAtualizadoEm(LocalDateTime.now());
-        repository.save(chat);
-
-        publicar(chat.getId(), salva);
-        return ResponseEntity.ok(toDetalhe(chat));
-    }
-
-    /** Publica a nova mensagem em tempo real (conversa + lista). */
-    private void publicar(Long chatId, Mensagem mensagem) {
-        messagingTemplate.convertAndSend("/topic/chat/" + chatId, MensagemResponse.from(mensagem));
-        messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
-    }
-
-    /** Sinal leve para as telas de lista recarregarem. */
-    public record ChatEvento(Long chatId) {
+        chatService.enviarComoPaciente(chat, request.texto());
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
     @PostMapping("/{id}/resolver")
@@ -151,7 +126,7 @@ public class ChatController {
         chat.setStatus(StatusChat.RESOLVIDO);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
-        return ResponseEntity.ok(toDetalhe(chat));
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
     @PostMapping("/{id}/reabrir")
@@ -161,52 +136,11 @@ public class ChatController {
         chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
-        return ResponseEntity.ok(toDetalhe(chat));
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
-
-    // ---------- helpers ----------
 
     private Chat obter(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Chat não encontrado"));
-    }
-
-    private void marcarMensagensDoPacienteComoLidas(Long chatId) {
-        List<Mensagem> naoLidas = mensagemRepository
-                .findByChatIdAndRemetenteAndLidaFalse(chatId, RemetenteMensagem.PACIENTE);
-        naoLidas.forEach(m -> m.setLida(true));
-        if (!naoLidas.isEmpty()) {
-            mensagemRepository.saveAll(naoLidas);
-        }
-    }
-
-    private ChatResponse toResponse(Chat chat) {
-        Mensagem ultima = mensagemRepository.findFirstByChatIdOrderByEnviadaEmDesc(chat.getId());
-        long naoLidas = mensagemRepository
-                .countByChatIdAndRemetenteAndLidaFalse(chat.getId(), RemetenteMensagem.PACIENTE);
-        return new ChatResponse(
-                chat.getId(),
-                new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
-                new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
-                chat.getStatus(),
-                chat.getStatus().getDescricao(),
-                ultima != null ? ultima.getTexto() : null,
-                ultima != null ? ultima.getRemetente() : null,
-                ultima != null ? ultima.getEnviadaEm() : null,
-                naoLidas,
-                chat.getAtualizadoEm());
-    }
-
-    private ChatDetalheResponse toDetalhe(Chat chat) {
-        List<MensagemResponse> mensagens = mensagemRepository
-                .findByChatIdOrderByEnviadaEmAsc(chat.getId())
-                .stream().map(MensagemResponse::from).toList();
-        return new ChatDetalheResponse(
-                chat.getId(),
-                new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
-                new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
-                chat.getStatus(),
-                chat.getStatus().getDescricao(),
-                mensagens);
     }
 }

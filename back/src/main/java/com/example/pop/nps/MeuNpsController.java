@@ -7,7 +7,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,68 +20,68 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.paciente.PacienteAcessoService;
 
 import jakarta.validation.Valid;
 
+/**
+ * NPS do paciente logado (app). Lista/detalhe/resposta sempre escopados ao
+ * paciente do token (via agendamento.paciente); id de outro paciente -> 404.
+ */
 @RestController
-@RequestMapping("/nps")
-public class NpsController {
+@RequestMapping("/meu/nps")
+public class MeuNpsController {
 
     private static final int TAMANHO_MAXIMO = 100;
 
     private final NpsRepository repository;
     private final NpsService npsService;
+    private final PacienteAcessoService acessoService;
 
-    public NpsController(NpsRepository repository, NpsService npsService) {
+    public MeuNpsController(NpsRepository repository, NpsService npsService, PacienteAcessoService acessoService) {
         this.repository = repository;
         this.npsService = npsService;
+        this.acessoService = acessoService;
     }
 
+    /** Lista os NPS do paciente logado (opcionalmente filtrando por status, ex.: PENDENTE). */
     @GetMapping
-    public Pagina<NpsResponse> listar(
+    public Pagina<NpsResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) StatusNps status,
-            @RequestParam(required = false) Long pacienteId,
-            @RequestParam(required = false) Long unidadeId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "100") int size) {
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
-        Page<Nps> resultado = repository.search(status, pacienteId, unidadeId, pageable);
+        Page<Nps> resultado = repository.search(status, pacienteId, null, pageable);
         List<NpsResponse> content = resultado.getContent().stream().map(NpsResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
 
+    /** Detalhe de um NPS do paciente logado. */
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
-    public ResponseEntity<NpsDetalheResponse> buscar(@PathVariable Long id) {
-        return repository.findById(id)
-                .map(nps -> ResponseEntity.ok(NpsDetalheResponse.from(nps)))
-                .orElse(ResponseEntity.notFound().build());
+    public NpsDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return NpsDetalheResponse.from(meuNps(jwt, id));
     }
 
-    /** Registra a resposta do paciente (uma nota 0 a 10 por categoria + observação opcional). */
+    /** Resposta do paciente logado (uma nota 0 a 10 por categoria + observação). */
     @PostMapping("/{id}/responder")
     @Transactional
-    public ResponseEntity<NpsDetalheResponse> responder(@PathVariable Long id,
+    public NpsDetalheResponse responder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody ResponderNpsRequest request) {
-        Nps nps = obter(id);
-        return ResponseEntity.ok(NpsDetalheResponse.from(npsService.responder(nps, request)));
+        Nps nps = meuNps(jwt, id);
+        return NpsDetalheResponse.from(npsService.responder(nps, request));
     }
 
-    @PostMapping("/{id}/expirar")
-    @Transactional
-    public ResponseEntity<NpsDetalheResponse> expirar(@PathVariable Long id) {
-        Nps nps = obter(id);
-        nps.setStatus(StatusNps.EXPIRADO);
-        return ResponseEntity.ok(NpsDetalheResponse.from(repository.save(nps)));
-    }
-
-    private Nps obter(Long id) {
-        return repository.findById(id)
+    /** Carrega o NPS garantindo que é do paciente logado (404 caso contrário). */
+    private Nps meuNps(Jwt jwt, Long id) {
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
+        return repository.findByIdAndAgendamento_Paciente_Id(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "NPS não encontrado"));
     }
 }

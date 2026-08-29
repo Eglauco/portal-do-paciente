@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -85,6 +86,20 @@ public class PacienteAcessoService {
         paciente.setCodigoAtivacaoHash(null);
         paciente.setCodigoAtivacaoExpiraEm(null);
         return repository.save(paciente);
+    }
+
+    /**
+     * Resolve e valida o paciente logado a partir do token do app: lê o claim
+     * {@code pid} e confere sessão (paciente ativo + aparelho vinculado). É a
+     * ÚNICA fonte do paciente logado nos endpoints /meu/** — nunca confiar em id
+     * vindo do cliente.
+     */
+    public Paciente pacienteDoToken(Jwt jwt) {
+        Object pid = jwt.getClaim("pid");
+        if (!(pid instanceof Number numero)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida");
+        }
+        return validarSessao(numero.longValue(), jwt.getClaimAsString("dev"));
     }
 
     /** Valida uma sessão do app: paciente ativo e o aparelho é o atualmente vinculado. */

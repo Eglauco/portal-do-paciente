@@ -1,5 +1,6 @@
 import { API_URL } from '@/constants/api';
 import { Agendamento, MotivoFalta, StatusAgendamento, StatusBackend } from '@/constants/agendamentos';
+import { fetchMeu } from '@/services/sessao';
 
 interface Ref {
   id: number;
@@ -84,22 +85,22 @@ async function comoJson<T>(resposta: Response): Promise<T> {
   return resposta.json() as Promise<T>;
 }
 
-/** Lista todos os agendamentos disponíveis (mais recentes primeiro). */
+/** Lista os agendamentos do paciente logado (mais recentes primeiro). */
 export async function listarAgendamentos(): Promise<Agendamento[]> {
-  const resposta = await fetch(`${API_URL}/agendamento?page=0&size=100`);
+  const resposta = await fetchMeu('/meu/agendamentos?page=0&size=100');
   const pagina = await comoJson<Pagina<AgendamentoBackend>>(resposta);
   return pagina.content.map(paraViewModel);
 }
 
 /** Confirma o agendamento (paciente). */
 export async function confirmarAgendamento(id: string): Promise<Agendamento> {
-  const resposta = await fetch(`${API_URL}/agendamento/${id}/confirmar`, { method: 'POST' });
+  const resposta = await fetchMeu(`/meu/agendamentos/${id}/confirmar`, { method: 'POST' });
   return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
 }
 
 /** Cancela o agendamento (paciente). */
 export async function cancelarAgendamento(id: string): Promise<Agendamento> {
-  const resposta = await fetch(`${API_URL}/agendamento/${id}/cancelar`, { method: 'POST' });
+  const resposta = await fetchMeu(`/meu/agendamentos/${id}/cancelar`, { method: 'POST' });
   return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
 }
 
@@ -116,7 +117,7 @@ export async function justificarFalta(
   motivoIds: number[],
   justificativa: string,
 ): Promise<Agendamento> {
-  const resposta = await fetch(`${API_URL}/agendamento/${id}/justificar-falta`, {
+  const resposta = await fetchMeu(`/meu/agendamentos/${id}/justificar-falta`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ motivoIds, justificativa }),

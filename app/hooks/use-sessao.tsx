@@ -3,6 +3,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import {
   ativar as ativarServico,
   carregarSessao,
+  registrarInvalidacao,
   sair as sairServico,
   type SessaoPaciente,
 } from '@/services/sessao';
@@ -29,8 +30,11 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       setSessao(s);
       setCarregando(false);
     });
+    // Se o backend recusar o token (401), a sessão local é encerrada e o app volta ao login.
+    registrarInvalidacao(() => setSessao(null));
     return () => {
       vivo = false;
+      registrarInvalidacao(null);
     };
   }, []);
 

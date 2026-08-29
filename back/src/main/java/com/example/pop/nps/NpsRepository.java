@@ -14,6 +14,9 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
 
     Optional<Nps> findByAgendamentoId(Long agendamentoId);
 
+    /** Carrega o NPS garantindo que é do paciente (via agendamento.paciente). Escopo do app. */
+    Optional<Nps> findByIdAndAgendamento_Paciente_Id(Long id, Long pacienteId);
+
     @Query("""
             select n from Nps n
             where (:status is null or n.status = :status)

@@ -87,9 +87,17 @@ class AuthSecurityMvcTest {
     }
 
     @Test
-    void apiPermaneceAbertaSemToken() throws Exception {
-        // Recorte combinado: o restante da API segue acessível sem token por ora.
-        mvc.perform(get("/usuario").param("size", "1")).andExpect(status().isOk());
+    void apiDeAdminExigeToken() throws Exception {
+        // Fase 4: o back-office agora exige o token do admin. Sem token → 401.
+        mvc.perform(get("/usuario").param("size", "1")).andExpect(status().isUnauthorized());
+
+        // Com o token do admin (claim role=ADMIN) → 200.
+        MvcResult login = mvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(LOGIN_OK))
+                .andExpect(status().isOk()).andReturn();
+        String token = login.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
+        mvc.perform(get("/usuario").param("size", "1").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
     }
 
     @Test

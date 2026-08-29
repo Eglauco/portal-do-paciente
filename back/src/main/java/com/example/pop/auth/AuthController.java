@@ -72,6 +72,7 @@ public class AuthController {
                 .expiresAt(expira)
                 .claim("nome", usuario.getNome())
                 .claim("uid", usuario.getId())
+                .claim("role", "ADMIN")
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

@@ -1,4 +1,4 @@
-import { API_URL } from '@/constants/api';
+import { fetchMeu } from '@/services/sessao';
 
 interface Ref {
   id: number;
@@ -59,12 +59,12 @@ async function comoJson<T>(resposta: Response): Promise<T> {
  * de cada prontuário para obter os documentos.
  */
 export async function listarProntuarios(): Promise<ProntuarioDetalhe[]> {
-  const resposta = await fetch(`${API_URL}/prontuario?page=0&size=100`);
+  const resposta = await fetchMeu('/meu/prontuarios?page=0&size=100');
   const pagina = await comoJson<Pagina<ProntuarioItem>>(resposta);
 
   const detalhes = await Promise.all(
     pagina.content.map((p) =>
-      fetch(`${API_URL}/prontuario/${p.id}`).then((r) => comoJson<ProntuarioDetalhe>(r)),
+      fetchMeu(`/meu/prontuarios/${p.id}`).then((r) => comoJson<ProntuarioDetalhe>(r)),
     ),
   );
 

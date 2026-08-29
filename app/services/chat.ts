@@ -1,4 +1,4 @@
-import { API_URL } from '@/constants/api';
+import { fetchMeu } from '@/services/sessao';
 
 export type StatusChat = 'NAO_LIDA' | 'AGUARDANDO_RESPOSTA' | 'EM_ATENDIMENTO' | 'RESOLVIDO';
 export type Remetente = 'PACIENTE' | 'UNIDADE';
@@ -56,22 +56,22 @@ async function comoJson<T>(resposta: Response): Promise<T> {
   return resposta.json() as Promise<T>;
 }
 
-/** Lista todas as conversas disponíveis (mais recentes primeiro). */
+/** Lista as conversas do paciente logado (mais recentes primeiro). */
 export async function listarChats(): Promise<ChatItem[]> {
-  const resposta = await fetch(`${API_URL}/chat?page=0&size=100`);
+  const resposta = await fetchMeu('/meu/chats?page=0&size=100');
   const pagina = await comoJson<Pagina<ChatItem>>(resposta);
   return pagina.content;
 }
 
-/** Abre uma conversa com o histórico de mensagens. */
+/** Abre uma conversa do paciente logado com o histórico de mensagens. */
 export async function buscarConversa(id: number | string): Promise<ChatDetalhe> {
-  const resposta = await fetch(`${API_URL}/chat/${id}`);
+  const resposta = await fetchMeu(`/meu/chats/${id}`);
   return comoJson<ChatDetalhe>(resposta);
 }
 
-/** Envia uma mensagem em nome do paciente. */
+/** Envia uma mensagem em nome do paciente logado. */
 export async function enviarMensagemPaciente(id: number | string, texto: string): Promise<ChatDetalhe> {
-  const resposta = await fetch(`${API_URL}/chat/${id}/mensagem-paciente`, {
+  const resposta = await fetchMeu(`/meu/chats/${id}/mensagem`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto }),

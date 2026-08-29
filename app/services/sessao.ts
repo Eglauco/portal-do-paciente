@@ -108,3 +108,32 @@ export async function sair(): Promise<void> {
 export function authHeaders(): Record<string, string> {
   return cache?.token ? { Authorization: `Bearer ${cache.token}` } : {};
 }
+
+/** Callback avisado quando o backend recusa o token (sessão inválida). */
+let aoInvalidar: (() => void) | null = null;
+export function registrarInvalidacao(callback: (() => void) | null): void {
+  aoInvalidar = callback;
+}
+
+/**
+ * fetch autenticado para os endpoints do paciente (/meu/**): anexa o Bearer e,
+ * se o backend responder 401 (token expirado ou aparelho trocado), encerra a
+ * sessão e avisa o app para voltar à tela de ativação.
+ */
+export async function fetchMeu(path: string, init: RequestInit = {}): Promise<Response> {
+  // Garante que a sessão guardada já foi lida (evita header vazio no arranque frio,
+  // ex.: chamada disparada por toque em notificação antes de carregar a sessão).
+  await carregarSessao();
+  const cabecalhos = authHeaders();
+  const resposta = await fetch(`${API_URL}${path}`, {
+    ...init,
+    headers: { ...(init.headers ?? {}), ...cabecalhos },
+  });
+  // Só encerra a sessão se REALMENTE enviamos um token e ele foi recusado (401).
+  if (resposta.status === 401 && cabecalhos.Authorization) {
+    await sair();
+    aoInvalidar?.();
+    throw new Error('Sessão expirada. Entre novamente.');
+  }
+  return resposta;
+}
