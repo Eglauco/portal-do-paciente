@@ -44,9 +44,9 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/login").permitAll()
-                        // /auth/me e /auth/unidade dependem do token do usuário logado.
-                        .requestMatchers("/auth/**").authenticated()
+                        .requestMatchers("/auth/login", "/paciente-auth/ativar").permitAll()
+                        // /auth/** e /paciente-auth/me dependem do token do usuário/paciente logado.
+                        .requestMatchers("/auth/**", "/paciente-auth/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
         return http.build();

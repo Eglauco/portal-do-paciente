@@ -1,5 +1,6 @@
 package com.example.pop.paciente;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 
@@ -27,9 +29,11 @@ public class PacienteController {
     private static final int TAMANHO_MAXIMO = 100;
 
     private final PacienteRepository repository;
+    private final PacienteAcessoService acessoService;
 
-    public PacienteController(PacienteRepository repository) {
+    public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService) {
         this.repository = repository;
+        this.acessoService = acessoService;
     }
 
     /**
@@ -70,7 +74,9 @@ public class PacienteController {
     @ResponseStatus(HttpStatus.CREATED)
     public Paciente criar(@RequestBody Paciente paciente) {
         paciente.setId(null);
-        return repository.save(paciente);
+        paciente.setTelefone(PacienteAcessoService.normalizarTelefone(paciente.getTelefone()));
+        paciente.setAtivo(false); // a liberação é feita depois, via "gerar código"
+        return salvarUnico(paciente);
     }
 
     @PutMapping("/{id}")
@@ -78,7 +84,9 @@ public class PacienteController {
         return repository.findById(id)
                 .map(existente -> {
                     existente.setNome(paciente.getNome());
-                    return ResponseEntity.ok(repository.save(existente));
+                    existente.setTelefone(PacienteAcessoService.normalizarTelefone(paciente.getTelefone()));
+                    // ativo/código/aparelho são geridos por gerar-codigo/revogar, não pelo corpo.
+                    return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -90,5 +98,39 @@ public class PacienteController {
         }
         repository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Libera o paciente (global) e gera um código de ativação para dar a ele (mostrado uma vez). */
+    @PostMapping("/{id}/gerar-codigo")
+    public ResponseEntity<GerarCodigoResponse> gerarCodigo(@PathVariable Long id) {
+        Paciente paciente = repository.findById(id).orElse(null);
+        if (paciente == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (paciente.getTelefone() == null || paciente.getTelefone().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Informe o telefone do paciente antes de gerar o código");
+        }
+        String codigo = acessoService.gerarCodigo(paciente);
+        return ResponseEntity.ok(new GerarCodigoResponse(codigo, paciente.getCodigoAtivacaoExpiraEm()));
+    }
+
+    /** Revoga o acesso do paciente ao app (desativa e desloga o aparelho). */
+    @PostMapping("/{id}/revogar-acesso")
+    public ResponseEntity<Void> revogarAcesso(@PathVariable Long id) {
+        Paciente paciente = repository.findById(id).orElse(null);
+        if (paciente == null) {
+            return ResponseEntity.notFound().build();
+        }
+        acessoService.revogar(paciente);
+        return ResponseEntity.noContent().build();
+    }
+
+    private Paciente salvarUnico(Paciente paciente) {
+        try {
+            return repository.save(paciente);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este telefone");
+        }
     }
 }
