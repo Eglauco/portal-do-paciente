@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, NgZone, inject } from '@angular/core';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../core/auth.service';
@@ -21,12 +21,22 @@ interface Assinatura {
 @Injectable({ providedIn: 'root' })
 export class ChatRealtimeService {
   private readonly auth = inject(AuthService);
+  private readonly zone = inject(NgZone);
   private client: Client | null = null;
   private readonly assinaturas = new Map<string, Assinatura>();
   private seq = 0;
 
   private urlWs(): string {
     return environment.apiUrl.replace(/^http/, 'ws').replace(/\/+$/, '') + '/ws';
+  }
+
+  /**
+   * Envolve o callback do STOMP na zona do Angular. Sem isso, atualizações de
+   * signal feitas dentro do callback (ex.: confirmação de entrega) não disparam
+   * a detecção de mudanças e a tela só atualiza na próxima interação.
+   */
+  private naZona(callback: (msg: IMessage) => void): (msg: IMessage) => void {
+    return (msg) => this.zone.run(() => callback(msg));
   }
 
   private cabecalhos(): Record<string, string> {
@@ -47,7 +57,7 @@ export class ChatRealtimeService {
       onConnect: () => {
         // Ao conectar (inclusive reconexão), reinscreve tudo.
         this.assinaturas.forEach((a) => {
-          a.sub = this.client!.subscribe(a.destino, a.callback);
+          a.sub = this.client!.subscribe(a.destino, this.naZona(a.callback));
         });
       },
     });
@@ -61,7 +71,7 @@ export class ChatRealtimeService {
     const assinatura: Assinatura = { destino, callback };
     this.assinaturas.set(chave, assinatura);
     if (cliente.connected) {
-      assinatura.sub = cliente.subscribe(destino, callback);
+      assinatura.sub = cliente.subscribe(destino, this.naZona(callback));
     }
     return () => {
       const a = this.assinaturas.get(chave);
