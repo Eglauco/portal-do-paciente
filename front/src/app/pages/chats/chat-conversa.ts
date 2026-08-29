@@ -262,9 +262,25 @@ export class ChatConversa {
     return (primeira + ultima).toUpperCase();
   }
 
+  /**
+   * Rola para a última mensagem. O elemento é lido DENTRO do rAF: ao abrir a
+   * conversa, o container `#mensagens` só existe depois do Angular renderizar o
+   * `@if (detalhe())`, então lê-lo de imediato devolveria undefined (ficava no
+   * topo). Dois frames: o 1º deixa as bolhas renderizarem; o 2º garante que o
+   * layout já tem a altura final antes de irmos ao fundo.
+   */
   private rolarParaFim(): void {
-    const el = this.mensagensRef()?.nativeElement;
-    if (!el || typeof requestAnimationFrame === 'undefined') return;
-    requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+    if (typeof requestAnimationFrame === 'undefined') return; // SSR: sem DOM
+    const irAoFundo = () => {
+      const el = this.mensagensRef()?.nativeElement;
+      if (el) el.scrollTop = el.scrollHeight;
+    };
+    requestAnimationFrame(() => requestAnimationFrame(irAoFundo));
+    // Cache frio: a fonte (Inter, display=swap) só chega depois do 2º frame e o
+    // reflow aumenta a altura das bolhas; com scroll anchoring a view ficaria
+    // acima do fundo real. Re-rola quando as fontes terminarem de carregar.
+    if (typeof document !== 'undefined' && document.fonts?.ready) {
+      document.fonts.ready.then(() => requestAnimationFrame(irAoFundo));
+    }
   }
 }
