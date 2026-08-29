@@ -41,6 +41,19 @@
           <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
         }
       </div>
+
+      <div class="form-field">
+        <label class="label" for="telefone">Telefone</label>
+        <input
+          id="telefone"
+          class="input"
+          formControlName="telefone"
+          placeholder="(DDD) número"
+          inputmode="tel"
+          autocomplete="off"
+        />
+        <span class="field-hint">Usado pelo paciente para entrar no aplicativo.</span>
+      </div>
     </div>
 
     <div class="form-actions">
@@ -50,6 +63,32 @@
       </button>
     </div>
   </form>
+
+  @if (editando()) {
+    <section class="panel acesso-app">
+      <header class="acesso-app__head">
+        <div>
+          <h2 class="acesso-app__title">Acesso ao aplicativo</h2>
+          <p class="acesso-app__sub">
+            Gere um código para o paciente ativar o app pelo telefone. Vale por 48 horas e serve uma única vez.
+            A liberação dá acesso aos dados do paciente em todas as unidades.
+          </p>
+        </div>
+        <span class="sit" [class.sit--off]="!ativo()">{{ ativo() ? 'Liberado' : 'Não liberado' }}</span>
+      </header>
+
+      <div class="acesso-app__actions">
+        <button type="button" class="btn btn--solid" (click)="gerarCodigo()" [disabled]="gerandoCodigo()">
+          {{ gerandoCodigo() ? 'Gerando…' : (ativo() ? 'Gerar novo código' : 'Liberar e gerar código') }}
+        </button>
+        @if (ativo()) {
+          <button type="button" class="btn btn--danger" (click)="revogar()" [disabled]="revogando()">
+            {{ revogando() ? 'Revogando…' : 'Revogar acesso' }}
+          </button>
+        }
+      </div>
+    </section>
+  }
 </section>
 
 <!-- Diálogo de confirmação (Sim / Não) -->
@@ -72,6 +111,32 @@
       <div class="modal__actions">
         <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
         <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Código de ativação gerado (mostrado uma única vez) -->
+@if (codigoAtivacao(); as ativacao) {
+  <div class="modal-backdrop" (click)="fecharCodigo()">
+    <div
+      class="modal modal--codigo"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="codigo-title"
+      (click)="$event.stopPropagation()"
+    >
+      <h2 id="codigo-title" class="codigo__title">Código de ativação</h2>
+      <p class="codigo__hint">
+        Informe este código ao paciente. No app, ele digita o telefone e este código para entrar.
+      </p>
+      <div class="codigo__box">
+        <span class="codigo__value">{{ ativacao.codigo }}</span>
+        <button type="button" class="btn btn--ghost btn--sm" (click)="copiarCodigo()">Copiar</button>
+      </div>
+      <p class="codigo__exp">Válido por 48 horas · uso único</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--solid" (click)="fecharCodigo()">Concluir</button>
       </div>
     </div>
   </div>

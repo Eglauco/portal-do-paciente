@@ -1,6 +1,15 @@
 export interface Paciente {
   id?: number;
   nome: string;
+  telefone?: string | null;
+  /** Liberado para acessar o app. */
+  ativo?: boolean;
+}
+
+/** Código de ativação gerado para o paciente (mostrado uma única vez). */
+export interface CodigoAtivacao {
+  codigo: string;
+  expiraEm: string;
 }
 
 export interface PacienteFiltro {

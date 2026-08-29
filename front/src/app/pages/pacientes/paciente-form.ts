@@ -2,7 +2,9 @@ import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { switchMap } from 'rxjs';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { CodigoAtivacao } from './paciente.model';
 import { PacienteService } from './paciente.service';
 
 @Component({
@@ -21,6 +23,7 @@ export class PacienteForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
     }),
+    telefone: new FormControl('', { nonNullable: true }),
   });
 
   protected readonly editando = signal(false);
@@ -28,6 +31,12 @@ export class PacienteForm implements PodeSair {
   protected readonly salvando = signal(false);
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
+
+  // Acesso ao app
+  protected readonly ativo = signal(false);
+  protected readonly gerandoCodigo = signal(false);
+  protected readonly revogando = signal(false);
+  protected readonly codigoAtivacao = signal<CodigoAtivacao | null>(null);
 
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
@@ -40,7 +49,10 @@ export class PacienteForm implements PodeSair {
       this.editando.set(true);
       this.codigo.set(id);
       this.service.buscarPorId(id).subscribe({
-        next: (paciente) => this.form.patchValue({ nome: paciente.nome }),
+        next: (paciente) => {
+          this.form.patchValue({ nome: paciente.nome, telefone: paciente.telefone ?? '' });
+          this.ativo.set(!!paciente.ativo);
+        },
         error: () => this.erroCarregar.set(true),
       });
     }
@@ -56,6 +68,13 @@ export class PacienteForm implements PodeSair {
     return control.invalid && (control.touched || control.dirty);
   }
 
+  private valores() {
+    return {
+      nome: this.form.controls.nome.value.trim(),
+      telefone: this.form.controls.telefone.value.trim() || null,
+    };
+  }
+
   protected salvar(event: Event): void {
     event.preventDefault();
     if (this.form.invalid) {
@@ -63,19 +82,85 @@ export class PacienteForm implements PodeSair {
       return;
     }
     this.salvando.set(true);
-    const dados = { nome: this.form.controls.nome.value };
     const requisicao = this.editando()
-      ? this.service.atualizar(this.codigo()!, dados)
-      : this.service.criar(dados);
+      ? this.service.atualizar(this.codigo()!, this.valores())
+      : this.service.criar(this.valores());
     requisicao.subscribe({
       next: () => {
         this.saidaAutorizada = true;
         this.toastr.success('Paciente salvo');
         this.router.navigate(['/pacientes']);
       },
-      error: () => {
+      error: (e) => {
         this.salvando.set(false);
-        this.toastr.error('Não foi possível salvar o paciente.');
+        this.toastr.error(
+          e?.status === 409 ? 'Já existe um paciente com este telefone.' : 'Não foi possível salvar o paciente.',
+        );
+      },
+    });
+  }
+
+  /** Garante que o telefone está salvo e gera um novo código de ativação. */
+  protected gerarCodigo(): void {
+    if (this.gerandoCodigo()) return;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    if (!this.form.controls.telefone.value.trim()) {
+      this.toastr.error('Informe o telefone do paciente para gerar o código.');
+      return;
+    }
+    const id = this.codigo()!;
+    this.gerandoCodigo.set(true);
+    this.service
+      .atualizar(id, this.valores())
+      .pipe(switchMap(() => this.service.gerarCodigo(id)))
+      .subscribe({
+        next: (codigo) => {
+          this.form.markAsPristine();
+          this.ativo.set(true);
+          this.codigoAtivacao.set(codigo);
+          this.gerandoCodigo.set(false);
+        },
+        error: (e) => {
+          this.gerandoCodigo.set(false);
+          this.toastr.error(
+            e?.status === 409 ? 'Já existe um paciente com este telefone.' : 'Não foi possível gerar o código.',
+          );
+        },
+      });
+  }
+
+  protected copiarCodigo(): void {
+    const codigo = this.codigoAtivacao()?.codigo;
+    if (codigo) {
+      navigator.clipboard?.writeText(codigo).then(
+        () => this.toastr.success('Código copiado'),
+        () => {},
+      );
+    }
+  }
+
+  protected fecharCodigo(): void {
+    this.codigoAtivacao.set(null);
+  }
+
+  protected async revogar(): Promise<void> {
+    const confirmado = await this.confirmar(
+      'Revogar o acesso do paciente ao app? Ele precisará de um novo código para entrar.',
+    );
+    if (!confirmado) return;
+    this.revogando.set(true);
+    this.service.revogarAcesso(this.codigo()!).subscribe({
+      next: () => {
+        this.ativo.set(false);
+        this.revogando.set(false);
+        this.toastr.success('Acesso revogado');
+      },
+      error: () => {
+        this.revogando.set(false);
+        this.toastr.error('Não foi possível revogar o acesso.');
       },
     });
   }

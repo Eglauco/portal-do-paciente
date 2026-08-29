@@ -2180,3 +2180,37 @@
 .unit-menu__item:disabled { opacity: 0.6; cursor: default; }
 .unit-menu__item.is-active { color: var(--brand-deep); font-weight: 600; }
 .unit-menu__item svg { width: 1.05rem; height: 1.05rem; stroke: var(--brand); flex-shrink: 0; }
+
+/* Acesso ao app (liberar / gerar código do paciente) */
+.acesso-app { margin-top: 1.25rem; }
+.acesso-app__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.acesso-app__title { margin: 0; font-size: 1.05rem; color: var(--ink); }
+.acesso-app__sub { margin: 0.3rem 0 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; max-width: 46rem; }
+.acesso-app__actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.1rem; }
+
+/* Modal do código de ativação */
+.modal--codigo { text-align: center; }
+.codigo__title { margin: 0; font-size: 1.15rem; color: var(--ink); }
+.codigo__hint { margin: 0.5rem 0 0; font-size: 0.9rem; color: var(--muted); line-height: 1.5; }
+.codigo__box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 1.1rem 0 0.5rem;
+}
+.codigo__value {
+  font-size: 2.1rem;
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  padding-left: 0.35em;
+  color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+}
+.codigo__exp { margin: 0; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.btn--sm { height: 2.2rem; padding: 0 0.9rem; font-size: 0.82rem; }
