@@ -1,41 +1,10 @@
 <section class="wa">
-  <!-- Coluna esquerda: lista de conversas -->
-  <aside class="wa__lista">
-    <div class="wa__lista-topo">
-      <button type="button" class="wa__voltar" (click)="voltar()" aria-label="Voltar para a pesquisa">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
-      </button>
-      <span class="wa__lista-titulo">Conversas</span>
-    </div>
-    <ul class="wa__conversas">
-      @for (c of chats(); track c.id) {
-        <li>
-          <button type="button" class="wa__item" [class.is-active]="c.id === idAtual()" (click)="abrir(c.id)">
-            <span class="convo__avatar">{{ iniciais(c.paciente.nome) }}</span>
-            <span class="convo__body">
-              <span class="convo__top">
-                <b class="convo__nome">{{ c.paciente.nome }}</b>
-                <span class="convo__hora">{{ c.ultimaMensagemEm | date: 'dd/MM HH:mm' }}</span>
-              </span>
-              <span class="convo__linha">
-                <span class="convo__previa">
-                  @if (c.ultimaMensagemDe === 'UNIDADE') { <span class="convo__voce">Você: </span> }
-                  {{ c.ultimaMensagem }}
-                </span>
-                @if (c.naoLidas > 0) { <span class="convo__badge">{{ c.naoLidas }}</span> }
-              </span>
-              <span class="wa__item-unidade">{{ c.unidadeSaude.nome }}</span>
-            </span>
-          </button>
-        </li>
-      }
-    </ul>
-  </aside>
-
-  <!-- Coluna direita: conversa -->
   <div class="wa__conversa">
     @if (detalhe(); as chat) {
       <header class="wa__cabecalho">
+        <button type="button" class="wa__voltar" (click)="voltar()" aria-label="Voltar para a pesquisa">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+        </button>
         <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
         <div class="wa__cabecalho-info">
           <b class="wa__cabecalho-nome">{{ chat.paciente.nome }}</b>

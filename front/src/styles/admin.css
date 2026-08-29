@@ -1674,7 +1674,7 @@
 /* WhatsApp Web (tela de conversa) */
 .wa {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 1fr;
   height: calc(100dvh - 68px - 4rem);
   min-height: 460px;
   background: var(--surface);

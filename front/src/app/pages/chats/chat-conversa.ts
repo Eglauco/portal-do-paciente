@@ -3,7 +3,7 @@ import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, vie
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { retry, timer } from 'rxjs';
-import { Chat, ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
+import { ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
@@ -27,7 +27,6 @@ export class ChatConversa {
   /** Atrasos entre as retentativas de envio (tentativa inicial + 4 ≈ 30s). */
   private readonly ATRASOS = [2000, 4000, 8000, 16000];
 
-  protected readonly chats = signal<Chat[]>([]);
   protected readonly detalhe = signal<ChatDetalhe | null>(null);
   protected readonly idAtual = signal<number | null>(null);
   protected readonly carregandoDetalhe = signal(false);
@@ -40,7 +39,6 @@ export class ChatConversa {
     if (idParam) this.idAtual.set(Number(idParam));
 
     afterNextRender(() => {
-      this.carregarLista();
       if (this.idAtual()) this.abrir(this.idAtual()!);
     });
 
@@ -55,7 +53,6 @@ export class ChatConversa {
       next: (d) => {
         this.aplicarDetalhe(d);
         this.carregandoDetalhe.set(false);
-        this.carregarLista();
         this.rolarParaFim();
       },
       error: () => this.carregandoDetalhe.set(false),
@@ -112,7 +109,6 @@ export class ChatConversa {
       return { ...d, mensagens: [...base, { ...mensagem, entregue: mensagem.entregue || jaEntregue }] };
     });
     this.rolarParaFim();
-    this.carregarLista();
   }
 
   private aoDigitandoRecebido(evento: DigitandoEvento): void {
@@ -181,7 +177,6 @@ export class ChatConversa {
                 }
               : atual,
           );
-          this.carregarLista();
           this.rolarParaFim();
         },
         // Esgotou as tentativas: marca falha (mostra "reenviar"), se ainda na mesma conversa.
@@ -218,7 +213,6 @@ export class ChatConversa {
     this.service.resolver(id).subscribe({
       next: (d) => {
         this.aplicarDetalhe(d);
-        this.carregarLista();
       },
     });
   }
@@ -229,7 +223,6 @@ export class ChatConversa {
     this.service.reabrir(id).subscribe({
       next: (d) => {
         this.aplicarDetalhe(d);
-        this.carregarLista();
       },
     });
   }
@@ -267,10 +260,6 @@ export class ChatConversa {
     const primeira = partes[0]?.charAt(0) ?? '';
     const ultima = partes.length > 1 ? partes[partes.length - 1].charAt(0) : '';
     return (primeira + ultima).toUpperCase();
-  }
-
-  private carregarLista(): void {
-    this.service.listar({}, 0, 100).subscribe({ next: (p) => this.chats.set(p.content) });
   }
 
   private rolarParaFim(): void {
