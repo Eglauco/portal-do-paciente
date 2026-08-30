@@ -160,10 +160,31 @@ public class ChatService {
         return mensagemRepository.save(mensagem);
     }
 
-    /** Publica a nova mensagem em tempo real (conversa + sinal de lista). */
+    /**
+     * Publica a nova mensagem em tempo real (conversa + sinal de lista) SÓ APÓS o
+     * commit: assim um eco nunca sai de um envio que sofreu rollback (evita bolha
+     * fantasma no back-office) e um eco recebido implica mensagem já persistida.
+     */
     public void publicar(Long chatId, Mensagem mensagem) {
-        messagingTemplate.convertAndSend("/topic/chat/" + chatId, MensagemResponse.from(mensagem));
-        messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
+        MensagemResponse payload = MensagemResponse.from(mensagem);
+        aposCommit(() -> {
+            messagingTemplate.convertAndSend("/topic/chat/" + chatId, payload);
+            messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
+        });
+    }
+
+    /** Executa a ação após o commit da transação atual (ou imediatamente, se não houver). */
+    private void aposCommit(Runnable acao) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    acao.run();
+                }
+            });
+        } else {
+            acao.run();
+        }
     }
 
     /**
@@ -182,21 +203,7 @@ public class ChatService {
         // Publica SÓ APÓS o commit: o back-office reage ao evento recarregando o
         // retrato da conversa; se publicássemos antes do commit, esse retrato
         // poderia ler o "entregue" ainda como false (2º check voltaria a 1).
-        publicarEntregueAposCommit(chatId);
-    }
-
-    private void publicarEntregueAposCommit(Long chatId) {
-        EntregaEvento evento = new EntregaEvento(chatId);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", evento);
-                }
-            });
-        } else {
-            messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", evento);
-        }
+        aposCommit(() -> messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", new EntregaEvento(chatId)));
     }
 
     /** Sinal de que as mensagens da conversa foram entregues ao paciente. */

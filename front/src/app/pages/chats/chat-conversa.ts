@@ -74,12 +74,21 @@ export class ChatConversa {
     ];
   }
 
-  /** Recarrega (passivamente) a conversa do servidor, preservando otimistas. */
+  /**
+   * Re-sincronização PASSIVA (reconexão / evento de entrega): concilia apenas as
+   * MENSAGENS (recupera o 2º check e ecos perdidos). NÃO toca em status nem em
+   * pacienteUsandoApp — este retrato pode chegar atrasado e regredi-los (ex.:
+   * re-bloquear o envio de um paciente que já voltou ao app). Esses campos têm
+   * seus próprios fluxos (mensagem do paciente, 422, abrir/resolver/reabrir).
+   */
   private ressincronizar(id: number): void {
     if (this.idAtual() !== id) return;
     this.service.detalhe(id).subscribe({
       next: (d) => {
-        if (this.idAtual() === id) this.aplicarDetalhe(d);
+        if (this.idAtual() !== id) return;
+        this.detalhe.update((prev) =>
+          !prev || prev.id !== d.id ? prev : { ...prev, mensagens: this.mesclarMensagens(prev.mensagens, d.mensagens) },
+        );
       },
     });
   }
@@ -242,18 +251,32 @@ export class ChatConversa {
   }
 
   /**
-   * Aplica o retrato do servidor preservando mensagens otimistas em voo (pendentes/falha)
-   * da MESMA conversa que ainda não estão no servidor — evita que a bolha "suma" numa recarga.
+   * Mescla as mensagens do retrato do servidor com o estado local PRESERVANDO A
+   * ORDEM local. Um retrato pode chegar ATRASADO (um GET disparado antes de a
+   * última mensagem ser gravada, mas aplicado depois): por isso percorremos a
+   * lista local na posição atual, casando cada uma com a do servidor (por
+   * clienteId, senão id) — nunca removemos uma local que o retrato ainda não tem
+   * (a bolha não "some" nem "pula") e o "entregue" só sobe (2º check não regride).
    */
-  private aplicarDetalhe(d: ChatDetalhe): void {
-    this.detalhe.update((prev) => {
-      if (!prev || prev.id !== d.id) return d; // conversa diferente: substitui
-      const noServidor = new Set(d.mensagens.map((m) => m.clienteId).filter(Boolean));
-      const otimistas = prev.mensagens.filter(
-        (m) => m.id < 0 && (m.pendente || m.falha) && (!m.clienteId || !noServidor.has(m.clienteId)),
-      );
-      return { ...d, mensagens: [...d.mensagens, ...otimistas] };
+  private mesclarMensagens(atuais: Mensagem[], servidor: Mensagem[]): Mensagem[] {
+    const servPorId = new Map(servidor.map((s) => [s.id, s]));
+    const servPorCliente = new Map(servidor.filter((s) => s.clienteId).map((s) => [s.clienteId!, s]));
+    const usados = new Set<Mensagem>();
+    const mescladas = atuais.map((m) => {
+      const s = (m.clienteId ? servPorCliente.get(m.clienteId) : undefined) ?? servPorId.get(m.id);
+      if (!s) return m; // ainda não refletida no servidor: mantém na posição
+      usados.add(s);
+      return { ...s, entregue: s.entregue || m.entregue };
     });
+    const novas = servidor.filter((s) => !usados.has(s)); // ex.: eco perdido, recuperado no retrato
+    return [...mescladas, ...novas];
+  }
+
+  /** Aplica um retrato FRESCO (abrir/resolver/reabrir): status/flags do servidor + mensagens mescladas. */
+  private aplicarDetalhe(d: ChatDetalhe): void {
+    this.detalhe.update((prev) =>
+      !prev || prev.id !== d.id ? d : { ...d, mensagens: this.mesclarMensagens(prev.mensagens, d.mensagens) },
+    );
   }
 
   protected resolver(): void {
