@@ -31,7 +31,21 @@ public class CorsConfig {
         config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(false);
 
+        // O handshake do WebSocket (/ws) chega do app NATIVO com um Origin
+        // imprevisível (o navegador manda o do front, que está na lista; o app
+        // manda null/file/etc. e levava 403 "Invalid CORS request"). A segurança
+        // do WS é o token no frame CONNECT (ChatChannelInterceptor), não o CORS —
+        // então o handshake aceita qualquer origem.
+        CorsConfiguration wsConfig = new CorsConfiguration();
+        wsConfig.setAllowedOriginPatterns(List.of("*"));
+        wsConfig.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        wsConfig.setAllowedHeaders(List.of("*"));
+        wsConfig.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        // Padrões específicos ANTES do genérico (o /ws pega a config permissiva).
+        source.registerCorsConfiguration("/ws", wsConfig);
+        source.registerCorsConfiguration("/ws/**", wsConfig);
         source.registerCorsConfiguration("/**", config);
         return source;
     }
