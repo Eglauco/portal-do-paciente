@@ -8,6 +8,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Ref;
@@ -177,7 +179,24 @@ public class ChatService {
         }
         pendentes.forEach(m -> m.setEntregue(true));
         mensagemRepository.saveAll(pendentes);
-        messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", new EntregaEvento(chatId));
+        // Publica SÓ APÓS o commit: o back-office reage ao evento recarregando o
+        // retrato da conversa; se publicássemos antes do commit, esse retrato
+        // poderia ler o "entregue" ainda como false (2º check voltaria a 1).
+        publicarEntregueAposCommit(chatId);
+    }
+
+    private void publicarEntregueAposCommit(Long chatId) {
+        EntregaEvento evento = new EntregaEvento(chatId);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", evento);
+                }
+            });
+        } else {
+            messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", evento);
+        }
     }
 
     /** Sinal de que as mensagens da conversa foram entregues ao paciente. */

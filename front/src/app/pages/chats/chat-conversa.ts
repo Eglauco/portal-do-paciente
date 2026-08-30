@@ -84,17 +84,16 @@ export class ChatConversa {
     });
   }
 
-  /** O app do paciente recebeu as mensagens: marca as da unidade como entregues (2º check). */
+  /**
+   * O app do paciente confirmou entrega. O evento é por CONVERSA (não diz QUAIS
+   * mensagens), então marcar todas as bolhas localmente marcaria como entregue
+   * até uma mensagem que o app ainda não recebeu — que voltaria para 1 check ao
+   * recarregar (o banco é a verdade). Em vez disso, relê o retrato do servidor,
+   * que traz o "entregue" correto por mensagem.
+   */
   private aoEntregaConfirmada(): void {
-    this.detalhe.update((d) => {
-      if (!d) return d;
-      return {
-        ...d,
-        mensagens: d.mensagens.map((m) =>
-          m.remetente === 'UNIDADE' && !m.entregue ? { ...m, entregue: true } : m,
-        ),
-      };
-    });
+    const id = this.idAtual();
+    if (id != null) this.ressincronizar(id);
   }
 
   private cancelarTudo(): void {
