@@ -241,8 +241,11 @@ export class ProntuarioForm implements PodeSair {
   }
 
   private carregarOpcoes(): void {
-    this.agendamentoService.listar(null, 0, 100).subscribe({
+    // Assinatura: listar(status, unidadeId, page, size). Sem o unidadeId a chamada
+    // ficava desalinhada (unidadeId=0, page=100) e o seletor vinha sempre vazio.
+    this.agendamentoService.listar(null, null, 0, 100).subscribe({
       next: (p) => this.agendamentos.set(p.content.map((a) => ({ id: a.id!, rotulo: this.rotuloAgendamento(a) }))),
+      error: () => this.toastr.error('Não foi possível carregar os agendamentos.'),
     });
   }
 
