@@ -68,7 +68,20 @@ export class ChatConversa {
       this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m)),
       this.realtime.observarDigitando(id, (e) => this.aoDigitandoRecebido(e)),
       this.realtime.observarEntrega(id, () => this.aoEntregaConfirmada()),
+      // Ao (re)conectar, recarrega o retrato: recupera o "entregue" da 1ª
+      // mensagem, cujo evento pode ter ocorrido antes de a inscrição ficar ativa.
+      this.realtime.observarConexao(() => this.ressincronizar(id)),
     ];
+  }
+
+  /** Recarrega (passivamente) a conversa do servidor, preservando otimistas. */
+  private ressincronizar(id: number): void {
+    if (this.idAtual() !== id) return;
+    this.service.detalhe(id).subscribe({
+      next: (d) => {
+        if (this.idAtual() === id) this.aplicarDetalhe(d);
+      },
+    });
   }
 
   /** O app do paciente recebeu as mensagens: marca as da unidade como entregues (2º check). */

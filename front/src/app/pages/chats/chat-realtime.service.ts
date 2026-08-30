@@ -24,6 +24,7 @@ export class ChatRealtimeService {
   private readonly zone = inject(NgZone);
   private client: Client | null = null;
   private readonly assinaturas = new Map<string, Assinatura>();
+  private readonly aoConectar = new Set<() => void>();
   private seq = 0;
 
   private urlWs(): string {
@@ -59,6 +60,9 @@ export class ChatRealtimeService {
         this.assinaturas.forEach((a) => {
           a.sub = this.client!.subscribe(a.destino, this.naZona(a.callback));
         });
+        // Avisa quem quer re-sincronizar o estado perdido na janela de conexão
+        // (ex.: o 2º "check" da 1ª mensagem, cujo evento é único e não se repete).
+        this.aoConectar.forEach((cb) => this.zone.run(cb));
       },
     });
     this.client.activate();
@@ -104,6 +108,17 @@ export class ChatRealtimeService {
   /** Observa a confirmação de entrega (o app do paciente recebeu as mensagens). */
   observarEntrega(chatId: number, callback: () => void): () => void {
     return this.inscrever(`/topic/chat/${chatId}/entregue`, () => callback());
+  }
+
+  /**
+   * Notifica a cada (re)conexão do WebSocket. Útil para recarregar o retrato do
+   * servidor e recuperar eventos únicos perdidos enquanto a conexão subia
+   * (as inscrições só ficam ativas no onConnect).
+   */
+  observarConexao(callback: () => void): () => void {
+    this.garantirCliente();
+    this.aoConectar.add(callback);
+    return () => this.aoConectar.delete(callback);
   }
 
   /** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */
