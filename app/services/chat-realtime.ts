@@ -18,18 +18,36 @@ let client: Client | null = null;
 const assinaturas = new Map<string, Assinatura>();
 let seq = 0;
 
+/** Estado da conexão em tempo real (para a UI mostrar "ao vivo / conectando / offline"). */
+export type EstadoConexao = 'conectando' | 'conectado' | 'offline';
+let estado: EstadoConexao = 'offline';
+const ouvintesEstado = new Set<(e: EstadoConexao) => void>();
+function definirEstado(novo: EstadoConexao): void {
+  estado = novo;
+  ouvintesEstado.forEach((cb) => cb(novo));
+}
+
+/** Assina o estado da conexão em tempo real; devolve a função de cancelamento. */
+export function observarConexao(callback: (estado: EstadoConexao) => void): () => void {
+  ouvintesEstado.add(callback);
+  callback(estado); // estado atual imediatamente
+  return () => ouvintesEstado.delete(callback);
+}
+
 function urlWs(): string {
   return API_URL.replace(/^http/, 'ws').replace(/\/+$/, '') + '/ws';
 }
 
 function garantirCliente(): Client {
   if (client) return client;
+  definirEstado('conectando');
   client = new Client({
     brokerURL: urlWs(),
     reconnectDelay: 4000,
     // Token do paciente no CONNECT (o backend autoriza a assinatura por conversa).
     connectHeaders: authHeaders(),
     beforeConnect: () => {
+      definirEstado('conectando');
       if (client) client.connectHeaders = authHeaders();
     },
     // Correções necessárias no React Native: o RN altera o byte NULL que
@@ -37,13 +55,29 @@ function garantirCliente(): Client {
     // recompomos o NULL no recebimento.
     forceBinaryWSFrames: true,
     appendMissingNULLonIncoming: true,
+    // Log do ciclo de vida (visível em `adb logcat` / dev) para diagnosticar a conexão.
+    debug: (msg) => {
+      if (msg) console.log('[STOMP]', msg);
+    },
     onConnect: () => {
+      definirEstado('conectado');
+      console.log('[STOMP] conectado a', urlWs());
       assinaturas.forEach((a) => {
         a.sub = client!.subscribe(a.destino, a.callback);
       });
     },
-    onStompError: (frame) => console.warn('[STOMP] erro:', frame.headers['message']),
-    onWebSocketError: () => console.warn('[STOMP] falha na conexão WebSocket:', urlWs()),
+    onStompError: (frame) => {
+      definirEstado('offline');
+      console.warn('[STOMP] erro do broker:', frame.headers['message'], frame.body);
+    },
+    onWebSocketError: (evento) => {
+      definirEstado('offline');
+      console.warn('[STOMP] falha no WebSocket:', (evento as { message?: string })?.message ?? evento, urlWs());
+    },
+    onWebSocketClose: (evento) => {
+      definirEstado('offline');
+      console.warn('[STOMP] WebSocket fechado:', evento?.code, evento?.reason);
+    },
   });
   client.activate();
   return client;

@@ -24,7 +24,13 @@ import {
   novoClienteId,
 } from '@/services/chat';
 import { limparChatAtivo, setChatAtivo } from '@/services/chat-ativo';
-import { observarDigitando, observarMensagens, sinalizarDigitando } from '@/services/chat-realtime';
+import {
+  EstadoConexao,
+  observarConexao,
+  observarDigitando,
+  observarMensagens,
+  sinalizarDigitando,
+} from '@/services/chat-realtime';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -60,6 +66,7 @@ export default function ConversaScreen() {
   const [erro, setErro] = useState(false);
   const [texto, setTexto] = useState('');
   const [digitando, setDigitando] = useState(false);
+  const [conexao, setConexao] = useState<EstadoConexao>('offline');
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
   const ultimoSinalDigitando = useRef(0);
@@ -129,9 +136,11 @@ export default function ConversaScreen() {
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
       timerDigitando.current = setTimeout(() => setDigitando(false), 3000);
     });
+    const cancelarConexao = observarConexao(setConexao);
     return () => {
       cancelarMsg();
       cancelarDig();
+      cancelarConexao();
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
     };
   }, [id]);
@@ -258,9 +267,13 @@ export default function ConversaScreen() {
             <Text style={styles.digitando} numberOfLines={1}>
               digitando…
             </Text>
-          ) : (
+          ) : conexao === 'conectado' ? (
             <Text style={styles.contatoStatus} numberOfLines={1}>
               {detalhe?.statusDescricao ?? 'Carregando…'}
+            </Text>
+          ) : (
+            <Text style={styles.contatoStatus} numberOfLines={1}>
+              {conexao === 'conectando' ? 'conectando ao vivo…' : 'sem conexão em tempo real'}
             </Text>
           )}
         </View>
