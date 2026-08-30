@@ -46,8 +46,12 @@ export interface ChatDetalhe {
   unidadeSaude: Ref;
   status: StatusChat;
   statusDescricao: string;
-  /** false quando o paciente não tem mais sessão no app: bloqueia o envio da unidade. */
-  pacienteUsandoApp: boolean;
+  /**
+   * false quando o paciente não tem mais sessão no app: bloqueia o envio da
+   * unidade. Ausente/indefinido em respostas antigas — nesse caso NÃO se bloqueia
+   * (o back é a autoridade e responde 422 quando preciso).
+   */
+  pacienteUsandoApp?: boolean;
   mensagens: Mensagem[];
 }
 

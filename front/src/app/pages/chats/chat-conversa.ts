@@ -130,8 +130,10 @@ export class ChatConversa {
     const conteudo = this.texto().trim();
     const id = this.idAtual();
     if (!conteudo || id == null) return;
-    // Paciente não usa mais o app: o envio está bloqueado (a UI já esconde o campo).
-    if (!this.detalhe()?.pacienteUsandoApp) return;
+    // Bloqueia só quando o back confirma que o paciente não usa mais o app
+    // (pacienteUsandoApp === false). Se o campo vier ausente/indefinido, não
+    // bloqueia na UI — o back ainda é a autoridade (responde 422 se preciso).
+    if (this.detalhe()?.pacienteUsandoApp === false) return;
 
     // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
     const tempId = -Date.now();
