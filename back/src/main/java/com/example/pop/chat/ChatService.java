@@ -2,12 +2,20 @@ package com.example.pop.chat;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Ref;
+import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.push.PushService;
+import com.example.pop.unidade.Unidade;
+import com.example.pop.unidade.UnidadeRepository;
 
 /**
  * Regras e mapeamentos de chat compartilhados entre o lado da unidade
@@ -18,15 +26,69 @@ public class ChatService {
 
     private final ChatRepository repository;
     private final MensagemRepository mensagemRepository;
+    private final PacienteRepository pacienteRepository;
+    private final UnidadeRepository unidadeRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
+            PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
             SimpMessagingTemplate messagingTemplate, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
+        this.pacienteRepository = pacienteRepository;
+        this.unidadeRepository = unidadeRepository;
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
+    }
+
+    /**
+     * Abre a conversa do paciente na unidade, criando-a se ainda não existir
+     * (regra: 1 conversa por paciente+unidade). Se já existir, devolve a mesma
+     * (o paciente pode ter deixado de usar o app — mesmo assim reabrimos o
+     * histórico). Só bloqueia a CRIAÇÃO de uma conversa nova quando o paciente
+     * não está usando o app (sem sessão amarrada a um aparelho): sem isso, ele
+     * nunca receberia as mensagens.
+     *
+     * <p>Sem {@code @Transactional} de propósito: cada operação de repositório
+     * roda na própria transação, então a violação do índice único numa corrida
+     * é capturada e resolvida relendo a conversa já criada (uma transação
+     * marcada para rollback não conseguiria reconsultar).
+     */
+    public AberturaConversa abrirOuCriar(Long pacienteId, Long unidadeId) {
+        Optional<Chat> existente = repository.findByPacienteIdAndUnidadeSaudeId(pacienteId, unidadeId);
+        if (existente.isPresent()) {
+            return new AberturaConversa(existente.get(), false);
+        }
+
+        Paciente paciente = pacienteRepository.findById(pacienteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente não encontrado"));
+        if (!(paciente.isAtivo() && paciente.getDispositivoAtivo() != null)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O paciente não está usando o aplicativo no celular.");
+        }
+        Unidade unidade = unidadeRepository.findById(unidadeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unidade não encontrada"));
+
+        Chat novo = new Chat();
+        novo.setPaciente(paciente);
+        novo.setUnidadeSaude(unidade);
+        novo.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
+        LocalDateTime agora = LocalDateTime.now();
+        novo.setCriadoEm(agora);
+        novo.setAtualizadoEm(agora);
+        try {
+            return new AberturaConversa(repository.save(novo), true);
+        } catch (DataIntegrityViolationException corrida) {
+            // Outro pedido criou o mesmo par entre a checagem e o insert: devolve o existente.
+            Chat criadoPorOutro = repository.findByPacienteIdAndUnidadeSaudeId(pacienteId, unidadeId)
+                    .orElseThrow(() -> corrida);
+            return new AberturaConversa(criadoPorOutro, false);
+        }
+    }
+
+    /** Resultado do "abrir ou criar": a conversa e se ela foi criada agora. */
+    public record AberturaConversa(Chat chat, boolean criado) {
     }
 
     /** Registra uma mensagem do paciente na conversa e publica em tempo real. */

@@ -3,13 +3,20 @@ package com.example.pop.chat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.unidade.UnidadeRepository;
 
 @SpringBootTest
 class ChatControllerTest {
@@ -20,6 +27,23 @@ class ChatControllerTest {
     private ChatService chatService;
     @Autowired
     private MensagemRepository mensagemRepository;
+    @Autowired
+    private PacienteRepository pacienteRepository;
+    @Autowired
+    private UnidadeRepository unidadeRepository;
+
+    private Long unidadeQualquer() {
+        return unidadeRepository.findAll().get(0).getId();
+    }
+
+    /** Cria um paciente novo (nome único) com a sessão do app no estado indicado. */
+    private Paciente salvarPaciente(boolean ativo, String dispositivoAtivo) {
+        Paciente p = new Paciente();
+        p.setNome("Teste " + java.util.UUID.randomUUID());
+        p.setAtivo(ativo);
+        p.setDispositivoAtivo(dispositivoAtivo);
+        return pacienteRepository.save(p);
+    }
 
     @Test
     void listaChatsSemeados() {
@@ -79,6 +103,38 @@ class ChatControllerTest {
 
         int depois = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(2L).size();
         assertEquals(antes + 1, depois, "reenvio com o mesmo clienteId nao deve duplicar");
+    }
+
+    @Test
+    void abrirCriaEReutilizaConversaDoPacienteQueUsaApp() {
+        Long unidadeId = unidadeQualquer();
+        Long pacienteId = salvarPaciente(true, "dev-" + java.util.UUID.randomUUID()).getId();
+
+        // 1ª vez: cria (201).
+        ResponseEntity<ChatDetalheResponse> criacao = controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId));
+        assertEquals(HttpStatus.CREATED, criacao.getStatusCode());
+        ChatDetalheResponse criado = criacao.getBody();
+        assertNotNull(criado);
+        assertNotNull(criado.id());
+        assertEquals(pacienteId, criado.paciente().id());
+        assertTrue(criado.mensagens().isEmpty(), "conversa nova começa sem mensagens");
+
+        // 2ª vez: reutiliza a mesma (200), sem duplicar (1 por paciente+unidade).
+        ResponseEntity<ChatDetalheResponse> reabertura = controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId));
+        assertEquals(HttpStatus.OK, reabertura.getStatusCode());
+        assertNotNull(reabertura.getBody());
+        assertEquals(criado.id(), reabertura.getBody().id());
+    }
+
+    @Test
+    void abrirBloqueiaPacienteQueNaoEstaUsandoOApp() {
+        Long unidadeId = unidadeQualquer();
+        // ativo=true mas sem aparelho amarrado (só recebeu o código, não ativou no celular).
+        Long pacienteId = salvarPaciente(true, null).getId();
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId)));
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, ex.getStatusCode());
     }
 
     @Test

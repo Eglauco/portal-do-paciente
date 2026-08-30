@@ -58,6 +58,18 @@ public class ChatController {
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
 
+    /**
+     * Abre a conversa do paciente na unidade. Reutiliza a existente (1 por
+     * paciente+unidade) ou cria uma nova; 422 se o paciente não estiver usando
+     * o app (sem sessão amarrada a um aparelho).
+     */
+    @PostMapping
+    public ResponseEntity<ChatDetalheResponse> abrir(@Valid @RequestBody AbrirConversaRequest request) {
+        ChatService.AberturaConversa abertura = chatService.abrirOuCriar(request.pacienteId(), request.unidadeId());
+        HttpStatus status = abertura.criado() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(chatService.toDetalhe(abertura.chat()));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ChatDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)

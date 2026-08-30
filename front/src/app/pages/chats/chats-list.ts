@@ -1,7 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
@@ -15,7 +15,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-chats-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink],
   templateUrl: './chats-list.html',
 })
 export class ChatsList {

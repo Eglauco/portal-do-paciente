@@ -82,6 +82,11 @@ export const routes: Routes = [
         title: 'Chats ao vivo — Portal do Paciente · Admin',
       },
       {
+        path: 'chats/nova',
+        loadComponent: () => import('./pages/chats/chat-nova').then((m) => m.ChatNova),
+        title: 'Nova conversa — Portal do Paciente · Admin',
+      },
+      {
         path: 'chats/:id',
         loadComponent: () => import('./pages/chats/chat-conversa').then((m) => m.ChatConversa),
         title: 'Conversa — Portal do Paciente · Admin',

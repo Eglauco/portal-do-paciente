@@ -25,6 +25,14 @@ export class ChatService {
     return this.http.get<ChatDetalhe>(`${this.base}/${id}`);
   }
 
+  /**
+   * Abre a conversa do paciente na unidade (1 por paciente+unidade): reutiliza
+   * a existente ou cria uma nova. Erro 422 = paciente não está usando o app.
+   */
+  abrir(pacienteId: number, unidadeId: number): Observable<ChatDetalhe> {
+    return this.http.post<ChatDetalhe>(this.base, { pacienteId, unidadeId });
+  }
+
   visualizar(id: number): Observable<ChatDetalhe> {
     return this.http.post<ChatDetalhe>(`${this.base}/${id}/visualizar`, {});
   }

@@ -1,0 +1,58 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Nova conversa</h1>
+      <p class="page-sub">Selecione o paciente para iniciar uma conversa na sua unidade.</p>
+    </div>
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="iniciar($event)">
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="label" for="paciente">Paciente <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="paciente"
+          formControlName="pacienteId"
+          [items]="pacientes()"
+          bindLabel="nome"
+          bindValue="id"
+          [typeahead]="buscaPaciente$"
+          [minTermLength]="2"
+          [loading]="carregandoPacientes()"
+          loadingText="Buscando…"
+          typeToSearchText="Digite ao menos 2 letras para buscar o paciente"
+          placeholder="Busque o paciente pelo nome"
+          notFoundText="Nenhum paciente encontrado"
+        ></ng-select>
+        @if (invalido()) {
+          <span class="field-error" role="alert">Selecione o paciente.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <span class="label">Unidade de saúde</span>
+        <input class="input" [value]="unidadeNome() ?? 'Nenhuma unidade ativa'" disabled />
+        <span class="field-hint">Vinculado à sua unidade ativa. Para mudar, troque a unidade no topo.</span>
+      </div>
+    </div>
+
+    @if (erro(); as mensagem) {
+      <div class="form-alert" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" />
+        </svg>
+        <div>
+          <b>Não é possível iniciar esta conversa</b>
+          <p>{{ mensagem }}</p>
+        </div>
+      </div>
+    }
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="iniciando()">
+        {{ iniciando() ? 'Abrindo…' : 'Iniciar conversa' }}
+      </button>
+    </div>
+  </form>
+</section>

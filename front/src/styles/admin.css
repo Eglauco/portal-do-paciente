@@ -1017,6 +1017,35 @@
   border-top: 1px solid var(--line);
 }
 
+/* Aviso destacado dentro de um formulário (ex.: não é possível iniciar a conversa) */
+.form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #f3b7bc;
+  border-radius: 0.75rem;
+  background: #fdecee;
+  color: #8a2230;
+}
+.form-alert svg {
+  width: 1.3rem;
+  height: 1.3rem;
+  stroke: currentColor;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+.form-alert b {
+  display: block;
+  font-size: 0.95rem;
+}
+.form-alert p {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .result-count {
   font-size: 0.85rem;
   color: var(--muted);

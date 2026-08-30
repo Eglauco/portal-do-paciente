@@ -13,6 +13,9 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     /** Carrega a conversa garantindo que é do paciente informado (escopo do app). */
     Optional<Chat> findByIdAndPacienteId(Long id, Long pacienteId);
 
+    /** Conversa única do par paciente+unidade (base do "abrir ou criar"). */
+    Optional<Chat> findByPacienteIdAndUnidadeSaudeId(Long pacienteId, Long unidadeId);
+
     /** Id do dono da conversa (sem carregar o agregado) — usado na autorização do WebSocket. */
     @Query("select c.paciente.id from Chat c where c.id = :id")
     Optional<Long> findPacienteIdById(@Param("id") Long id);
