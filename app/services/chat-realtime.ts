@@ -21,16 +21,18 @@ let seq = 0;
 /** Estado da conexão em tempo real (para a UI mostrar "ao vivo / conectando / offline"). */
 export type EstadoConexao = 'conectando' | 'conectado' | 'offline';
 let estado: EstadoConexao = 'offline';
-const ouvintesEstado = new Set<(e: EstadoConexao) => void>();
-function definirEstado(novo: EstadoConexao): void {
+let detalhe = ''; // motivo do último problema (diagnóstico): código de fecho, erro STOMP, etc.
+const ouvintesEstado = new Set<(e: EstadoConexao, d: string) => void>();
+function definirEstado(novo: EstadoConexao, motivo = ''): void {
   estado = novo;
-  ouvintesEstado.forEach((cb) => cb(novo));
+  detalhe = motivo;
+  ouvintesEstado.forEach((cb) => cb(novo, motivo));
 }
 
 /** Assina o estado da conexão em tempo real; devolve a função de cancelamento. */
-export function observarConexao(callback: (estado: EstadoConexao) => void): () => void {
+export function observarConexao(callback: (estado: EstadoConexao, detalhe: string) => void): () => void {
   ouvintesEstado.add(callback);
-  callback(estado); // estado atual imediatamente
+  callback(estado, detalhe); // estado atual imediatamente
   return () => ouvintesEstado.delete(callback);
 }
 
@@ -67,15 +69,16 @@ function garantirCliente(): Client {
       });
     },
     onStompError: (frame) => {
-      definirEstado('offline');
+      definirEstado('offline', 'STOMP: ' + (frame.headers['message'] ?? 'erro'));
       console.warn('[STOMP] erro do broker:', frame.headers['message'], frame.body);
     },
     onWebSocketError: (evento) => {
-      definirEstado('offline');
-      console.warn('[STOMP] falha no WebSocket:', (evento as { message?: string })?.message ?? evento, urlWs());
+      const msg = (evento as { message?: string })?.message ?? 'falha';
+      definirEstado('offline', 'WS-erro: ' + msg);
+      console.warn('[STOMP] falha no WebSocket:', msg, urlWs());
     },
     onWebSocketClose: (evento) => {
-      definirEstado('offline');
+      definirEstado('offline', 'WS fechou ' + (evento?.code ?? '?') + (evento?.reason ? ' ' + evento.reason : ''));
       console.warn('[STOMP] WebSocket fechado:', evento?.code, evento?.reason);
     },
   });

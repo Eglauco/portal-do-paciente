@@ -67,6 +67,7 @@ export default function ConversaScreen() {
   const [texto, setTexto] = useState('');
   const [digitando, setDigitando] = useState(false);
   const [conexao, setConexao] = useState<EstadoConexao>('offline');
+  const [conexaoDetalhe, setConexaoDetalhe] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
   const ultimoSinalDigitando = useRef(0);
@@ -136,7 +137,10 @@ export default function ConversaScreen() {
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
       timerDigitando.current = setTimeout(() => setDigitando(false), 3000);
     });
-    const cancelarConexao = observarConexao(setConexao);
+    const cancelarConexao = observarConexao((e, d) => {
+      setConexao(e);
+      setConexaoDetalhe(d);
+    });
     return () => {
       cancelarMsg();
       cancelarDig();
@@ -273,7 +277,9 @@ export default function ConversaScreen() {
             </Text>
           ) : (
             <Text style={styles.contatoStatus} numberOfLines={1}>
-              {conexao === 'conectando' ? 'conectando ao vivo…' : 'sem conexão em tempo real'}
+              {conexao === 'conectando'
+                ? 'conectando ao vivo…'
+                : `sem tempo real${conexaoDetalhe ? ' · ' + conexaoDetalhe : ''}`}
             </Text>
           )}
         </View>
