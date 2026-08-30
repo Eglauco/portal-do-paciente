@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { retry, timer } from 'rxjs';
+import { retry, throwError, timer } from 'rxjs';
 import { ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
@@ -33,6 +33,7 @@ export class ChatConversa {
   protected readonly texto = signal('');
 
   private readonly mensagensRef = viewChild<ElementRef<HTMLElement>>('mensagens');
+  private readonly bloqueioRef = viewChild<ElementRef<HTMLElement>>('bloqueio');
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -106,7 +107,14 @@ export class ChatConversa {
           : x.remetente === mensagem.remetente && x.texto === mensagem.texto);
       const jaEntregue = d.mensagens.some((x) => ehTemp(x) && x.entregue);
       const base = d.mensagens.filter((x) => !ehTemp(x));
-      return { ...d, mensagens: [...base, { ...mensagem, entregue: mensagem.entregue || jaEntregue }] };
+      // Uma mensagem do paciente prova que ele voltou a usar o app (o endpoint
+      // dele exige sessão válida): re-libera o envio se estava bloqueado.
+      const usandoApp = mensagem.remetente === 'PACIENTE' ? true : d.pacienteUsandoApp;
+      return {
+        ...d,
+        pacienteUsandoApp: usandoApp,
+        mensagens: [...base, { ...mensagem, entregue: mensagem.entregue || jaEntregue }],
+      };
     });
     this.rolarParaFim();
   }
@@ -122,6 +130,8 @@ export class ChatConversa {
     const conteudo = this.texto().trim();
     const id = this.idAtual();
     if (!conteudo || id == null) return;
+    // Paciente não usa mais o app: o envio está bloqueado (a UI já esconde o campo).
+    if (!this.detalhe()?.pacienteUsandoApp) return;
 
     // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
     const tempId = -Date.now();
@@ -155,7 +165,12 @@ export class ChatConversa {
     this.service
       .enviar(id, conteudo, clienteId)
       .pipe(
-        retry({ count: this.ATRASOS.length, delay: (_e, n) => timer(this.ATRASOS[n - 1] ?? 16000) }),
+        retry({
+          count: this.ATRASOS.length,
+          // 422 = paciente não usa mais o app: erro permanente, não adianta retentar.
+          delay: (e, n) =>
+            e?.status === 422 ? throwError(() => e) : timer(this.ATRASOS[n - 1] ?? 16000),
+        }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
@@ -179,9 +194,29 @@ export class ChatConversa {
           );
           this.rolarParaFim();
         },
-        // Esgotou as tentativas: marca falha (mostra "reenviar"), se ainda na mesma conversa.
-        error: () => {
-          if (this.idAtual() === id) this.marcarMensagem(tempId, { pendente: false, falha: true });
+        error: (e) => {
+          if (this.idAtual() !== id) return;
+          // Paciente deixou de usar o app durante a conversa: bloqueia o envio e
+          // mostra o aviso fixo. Mantém a bolha marcada como "não enviada" (o
+          // texto do operador fica visível), mas sem "reenviar" — o envio está
+          // bloqueado (o botão é ocultado enquanto pacienteUsandoApp é false).
+          if (e?.status === 422) {
+            this.detalhe.update((d) =>
+              d
+                ? {
+                    ...d,
+                    pacienteUsandoApp: false,
+                    mensagens: d.mensagens.map((m) =>
+                      m.id === tempId ? { ...m, pendente: false, falha: true } : m,
+                    ),
+                  }
+                : d,
+            );
+            this.focarBloqueio();
+            return;
+          }
+          // Esgotou as tentativas (conexão): marca falha (mostra "reenviar").
+          this.marcarMensagem(tempId, { pendente: false, falha: true });
         },
       });
   }
@@ -269,6 +304,16 @@ export class ChatConversa {
    * topo). Dois frames: o 1º deixa as bolhas renderizarem; o 2º garante que o
    * layout já tem a altura final antes de irmos ao fundo.
    */
+  /**
+   * Move o foco para o aviso de bloqueio quando ele aparece (o campo de envio
+   * foi removido do DOM): mantém o teclado/leitor de tela no contexto certo e
+   * anuncia o aviso (role="alert" + foco). Ver WCAG 2.4.3.
+   */
+  private focarBloqueio(): void {
+    if (typeof requestAnimationFrame === 'undefined') return;
+    requestAnimationFrame(() => this.bloqueioRef()?.nativeElement?.focus());
+  }
+
   private rolarParaFim(): void {
     if (typeof requestAnimationFrame === 'undefined') return; // SSR: sem DOM
     const irAoFundo = () => {

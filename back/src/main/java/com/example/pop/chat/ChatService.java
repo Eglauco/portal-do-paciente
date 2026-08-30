@@ -63,7 +63,7 @@ public class ChatService {
 
         Paciente paciente = pacienteRepository.findById(pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente não encontrado"));
-        if (!(paciente.isAtivo() && paciente.getDispositivoAtivo() != null)) {
+        if (!pacienteUsandoApp(paciente)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "O paciente não está usando o aplicativo no celular.");
         }
@@ -91,6 +91,16 @@ public class ChatService {
     public record AberturaConversa(Chat chat, boolean criado) {
     }
 
+    /**
+     * true quando o paciente tem uma sessão do app amarrada a um aparelho — ou
+     * seja, está de fato usando o app. {@code ativo} sozinho não basta: fica
+     * true assim que o admin gera o código de ativação, antes de o paciente
+     * ativar no celular. Sem uma sessão, ele não recebe as mensagens.
+     */
+    public boolean pacienteUsandoApp(Paciente paciente) {
+        return paciente != null && paciente.isAtivo() && paciente.getDispositivoAtivo() != null;
+    }
+
     /** Registra uma mensagem do paciente na conversa e publica em tempo real. */
     public Chat enviarComoPaciente(Chat chat, String texto, String clienteId) {
         if (jaEnviada(chat.getId(), clienteId)) {
@@ -110,7 +120,13 @@ public class ChatService {
     /** Registra uma mensagem da unidade (operador), publica e notifica o paciente. */
     public Chat enviarComoUnidade(Chat chat, String texto, String clienteId) {
         if (jaEnviada(chat.getId(), clienteId)) {
-            return chat; // idempotente
+            return chat; // idempotente: mensagem já entregue quando o paciente ainda usava o app
+        }
+        // Paciente deixou de usar o app (sessão revogada/trocou de aparelho): a
+        // mensagem não chegaria a ninguém — bloqueia o envio da unidade.
+        if (!pacienteUsandoApp(chat.getPaciente())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O paciente não está mais utilizando o aplicativo no celular.");
         }
         marcarMensagensDoPacienteComoLidas(chat.getId());
         Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true);
@@ -205,6 +221,7 @@ public class ChatService {
                 new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
                 chat.getStatus(),
                 chat.getStatus().getDescricao(),
+                pacienteUsandoApp(chat.getPaciente()),
                 mensagens);
     }
 

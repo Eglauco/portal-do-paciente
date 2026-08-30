@@ -1767,6 +1767,19 @@
 .wa__enviar:disabled { opacity: 0.6; cursor: default; }
 .wa__resolvido { padding: 16px; text-align: center; font-size: 0.9rem; color: var(--muted); background: var(--surface); border-top: 1px solid var(--line); }
 
+/* Envio bloqueado: paciente não usa mais o app (aviso fixo no lugar do campo). */
+.wa__bloqueio {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 14px 16px;
+  background: #fdecee;
+  border-top: 1px solid #f3b7bc;
+  color: #8a2230;
+}
+.wa__bloqueio svg { width: 1.3rem; height: 1.3rem; stroke: currentColor; flex-shrink: 0; }
+.wa__bloqueio p { margin: 0; font-size: 0.9rem; line-height: 1.4; }
+
 .wa__vazio { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); background: #eef3f1; }
 .wa__vazio-icone { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 1.2rem; color: var(--brand-deep); background: color-mix(in srgb, var(--brand) 12%, white); }
 .wa__vazio-icone svg { width: 2rem; height: 2rem; stroke: currentColor; }

@@ -46,6 +46,8 @@ export interface ChatDetalhe {
   unidadeSaude: Ref;
   status: StatusChat;
   statusDescricao: string;
+  /** false quando o paciente não tem mais sessão no app: bloqueia o envio da unidade. */
+  pacienteUsandoApp: boolean;
   mensagens: Mensagem[];
 }
 

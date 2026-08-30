@@ -11,5 +11,6 @@ public record ChatDetalheResponse(
         Ref unidadeSaude,
         StatusChat status,
         String statusDescricao,
+        boolean pacienteUsandoApp,
         List<MensagemResponse> mensagens) {
 }

@@ -45,6 +45,13 @@ class ChatControllerTest {
         return pacienteRepository.save(p);
     }
 
+    /** Conversa nova isolada, com um paciente que está usando o app. */
+    private Long novaConversaComAppAtivo() {
+        Long unidadeId = unidadeQualquer();
+        Long pacienteId = salvarPaciente(true, "dev-" + java.util.UUID.randomUUID()).getId();
+        return controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId)).getBody().id();
+    }
+
     @Test
     void listaChatsSemeados() {
         Pagina<ChatResponse> pagina = controller.listar(null, null, null, false, 0, 50);
@@ -82,15 +89,38 @@ class ChatControllerTest {
 
     @Test
     void marcarEntregueMarcaMensagensDaUnidade() {
-        // Garante ao menos uma mensagem da unidade no chat.
-        controller.enviar(1L, new MensagemRequest("Resposta da unidade", null));
+        // Conversa nova com paciente usando o app (a unidade só pode enviar nesse caso).
+        Long chatId = novaConversaComAppAtivo();
+        controller.enviar(chatId, new MensagemRequest("Resposta da unidade", null));
 
-        chatService.marcarEntregue(1L);
+        chatService.marcarEntregue(chatId);
 
-        boolean todasEntregues = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(1L).stream()
+        boolean todasEntregues = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(chatId).stream()
                 .filter(m -> m.getRemetente() == RemetenteMensagem.UNIDADE)
                 .allMatch(Mensagem::isEntregue);
         assertTrue(todasEntregues, "todas as mensagens da unidade deveriam ficar entregues");
+    }
+
+    @Test
+    void enviarComoUnidadeBloqueiaQuandoPacienteNaoUsaMaisApp() {
+        Long unidadeId = unidadeQualquer();
+        Long pacienteId = salvarPaciente(true, "dev-" + java.util.UUID.randomUUID()).getId();
+        Long chatId = controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId)).getBody().id();
+
+        // O paciente deixa de usar o app (sessão revogada / trocou de aparelho).
+        Paciente p = pacienteRepository.findById(pacienteId).orElseThrow();
+        p.setDispositivoAtivo(null);
+        pacienteRepository.save(p);
+
+        // A unidade não consegue mais enviar (422)...
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.enviar(chatId, new MensagemRequest("Você está aí?", null)));
+        assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, ex.getStatusCode());
+
+        // ...e o detalhe informa o bloqueio para a tela mostrar o aviso fixo.
+        ChatDetalheResponse detalhe = controller.buscar(chatId).getBody();
+        assertNotNull(detalhe);
+        assertFalse(detalhe.pacienteUsandoApp());
     }
 
     @Test
@@ -118,6 +148,7 @@ class ChatControllerTest {
         assertNotNull(criado.id());
         assertEquals(pacienteId, criado.paciente().id());
         assertTrue(criado.mensagens().isEmpty(), "conversa nova começa sem mensagens");
+        assertTrue(criado.pacienteUsandoApp(), "paciente com sessão ativa está usando o app");
 
         // 2ª vez: reutiliza a mesma (200), sem duplicar (1 por paciente+unidade).
         ResponseEntity<ChatDetalheResponse> reabertura = controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId));
