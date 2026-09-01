@@ -18,13 +18,16 @@ export class StorageService {
    * 1) pede ao backend uma URL pré-assinada (PUT);
    * 2) faz o PUT do arquivo direto no S3;
    * 3) retorna a URL pública para salvar no documento.
+   *
+   * {@code pasta}: subpasta no bucket (ex.: "rede-social"). Omitida → "prontuarios".
    */
-  async enviar(arquivo: File): Promise<string> {
+  async enviar(arquivo: File, pasta?: string): Promise<string> {
     const contentType = arquivo.type || 'application/octet-stream';
     const { uploadUrl, publicUrl } = await firstValueFrom(
       this.http.post<UploadUrlResponse>(`${this.base}/upload-url`, {
         nomeArquivo: arquivo.name,
         contentType,
+        pasta,
       }),
     );
 

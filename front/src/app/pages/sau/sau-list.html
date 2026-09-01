@@ -1,0 +1,139 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">SAU</h1>
+      <p class="page-sub">Serviço de Atendimento ao Usuário — elogios, críticas e sugestões dos pacientes.</p>
+    </div>
+  </header>
+
+  <!-- Filtros -->
+  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+    <p class="section-label">Filtros</p>
+    <div class="filters__chat">
+      <div class="form-field">
+        <label class="label">Tipo</label>
+        <ng-select
+          formControlName="tipoId"
+          [items]="tipos()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Todos os tipos"
+        ></ng-select>
+      </div>
+      <div class="form-field">
+        <label class="label">Status</label>
+        <ng-select
+          formControlName="status"
+          [items]="statusOpcoes"
+          bindLabel="label"
+          bindValue="value"
+          placeholder="Todos os status"
+        ></ng-select>
+      </div>
+    </div>
+    <div class="filters__chat-acoes">
+      <span></span>
+      <div class="filters__actions">
+        <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+        <button type="submit" class="btn btn--solid">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          Pesquisar
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Lista de manifestações -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Manifestações</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} registro(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando manifestações…</p></div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (manifestacoes().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+          </svg>
+        </span>
+        <h3>Nenhuma manifestação encontrada</h3>
+        <p>Ajuste os filtros para localizar uma manifestação.</p>
+      </div>
+    } @else {
+      <ul class="convo-list">
+        @for (m of manifestacoes(); track m.id) {
+          <li>
+            <button type="button" class="convo" (click)="abrir(m)">
+              <span class="convo__avatar">{{ iniciais(m.paciente.nome) }}</span>
+              <span class="convo__body">
+                <span class="convo__top">
+                  <b class="convo__nome">{{ m.paciente.nome }}</b>
+                  <span class="convo__hora">{{ m.atualizadoEm | date: 'dd/MM HH:mm' }}</span>
+                </span>
+                <span class="convo__meta">
+                  <span class="convo__unidade">{{ m.unidadeSaude.nome }}</span>
+                  <span class="status-pill status-pill--tipo">{{ m.tipo.nome }}</span>
+                  <span class="status-pill" [attr.data-st]="m.status">{{ m.statusDescricao }}</span>
+                </span>
+                <span class="convo__linha">
+                  <span class="convo__previa">
+                    @if (m.ultimaMensagemDe === 'SAU') { <span class="convo__voce">SAU: </span> }
+                    {{ m.ultimaMensagem }}
+                  </span>
+                </span>
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+
+      <!-- Paginação -->
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Registros por página">
+                @for (t of tamanhos; track t) { <option [value]="t" [selected]="t === size()">{{ t }}</option> }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}</span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') { <span class="pager__ellipsis" aria-hidden="true">…</span> }
+              @else {
+                <button type="button" class="pager__btn" [class.is-active]="item === page()" (click)="irParaPagina(item)">{{ item + 1 }}</button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+</section>

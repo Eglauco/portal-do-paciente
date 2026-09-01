@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.pop.common.Pagina;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/procedimento")
 public class ProcedimentoController {
@@ -68,17 +70,19 @@ public class ProcedimentoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Procedimento criar(@RequestBody Procedimento procedimento) {
+    public Procedimento criar(@Valid @RequestBody Procedimento procedimento) {
         procedimento.setId(null);
         return repository.save(procedimento);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Procedimento> atualizar(@PathVariable Long id, @RequestBody Procedimento procedimento) {
+    public ResponseEntity<Procedimento> atualizar(@PathVariable Long id,
+            @Valid @RequestBody Procedimento procedimento) {
         return repository.findById(id)
                 .map(existente -> {
                     existente.setNome(procedimento.getNome());
                     existente.setPreparo(procedimento.getPreparo());
+                    existente.setHorasCancelamento(procedimento.getHorasCancelamento());
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

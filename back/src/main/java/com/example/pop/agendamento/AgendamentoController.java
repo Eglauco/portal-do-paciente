@@ -122,6 +122,7 @@ public class AgendamentoController {
             @Valid @RequestBody AgendamentoRequest request) {
         return repository.findById(id)
                 .map(agendamento -> {
+                    StatusAgendamento anterior = agendamento.getStatusAgendamento();
                     aplicar(agendamento, request);
                     if (request.statusAgendamento() != null) {
                         agendamento.setStatusAgendamento(request.statusAgendamento());
@@ -129,6 +130,11 @@ public class AgendamentoController {
                     Agendamento salvo = repository.save(agendamento);
                     // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
                     npsService.gerarSeNecessario(salvo);
+                    // Ao MARCAR falta (transição), notifica o paciente para justificar a ausência.
+                    if (salvo.getStatusAgendamento() == StatusAgendamento.FALTA_PACIENTE
+                            && anterior != StatusAgendamento.FALTA_PACIENTE) {
+                        pushService.notificarFaltaPaciente(salvo);
+                    }
                     return ResponseEntity.ok(AgendamentoResponse.from(salvo));
                 })
                 .orElse(ResponseEntity.notFound().build());

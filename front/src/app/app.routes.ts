@@ -92,6 +92,36 @@ export const routes: Routes = [
         title: 'Conversa — Portal do Paciente · Admin',
       },
       {
+        path: 'sau',
+        loadComponent: () => import('./pages/sau/sau-list').then((m) => m.SauList),
+        title: 'SAU — Portal do Paciente · Admin',
+      },
+      {
+        path: 'sau/:id',
+        loadComponent: () => import('./pages/sau/sau-detalhe').then((m) => m.SauDetalhe),
+        title: 'Manifestação — Portal do Paciente · Admin',
+      },
+      {
+        path: 'tipos-manifestacao',
+        loadComponent: () =>
+          import('./pages/tipos-manifestacao/tipos-manifestacao-list').then((m) => m.TiposManifestacaoList),
+        title: 'Tipos de Manifestação — Portal do Paciente · Admin',
+      },
+      {
+        path: 'tipos-manifestacao/novo',
+        loadComponent: () =>
+          import('./pages/tipos-manifestacao/tipo-manifestacao-form').then((m) => m.TipoManifestacaoForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Novo tipo de manifestação — Portal do Paciente · Admin',
+      },
+      {
+        path: 'tipos-manifestacao/:id',
+        loadComponent: () =>
+          import('./pages/tipos-manifestacao/tipo-manifestacao-form').then((m) => m.TipoManifestacaoForm),
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar tipo de manifestação — Portal do Paciente · Admin',
+      },
+      {
         path: 'nps',
         loadComponent: () => import('./pages/nps/nps-list').then((m) => m.NpsList),
         title: 'NPS — Portal do Paciente · Admin',

@@ -17,6 +17,12 @@ export class NpsDetalheComponent {
   private readonly toastr = inject(ToastrService);
 
   protected readonly rotuloStatus = statusLabel;
+  protected readonly estrelas = [1, 2, 3, 4, 5];
+
+  /** Estrelas cheias para uma média (arredonda para o inteiro mais próximo). */
+  protected arredondar(valor: number): number {
+    return Math.round(valor);
+  }
 
   protected readonly detalhe = signal<NpsDetalhe | null>(null);
   protected readonly loading = signal(false);

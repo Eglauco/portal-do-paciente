@@ -69,7 +69,7 @@ public class MeuNpsController {
         return NpsDetalheResponse.from(meuNps(jwt, id));
     }
 
-    /** Resposta do paciente logado (uma nota 0 a 10 por categoria + observação). */
+    /** Resposta do paciente logado (uma nota em estrelas 1 a 5 por categoria + observação). */
     @PostMapping("/{id}/responder")
     @Transactional
     public NpsDetalheResponse responder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,

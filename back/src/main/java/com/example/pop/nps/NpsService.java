@@ -48,7 +48,7 @@ public class NpsService {
     }
 
     /**
-     * Aplica a resposta do paciente (uma nota 0..10 por categoria + observação).
+     * Aplica a resposta do paciente (uma nota em estrelas 1..5 por categoria + observação).
      * Regras: bloqueia reavaliação (409), rejeita categoria repetida (400),
      * recalcula a média e marca como RESPONDIDO. Reutilizado pelo admin e pelo app.
      * Deve rodar dentro de uma transação (a coleção de notas é LAZY).

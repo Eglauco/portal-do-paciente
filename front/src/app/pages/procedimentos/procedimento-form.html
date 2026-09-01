@@ -36,10 +36,33 @@
           placeholder="Nome do procedimento"
           autocomplete="off"
           [class.input--error]="invalido('nome')"
+          [attr.aria-invalid]="invalido('nome')"
+          aria-describedby="nome-erro"
         />
         @if (invalido('nome')) {
-          <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
+          <span id="nome-erro" class="field-error">Informe o nome (mínimo 3 caracteres).</span>
         }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="horasCancelamento">
+          Prazo p/ cancelar (horas antes) <span class="req" aria-hidden="true">*</span>
+        </label>
+        <input
+          id="horasCancelamento"
+          class="input"
+          type="number"
+          min="0"
+          formControlName="horasCancelamento"
+          placeholder="Ex.: 24"
+          [class.input--error]="invalido('horasCancelamento')"
+          [attr.aria-invalid]="invalido('horasCancelamento')"
+          aria-describedby="horas-hint horas-erro"
+        />
+        @if (invalido('horasCancelamento')) {
+          <span id="horas-erro" class="field-error">Informe as horas (0 ou mais).</span>
+        }
+        <span id="horas-hint" class="field-hint">Quantas horas antes da consulta o paciente ainda pode cancelar.</span>
       </div>
     </div>
 

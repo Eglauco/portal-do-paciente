@@ -1,0 +1,149 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Tipos de manifestação</h1>
+      <p class="page-sub">Cadastre os tipos que o paciente pode selecionar ao abrir uma manifestação no SAU.</p>
+    </div>
+    <a class="btn btn--solid" routerLink="/tipos-manifestacao/novo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Novo tipo
+    </a>
+  </header>
+
+  <!-- Filtros -->
+  <form class="filters" (submit)="buscar($event)">
+    <p class="section-label">Filtros</p>
+    <div class="filters__row2">
+      <input
+        class="input"
+        placeholder="Nome"
+        aria-label="Nome"
+        [value]="nome()"
+        (input)="updateNome($event)"
+      />
+      <span class="select">
+        <select aria-label="Situação" [value]="situacao()" (change)="updateSituacao($event)">
+          <option value="">Todas as situações</option>
+          <option value="true">Apenas ativos</option>
+          <option value="false">Apenas inativos</option>
+        </select>
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </span>
+      <div class="filters__actions">
+        <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+        <button type="submit" class="btn btn--solid">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          Pesquisar
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <!-- Dados -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Dados</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} registro(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando tipos…</p></div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (tipos().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+          </svg>
+        </span>
+        <h3>Nenhum tipo encontrado</h3>
+        <p>Ajuste os filtros ou cadastre um novo tipo de manifestação.</p>
+        <a class="btn btn--ghost" routerLink="/tipos-manifestacao/novo">Cadastrar tipo</a>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th class="col-cod">Código</th>
+              <th>Nome</th>
+              <th>Descrição</th>
+              <th class="col-sit">Situação</th>
+              <th class="col-act"><span class="sr-only">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (t of tipos(); track t.id) {
+              <tr
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Editar ' + t.nome"
+                (click)="editar(t)"
+                (keydown.enter)="editar(t)"
+              >
+                <td class="mono">{{ t.id }}</td>
+                <td><b>{{ t.nome }}</b></td>
+                <td>{{ t.descricao || '—' }}</td>
+                <td class="col-sit">
+                  <span class="sit" [class.sit--off]="!t.ativo">{{ t.ativo ? 'Ativo' : 'Inativo' }}</span>
+                </td>
+                <td class="col-act">
+                  <span class="row-go" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação -->
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Registros por página">
+                @for (t of tamanhos; track t) { <option [value]="t" [selected]="t === size()">{{ t }}</option> }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}</span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') { <span class="pager__ellipsis" aria-hidden="true">…</span> }
+              @else {
+                <button type="button" class="pager__btn" [class.is-active]="item === page()"
+                  [attr.aria-current]="item === page() ? 'page' : null" (click)="irParaPagina(item)">{{ item + 1 }}</button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+</section>

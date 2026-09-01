@@ -15,7 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Nota (0 a 10) dada pelo paciente a uma categoria de NPS dentro de uma avaliação. */
+/** Nota em estrelas (1 a 5) dada pelo paciente a uma categoria de NPS dentro de uma avaliação. */
 @Entity
 @Table(name = "nps_categoria_nota")
 @Getter

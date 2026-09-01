@@ -65,23 +65,23 @@ class NpsControllerTest {
         assertEquals(StatusNps.PENDENTE, gerado.getStatus());
         assertNull(gerado.getNota());
 
-        // Responde o NPS com uma nota por categoria (categorias semeadas 1 e 2).
+        // Responde o NPS com uma nota (estrelas 1..5) por categoria (categorias semeadas 1 e 2).
         ResponseEntity<NpsDetalheResponse> resposta = controller.responder(
                 gerado.getId(),
                 new ResponderNpsRequest(
-                        List.of(new CategoriaNotaRequest(1L, 9), new CategoriaNotaRequest(2L, 8)),
+                        List.of(new CategoriaNotaRequest(1L, 5), new CategoriaNotaRequest(2L, 4)),
                         "Muito bom!"));
         NpsDetalheResponse corpo = resposta.getBody();
         assertNotNull(corpo);
         assertEquals(StatusNps.RESPONDIDO, corpo.status());
-        assertEquals(8.5, corpo.media(), 0.0001);
+        assertEquals(4.5, corpo.media(), 0.0001);
         assertEquals(2, corpo.notas().size());
         assertNotNull(corpo.respondidoEm());
 
         // Regra: não pode responder de novo (já respondido).
         assertThrows(ResponseStatusException.class,
                 () -> controller.responder(gerado.getId(),
-                        new ResponderNpsRequest(List.of(new CategoriaNotaRequest(1L, 3)), "mudei de ideia")));
+                        new ResponderNpsRequest(List.of(new CategoriaNotaRequest(1L, 2)), "mudei de ideia")));
 
         repository.deleteById(gerado.getId());
         agendamentoController.excluir(criado.id());
@@ -100,7 +100,7 @@ class NpsControllerTest {
         // Duas notas para a mesma categoria devem ser recusadas com 400 (e não estourar 500).
         assertThrows(ResponseStatusException.class,
                 () -> controller.responder(gerado.getId(), new ResponderNpsRequest(
-                        List.of(new CategoriaNotaRequest(1L, 8), new CategoriaNotaRequest(1L, 6)), null)));
+                        List.of(new CategoriaNotaRequest(1L, 5), new CategoriaNotaRequest(1L, 3)), null)));
 
         // Limpa os registros criados no teste.
         repository.deleteById(gerado.getId());

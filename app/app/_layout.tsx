@@ -26,6 +26,8 @@ interface DadosNotificacao {
   tipo?: string;
   chatId?: number;
   postagemId?: number;
+  manifestacaoId?: number;
+  agendamentoId?: number;
 }
 
 // Como exibir a notificação quando o app está em primeiro plano.
@@ -55,6 +57,8 @@ function tratarToque(resposta: Notifications.NotificationResponse) {
   const dados = resposta.notification.request.content.data as DadosNotificacao;
   switch (dados?.tipo) {
     case 'AGENDAMENTO':
+    case 'FALTA':
+      // Falta registrada: leva o paciente à lista de agendamentos para justificar.
       router.navigate('/(tabs)/agendamentos');
       break;
     case 'CHAT':
@@ -66,6 +70,13 @@ function tratarToque(resposta: Notifications.NotificationResponse) {
       break;
     case 'NPS':
       router.navigate('/(tabs)/nps');
+      break;
+    case 'SAU':
+      if (dados.manifestacaoId != null) {
+        router.navigate({ pathname: '/sau/[id]', params: { id: String(dados.manifestacaoId) } });
+      } else {
+        router.navigate('/(tabs)/sau');
+      }
       break;
     case 'PRONTUARIO':
       router.navigate('/(tabs)/prontuario');
@@ -106,8 +117,11 @@ function Navegacao() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
       <Stack.Screen name="perfil" options={{ headerShown: false }} />
+      <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
       <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="sau/nova" options={{ headerShown: false }} />
+      <Stack.Screen name="sau/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
     </Stack>
   );

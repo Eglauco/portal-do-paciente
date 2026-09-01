@@ -21,7 +21,7 @@ export interface NpsItem {
   criadoEm: string;
 }
 
-/** Categoria de NPS ativa (o paciente dá uma nota 0 a 10 para cada). */
+/** Categoria de NPS ativa (o paciente dá uma nota em estrelas 1 a 5 para cada). */
 export interface CategoriaNps {
   id: number;
   nome: string;
@@ -88,7 +88,7 @@ export async function listarCategoriasNps(): Promise<CategoriaNps[]> {
   return comoJson<CategoriaNps[]>(resposta);
 }
 
-/** Responde uma avaliação (uma nota 0 a 10 por categoria + observação opcional). */
+/** Responde uma avaliação (uma nota em estrelas 1 a 5 por categoria + observação opcional). */
 export async function responderNps(
   id: number | string,
   notas: { categoriaId: number; nota: number }[],

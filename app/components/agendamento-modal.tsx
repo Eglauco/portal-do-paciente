@@ -6,8 +6,12 @@ import { Brand } from '@/constants/theme';
 
 interface Props {
   visivel: boolean;
+  /** 'confirmar' (agendamento aguardando) ou 'cancelar' (agendamento confirmado). */
+  modo?: 'confirmar' | 'cancelar';
   agendamento: Agendamento | null;
   processando?: boolean;
+  /** false quando o prazo de cancelamento já passou (esconde o botão e mostra aviso). */
+  podeCancelar?: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
   onFechar: () => void;
@@ -15,12 +19,15 @@ interface Props {
 
 export function AgendamentoModal({
   visivel,
+  modo = 'confirmar',
   agendamento,
   processando = false,
+  podeCancelar = true,
   onConfirmar,
   onCancelar,
   onFechar,
 }: Props) {
+  const cancelarModo = modo === 'cancelar';
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
       <View style={styles.backdrop}>
@@ -35,12 +42,18 @@ export function AgendamentoModal({
           </Pressable>
 
           <View style={styles.icone}>
-            <Ionicons name="calendar" size={26} color={Brand.brandDeep} />
+            <Ionicons
+              name={cancelarModo ? 'close-circle-outline' : 'calendar'}
+              size={26}
+              color={Brand.brandDeep}
+            />
           </View>
 
-          <Text style={styles.titulo}>Confirmar agendamento</Text>
+          <Text style={styles.titulo}>{cancelarModo ? 'Cancelar agendamento' : 'Confirmar agendamento'}</Text>
           <Text style={styles.subtitulo}>
-            Você tem um agendamento aguardando confirmação. Confirme para garantir seu horário.
+            {cancelarModo
+              ? 'Você pode cancelar este agendamento direto por aqui, sem precisar entrar em contato com a unidade.'
+              : 'Você tem um agendamento aguardando confirmação. Confirme para garantir seu horário.'}
           </Text>
 
           {agendamento && (
@@ -63,26 +76,42 @@ export function AgendamentoModal({
             </View>
           )}
 
-          <Pressable
-            style={({ pressed }) => [styles.btnConfirmar, pressed && styles.pressed, processando && styles.pressed]}
-            onPress={onConfirmar}
-            disabled={processando}>
-            {processando ? (
-              <ActivityIndicator color="#fff" />
+          {cancelarModo ? (
+            podeCancelar ? (
+              <Pressable
+                style={({ pressed }) => [styles.btnCancelarPrimario, (pressed || processando) && styles.pressed]}
+                onPress={onCancelar}
+                disabled={processando}>
+                {processando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="close-circle" size={20} color="#fff" />
+                    <Text style={styles.btnCancelarPrimarioTxt}>Cancelar agendamento</Text>
+                  </>
+                )}
+              </Pressable>
             ) : (
-              <>
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                <Text style={styles.btnConfirmarTxt}>Confirmar agendamento</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.btnCancelar, pressed && styles.btnCancelarPressed]}
-            onPress={onCancelar}
-            disabled={processando}>
-            <Text style={styles.btnCancelarTxt}>Cancelar agendamento</Text>
-          </Pressable>
+              <View style={styles.semCancelamento}>
+                <Ionicons name="lock-closed-outline" size={15} color={Brand.muted} />
+                <Text style={styles.semCancelamentoTxt}>Este agendamento não pode mais ser cancelado.</Text>
+              </View>
+            )
+          ) : (
+            <Pressable
+              style={({ pressed }) => [styles.btnConfirmar, (pressed || processando) && styles.pressed]}
+              onPress={onConfirmar}
+              disabled={processando}>
+              {processando ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.btnConfirmarTxt}>Confirmar agendamento</Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>
@@ -160,17 +189,28 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.9 },
   btnConfirmarTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
-  btnCancelar: {
+  btnCancelarPrimario: {
     width: '100%',
-    height: 50,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    height: 52,
     borderRadius: 16,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#F3D6DB',
-    backgroundColor: Brand.surface,
+    backgroundColor: '#B23B4E',
   },
-  btnCancelarPressed: { backgroundColor: '#FDF2F3' },
-  btnCancelarTxt: { color: '#B23B4E', fontSize: 15, fontWeight: '700' },
+  btnCancelarPrimarioTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  semCancelamento: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: Brand.bg,
+  },
+  semCancelamentoTxt: { flex: 1, color: Brand.muted, fontSize: 13, fontWeight: '600' },
 });

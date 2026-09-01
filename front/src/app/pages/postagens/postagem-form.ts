@@ -184,7 +184,7 @@ export class PostagemForm implements PodeSair {
       let url = this.urlAtual;
       if (this.imagemBlob) {
         const arquivo = new File([this.imagemBlob], 'postagem.jpg', { type: 'image/jpeg' });
-        url = await this.storage.enviar(arquivo);
+        url = await this.storage.enviar(arquivo, 'rede-social');
       }
       const v = this.form.getRawValue();
       const dados: PostagemRequest = {

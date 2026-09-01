@@ -49,7 +49,8 @@ function dataHoraFmt(iso: string): string {
   )}:${doisDigitos(d.getMinutes())}`;
 }
 
-const NOTAS = Array.from({ length: 11 }, (_, i) => i);
+const ESTRELAS = [1, 2, 3, 4, 5];
+const COR_ESTRELA = '#F2A900';
 
 export function NpsModal({
   visivel,
@@ -89,8 +90,8 @@ export function NpsModal({
   };
 
   return (
-    <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
-      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Modal visible={visivel} transparent animationType="fade" statusBarTranslucent onRequestClose={onFechar}>
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.card}>
           <Pressable
             style={styles.fechar}
@@ -109,7 +110,7 @@ export function NpsModal({
             <Text style={styles.titulo}>{avaliar ? 'Avaliar atendimento' : 'Sua avaliação'}</Text>
             <Text style={styles.subtitulo}>
               {avaliar
-                ? 'Dê uma nota de 0 a 10 para cada categoria.'
+                ? 'Toque nas estrelas para avaliar cada categoria (1 a 5).'
                 : 'Esta avaliação já foi enviada e não pode ser alterada.'}
             </Text>
 
@@ -143,18 +144,22 @@ export function NpsModal({
                   categorias.map((cat) => (
                     <View key={cat.id} style={styles.catBloco}>
                       <Text style={styles.catNome}>{cat.nome}</Text>
-                      <View style={styles.notas}>
-                        {NOTAS.map((n) => {
-                          const ativo = notas[cat.id] === n;
+                      <View style={styles.estrelas}>
+                        {ESTRELAS.map((n) => {
+                          const preenchida = (notas[cat.id] ?? 0) >= n;
                           return (
                             <Pressable
                               key={n}
                               onPress={() => setNotas((p) => ({ ...p, [cat.id]: n }))}
-                              style={[styles.notaBtn, ativo && styles.notaBtnAtivo]}
+                              style={styles.estrelaBtn}
                               accessibilityRole="button"
-                              accessibilityLabel={`${cat.nome}: nota ${n}`}
-                              accessibilityState={{ selected: ativo }}>
-                              <Text style={[styles.notaBtnTxt, ativo && styles.notaBtnTxtAtivo]}>{n}</Text>
+                              accessibilityLabel={`${cat.nome}: ${n} de 5 estrelas`}
+                              accessibilityState={{ selected: notas[cat.id] === n }}>
+                              <Ionicons
+                                name={preenchida ? 'star' : 'star-outline'}
+                                size={38}
+                                color={preenchida ? COR_ESTRELA : '#CBD6D1'}
+                              />
                             </Pressable>
                           );
                         })}
@@ -178,7 +183,22 @@ export function NpsModal({
               <>
                 <View style={styles.verMedia}>
                   <Text style={styles.verMediaNum}>{mediaAtual != null ? mediaAtual.toFixed(1) : '—'}</Text>
-                  <Text style={styles.verMediaDe}>média</Text>
+                  <View>
+                    <View
+                      style={styles.estrelasVer}
+                      accessible
+                      accessibilityLabel={mediaAtual != null ? `Média ${mediaAtual.toFixed(1)} de 5 estrelas` : 'Sem média'}>
+                      {ESTRELAS.map((n) => (
+                        <Ionicons
+                          key={n}
+                          name={mediaAtual != null && Math.round(mediaAtual) >= n ? 'star' : 'star-outline'}
+                          size={16}
+                          color={mediaAtual != null && Math.round(mediaAtual) >= n ? COR_ESTRELA : '#CBD6D1'}
+                        />
+                      ))}
+                    </View>
+                    <Text style={styles.verMediaDe}>média de 5</Text>
+                  </View>
                 </View>
 
                 <Text style={styles.rotulo}>Notas por categoria</Text>
@@ -186,8 +206,18 @@ export function NpsModal({
                   {(notasRespondidas ?? []).map((n) => (
                     <View key={n.categoriaId} style={styles.verNotaLinha}>
                       <Text style={styles.verNotaCat}>{n.categoria}</Text>
-                      <View style={styles.verNotaBadge}>
-                        <Text style={styles.verNotaBadgeTxt}>{n.nota}</Text>
+                      <View
+                        style={styles.estrelasVer}
+                        accessible
+                        accessibilityLabel={`${n.categoria}: ${n.nota} de 5 estrelas`}>
+                        {ESTRELAS.map((s) => (
+                          <Ionicons
+                            key={s}
+                            name={n.nota >= s ? 'star' : 'star-outline'}
+                            size={16}
+                            color={n.nota >= s ? COR_ESTRELA : '#CBD6D1'}
+                          />
+                        ))}
                       </View>
                     </View>
                   ))}
@@ -283,20 +313,9 @@ const styles = StyleSheet.create({
   semCategorias: { alignSelf: 'flex-start', fontSize: 13, color: Brand.muted, marginBottom: 12 },
   catBloco: { width: '100%', marginBottom: 14 },
   catNome: { fontSize: 13.5, fontWeight: '700', color: Brand.ink, marginBottom: 8 },
-  notas: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  notaBtn: {
-    width: 29,
-    height: 34,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Brand.bg,
-    borderWidth: 1,
-    borderColor: Brand.line,
-  },
-  notaBtnAtivo: { backgroundColor: Brand.brand, borderColor: Brand.brand },
-  notaBtnTxt: { fontSize: 13.5, fontWeight: '700', color: Brand.ink },
-  notaBtnTxtAtivo: { color: '#fff' },
+  estrelas: { flexDirection: 'row', width: '100%', marginTop: 2 },
+  estrelaBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
+  estrelasVer: { flexDirection: 'row', gap: 2 },
 
   rotulo: { alignSelf: 'flex-start', fontSize: 12.5, fontWeight: '700', color: Brand.muted, marginTop: 6, marginBottom: 8 },
   obsInput: {
@@ -329,8 +348,8 @@ const styles = StyleSheet.create({
   // Ver
   verMedia: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: Brand.bg,
     borderRadius: 16,
     borderWidth: 1,
@@ -357,16 +376,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   verNotaCat: { flex: 1, fontSize: 14, fontWeight: '600', color: Brand.ink },
-  verNotaBadge: {
-    minWidth: 34,
-    height: 30,
-    borderRadius: 9,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Brand.brand,
-  },
-  verNotaBadgeTxt: { fontSize: 14.5, fontWeight: '800', color: '#fff' },
   verObs: { alignSelf: 'flex-start', fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
   verObsVazio: { alignSelf: 'flex-start', fontSize: 14, color: Brand.muted, fontStyle: 'italic' },
   verQuando: { alignSelf: 'flex-start', fontSize: 12, color: Brand.muted, marginTop: 12 },

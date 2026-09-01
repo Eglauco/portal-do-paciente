@@ -20,6 +20,7 @@ interface AgendamentoBackend {
   faltaJustificada: boolean;
   justificativaFalta: string | null;
   motivosFalta: Ref[];
+  horasCancelamento: number | null;
 }
 
 interface MotivoFaltaBackend {
@@ -75,7 +76,34 @@ function paraViewModel(b: AgendamentoBackend): Agendamento {
     faltaJustificada: b.faltaJustificada,
     justificativaFalta: b.justificativaFalta,
     motivosFalta: (b.motivosFalta ?? []).map((m) => ({ id: m.id, motivo: m.nome })),
+    dataHoraIso: b.dataHora,
+    horasCancelamento: b.horasCancelamento ?? null,
   };
+}
+
+/** Prazo de cancelamento de um agendamento em relação a "agora" (ms). */
+export interface InfoCancelamento {
+  /** Ainda dá para cancelar (dentro do prazo). */
+  podeCancelar: boolean;
+  /** Milissegundos restantes até o limite (negativo se já passou). */
+  restanteMs: number;
+}
+
+/** Calcula o prazo de cancelamento; null quando o procedimento não define prazo. */
+export function infoCancelamento(a: Agendamento, agoraMs: number): InfoCancelamento | null {
+  if (a.horasCancelamento == null || !a.dataHoraIso) return null;
+  const limite = new Date(a.dataHoraIso).getTime() - a.horasCancelamento * 3_600_000;
+  const restante = limite - agoraMs;
+  return { podeCancelar: restante > 0, restanteMs: restante };
+}
+
+/** Formata um intervalo (ms) como "Xh Ymin" / "Ymin" / "menos de 1min". */
+export function formatarRestante(ms: number): string {
+  const totalMin = Math.max(0, Math.floor(ms / 60_000));
+  if (totalMin === 0) return 'menos de 1min';
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}min` : `${m}min`;
 }
 
 async function comoJson<T>(resposta: Response): Promise<T> {

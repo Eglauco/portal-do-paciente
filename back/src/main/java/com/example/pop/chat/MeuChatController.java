@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.common.Ref;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
 
@@ -38,11 +40,34 @@ public class MeuChatController {
     private final ChatRepository repository;
     private final ChatService chatService;
     private final PacienteAcessoService acessoService;
+    private final UnidadeRepository unidadeRepository;
 
-    public MeuChatController(ChatRepository repository, ChatService chatService, PacienteAcessoService acessoService) {
+    public MeuChatController(ChatRepository repository, ChatService chatService,
+            PacienteAcessoService acessoService, UnidadeRepository unidadeRepository) {
         this.repository = repository;
         this.chatService = chatService;
         this.acessoService = acessoService;
+        this.unidadeRepository = unidadeRepository;
+    }
+
+    /** Unidades disponíveis para o paciente iniciar uma conversa. */
+    @GetMapping("/unidades")
+    public List<Ref> unidades() {
+        return unidadeRepository.findAll(Sort.by("nome")).stream()
+                .map(u -> new Ref(u.getId(), u.getNome())).toList();
+    }
+
+    /**
+     * Abre (ou reutiliza) a conversa do paciente logado com a unidade. Regra: 1
+     * conversa por paciente+unidade — se já existir, devolve a mesma (o app leva
+     * o paciente direto para ela).
+     */
+    @PostMapping
+    public ChatDetalheResponse abrir(@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody AbrirMinhaConversaRequest request) {
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
+        ChatService.AberturaConversa abertura = chatService.abrirOuCriar(pacienteId, request.unidadeId());
+        return chatService.toDetalhe(abertura.chat());
     }
 
     /** Lista as conversas do paciente logado (mais recentes primeiro). */

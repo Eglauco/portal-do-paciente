@@ -62,7 +62,7 @@ public class NpsController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Registra a resposta do paciente (uma nota 0 a 10 por categoria + observação opcional). */
+    /** Registra a resposta do paciente (uma nota em estrelas 1 a 5 por categoria + observação opcional). */
     @PostMapping("/{id}/responder")
     @Transactional
     public ResponseEntity<NpsDetalheResponse> responder(@PathVariable Long id,

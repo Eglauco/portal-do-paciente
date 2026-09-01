@@ -75,6 +75,30 @@ export async function listarChats(): Promise<ChatItem[]> {
   return pagina.content;
 }
 
+export interface UnidadeRef {
+  id: number;
+  nome: string;
+}
+
+/** Unidades disponíveis para o paciente iniciar uma conversa. */
+export async function listarUnidadesChat(): Promise<UnidadeRef[]> {
+  const resposta = await fetchMeu('/meu/chats/unidades');
+  return comoJson<UnidadeRef[]>(resposta);
+}
+
+/**
+ * Abre (ou reutiliza) a conversa do paciente logado com a unidade. Se já houver
+ * conversa com essa unidade, o backend devolve a mesma (1 por paciente+unidade).
+ */
+export async function abrirConversa(unidadeId: number): Promise<ChatDetalhe> {
+  const resposta = await fetchMeu('/meu/chats', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ unidadeId }),
+  });
+  return comoJson<ChatDetalhe>(resposta);
+}
+
 /** Abre uma conversa do paciente logado com o histórico de mensagens. */
 export async function buscarConversa(id: number | string): Promise<ChatDetalhe> {
   const resposta = await fetchMeu(`/meu/chats/${id}`);

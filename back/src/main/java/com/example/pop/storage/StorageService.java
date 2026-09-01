@@ -96,10 +96,10 @@ public class StorageService {
     }
 
     /** Gera uma URL pré-assinada (PUT) para o navegador enviar o arquivo direto ao S3. */
-    public UploadUrlResponse gerarUploadUrl(String nomeArquivo, String contentType) {
+    public UploadUrlResponse gerarUploadUrl(String nomeArquivo, String contentType, String pasta) {
         exigirConfiguracao();
         String tipo = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
-        String chave = "prontuarios/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
+        String chave = pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
 
         PutObjectRequest put = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -192,6 +192,18 @@ public class StorageService {
         }
         String limpo = nome.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
         return limpo.length() > 120 ? limpo.substring(limpo.length() - 120) : limpo;
+    }
+
+    /**
+     * Subpasta (prefixo) segura: só minúsculas/dígitos/hífen (evita "../" e chaves
+     * estranhas). Vazio/ausente cai em "prontuarios" (retrocompatível).
+     */
+    private String pastaSegura(String pasta) {
+        if (!StringUtils.hasText(pasta)) {
+            return "prontuarios";
+        }
+        String limpa = pasta.trim().toLowerCase().replaceAll("[^a-z0-9-]", "");
+        return limpa.isEmpty() ? "prontuarios" : limpa;
     }
 
     /** Remove barra final e portas padrão (para casar com o Host que o navegador envia). */

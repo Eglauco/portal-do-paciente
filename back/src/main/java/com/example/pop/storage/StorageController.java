@@ -27,7 +27,7 @@ public class StorageController {
     @PostMapping("/upload-url")
     public UploadUrlResponse gerarUploadUrl(@Valid @RequestBody UploadUrlRequest request) {
         try {
-            return storageService.gerarUploadUrl(request.nomeArquivo(), request.contentType());
+            return storageService.gerarUploadUrl(request.nomeArquivo(), request.contentType(), request.pasta());
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Não foi possível preparar o upload. Verifique a configuração do armazenamento.");

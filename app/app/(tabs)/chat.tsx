@@ -119,7 +119,7 @@ export default function ChatScreen() {
 
       <ScrollView
         style={styles.lista}
-        contentContainerStyle={filtrados.length === 0 && styles.listaVaziaContent}
+        contentContainerStyle={[styles.listaContent, filtrados.length === 0 && styles.listaVaziaContent]}
         refreshControl={
           <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
         }>
@@ -184,6 +184,15 @@ export default function ChatScreen() {
           })
         )}
       </ScrollView>
+
+      {/* Botão flutuante: iniciar uma nova conversa */}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        onPress={() => router.push('/conversa/nova')}
+        accessibilityRole="button"
+        accessibilityLabel="Nova conversa">
+        <Ionicons name="add" size={26} color="#fff" />
+      </Pressable>
     </View>
   );
 }
@@ -206,7 +215,26 @@ const styles = StyleSheet.create({
   buscaInput: { flex: 1, fontSize: 15, color: Brand.ink },
 
   lista: { flex: 1 },
+  listaContent: { paddingBottom: 92 },
   listaVaziaContent: { flexGrow: 1 },
+
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Brand.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+  },
+  fabPressed: { opacity: 0.85 },
 
   row: {
     flexDirection: 'row',

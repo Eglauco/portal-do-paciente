@@ -23,6 +23,14 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'sau/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'tipos-manifestacao/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'nps/:id',
     renderMode: RenderMode.Server,
   },

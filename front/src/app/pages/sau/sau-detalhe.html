@@ -1,0 +1,92 @@
+<section class="dash">
+  @if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h3>Não foi possível carregar</h3>
+      <p>Verifique se o servidor está disponível e tente novamente.</p>
+      <div class="state__acoes">
+        <button type="button" class="btn btn--ghost" (click)="voltar()">Voltar para a lista</button>
+        <button type="button" class="btn btn--solid" (click)="recarregar()">Tentar novamente</button>
+      </div>
+    </div>
+  } @else if (detalhe(); as m) {
+    <header class="page-head sau-head">
+      <div class="sau-head__info">
+        <button type="button" class="btn btn--ghost sau-head__voltar" (click)="voltar()" aria-label="Voltar para a lista">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+          Voltar
+        </button>
+        <div>
+          <h1 class="page-title">{{ m.tipo.nome }}</h1>
+          <p class="page-sub">{{ m.paciente.nome }} · {{ m.unidadeSaude.nome }}</p>
+        </div>
+      </div>
+      <div class="sau-head__acoes">
+        <span class="status-pill" [attr.data-st]="m.status">{{ m.statusDescricao }}</span>
+        @if (m.status !== 'FECHADA') {
+          <button type="button" class="btn btn--ghost" [disabled]="fechando()" (click)="fechar()">Fechar mensagem</button>
+        }
+      </div>
+    </header>
+
+    <!-- Histórico (estilo e-mail) -->
+    <section class="panel sau-thread">
+      @for (msg of m.mensagens; track msg.id) {
+        <article class="sau-msg" [class.sau-msg--sau]="msg.autor === 'SAU'">
+          <header class="sau-msg__cab">
+            <span class="sau-msg__avatar" [class.sau-msg__avatar--sau]="msg.autor === 'SAU'">{{ iniciais(msg.autorNome) }}</span>
+            <div class="sau-msg__quem">
+              <b class="sau-msg__nome">{{ msg.autorNome }}</b>
+              <span class="sau-msg__papel">{{ msg.autor === 'SAU' ? 'Atendimento SAU' : 'Paciente' }}</span>
+            </div>
+            <time class="sau-msg__data">{{ msg.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</time>
+          </header>
+          <p class="sau-msg__corpo">{{ msg.texto }}</p>
+        </article>
+      }
+    </section>
+
+    <!-- Responder (só quando é a vez do SAU) ou aviso de estado -->
+    @if (podeResponder()) {
+      <section class="panel sau-responder">
+        <label class="label" for="sau-resposta">Responder ao paciente</label>
+        <textarea
+          id="sau-resposta"
+          class="input input--area sau-responder__campo"
+          [value]="texto()"
+          (input)="aoDigitar($event)"
+          placeholder="Escreva sua resposta. O paciente receberá uma notificação e poderá responder novamente."
+          maxlength="4000"
+          rows="6"
+        ></textarea>
+        <div class="sau-responder__acoes">
+          <button type="button" class="btn btn--solid" [disabled]="enviando() || !texto().trim()" (click)="enviar()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+            Enviar resposta
+          </button>
+        </div>
+      </section>
+    } @else {
+      <div class="sau-estado-vez" #estadoVez tabindex="-1" role="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          @if (m.status === 'FECHADA') {
+            <path d="M5 11V7a5 5 0 0 1 10 0v4" /><rect x="4" y="11" width="16" height="9" rx="2" />
+          } @else {
+            <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+          }
+        </svg>
+        <p>
+          @if (m.status === 'FECHADA') {
+            Mensagem fechada. O paciente ainda pode reabrir respondendo pelo aplicativo.
+          } @else {
+            Aguardando a resposta do paciente. Você poderá responder novamente quando ele retornar.
+          }
+        </p>
+      </div>
+    }
+  } @else if (carregando()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando manifestação…</p></div>
+  } @else {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando manifestação…</p></div>
+  }
+</section>

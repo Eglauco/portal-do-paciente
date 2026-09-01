@@ -68,7 +68,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**", "/paciente/**", "/prontuario/**", "/storage/**", "/usuario/**",
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/procedimento/**", "/profissional/**", "/motivo-falta/**", "/categoria-nps/**",
-                                "/postagem/**")
+                                "/postagem/**", "/sau/**", "/tipo-manifestacao/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())

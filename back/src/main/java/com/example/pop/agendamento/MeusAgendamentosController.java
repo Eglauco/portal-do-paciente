@@ -1,6 +1,7 @@
 package com.example.pop.agendamento;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -39,6 +40,9 @@ public class MeusAgendamentosController {
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
 
+    /** Fuso das unidades (o dataHora do agendamento é hora local do Brasil). */
+    private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
+
     private final AgendamentoRepository repository;
     private final MotivoFaltaRepository motivoFaltaRepository;
     private final PacienteAcessoService acessoService;
@@ -75,16 +79,44 @@ public class MeusAgendamentosController {
                 resultado.isLast());
     }
 
-    /** Confirmação do paciente: move o status para PACIENTE_CONFIRMOU. */
+    /**
+     * Confirmação do paciente: move o status para PACIENTE_CONFIRMOU. Só é permitido
+     * quando o agendamento ainda aguarda confirmação — evita "reconfirmar" um
+     * agendamento já cancelado/realizado só para depois cancelá-lo.
+     */
     @PostMapping("/{id}/confirmar")
     public AgendamentoResponse confirmar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        return alterarStatus(jwt, id, StatusAgendamento.PACIENTE_CONFIRMOU);
+        Agendamento agendamento = meuAgendamento(jwt, id);
+        if (agendamento.getStatusAgendamento() != StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Só é possível confirmar um agendamento que aguarda confirmação.");
+        }
+        agendamento.setStatusAgendamento(StatusAgendamento.PACIENTE_CONFIRMOU);
+        return AgendamentoResponse.from(repository.save(agendamento));
     }
 
-    /** Cancelamento pelo paciente: move o status para CANCELADO_PELO_PACIENTE. */
+    /**
+     * Cancelamento pelo paciente: move o status para CANCELADO_PELO_PACIENTE.
+     * Só é permitido em agendamento CONFIRMADO (regra de negócio) e dentro do prazo
+     * de cancelamento do procedimento — fora disso, 409.
+     */
     @PostMapping("/{id}/cancelar")
     public AgendamentoResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        return alterarStatus(jwt, id, StatusAgendamento.CANCELADO_PELO_PACIENTE);
+        Agendamento agendamento = meuAgendamento(jwt, id);
+        if (agendamento.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Só é possível cancelar um agendamento confirmado.");
+        }
+        Integer horas = agendamento.getProcedimento().getHorasCancelamento();
+        if (horas != null) {
+            LocalDateTime prazo = agendamento.getDataHora().minusHours(horas);
+            if (LocalDateTime.now(FUSO).isAfter(prazo)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "O prazo para cancelar este agendamento já passou.");
+            }
+        }
+        agendamento.setStatusAgendamento(StatusAgendamento.CANCELADO_PELO_PACIENTE);
+        return AgendamentoResponse.from(repository.save(agendamento));
     }
 
     /**
@@ -105,12 +137,6 @@ public class MeusAgendamentosController {
         String texto = request.justificativa() == null ? null : request.justificativa().trim();
         agendamento.setJustificativaFalta(texto == null || texto.isBlank() ? null : texto);
         agendamento.setFaltaJustificadaEm(LocalDateTime.now());
-        return AgendamentoResponse.from(repository.save(agendamento));
-    }
-
-    private AgendamentoResponse alterarStatus(Jwt jwt, Long id, StatusAgendamento status) {
-        Agendamento agendamento = meuAgendamento(jwt, id);
-        agendamento.setStatusAgendamento(status);
         return AgendamentoResponse.from(repository.save(agendamento));
     }
 

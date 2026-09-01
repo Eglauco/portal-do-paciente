@@ -998,6 +998,11 @@
   flex-direction: column;
 }
 
+/* Campo que ocupa a linha inteira do form-grid (2 colunas). */
+.form-field--full {
+  grid-column: 1 / -1;
+}
+
 .form-field--sm {
   max-width: 200px;
 }
@@ -1834,6 +1839,12 @@
 }
 .nps-score__de { font-size: 0.95rem; color: var(--muted); font-weight: 600; }
 
+/* Estrelas (NPS 1–5) */
+.stars { display: inline-flex; gap: 0.1rem; line-height: 1; }
+.stars .star { color: #d6dcd9; font-size: 1rem; }
+.stars .star--on { color: #f2a900; }
+.stars--lg .star { font-size: 1.5rem; }
+
 /* Observação */
 .nps-obs { padding-top: 0.5rem; border-top: 1px solid var(--line); }
 .nps-obs__texto {
@@ -2271,3 +2282,62 @@
 }
 .codigo__exp { margin: 0; font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
 .btn--sm { height: 2.2rem; padding: 0 0.9rem; font-size: 0.82rem; }
+
+/* ============================================================
+   SAU — Serviço de Atendimento ao Usuário
+   Lista reusa os pills; o detalhe é um layout de e-mail (não chat).
+   ============================================================ */
+
+/* Status da manifestação (pills) */
+.status-pill[data-st='AGUARDANDO_SAU'] { color: #a5741a; background: #fbf0d6; }
+.status-pill[data-st='AGUARDANDO_PACIENTE'] { color: #2f6df6; background: #e9f0fe; }
+.status-pill[data-st='FECHADA'] { color: #0a7d5a; background: #e3f6ec; }
+
+/* Tipo da manifestação (pill neutro — o nome é livre, vem do cadastro) */
+.status-pill--tipo { color: var(--brand-deep); background: color-mix(in srgb, var(--brand) 12%, white); }
+
+/* Detalhe — cabeçalho */
+.sau-head { align-items: flex-start; }
+.sau-head__info { display: flex; align-items: flex-start; gap: 0.9rem; }
+.sau-head__voltar { padding: 0.4rem 0.7rem; }
+.sau-head__acoes { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+
+/* Detalhe — histórico estilo e-mail */
+.sau-thread { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+.sau-msg { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--line); }
+.sau-msg:last-child { border-bottom: 0; }
+.sau-msg--sau { background: color-mix(in srgb, var(--brand) 5%, white); }
+.sau-msg__cab { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
+.sau-msg__avatar {
+  display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 50%;
+  background: #e2eae6; color: #40514c; font-size: 0.8rem; font-weight: 800; flex-shrink: 0;
+}
+.sau-msg__avatar--sau { background: var(--brand); color: #fff; }
+.sau-msg__quem { display: flex; flex-direction: column; line-height: 1.25; }
+.sau-msg__nome { font-size: 0.92rem; color: var(--ink); }
+.sau-msg__papel { font-size: 0.75rem; color: var(--muted); }
+.sau-msg__data { margin-left: auto; font-size: 0.78rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sau-msg__corpo { margin: 0; padding-left: 3rem; font-size: 0.95rem; color: var(--ink); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+
+/* Detalhe — responder (campo grande) */
+.sau-responder { display: flex; flex-direction: column; gap: 0.7rem; }
+.sau-responder__campo { width: 100%; min-height: 8rem; resize: vertical; }
+.sau-responder__acoes { display: flex; justify-content: flex-end; }
+
+/* Detalhe — aviso quando não é a vez do SAU */
+.sau-estado-vez {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 1rem 1.25rem; border-radius: 0.9rem;
+  background: var(--surface); border: 1px dashed var(--line); color: var(--muted);
+}
+.sau-estado-vez svg { width: 1.4rem; height: 1.4rem; stroke: var(--muted); flex-shrink: 0; }
+.sau-estado-vez p { margin: 0; font-size: 0.9rem; line-height: 1.45; }
+.sau-estado-vez:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Ações lado a lado no estado de erro (voltar + tentar novamente) */
+.state__acoes { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+
+@media (max-width: 640px) {
+  .sau-msg__corpo { padding-left: 0; }
+  .sau-head__acoes { width: 100%; }
+}

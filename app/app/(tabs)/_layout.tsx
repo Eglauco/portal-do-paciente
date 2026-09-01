@@ -54,6 +54,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="sau"
+        options={{
+          title: 'SAU',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'megaphone' : 'megaphone-outline'} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="prontuario"
         options={{
           title: 'Prontuário',

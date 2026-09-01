@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AgendamentoModal } from '@/components/agendamento-modal';
@@ -10,6 +10,8 @@ import { Brand, Status } from '@/constants/theme';
 import {
   cancelarAgendamento,
   confirmarAgendamento,
+  formatarRestante,
+  infoCancelamento,
   justificarFalta,
   listarAgendamentos,
   listarMotivosFalta,
@@ -25,10 +27,35 @@ const FILTROS: { chave: Filtro; rotulo: string }[] = [
 
 const capitalizar = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
+/** Relógio do prazo de cancelamento no card (variante clara/escura conforme o fundo). */
+function RelogioCancelamento({ a, agora, escuro }: { a: Agendamento; agora: number; escuro?: boolean }) {
+  const info = infoCancelamento(a, agora);
+  if (!info) return null;
+  if (!info.podeCancelar) {
+    const cor = escuro ? '#F4C7CE' : '#B23B4E';
+    return (
+      <View style={styles.relogioLinha}>
+        <Ionicons name="lock-closed-outline" size={13} color={cor} />
+        <Text style={[styles.relogioTxt, { color: cor }]}>Não pode mais ser cancelado</Text>
+      </View>
+    );
+  }
+  const cor = escuro ? Brand.glow : Brand.brandDeep;
+  return (
+    <View style={styles.relogioLinha}>
+      <Ionicons name="timer-outline" size={13} color={cor} />
+      <Text style={[styles.relogioTxt, { color: cor }]}>
+        Cancelamento disponível por mais {formatarRestante(info.restanteMs)}
+      </Text>
+    </View>
+  );
+}
+
 export default function AgendamentosScreen() {
   const [lista, setLista] = useState<Agendamento[]>([]);
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [selecionado, setSelecionado] = useState<Agendamento | null>(null);
+  const [modoModal, setModoModal] = useState<'confirmar' | 'cancelar'>('confirmar');
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
@@ -40,6 +67,7 @@ export default function AgendamentosScreen() {
   const motivosCarregados = useRef(false);
   const entradaMostrada = useRef(false);
   const jaCarregou = useRef(false);
+  const [agora, setAgora] = useState(Date.now());
 
   const carregar = useCallback(async (mostrarSpinner: boolean) => {
     try {
@@ -52,7 +80,10 @@ export default function AgendamentosScreen() {
       if (!entradaMostrada.current) {
         entradaMostrada.current = true;
         const primeiroPendente = dados.find((a) => a.status === 'aguardando');
-        if (primeiroPendente) setSelecionado(primeiroPendente);
+        if (primeiroPendente) {
+          setSelecionado(primeiroPendente);
+          setModoModal('confirmar');
+        }
       }
     } catch {
       setErro(true);
@@ -75,6 +106,19 @@ export default function AgendamentosScreen() {
   };
 
   const pendentes = useMemo(() => lista.filter((a) => a.status === 'aguardando'), [lista]);
+  const temConfirmados = useMemo(() => lista.some((a) => a.status === 'confirmado'), [lista]);
+
+  // Relógio: só liga o tick (30s) quando há agendamentos confirmados (onde a contagem aparece).
+  useEffect(() => {
+    if (!temConfirmados) return;
+    const t = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(t);
+  }, [temConfirmados]);
+
+  const abrirCancelamento = (a: Agendamento) => {
+    setSelecionado(a);
+    setModoModal('cancelar');
+  };
   const faltasPendentes = useMemo(
     () => lista.filter((a) => a.statusBackend === 'FALTA_PACIENTE' && !a.faltaJustificada),
     [lista],
@@ -115,8 +159,15 @@ export default function AgendamentosScreen() {
       const atualizado = await cancelarAgendamento(alvo.id);
       setLista((l) => l.map((a) => (a.id === atualizado.id ? atualizado : a)));
       setSelecionado(null);
-    } catch {
-      Alert.alert('Ops', 'Não foi possível cancelar o agendamento. Tente novamente.');
+    } catch (e) {
+      // 409 = não é mais cancelável (prazo vencido OU status mudou no servidor): avisa e recarrega.
+      if (e instanceof Error && e.message.includes('409')) {
+        Alert.alert('Não foi possível cancelar', 'Este agendamento não está mais disponível para cancelamento.');
+        setSelecionado(null);
+        carregar(false);
+      } else {
+        Alert.alert('Ops', 'Não foi possível cancelar o agendamento. Tente novamente.');
+      }
     } finally {
       setProcessando(false);
     }
@@ -211,7 +262,10 @@ export default function AgendamentosScreen() {
             {pendentes.map((a) => (
               <Pressable
                 key={a.id}
-                onPress={() => setSelecionado(a)}
+                onPress={() => {
+                  setSelecionado(a);
+                  setModoModal('confirmar');
+                }}
                 style={({ pressed }) => [styles.pendente, pressed && styles.pendentePressed]}>
                 <View style={styles.pendenteTopo}>
                   <View style={styles.pendenteTag}>
@@ -316,8 +370,10 @@ export default function AgendamentosScreen() {
             ) : (
               filtrados.map((a) => {
                 const cor = Status[a.status];
-                return (
-                  <View key={a.id} style={styles.card}>
+                // Só agendamentos CONFIRMADOS podem ser cancelados (toque abre o cancelamento).
+                const cancelavel = a.status === 'confirmado';
+                const conteudo = (
+                  <>
                     <View style={styles.dateBox}>
                       <Text style={styles.dateDay}>{a.dia}</Text>
                       <Text style={styles.dateMonth}>{a.mes}</Text>
@@ -345,8 +401,20 @@ export default function AgendamentosScreen() {
                           {a.unidade}
                         </Text>
                       </View>
+                      {cancelavel && <RelogioCancelamento a={a} agora={agora} />}
                     </View>
-                  </View>
+                  </>
+                );
+
+                return cancelavel ? (
+                  <Pressable
+                    key={a.id}
+                    onPress={() => abrirCancelamento(a)}
+                    style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
+                    {conteudo}
+                  </Pressable>
+                ) : (
+                  <View key={a.id} style={styles.card}>{conteudo}</View>
                 );
               })
             )}
@@ -356,8 +424,10 @@ export default function AgendamentosScreen() {
 
       <AgendamentoModal
         visivel={!!selecionado}
+        modo={modoModal}
         agendamento={selecionado}
         processando={processando}
+        podeCancelar={selecionado ? (infoCancelamento(selecionado, agora)?.podeCancelar ?? true) : true}
         onConfirmar={confirmar}
         onCancelar={cancelar}
         onFechar={() => setSelecionado(null)}
@@ -451,6 +521,8 @@ const styles = StyleSheet.create({
   pendenteProf: { fontSize: 13.5, color: 'rgba(234,250,244,0.82)', marginTop: 2 },
   pendenteMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   pendenteMetaTxt: { fontSize: 12.5, color: 'rgba(234,250,244,0.82)', flexShrink: 1 },
+  relogioLinha: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
+  relogioTxt: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
   pendenteDot: { color: 'rgba(234,250,244,0.6)', marginHorizontal: 2 },
   pendenteCta: {
     flexDirection: 'row',
@@ -521,6 +593,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12,
   },
+  cardPressed: { backgroundColor: '#F1F6F4' },
   dateBox: { width: 58, borderRadius: 14, backgroundColor: '#E7F3EF', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
   dateDay: { fontSize: 22, fontWeight: '800', color: Brand.brandDeep, lineHeight: 24 },
   dateMonth: { fontSize: 11, fontWeight: '700', color: Brand.brand, letterSpacing: 1 },

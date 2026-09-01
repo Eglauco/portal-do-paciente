@@ -6,6 +6,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,4 +30,10 @@ public class Procedimento {
 
     @Column(name = "preparo", columnDefinition = "TEXT")
     private String preparo;
+
+    /** Antecedência mínima (em horas) para o paciente poder cancelar o agendamento. */
+    @NotNull
+    @Min(0)
+    @Column(name = "horas_cancelamento", nullable = false)
+    private Integer horasCancelamento;
 }

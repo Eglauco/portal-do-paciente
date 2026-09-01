@@ -2,6 +2,8 @@ export interface Procedimento {
   id?: number;
   nome: string;
   preparo?: string;
+  /** Antecedência mínima (em horas) para o paciente poder cancelar o agendamento. */
+  horasCancelamento: number;
 }
 
 export interface ProcedimentoFiltro {

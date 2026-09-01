@@ -210,7 +210,15 @@ export default function NpsScreen() {
             <View style={styles.resumo}>
               <View style={styles.mediaBox}>
                 <Text style={styles.mediaNum}>{media}</Text>
-                <Text style={styles.mediaLabel}>nota média</Text>
+                <View style={styles.mediaEstrelas}>
+                  {[1, 2, 3, 4, 5].map((s) => {
+                    const cheia = media !== '—' && Math.round(Number(media)) >= s;
+                    return (
+                      <Ionicons key={s} name={cheia ? 'star' : 'star-outline'} size={12} color={cheia ? '#F2A900' : '#CBD6D1'} />
+                    );
+                  })}
+                </View>
+                <Text style={styles.mediaLabel}>média de 5</Text>
               </View>
               <View style={styles.divisor} />
               <View style={styles.resumoInfo}>
@@ -361,6 +369,7 @@ const styles = StyleSheet.create({
   },
   mediaBox: { alignItems: 'center', width: 96 },
   mediaNum: { fontSize: 40, fontWeight: '800', color: Brand.brandDeep, letterSpacing: -1 },
+  mediaEstrelas: { flexDirection: 'row', gap: 1, marginTop: 2 },
   mediaLabel: { fontSize: 12, color: Brand.muted, marginTop: 2 },
   divisor: { width: 1, alignSelf: 'stretch', backgroundColor: Brand.line, marginHorizontal: 16 },
   resumoInfo: { flex: 1 },

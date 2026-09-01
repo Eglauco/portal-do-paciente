@@ -54,6 +54,14 @@ public class PushService {
         notificarPaciente(a.getPaciente().getId(), "Novo agendamento", corpo, data);
     }
 
+    /** Falta registrada — pede ao paciente para justificar a ausência. */
+    public void notificarFaltaPaciente(Agendamento a) {
+        String corpo = "Você foi marcado como falta na consulta de " + a.getEspecialidade().getNome()
+                + " em " + a.getDataHora().format(DATA_FMT) + ". Toque para justificar.";
+        Map<String, Object> data = Map.of("tipo", "FALTA", "agendamentoId", a.getId());
+        notificarPaciente(a.getPaciente().getId(), "Falta registrada", corpo, data);
+    }
+
     /** Nova mensagem da unidade no chat — só o paciente da conversa. */
     public void notificarNovaMensagem(Chat chat) {
         String corpo = "Você recebeu uma nova mensagem de " + chat.getUnidadeSaude().getNome() + ".";
