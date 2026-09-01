@@ -1,5 +1,5 @@
 import { API_URL } from '@/constants/api';
-import { fetchMeu } from '@/services/sessao';
+import { authHeaders, carregarSessao, fetchMeu } from '@/services/sessao';
 
 interface Ref {
   id: number;
@@ -25,6 +25,12 @@ export interface Comentario {
   autor: string;
   texto: string;
   criadoEm: string;
+  /** Foi editado depois de publicado (mostra o selo "editado"). */
+  editado: boolean;
+  /** É do paciente logado (mostra editar/excluir). */
+  meu: boolean;
+  /** Ainda dentro da janela de edição (calculado no servidor; controla o botão "Editar"). */
+  podeEditar: boolean;
   respostas: Comentario[];
 }
 
@@ -87,8 +93,38 @@ export async function listarComentarios(
   size = 20,
 ): Promise<PaginaComentarios> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
-  const resposta = await fetch(`${API_URL}/postagem/${postagemId}/comentarios?${params.toString()}`);
+  const url = `${API_URL}/postagem/${postagemId}/comentarios?${params.toString()}`;
+  // Leitura é pública; com o token, o backend marca "meu"/"podeEditar". Enviamos o
+  // token MANUALMENTE (sem a lógica de logout do fetchMeu): se estiver expirado/rotacionado
+  // (401), relemos como anônimo — nunca deslogar o paciente só por LER comentários.
+  await carregarSessao();
+  let resposta = await fetch(url, { headers: authHeaders() });
+  if (resposta.status === 401) {
+    resposta = await fetch(url);
+  }
   return comoJson<PaginaComentarios>(resposta);
+}
+
+/** Edita o próprio comentário (permitido só até 15 min após criar). */
+export async function editarComentario(
+  postagemId: number | string,
+  comentarioId: number,
+  texto: string,
+): Promise<Comentario> {
+  const resposta = await fetchMeu(`/postagem/${postagemId}/comentarios/${comentarioId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto }),
+  });
+  return comoJson<Comentario>(resposta);
+}
+
+/** Exclui o próprio comentário. Excluir o comentário-raiz remove também as respostas. */
+export async function excluirComentario(postagemId: number | string, comentarioId: number): Promise<void> {
+  const resposta = await fetchMeu(`/postagem/${postagemId}/comentarios/${comentarioId}`, { method: 'DELETE' });
+  if (!resposta.ok) {
+    throw new Error(`Falha na requisição (${resposta.status})`);
+  }
 }
 
 export async function comentar(postagemId: number | string, autor: string, texto: string): Promise<Comentario> {

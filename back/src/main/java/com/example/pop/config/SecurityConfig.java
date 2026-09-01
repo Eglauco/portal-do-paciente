@@ -59,6 +59,9 @@ public class SecurityConfig {
                         // App do paciente logado.
                         .requestMatchers(HttpMethod.POST, "/postagem/*/comentarios", "/postagem/*/comentarios/*/responder")
                         .hasRole("PACIENTE")
+                        // Editar/excluir o próprio comentário (o dono é conferido no controller).
+                        .requestMatchers(HttpMethod.PUT, "/postagem/*/comentarios/*").hasRole("PACIENTE")
+                        .requestMatchers(HttpMethod.DELETE, "/postagem/*/comentarios/*").hasRole("PACIENTE")
                         .requestMatchers("/meu/**").hasRole("PACIENTE")
                         .requestMatchers("/paciente-auth/**").authenticated() // /me
                         // Back-office (admin): o front do admin envia o token em todas as chamadas.

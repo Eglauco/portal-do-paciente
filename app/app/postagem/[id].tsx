@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -10,6 +11,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +19,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
 import { Brand } from '@/constants/theme';
 import { useSessao } from '@/hooks/use-sessao';
-import { buscarPostagem, comentar, Comentario, curtir, listarComentarios, Postagem, responder } from '@/services/feed';
+import {
+  buscarPostagem,
+  comentar,
+  Comentario,
+  curtir,
+  editarComentario,
+  excluirComentario,
+  listarComentarios,
+  Postagem,
+  responder,
+} from '@/services/feed';
 import { obterDispositivoId } from '@/services/identidade';
 
 const TAMANHO = 20;
@@ -38,6 +50,45 @@ function haQuanto(iso: string): string {
   return `há ${Math.floor(h / 24)} d`;
 }
 
+/** Caixa de edição inline — mantém o texto em estado próprio (não re-renderiza a lista a cada tecla). */
+function EdicaoComentario({
+  inicial,
+  salvando,
+  onSalvar,
+  onCancelar,
+}: {
+  inicial: string;
+  salvando: boolean;
+  onSalvar: (texto: string) => void;
+  onCancelar: () => void;
+}) {
+  const [txt, setTxt] = useState(inicial);
+  return (
+    <View style={styles.editBox}>
+      <TextInput
+        style={styles.editInput}
+        value={txt}
+        onChangeText={setTxt}
+        multiline
+        autoFocus
+        editable={!salvando}
+        placeholder="Edite seu comentário"
+        placeholderTextColor={Brand.muted}
+      />
+      <View style={styles.editAcoes}>
+        <Pressable onPress={onCancelar} hitSlop={6} disabled={salvando}>
+          <Text style={styles.acaoLink}>Cancelar</Text>
+        </Pressable>
+        <Pressable onPress={() => onSalvar(txt)} hitSlop={6} disabled={salvando || !txt.trim()}>
+          <Text style={[styles.acaoSalvar, (salvando || !txt.trim()) && styles.acaoDesabilitada]}>
+            {salvando ? 'Salvando…' : 'Salvar'}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 export default function PostagemDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -51,6 +102,8 @@ export default function PostagemDetalheScreen() {
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [respondendo, setRespondendo] = useState<{ raizId: number; autor: string } | null>(null);
+  const [editando, setEditando] = useState<number | null>(null);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const inputRef = useRef<ComentarioInputHandle>(null);
   const dispositivoId = useRef('');
   const page = useRef(0);
@@ -146,6 +199,120 @@ export default function PostagemDetalheScreen() {
     [id, respondendo],
   );
 
+  const iniciarEdicao = useCallback((c: Comentario) => {
+    setRespondendo(null);
+    setEditando(c.id);
+  }, []);
+
+  const cancelarEdicao = useCallback(() => setEditando(null), []);
+
+  const salvarEdicao = useCallback(
+    async (c: Comentario, raizId: number | null, texto: string) => {
+      if (!id) return;
+      const novo = texto.trim();
+      if (!novo || novo === c.texto) {
+        setEditando(null);
+        return;
+      }
+      setSalvandoEdicao(true);
+      try {
+        await editarComentario(id, c.id, novo);
+        setComentarios((lista) =>
+          raizId == null
+            ? lista.map((x) => (x.id === c.id ? { ...x, texto: novo, editado: true } : x))
+            : lista.map((x) =>
+                x.id === raizId
+                  ? { ...x, respostas: x.respostas.map((r) => (r.id === c.id ? { ...r, texto: novo, editado: true } : r)) }
+                  : x,
+              ),
+        );
+        setEditando(null);
+      } catch {
+        Alert.alert('Não foi possível editar', 'Talvez o prazo de 15 minutos tenha expirado. Tente novamente.');
+      } finally {
+        setSalvandoEdicao(false);
+      }
+    },
+    [id],
+  );
+
+  const excluir = useCallback(
+    async (c: Comentario, raizId: number | null) => {
+      if (!id) return;
+      const removidos = raizId == null ? 1 + (c.respostas?.length ?? 0) : 1;
+      try {
+        await excluirComentario(id, c.id);
+        setComentarios((lista) =>
+          raizId == null
+            ? lista.filter((x) => x.id !== c.id)
+            : lista.map((x) => (x.id === raizId ? { ...x, respostas: x.respostas.filter((r) => r.id !== c.id) } : x)),
+        );
+        setPost((p) => (p ? { ...p, totalComentarios: Math.max(0, p.totalComentarios - removidos) } : p));
+        setEditando((atual) => (atual === c.id ? null : atual));
+      } catch {
+        Alert.alert('Não foi possível excluir', 'Tente novamente.');
+      }
+    },
+    [id],
+  );
+
+  const confirmarExclusao = useCallback(
+    (c: Comentario, raizId: number | null) => {
+      const respostas = raizId == null ? c.respostas?.length ?? 0 : 0;
+      const msg =
+        respostas > 0
+          ? `Isso também vai excluir as ${respostas} resposta(s) abaixo. Deseja continuar?`
+          : 'Deseja excluir este comentário?';
+      Alert.alert('Excluir comentário', msg, [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => excluir(c, raizId) },
+      ]);
+    },
+    [excluir],
+  );
+
+  /** Corpo do comentário (raiz ou resposta): texto/edição + meta + ações. raizId nulo = comentário-raiz. */
+  const renderCorpo = (item: Comentario, raizId: number | null) => (
+    <View style={{ flex: 1 }}>
+      {editando === item.id ? (
+        <EdicaoComentario
+          inicial={item.texto}
+          salvando={salvandoEdicao}
+          onSalvar={(txt) => salvarEdicao(item, raizId, txt)}
+          onCancelar={cancelarEdicao}
+        />
+      ) : (
+        <>
+          <Text style={styles.itemTexto}>
+            <Text style={styles.itemAutor}>{item.autor} </Text>
+            {item.texto}
+          </Text>
+          <View style={styles.itemMeta}>
+            <Text style={styles.itemTempo}>
+              {haQuanto(item.criadoEm)}
+              {item.editado ? ' · editado' : ''}
+            </Text>
+            {post?.habilitarComentarios && (
+              <Pressable onPress={() => iniciarResposta(raizId ?? item.id, item.autor)} hitSlop={6}>
+                <Text style={styles.responder}>Responder</Text>
+              </Pressable>
+            )}
+            {item.meu && item.podeEditar && (
+              <Pressable onPress={() => iniciarEdicao(item)} hitSlop={6}>
+                <Text style={styles.acaoLink}>Editar</Text>
+              </Pressable>
+            )}
+            {item.meu && (
+              <Pressable onPress={() => confirmarExclusao(item, raizId)} hitSlop={6}>
+                <Text style={styles.acaoExcluir}>Excluir</Text>
+              </Pressable>
+            )}
+          </View>
+        </>
+      )}
+    </View>
+  );
+
   const renderCabecalho = () => {
     if (!post) return null;
     return (
@@ -207,20 +374,7 @@ export default function PostagemDetalheScreen() {
         <View style={styles.itemAvatar}>
           <Text style={styles.itemAvatarTxt}>{iniciais(item.autor)}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.itemTexto}>
-            <Text style={styles.itemAutor}>{item.autor} </Text>
-            {item.texto}
-          </Text>
-          <View style={styles.itemMeta}>
-            <Text style={styles.itemTempo}>{haQuanto(item.criadoEm)}</Text>
-            {post?.habilitarComentarios && (
-              <Pressable onPress={() => iniciarResposta(item.id, item.autor)} hitSlop={6}>
-                <Text style={styles.responder}>Responder</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
+        {renderCorpo(item, null)}
       </View>
 
       {item.respostas?.length > 0 && (
@@ -230,20 +384,7 @@ export default function PostagemDetalheScreen() {
               <View style={styles.itemAvatarSm}>
                 <Text style={styles.itemAvatarTxtSm}>{iniciais(r.autor)}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTexto}>
-                  <Text style={styles.itemAutor}>{r.autor} </Text>
-                  {r.texto}
-                </Text>
-                <View style={styles.itemMeta}>
-                  <Text style={styles.itemTempo}>{haQuanto(r.criadoEm)}</Text>
-                  {post?.habilitarComentarios && (
-                    <Pressable onPress={() => iniciarResposta(item.id, r.autor)} hitSlop={6}>
-                      <Text style={styles.responder}>Responder</Text>
-                    </Pressable>
-                  )}
-                </View>
-              </View>
+              {renderCorpo(r, item.id)}
             </View>
           ))}
         </View>
@@ -283,6 +424,7 @@ export default function PostagemDetalheScreen() {
             data={comentarios}
             keyExtractor={(c) => String(c.id)}
             renderItem={renderComentario}
+            extraData={`${editando}-${salvandoEdicao}`}
             ListHeaderComponent={renderCabecalho()}
             contentContainerStyle={styles.conteudo}
             onEndReached={carregarMais}
@@ -366,6 +508,23 @@ const styles = StyleSheet.create({
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
   itemTempo: { fontSize: 11.5, color: Brand.muted },
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  acaoExcluir: { fontSize: 11.5, fontWeight: '700', color: '#C0475A' },
+  acaoSalvar: { fontSize: 12.5, fontWeight: '800', color: Brand.brandDeep },
+  acaoDesabilitada: { opacity: 0.5 },
+  editBox: { marginTop: 2 },
+  editInput: {
+    borderWidth: 1,
+    borderColor: Brand.line,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: Brand.ink,
+    backgroundColor: '#fff',
+    minHeight: 38,
+  },
+  editAcoes: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
   respostas: { paddingLeft: 44 },
   itemResposta: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 12 },
   itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },

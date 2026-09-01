@@ -39,9 +39,17 @@ public class Comentario {
     @Column(nullable = false, length = 80)
     private String autor;
 
+    /** Dono do comentário (quem pode editar/excluir). Nulo em comentários antigos. */
+    @Column(name = "paciente_id")
+    private Long pacienteId;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
+
+    /** Quando foi editado pela última vez (nulo se nunca editado). */
+    @Column(name = "editado_em")
+    private LocalDateTime editadoEm;
 }

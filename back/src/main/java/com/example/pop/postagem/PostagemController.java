@@ -158,8 +158,9 @@ public class PostagemController {
         resposta.setAutor(request.autor().trim());
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
+        // Resposta do admin não tem dono paciente (pacienteId nulo) — não é editável/excluível pelo app.
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ComentarioResponse.from(comentarioRepository.save(resposta)));
+                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null));
     }
 
     // ---------- helpers ----------

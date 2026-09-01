@@ -11,13 +11,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,6 +39,8 @@ import jakarta.validation.Valid;
 public class FeedController {
 
     private static final int TAMANHO_MAXIMO = 100;
+    /** Janela em que o autor ainda pode editar o próprio comentário (fonte única no response). */
+    private static final int JANELA_EDICAO_MIN = ComentarioResponse.JANELA_EDICAO_MINUTOS;
 
     private final PostagemRepository repository;
     private final CurtidaRepository curtidaRepository;
@@ -103,7 +108,12 @@ public class FeedController {
     public Pagina<ComentarioResponse> comentarios(
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Jwt jwt) {
+        // Leitura é pública; com token, marca-se "meu" nos comentários do paciente
+        // logado (para o app mostrar editar/excluir). Só o claim do id, sem validar
+        // sessão — é apenas uma dica de UI (a escrita valida de verdade).
+        Long pacienteAtual = pacienteIdDoToken(jwt);
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pagina, tamanho);
@@ -118,7 +128,7 @@ public class FeedController {
                         .collect(Collectors.groupingBy(r -> r.getComentarioPai().getId()));
 
         List<ComentarioResponse> content = resultado.getContent().stream()
-                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of())))
+                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()), pacienteAtual))
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -137,9 +147,10 @@ public class FeedController {
         Comentario comentario = new Comentario();
         comentario.setPostagem(postagem);
         comentario.setAutor(nomeExibicao(paciente.getNome()));
+        comentario.setPacienteId(paciente.getId());
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(comentario));
+        return ComentarioResponse.from(comentarioRepository.save(comentario), paciente.getId());
     }
 
     /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
@@ -163,12 +174,77 @@ public class FeedController {
         resposta.setPostagem(postagem);
         resposta.setComentarioPai(raiz);
         resposta.setAutor(nomeExibicao(paciente.getNome()));
+        resposta.setPacienteId(paciente.getId());
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(resposta));
+        return ComentarioResponse.from(comentarioRepository.save(resposta), paciente.getId());
+    }
+
+    /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
+    @PutMapping("/postagem/{id}/comentarios/{comentarioId}")
+    @Transactional
+    public ComentarioResponse editar(@PathVariable Long id, @PathVariable Long comentarioId,
+            @Valid @RequestBody EditarComentarioRequest request, @AuthenticationPrincipal Jwt jwt) {
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
+        Comentario c = comentarioDaPostagem(id, comentarioId);
+        exigirDono(c, paciente);
+        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(JANELA_EDICAO_MIN))) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O prazo para editar este comentário (" + JANELA_EDICAO_MIN + " min) expirou.");
+        }
+        c.setTexto(request.texto().trim());
+        c.setEditadoEm(LocalDateTime.now());
+        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId());
+    }
+
+    /**
+     * Exclui o próprio comentário (sem prazo). Se for um comentário-raiz, apaga
+     * também todas as respostas abaixo — inclusive de outros pacientes.
+     */
+    @DeleteMapping("/postagem/{id}/comentarios/{comentarioId}")
+    @Transactional
+    public ResponseEntity<Void> excluir(@PathVariable Long id, @PathVariable Long comentarioId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
+        Comentario c = comentarioDaPostagem(id, comentarioId);
+        exigirDono(c, paciente);
+        if (c.getComentarioPai() == null) {
+            List<Comentario> respostas = comentarioRepository.findByComentarioPaiIdOrderByCriadoEmAsc(c.getId());
+            if (!respostas.isEmpty()) {
+                comentarioRepository.deleteAll(respostas);
+            }
+        }
+        comentarioRepository.delete(c);
+        return ResponseEntity.noContent().build();
     }
 
     // ---------- helpers ----------
+
+    /** Id do paciente a partir do claim do token (sem validar sessão); nulo se não autenticado. */
+    private Long pacienteIdDoToken(Jwt jwt) {
+        if (jwt == null) {
+            return null;
+        }
+        Object pid = jwt.getClaim("pid");
+        return pid instanceof Number numero ? numero.longValue() : null;
+    }
+
+    /** Carrega o comentário garantindo que pertence à postagem informada. */
+    private Comentario comentarioDaPostagem(Long postagemId, Long comentarioId) {
+        Comentario c = comentarioRepository.findById(comentarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado"));
+        if (!c.getPostagem().getId().equals(postagemId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comentário não pertence à postagem");
+        }
+        return c;
+    }
+
+    /** Garante que o paciente logado é o dono do comentário (403 caso contrário). */
+    private void exigirDono(Comentario c, Paciente paciente) {
+        if (c.getPacienteId() == null || !c.getPacienteId().equals(paciente.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só o autor pode alterar este comentário.");
+        }
+    }
 
     /**
      * Nome exibido no comentário: primeiro nome + inicial do sobrenome

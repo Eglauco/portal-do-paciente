@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,8 @@ class PostagemControllerTest {
     private PacienteAuthController authController;
     @Autowired
     private PacienteRepository pacienteRepository;
+    @Autowired
+    private ComentarioRepository comentarioRepository;
     @Autowired
     private JwtDecoder jwtDecoder;
 
@@ -94,7 +98,11 @@ class PostagemControllerTest {
         // Comentar — o autor vem do token do paciente (primeiro nome + inicial), não do corpo
         ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "Muito bom!"), jwt);
         assertEquals("Joao T.", c.autor());
-        assertEquals(1, feedController.comentarios(id, 0, 20).totalElements());
+        assertTrue(c.meu(), "o comentário recém-criado é do paciente logado");
+        assertFalse(c.editado());
+        Pagina<ComentarioResponse> lista = feedController.comentarios(id, 0, 20, jwt);
+        assertEquals(1, lista.totalElements());
+        assertTrue(lista.content().get(0).meu());
 
         // Excluir (cascade remove curtidas/comentários)
         controller.excluir(id);
@@ -125,7 +133,7 @@ class PostagemControllerTest {
         feedController.responder(id, respAdmin.id(), new ComentarRequest("Mariana Duarte", "Qual horário?"), jwt);
 
         // Listagem: 1 comentário-raiz com 3 respostas
-        Pagina<ComentarioResponse> pagina = feedController.comentarios(id, 0, 20);
+        Pagina<ComentarioResponse> pagina = feedController.comentarios(id, 0, 20, jwt);
         assertEquals(1, pagina.totalElements());
         assertEquals(3, pagina.content().get(0).respostas().size());
 
@@ -145,6 +153,80 @@ class PostagemControllerTest {
         assertThrows(ResponseStatusException.class,
                 () -> feedController.comentar(id, new ComentarRequest("Ana", "oi"), jwt));
         controller.excluir(id);
+    }
+
+    @Test
+    void editarProprioComentarioDentroDaJanela() {
+        Long id = controller.criar(new PostagemRequest("Dica", "Beba água", true, true, 1L, IMG)).id();
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "otimo"), jwt);
+        assertFalse(c.editado());
+
+        ComentarioResponse editado = feedController.editar(id, c.id(),
+                new EditarComentarioRequest("ótimo, obrigado!"), jwt);
+        assertEquals("ótimo, obrigado!", editado.texto());
+        assertTrue(editado.editado());
+        assertTrue(editado.meu());
+
+        controller.excluir(id);
+    }
+
+    @Test
+    void naoEditaComentarioForaDaJanelaMasAindaExclui() {
+        Long id = controller.criar(new PostagemRequest("Aviso", "texto", true, true, 1L, IMG)).id();
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "antigo"), jwt);
+        // Envelhece o comentário além dos 15 min.
+        Comentario entidade = comentarioRepository.findById(c.id()).orElseThrow();
+        entidade.setCriadoEm(LocalDateTime.now().minusMinutes(20));
+        comentarioRepository.save(entidade);
+
+        assertEquals(422, assertThrows(ResponseStatusException.class,
+                () -> feedController.editar(id, c.id(), new EditarComentarioRequest("novo"), jwt))
+                .getStatusCode().value());
+        // Excluir não tem prazo.
+        feedController.excluir(id, c.id(), jwt);
+        assertEquals(0, feedController.comentarios(id, 0, 20, jwt).totalElements());
+
+        controller.excluir(id);
+    }
+
+    @Test
+    void excluirComentarioRaizRemoveTodasAsRespostas() {
+        Long id = controller.criar(new PostagemRequest("Mutirão", "Sábado", true, true, 1L, IMG)).id();
+        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "que horas?"), jwt);
+        feedController.responder(id, raiz.id(), new ComentarRequest("João", "eu também"), jwt);
+        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "às 9h")); // resposta de outro
+        assertEquals(3, feedController.postagem(id, "dev-x").totalComentarios());
+
+        // O dono exclui o raiz → apaga o raiz e TODAS as respostas (inclusive a do admin).
+        feedController.excluir(id, raiz.id(), jwt);
+        assertEquals(0, feedController.comentarios(id, 0, 20, jwt).totalElements());
+        assertEquals(0, feedController.postagem(id, "dev-x").totalComentarios());
+
+        controller.excluir(id);
+    }
+
+    @Test
+    void soODonoPodeEditarOuExcluir() {
+        String tel2 = "11933332222";
+        pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        Long outroId = pacienteController.criar(new PacienteRequest("Maria Outra", tel2)).getId();
+        String cod2 = pacienteController.gerarCodigo(outroId).getBody().codigo();
+        Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, cod2, "dev-outro")).token());
+
+        Long id = controller.criar(new PostagemRequest("Regras", "teste", true, true, 1L, IMG)).id();
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "meu comentário"), jwt);
+
+        // Outro paciente não pode editar nem excluir (403).
+        assertEquals(403, assertThrows(ResponseStatusException.class,
+                () -> feedController.editar(id, c.id(), new EditarComentarioRequest("hack"), jwtOutro))
+                .getStatusCode().value());
+        assertEquals(403, assertThrows(ResponseStatusException.class,
+                () -> feedController.excluir(id, c.id(), jwtOutro)).getStatusCode().value());
+        // Para o outro paciente, o comentário não é "meu".
+        assertFalse(feedController.comentarios(id, 0, 20, jwtOutro).content().get(0).meu());
+
+        controller.excluir(id);
+        pacienteRepository.deleteById(outroId);
     }
 
     @Test
