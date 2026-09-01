@@ -11,11 +11,11 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EdicaoComentario } from '@/components/comentario-edicao';
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
 import { Brand } from '@/constants/theme';
 import { useSessao } from '@/hooks/use-sessao';
@@ -48,45 +48,6 @@ function haQuanto(iso: string): string {
   const h = Math.floor(min / 60);
   if (h < 24) return `há ${h} h`;
   return `há ${Math.floor(h / 24)} d`;
-}
-
-/** Caixa de edição inline — mantém o texto em estado próprio (não re-renderiza a lista a cada tecla). */
-function EdicaoComentario({
-  inicial,
-  salvando,
-  onSalvar,
-  onCancelar,
-}: {
-  inicial: string;
-  salvando: boolean;
-  onSalvar: (texto: string) => void;
-  onCancelar: () => void;
-}) {
-  const [txt, setTxt] = useState(inicial);
-  return (
-    <View style={styles.editBox}>
-      <TextInput
-        style={styles.editInput}
-        value={txt}
-        onChangeText={setTxt}
-        multiline
-        autoFocus
-        editable={!salvando}
-        placeholder="Edite seu comentário"
-        placeholderTextColor={Brand.muted}
-      />
-      <View style={styles.editAcoes}>
-        <Pressable onPress={onCancelar} hitSlop={6} disabled={salvando}>
-          <Text style={styles.acaoLink}>Cancelar</Text>
-        </Pressable>
-        <Pressable onPress={() => onSalvar(txt)} hitSlop={6} disabled={salvando || !txt.trim()}>
-          <Text style={[styles.acaoSalvar, (salvando || !txt.trim()) && styles.acaoDesabilitada]}>
-            {salvando ? 'Salvando…' : 'Salvar'}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
 }
 
 export default function PostagemDetalheScreen() {
@@ -510,21 +471,6 @@ const styles = StyleSheet.create({
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
   acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
   acaoExcluir: { fontSize: 11.5, fontWeight: '700', color: '#C0475A' },
-  acaoSalvar: { fontSize: 12.5, fontWeight: '800', color: Brand.brandDeep },
-  acaoDesabilitada: { opacity: 0.5 },
-  editBox: { marginTop: 2 },
-  editInput: {
-    borderWidth: 1,
-    borderColor: Brand.line,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: Brand.ink,
-    backgroundColor: '#fff',
-    minHeight: 38,
-  },
-  editAcoes: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
   respostas: { paddingLeft: 44 },
   itemResposta: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 12 },
   itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },

@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -14,9 +15,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EdicaoComentario } from '@/components/comentario-edicao';
 import { Brand } from '@/constants/theme';
 import { useSessao } from '@/hooks/use-sessao';
-import { comentar, Comentario, listarComentarios, responder } from '@/services/feed';
+import {
+  comentar,
+  Comentario,
+  editarComentario,
+  excluirComentario,
+  listarComentarios,
+  responder,
+} from '@/services/feed';
 
 const TAMANHO = 20;
 
@@ -54,6 +63,8 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
   const [texto, setTexto] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [respondendo, setRespondendo] = useState<{ raizId: number; autor: string } | null>(null);
+  const [editando, setEditando] = useState<number | null>(null);
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
   const campoRef = useRef<TextInput>(null);
   const page = useRef(0);
   const temMais = useRef(false);
@@ -65,6 +76,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
     setErro(false);
     setComentarios([]);
     setRespondendo(null);
+    setEditando(null);
     setTexto('');
     page.current = 0;
     temMais.current = false;
@@ -135,24 +147,113 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
 
   const podeEnviar = !!texto.trim() && !enviando;
 
+  const iniciarEdicao = (c: Comentario) => {
+    setRespondendo(null);
+    setEditando(c.id);
+  };
+  const cancelarEdicao = () => setEditando(null);
+
+  const salvarEdicao = async (c: Comentario, raizId: number | null, novoTexto: string) => {
+    if (postagemId == null) return;
+    const novo = novoTexto.trim();
+    if (!novo || novo === c.texto) {
+      setEditando(null);
+      return;
+    }
+    setSalvandoEdicao(true);
+    try {
+      await editarComentario(postagemId, c.id, novo);
+      setComentarios((lista) =>
+        raizId == null
+          ? lista.map((x) => (x.id === c.id ? { ...x, texto: novo, editado: true } : x))
+          : lista.map((x) =>
+              x.id === raizId
+                ? { ...x, respostas: x.respostas.map((r) => (r.id === c.id ? { ...r, texto: novo, editado: true } : r)) }
+                : x,
+            ),
+      );
+      setEditando(null);
+    } catch {
+      Alert.alert('Não foi possível editar', 'Talvez o prazo de 15 minutos tenha expirado. Tente novamente.');
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  };
+
+  const excluir = async (c: Comentario, raizId: number | null) => {
+    if (postagemId == null) return;
+    try {
+      await excluirComentario(postagemId, c.id);
+      setComentarios((lista) =>
+        raizId == null
+          ? lista.filter((x) => x.id !== c.id)
+          : lista.map((x) => (x.id === raizId ? { ...x, respostas: x.respostas.filter((r) => r.id !== c.id) } : x)),
+      );
+      setEditando((atual) => (atual === c.id ? null : atual));
+    } catch {
+      Alert.alert('Não foi possível excluir', 'Tente novamente.');
+    }
+  };
+
+  const confirmarExclusao = (c: Comentario, raizId: number | null) => {
+    const qtd = raizId == null ? c.respostas?.length ?? 0 : 0;
+    const msg =
+      qtd > 0
+        ? `Isso também vai excluir as ${qtd} resposta(s) abaixo. Deseja continuar?`
+        : 'Deseja excluir este comentário?';
+    Alert.alert('Excluir comentário', msg, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: () => excluir(c, raizId) },
+    ]);
+  };
+
+  /** Corpo do comentário (raiz ou resposta): texto/edição + meta + ações. raizId nulo = raiz. */
+  const renderCorpo = (item: Comentario, raizId: number | null) => (
+    <View style={{ flex: 1 }}>
+      {editando === item.id ? (
+        <EdicaoComentario
+          inicial={item.texto}
+          salvando={salvandoEdicao}
+          onSalvar={(txt) => salvarEdicao(item, raizId, txt)}
+          onCancelar={cancelarEdicao}
+        />
+      ) : (
+        <>
+          <Text style={styles.itemTexto}>
+            <Text style={styles.itemAutor}>{item.autor} </Text>
+            {item.texto}
+          </Text>
+          <View style={styles.itemMeta}>
+            <Text style={styles.itemTempo}>
+              {haQuanto(item.criadoEm)}
+              {item.editado ? ' · editado' : ''}
+            </Text>
+            <Pressable onPress={() => iniciarResposta(raizId ?? item.id, item.autor)} hitSlop={6}>
+              <Text style={styles.responder}>Responder</Text>
+            </Pressable>
+            {item.meu && item.podeEditar && (
+              <Pressable onPress={() => iniciarEdicao(item)} hitSlop={6}>
+                <Text style={styles.acaoLink}>Editar</Text>
+              </Pressable>
+            )}
+            {item.meu && (
+              <Pressable onPress={() => confirmarExclusao(item, raizId)} hitSlop={6}>
+                <Text style={styles.acaoExcluir}>Excluir</Text>
+              </Pressable>
+            )}
+          </View>
+        </>
+      )}
+    </View>
+  );
+
   const renderItem = ({ item }: { item: Comentario }) => (
     <View>
       <View style={styles.item}>
         <View style={styles.itemAvatar}>
           <Text style={styles.itemAvatarTxt}>{iniciais(item.autor)}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.itemTexto}>
-            <Text style={styles.itemAutor}>{item.autor} </Text>
-            {item.texto}
-          </Text>
-          <View style={styles.itemMeta}>
-            <Text style={styles.itemTempo}>{haQuanto(item.criadoEm)}</Text>
-            <Pressable onPress={() => iniciarResposta(item.id, item.autor)} hitSlop={6}>
-              <Text style={styles.responder}>Responder</Text>
-            </Pressable>
-          </View>
-        </View>
+        {renderCorpo(item, null)}
       </View>
 
       {item.respostas?.length > 0 && (
@@ -162,18 +263,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
               <View style={styles.itemAvatarSm}>
                 <Text style={styles.itemAvatarTxtSm}>{iniciais(r.autor)}</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemTexto}>
-                  <Text style={styles.itemAutor}>{r.autor} </Text>
-                  {r.texto}
-                </Text>
-                <View style={styles.itemMeta}>
-                  <Text style={styles.itemTempo}>{haQuanto(r.criadoEm)}</Text>
-                  <Pressable onPress={() => iniciarResposta(item.id, r.autor)} hitSlop={6}>
-                    <Text style={styles.responder}>Responder</Text>
-                  </Pressable>
-                </View>
-              </View>
+              {renderCorpo(r, item.id)}
             </View>
           ))}
         </View>
@@ -210,6 +300,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
               data={comentarios}
               keyExtractor={(c) => String(c.id)}
               renderItem={renderItem}
+              extraData={`${editando}-${salvandoEdicao}`}
               style={styles.lista}
               contentContainerStyle={styles.listaConteudo}
               onEndReached={carregarMais}
@@ -307,6 +398,8 @@ const styles = StyleSheet.create({
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
   itemTempo: { fontSize: 11.5, color: Brand.muted },
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  acaoExcluir: { fontSize: 11.5, fontWeight: '700', color: '#C0475A' },
   respostas: { paddingLeft: 44, gap: 12, marginTop: 12 },
   itemResposta: { flexDirection: 'row', gap: 10 },
   itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
