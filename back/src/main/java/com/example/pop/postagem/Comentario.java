@@ -39,9 +39,13 @@ public class Comentario {
     @Column(nullable = false, length = 80)
     private String autor;
 
-    /** Dono do comentário (quem pode editar/excluir). Nulo em comentários antigos. */
+    /** Dono do comentário quando é do paciente (app). Nulo em comentários antigos ou do admin. */
     @Column(name = "paciente_id")
     private Long pacienteId;
+
+    /** Dono do comentário quando é do admin (back-office). Nulo em comentários do paciente. */
+    @Column(name = "usuario_id")
+    private Long usuarioId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;

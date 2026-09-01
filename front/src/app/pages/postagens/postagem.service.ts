@@ -62,4 +62,9 @@ export class PostagemService {
   responderComentario(comentarioId: number, autor: string, texto: string): Observable<Comentario> {
     return this.http.post<Comentario>(`${this.base}/comentario/${comentarioId}/responder`, { autor, texto });
   }
+
+  /** Edita um comentário do próprio admin (permitido só até 15 min após criar). */
+  editarComentario(comentarioId: number, texto: string): Observable<Comentario> {
+    return this.http.put<Comentario>(`${this.base}/comentario/${comentarioId}`, { texto });
+  }
 }

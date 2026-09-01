@@ -98,6 +98,11 @@ export class PostagemForm implements PodeSair {
   protected readonly textoResposta = signal('');
   protected readonly enviandoResposta = signal(false);
 
+  // Editar o próprio comentário do admin (janela de 15 min conferida no servidor).
+  protected readonly editandoComentario = signal<number | null>(null);
+  protected readonly textoEdicao = signal('');
+  protected readonly salvandoEdicao = signal(false);
+
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
@@ -309,7 +314,53 @@ export class PostagemForm implements PodeSair {
     });
   }
 
+  protected iniciarEdicaoComentario(c: Comentario): void {
+    this.respondendoId.set(null);
+    this.editandoComentario.set(c.id);
+    this.textoEdicao.set(c.texto);
+  }
+
+  protected cancelarEdicaoComentario(): void {
+    this.editandoComentario.set(null);
+    this.textoEdicao.set('');
+  }
+
+  protected aoDigitarEdicao(evento: Event): void {
+    this.textoEdicao.set((evento.target as HTMLTextAreaElement).value);
+  }
+
+  /** Salva a edição do comentário do admin (raizId nulo = comentário-raiz). */
+  protected salvarEdicaoComentario(c: Comentario, raizId: number | null): void {
+    const texto = this.textoEdicao().trim();
+    if (!texto || texto === c.texto || this.salvandoEdicao()) {
+      this.cancelarEdicaoComentario();
+      return;
+    }
+    this.salvandoEdicao.set(true);
+    this.service.editarComentario(c.id, texto).subscribe({
+      next: () => {
+        this.comentarios.update((lista) =>
+          raizId == null
+            ? lista.map((x) => (x.id === c.id ? { ...x, texto, editado: true } : x))
+            : lista.map((x) =>
+                x.id === raizId
+                  ? { ...x, respostas: x.respostas.map((r) => (r.id === c.id ? { ...r, texto, editado: true } : r)) }
+                  : x,
+              ),
+        );
+        this.cancelarEdicaoComentario();
+        this.salvandoEdicao.set(false);
+        this.toastr.success('Comentário editado');
+      },
+      error: () => {
+        this.salvandoEdicao.set(false);
+        this.toastr.error('Não foi possível editar (o prazo de 15 min pode ter expirado).');
+      },
+    });
+  }
+
   protected abrirResposta(raizId: number): void {
+    this.editandoComentario.set(null);
     this.respondendoId.set(raizId);
     this.textoResposta.set('');
   }

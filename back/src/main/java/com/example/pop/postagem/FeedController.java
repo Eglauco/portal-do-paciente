@@ -110,10 +110,11 @@ public class FeedController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal Jwt jwt) {
-        // Leitura é pública; com token, marca-se "meu" nos comentários do paciente
-        // logado (para o app mostrar editar/excluir). Só o claim do id, sem validar
-        // sessão — é apenas uma dica de UI (a escrita valida de verdade).
+        // Leitura é pública; com token, marca-se "meu" nos comentários de quem lê —
+        // paciente (app) OU admin (front) — para mostrar editar/excluir. Só o claim do
+        // id, sem validar sessão: é uma dica de UI (a escrita valida de verdade).
         Long pacienteAtual = pacienteIdDoToken(jwt);
+        Long adminAtual = usuarioIdDoToken(jwt);
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pagina, tamanho);
@@ -128,7 +129,7 @@ public class FeedController {
                         .collect(Collectors.groupingBy(r -> r.getComentarioPai().getId()));
 
         List<ComentarioResponse> content = resultado.getContent().stream()
-                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()), pacienteAtual))
+                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()), pacienteAtual, adminAtual))
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -150,7 +151,7 @@ public class FeedController {
         comentario.setPacienteId(paciente.getId());
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(comentario), paciente.getId());
+        return ComentarioResponse.from(comentarioRepository.save(comentario), paciente.getId(), null);
     }
 
     /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
@@ -177,7 +178,7 @@ public class FeedController {
         resposta.setPacienteId(paciente.getId());
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(resposta), paciente.getId());
+        return ComentarioResponse.from(comentarioRepository.save(resposta), paciente.getId(), null);
     }
 
     /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
@@ -194,7 +195,7 @@ public class FeedController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId());
+        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null);
     }
 
     /**
@@ -227,6 +228,15 @@ public class FeedController {
         }
         Object pid = jwt.getClaim("pid");
         return pid instanceof Number numero ? numero.longValue() : null;
+    }
+
+    /** Id do usuário admin a partir do claim do token (sem validar sessão); nulo se não for admin. */
+    private Long usuarioIdDoToken(Jwt jwt) {
+        if (jwt == null) {
+            return null;
+        }
+        Object uid = jwt.getClaim("uid");
+        return uid instanceof Number numero ? numero.longValue() : null;
     }
 
     /** Carrega o comentário garantindo que pertence à postagem informada. */

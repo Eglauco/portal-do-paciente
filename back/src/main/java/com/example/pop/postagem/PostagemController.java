@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -145,22 +147,49 @@ public class PostagemController {
     @PostMapping("/comentario/{comentarioId}/responder")
     @Transactional
     public ResponseEntity<ComentarioResponse> responderComentario(@PathVariable Long comentarioId,
-            @Valid @RequestBody ComentarRequest request) {
+            @Valid @RequestBody ComentarRequest request, @AuthenticationPrincipal Jwt jwt) {
         Comentario pai = comentarioRepository.findById(comentarioId).orElse(null);
         if (pai == null) {
             return ResponseEntity.notFound().build();
         }
+        Long adminId = uidDoToken(jwt);
         // Threading de 1 nível: a resposta se ancora sempre no comentário-raiz.
         Comentario raiz = pai.getComentarioPai() != null ? pai.getComentarioPai() : pai;
         Comentario resposta = new Comentario();
         resposta.setPostagem(pai.getPostagem());
         resposta.setComentarioPai(raiz);
         resposta.setAutor(request.autor().trim());
+        resposta.setUsuarioId(adminId); // dono admin — pode editar por 15 min; sem dono paciente
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
-        // Resposta do admin não tem dono paciente (pacienteId nulo) — não é editável/excluível pelo app.
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null));
+                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId));
+    }
+
+    /** Edita o próprio comentário do admin — permitido só até 15 min após criar. */
+    @PutMapping("/comentario/{comentarioId}")
+    @Transactional
+    public ComentarioResponse editarComentario(@PathVariable Long comentarioId,
+            @Valid @RequestBody EditarComentarioRequest request, @AuthenticationPrincipal Jwt jwt) {
+        Long adminId = uidDoToken(jwt);
+        Comentario c = comentarioRepository.findById(comentarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado"));
+        if (adminId == null || !adminId.equals(c.getUsuarioId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só o autor pode editar este comentário.");
+        }
+        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(ComentarioResponse.JANELA_EDICAO_MINUTOS))) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O prazo para editar este comentário (" + ComentarioResponse.JANELA_EDICAO_MINUTOS + " min) expirou.");
+        }
+        c.setTexto(request.texto().trim());
+        c.setEditadoEm(LocalDateTime.now());
+        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId);
+    }
+
+    /** Id do usuário admin a partir do claim "uid" do token; nulo se ausente. */
+    private Long uidDoToken(Jwt jwt) {
+        Object uid = jwt == null ? null : jwt.getClaim("uid");
+        return uid instanceof Number numero ? numero.longValue() : null;
     }
 
     // ---------- helpers ----------

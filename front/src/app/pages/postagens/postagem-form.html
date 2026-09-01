@@ -136,11 +136,36 @@
               <div class="coment__row">
                 <span class="coment__avatar">{{ iniciais(c.autor) }}</span>
                 <div class="coment__body">
-                  <p class="coment__texto"><b>{{ c.autor }}</b> {{ c.texto }}</p>
-                  <div class="coment__meta">
-                    <span class="coment__data">{{ c.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
-                    <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
-                  </div>
+                  @if (editandoComentario() === c.id) {
+                    <textarea
+                      class="input input--area coment-resposta-campo"
+                      [value]="textoEdicao()"
+                      (input)="aoDigitarEdicao($event)"
+                      aria-label="Editar comentário"
+                    ></textarea>
+                    <div class="coment-resposta-acoes">
+                      <button type="button" class="btn btn--ghost" (click)="cancelarEdicaoComentario()">Cancelar</button>
+                      <button
+                        type="button"
+                        class="btn btn--solid"
+                        (click)="salvarEdicaoComentario(c, null)"
+                        [disabled]="salvandoEdicao() || !textoEdicao().trim()"
+                      >
+                        {{ salvandoEdicao() ? 'Salvando…' : 'Salvar' }}
+                      </button>
+                    </div>
+                  } @else {
+                    <p class="coment__texto"><b>{{ c.autor }}</b> {{ c.texto }}</p>
+                    <div class="coment__meta">
+                      <span class="coment__data">
+                        {{ c.criadoEm | date: 'dd/MM/yyyy HH:mm' }}@if (c.editado) {<span class="coment__editado"> · editado</span>}
+                      </span>
+                      <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
+                      @if (c.meu && c.podeEditar) {
+                        <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(c)">Editar</button>
+                      }
+                    </div>
+                  }
                 </div>
                 <button
                   type="button"
@@ -162,11 +187,36 @@
                       <div class="coment__row">
                         <span class="coment__avatar">{{ iniciais(r.autor) }}</span>
                         <div class="coment__body">
-                          <p class="coment__texto"><b>{{ r.autor }}</b> {{ r.texto }}</p>
-                          <div class="coment__meta">
-                            <span class="coment__data">{{ r.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
-                            <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
-                          </div>
+                          @if (editandoComentario() === r.id) {
+                            <textarea
+                              class="input input--area coment-resposta-campo"
+                              [value]="textoEdicao()"
+                              (input)="aoDigitarEdicao($event)"
+                              aria-label="Editar resposta"
+                            ></textarea>
+                            <div class="coment-resposta-acoes">
+                              <button type="button" class="btn btn--ghost" (click)="cancelarEdicaoComentario()">Cancelar</button>
+                              <button
+                                type="button"
+                                class="btn btn--solid"
+                                (click)="salvarEdicaoComentario(r, c.id)"
+                                [disabled]="salvandoEdicao() || !textoEdicao().trim()"
+                              >
+                                {{ salvandoEdicao() ? 'Salvando…' : 'Salvar' }}
+                              </button>
+                            </div>
+                          } @else {
+                            <p class="coment__texto"><b>{{ r.autor }}</b> {{ r.texto }}</p>
+                            <div class="coment__meta">
+                              <span class="coment__data">
+                                {{ r.criadoEm | date: 'dd/MM/yyyy HH:mm' }}@if (r.editado) {<span class="coment__editado"> · editado</span>}
+                              </span>
+                              <button type="button" class="coment__responder" (click)="abrirResposta(c.id)">Responder</button>
+                              @if (r.meu && r.podeEditar) {
+                                <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(r)">Editar</button>
+                              }
+                            </div>
+                          }
                         </div>
                         <button
                           type="button"

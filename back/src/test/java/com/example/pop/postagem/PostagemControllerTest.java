@@ -23,6 +23,7 @@ import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
+import com.example.pop.usuario.UsuarioRepository;
 
 @SpringBootTest
 class PostagemControllerTest {
@@ -43,11 +44,19 @@ class PostagemControllerTest {
     @Autowired
     private ComentarioRepository comentarioRepository;
     @Autowired
+    private UsuarioRepository usuarioRepository;
+    @Autowired
     private JwtDecoder jwtDecoder;
 
     private Long pacienteId;
     /** Token do paciente logado — comentar/responder derivam o autor dele. */
     private Jwt jwt;
+
+    /** Token de admin com o claim "uid" (um usuário existente, p/ respeitar a FK). */
+    private Jwt adminJwt() {
+        Long uid = usuarioRepository.findAll().get(0).getId();
+        return Jwt.withTokenValue("t").header("alg", "none").claim("uid", uid).build();
+    }
 
     @BeforeEach
     void setup() {
@@ -122,7 +131,7 @@ class PostagemControllerTest {
 
         // Administração responde (lado admin: autor vem do corpo)
         ComentarioResponse respAdmin = controller
-                .responderComentario(raiz.id(), new ComentarRequest("Administração", "Será dia 10")).getBody();
+                .responderComentario(raiz.id(), new ComentarRequest("Administração", "Será dia 10"), adminJwt()).getBody();
         assertNotNull(respAdmin);
         assertEquals("Administração", respAdmin.autor());
 
@@ -194,7 +203,7 @@ class PostagemControllerTest {
         Long id = controller.criar(new PostagemRequest("Mutirão", "Sábado", true, true, 1L, IMG)).id();
         ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "que horas?"), jwt);
         feedController.responder(id, raiz.id(), new ComentarRequest("João", "eu também"), jwt);
-        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "às 9h")); // resposta de outro
+        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "às 9h"), adminJwt()); // resposta de outro
         assertEquals(3, feedController.postagem(id, "dev-x").totalComentarios());
 
         // O dono exclui o raiz → apaga o raiz e TODAS as respostas (inclusive a do admin).
@@ -227,6 +236,30 @@ class PostagemControllerTest {
 
         controller.excluir(id);
         pacienteRepository.deleteById(outroId);
+    }
+
+    @Test
+    void adminEditaOProprioComentarioDentroDaJanela() {
+        Long id = controller.criar(new PostagemRequest("Aviso admin", "texto", true, true, 1L, IMG)).id();
+        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "dúvida"), jwt);
+        ComentarioResponse resp = controller
+                .responderComentario(raiz.id(), new ComentarRequest("Administração", "resposta"), adminJwt()).getBody();
+        assertNotNull(resp);
+        assertTrue(resp.meu(), "a resposta é do admin logado");
+        assertFalse(resp.editado());
+
+        ComentarioResponse editado = controller.editarComentario(resp.id(),
+                new EditarComentarioRequest("resposta corrigida"), adminJwt());
+        assertEquals("resposta corrigida", editado.texto());
+        assertTrue(editado.editado());
+
+        // Outro admin (uid diferente) não pode editar.
+        Jwt outroAdmin = Jwt.withTokenValue("t").header("alg", "none").claim("uid", 999999L).build();
+        assertEquals(403, assertThrows(ResponseStatusException.class,
+                () -> controller.editarComentario(resp.id(), new EditarComentarioRequest("hack"), outroAdmin))
+                .getStatusCode().value());
+
+        controller.excluir(id);
     }
 
     @Test

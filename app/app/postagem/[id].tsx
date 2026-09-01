@@ -264,8 +264,12 @@ export default function PostagemDetalheScreen() {
               </Pressable>
             )}
             {item.meu && (
-              <Pressable onPress={() => confirmarExclusao(item, raizId)} hitSlop={6}>
-                <Text style={styles.acaoExcluir}>Excluir</Text>
+              <Pressable
+                style={styles.lixeira}
+                onPress={() => confirmarExclusao(item, raizId)}
+                hitSlop={8}
+                accessibilityLabel="Excluir comentário">
+                <Ionicons name="trash-outline" size={16} color="#C0475A" />
               </Pressable>
             )}
           </View>
@@ -470,7 +474,7 @@ const styles = StyleSheet.create({
   itemTempo: { fontSize: 11.5, color: Brand.muted },
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
   acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
-  acaoExcluir: { fontSize: 11.5, fontWeight: '700', color: '#C0475A' },
+  lixeira: { marginLeft: 'auto', padding: 2 },
   respostas: { paddingLeft: 44 },
   itemResposta: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 12 },
   itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },

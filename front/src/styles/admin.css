@@ -2053,6 +2053,7 @@
 .coment__texto b { font-weight: 700; }
 .coment__meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.3rem; }
 .coment__data { font-size: 0.75rem; color: var(--muted); }
+.coment__editado { font-style: italic; color: var(--muted); }
 .coment__responder {
   padding: 0;
   border: 0;

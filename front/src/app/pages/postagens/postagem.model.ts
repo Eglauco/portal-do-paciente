@@ -35,6 +35,12 @@ export interface Comentario {
   autor: string;
   texto: string;
   criadoEm: string;
+  /** Foi editado depois de publicado (mostra "editado"). */
+  editado: boolean;
+  /** É do admin logado (mostra editar). */
+  meu: boolean;
+  /** Ainda dentro da janela de edição de 15 min (calculado no servidor). */
+  podeEditar: boolean;
   respostas: Comentario[];
 }
 

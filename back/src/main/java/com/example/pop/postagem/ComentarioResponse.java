@@ -16,9 +16,13 @@ public record ComentarioResponse(
     /** Janela em que o autor ainda pode editar o próprio comentário (fonte única). */
     public static final int JANELA_EDICAO_MINUTOS = 15;
 
-    /** Comentário/resposta sem filhos aninhados. {@code pacienteAtual} = paciente logado (ou nulo). */
-    public static ComentarioResponse from(Comentario c, Long pacienteAtual) {
-        boolean dono = ehDono(c, pacienteAtual);
+    /**
+     * Comentário/resposta sem filhos aninhados. O "dono" é conferido contra o
+     * paciente logado ({@code pacienteAtual}) OU o admin logado ({@code adminAtual});
+     * qualquer um pode ser nulo conforme quem está lendo (app = paciente, front = admin).
+     */
+    public static ComentarioResponse from(Comentario c, Long pacienteAtual, Long adminAtual) {
+        boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
@@ -31,9 +35,9 @@ public record ComentarioResponse(
     }
 
     /** Comentário-raiz com suas respostas (as respostas não aninham mais níveis). */
-    public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual) {
-        List<ComentarioResponse> filhos = respostas.stream().map(r -> from(r, pacienteAtual)).toList();
-        boolean dono = ehDono(c, pacienteAtual);
+    public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual, Long adminAtual) {
+        List<ComentarioResponse> filhos = respostas.stream().map(r -> from(r, pacienteAtual, adminAtual)).toList();
+        boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
@@ -45,14 +49,15 @@ public record ComentarioResponse(
                 filhos);
     }
 
-    /** true quando o comentário pertence ao paciente logado (base para editar/excluir). */
-    private static boolean ehDono(Comentario c, Long pacienteAtual) {
-        return pacienteAtual != null && pacienteAtual.equals(c.getPacienteId());
+    /** true quando o comentário pertence a quem está lendo (paciente OU admin). */
+    private static boolean ehDono(Comentario c, Long pacienteAtual, Long adminAtual) {
+        return (pacienteAtual != null && pacienteAtual.equals(c.getPacienteId()))
+                || (adminAtual != null && adminAtual.equals(c.getUsuarioId()));
     }
 
     /**
      * true se ainda está dentro da janela de edição. Calculado no servidor (relógio
-     * consistente): o app não faz conta de tempo/fuso — só mostra/oculta "Editar".
+     * consistente): os clientes não fazem conta de tempo/fuso — só mostram/ocultam "Editar".
      */
     private static boolean dentroDaJanela(Comentario c) {
         return c.getCriadoEm() != null
