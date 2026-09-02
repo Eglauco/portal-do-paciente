@@ -15,5 +15,8 @@ public record ChatResponse(
         RemetenteMensagem ultimaMensagemDe,
         LocalDateTime ultimaMensagemEm,
         long naoLidas,
-        LocalDateTime atualizadoEm) {
+        LocalDateTime atualizadoEm,
+        /** Atendente responsável pela conversa (nulo = ninguém assumiu). */
+        Long responsavelId,
+        String responsavelNome) {
 }

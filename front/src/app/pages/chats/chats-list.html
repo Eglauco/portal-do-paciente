@@ -25,6 +25,16 @@
         ></ng-select>
       </div>
       <div class="form-field">
+        <label class="label">Responsável</label>
+        <ng-select
+          formControlName="responsavelId"
+          [items]="usuarios()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Todos os responsáveis"
+        ></ng-select>
+      </div>
+      <div class="form-field">
         <label class="label">Status</label>
         <ng-select
           formControlName="status"
@@ -96,6 +106,14 @@
                 </span>
                 <span class="convo__meta">
                   <span class="convo__unidade">{{ c.unidadeSaude.nome }}</span>
+                  @if (c.responsavelNome) {
+                    <span class="convo__resp">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+                      {{ c.responsavelNome }}
+                    </span>
+                  } @else {
+                    <span class="convo__resp convo__resp--vazio">Sem responsável</span>
+                  }
                   <span class="status-pill" [attr.data-st]="c.status">{{ rotuloStatus(c.status) }}</span>
                 </span>
                 <span class="convo__linha">

@@ -1,8 +1,9 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, ElementRef, afterNextRender, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { retry, throwError, timer } from 'rxjs';
+import { AuthService } from '../../core/auth.service';
 import { ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
@@ -18,6 +19,7 @@ export class ChatConversa {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
 
   protected readonly digitando = signal(false);
   private cancelamentos: (() => void)[] = [];
@@ -31,9 +33,21 @@ export class ChatConversa {
   protected readonly idAtual = signal<number | null>(null);
   protected readonly carregandoDetalhe = signal(false);
   protected readonly texto = signal('');
+  protected readonly assumindo = signal(false);
+  /** Pergunta ao abrir: assumir (nova) ou transferir (já tem responsável). Null = sem pergunta. */
+  protected readonly promptAssumir = signal<{ transferir: boolean; nome: string | null } | null>(null);
+
+  /** Sou o atendente responsável por esta conversa (só o responsável envia). */
+  protected readonly souResponsavel = computed(() => {
+    const d = this.detalhe();
+    const uid = this.auth.usuarioId();
+    return !!d && d.responsavelId != null && d.responsavelId === uid;
+  });
 
   private readonly mensagensRef = viewChild<ElementRef<HTMLElement>>('mensagens');
   private readonly bloqueioRef = viewChild<ElementRef<HTMLElement>>('bloqueio');
+  private readonly assumirRef = viewChild<ElementRef<HTMLElement>>('assumirBanner');
+  private readonly promptDialogRef = viewChild<ElementRef<HTMLElement>>('promptDialog');
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -54,11 +68,82 @@ export class ChatConversa {
       next: (d) => {
         this.aplicarDetalhe(d);
         this.carregandoDetalhe.set(false);
+        this.avaliarPrompt();
         this.rolarParaFim();
       },
       error: () => this.carregandoDetalhe.set(false),
     });
     this.observarTempoReal(id);
+  }
+
+  /** Ao abrir, se não sou o responsável, pergunta se quero assumir/transferir. */
+  private avaliarPrompt(): void {
+    const d = this.detalhe();
+    if (!d) return;
+    // Conversa resolvida exige "Reabrir" explícito (cabeçalho): não oferece
+    // assumir/transferir aqui — senão assumir reabriria a conversa em silêncio.
+    if (this.souResponsavel() || d.status === 'RESOLVIDO') {
+      this.promptAssumir.set(null);
+      return;
+    }
+    this.abrirPrompt({ transferir: d.responsavelId != null, nome: d.responsavelNome ?? null });
+  }
+
+  /** Abre o modal de assumir/transferir e move o foco para ele (a11y). */
+  private abrirPrompt(valor: { transferir: boolean; nome: string | null }): void {
+    this.promptAssumir.set(valor);
+    this.focarRef(this.promptDialogRef);
+  }
+
+  /** Assume (ou transfere para si) a conversa: passo a ser o responsável. */
+  protected assumir(): void {
+    const id = this.idAtual();
+    if (id == null || this.assumindo()) return;
+    this.assumindo.set(true);
+    this.promptAssumir.set(null);
+    this.service.assumir(id).subscribe({
+      next: (d) => {
+        this.aplicarDetalhe(d);
+        this.assumindo.set(false);
+      },
+      error: () => this.assumindo.set(false),
+    });
+  }
+
+  /** Recusou assumir: fica só em modo leitura. */
+  protected recusarPrompt(): void {
+    this.promptAssumir.set(null);
+  }
+
+  /** Troca de responsável em tempo real (bloqueia na hora quem deixou de ser o dono). */
+  private aoResponsavelMudou(e: { responsavelId: number | null; responsavelNome: string | null }): void {
+    const eraResponsavel = this.souResponsavel();
+    this.detalhe.update((d) =>
+      d ? { ...d, responsavelId: e.responsavelId, responsavelNome: e.responsavelNome } : d,
+    );
+    const souResponsavelAgora = this.souResponsavel();
+    // Perdi a posse ao vivo (outro atendente assumiu): o campo de envio some e dá
+    // lugar ao aviso — move o foco para ele para anunciar a mudança (WCAG 2.4.3).
+    if (eraResponsavel && !souResponsavelAgora) this.focarRef(this.assumirRef);
+    // Mantém o texto do modal aberto coerente com o responsável atual (evita
+    // mostrar "Deseja assumir?" depois que outro atendente já assumiu).
+    if (this.promptAssumir() !== null) {
+      if (souResponsavelAgora) {
+        this.promptAssumir.set(null);
+      } else {
+        const atual = this.detalhe();
+        this.promptAssumir.set({
+          transferir: atual?.responsavelId != null,
+          nome: atual?.responsavelNome ?? null,
+        });
+      }
+    }
+  }
+
+  /** Move o foco para um elemento renderizado condicionalmente (após 2 frames). */
+  private focarRef(ref: () => ElementRef<HTMLElement> | undefined): void {
+    if (typeof requestAnimationFrame === 'undefined') return;
+    requestAnimationFrame(() => requestAnimationFrame(() => ref()?.nativeElement?.focus()));
   }
 
   /** Inscreve na conversa: mensagens, "digitando…" e recibo de leitura. */
@@ -68,6 +153,7 @@ export class ChatConversa {
       this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m)),
       this.realtime.observarDigitando(id, (e) => this.aoDigitandoRecebido(e)),
       this.realtime.observarEntrega(id, () => this.aoEntregaConfirmada()),
+      this.realtime.observarResponsavel(id, (e) => this.aoResponsavelMudou(e)),
       // Ao (re)conectar, recarrega o retrato: recupera o "entregue" da 1ª
       // mensagem, cujo evento pode ter ocorrido antes de a inscrição ficar ativa.
       this.realtime.observarConexao(() => this.ressincronizar(id)),
@@ -190,9 +276,12 @@ export class ChatConversa {
       .pipe(
         retry({
           count: this.ATRASOS.length,
-          // 422 = paciente não usa mais o app: erro permanente, não adianta retentar.
+          // 422 (paciente não usa app) e 409 (outro atendente assumiu) são
+          // permanentes: não adianta retentar.
           delay: (e, n) =>
-            e?.status === 422 ? throwError(() => e) : timer(this.ATRASOS[n - 1] ?? 16000),
+            e?.status === 422 || e?.status === 409
+              ? throwError(() => e)
+              : timer(this.ATRASOS[n - 1] ?? 16000),
         }),
         takeUntilDestroyed(this.destroyRef),
       )
@@ -219,6 +308,13 @@ export class ChatConversa {
         },
         error: (e) => {
           if (this.idAtual() !== id) return;
+          // Outro atendente assumiu a conversa: perdi a posse. Re-sincroniza o
+          // responsável (o campo de envio some) e marca a bolha como não enviada.
+          if (e?.status === 409) {
+            this.service.detalhe(id).subscribe({ next: (d) => this.aplicarDetalhe(d) });
+            this.marcarMensagem(tempId, { pendente: false, falha: true });
+            return;
+          }
           // Paciente deixou de usar o app durante a conversa: bloqueia o envio e
           // mostra o aviso fixo. Mantém a bolha marcada como "não enviada" (o
           // texto do operador fica visível), mas sem "reenviar" — o envio está

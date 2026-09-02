@@ -110,6 +110,16 @@ export class ChatRealtimeService {
     return this.inscrever(`/topic/chat/${chatId}/entregue`, () => callback());
   }
 
+  /** Observa a troca de responsável (bloqueia o atendente anterior em tempo real). */
+  observarResponsavel(
+    chatId: number,
+    callback: (evento: { responsavelId: number | null; responsavelNome: string | null }) => void,
+  ): () => void {
+    return this.inscrever(`/topic/chat/${chatId}/responsavel`, (msg) =>
+      callback(JSON.parse(msg.body) as { responsavelId: number | null; responsavelNome: string | null }),
+    );
+  }
+
   /**
    * Notifica a cada (re)conexão do WebSocket. Útil para recarregar o retrato do
    * servidor e recuperar eventos únicos perdidos enquanto a conexão subia

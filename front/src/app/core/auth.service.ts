@@ -45,6 +45,19 @@ export class AuthService {
   readonly unidadeId = computed(() => this._usuario()?.unidadeSaudeId ?? null);
   readonly unidadeNome = computed(() => this._usuario()?.unidadeSaudeNome ?? null);
 
+  /** Id do usuário logado (claim "uid" do token) — usado no chat para saber quem é o responsável. */
+  usuarioId(): number | null {
+    const token = this.token();
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      const uid = payload.uid;
+      return typeof uid === 'number' ? uid : uid != null ? Number(uid) : null;
+    } catch {
+      return null;
+    }
+  }
+
   login(email: string, senha: string, lembrar: boolean): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${this.base}/login`, { email, senha })

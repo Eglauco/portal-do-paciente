@@ -16,6 +16,7 @@ export class ChatService {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.responsavelId) params = params.set('responsavelId', filtro.responsavelId);
     if (filtro.status) params = params.set('status', filtro.status);
     if (filtro.naoResolvidas) params = params.set('naoResolvidas', true);
     return this.http.get<Pagina<Chat>>(this.base, { params });
@@ -35,6 +36,11 @@ export class ChatService {
 
   visualizar(id: number): Observable<ChatDetalhe> {
     return this.http.post<ChatDetalhe>(`${this.base}/${id}/visualizar`, {});
+  }
+
+  /** Assume (ou transfere para si) a conversa: o atendente passa a ser o responsável. */
+  assumir(id: number): Observable<ChatDetalhe> {
+    return this.http.post<ChatDetalhe>(`${this.base}/${id}/assumir`, {});
   }
 
   enviar(id: number, texto: string, clienteId?: string): Observable<ChatDetalhe> {

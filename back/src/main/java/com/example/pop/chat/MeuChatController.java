@@ -67,7 +67,7 @@ public class MeuChatController {
             @Valid @RequestBody AbrirMinhaConversaRequest request) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         ChatService.AberturaConversa abertura = chatService.abrirOuCriar(pacienteId, request.unidadeId());
-        return chatService.toDetalhe(abertura.chat());
+        return semResponsavelId(chatService.toDetalhe(abertura.chat()));
     }
 
     /** Lista as conversas do paciente logado (mais recentes primeiro). */
@@ -80,8 +80,9 @@ public class MeuChatController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "atualizadoEm"));
-        Page<Chat> resultado = repository.search(pacienteId, null, null, false, StatusChat.RESOLVIDO, pageable);
-        List<ChatResponse> content = resultado.getContent().stream().map(chatService::toResponse).toList();
+        Page<Chat> resultado = repository.search(pacienteId, null, null, null, false, StatusChat.RESOLVIDO, pageable);
+        List<ChatResponse> content = resultado.getContent().stream()
+                .map(chatService::toResponse).map(this::semResponsavelId).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -91,7 +92,7 @@ public class MeuChatController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ChatDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        return chatService.toDetalhe(minhaConversa(jwt, id));
+        return semResponsavelId(chatService.toDetalhe(minhaConversa(jwt, id)));
     }
 
     /** Envia uma mensagem do paciente logado na conversa dele. */
@@ -100,7 +101,7 @@ public class MeuChatController {
     public ChatDetalheResponse enviar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
         Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId());
-        return chatService.toDetalhe(chat);
+        return semResponsavelId(chatService.toDetalhe(chat));
     }
 
     /** Confirma que as mensagens da unidade chegaram no aparelho do paciente (2º "check"). */
@@ -109,6 +110,21 @@ public class MeuChatController {
     public void confirmarEntrega(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         Chat chat = minhaConversa(jwt, id);
         chatService.marcarEntregue(chat.getId());
+    }
+
+    /**
+     * Remove o id interno do atendente (PK de usuário) das respostas ao paciente:
+     * o app só precisa do NOME do responsável, não do identificador do admin.
+     */
+    private ChatDetalheResponse semResponsavelId(ChatDetalheResponse d) {
+        return new ChatDetalheResponse(d.id(), d.paciente(), d.unidadeSaude(), d.status(),
+                d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.mensagens());
+    }
+
+    private ChatResponse semResponsavelId(ChatResponse c) {
+        return new ChatResponse(c.id(), c.paciente(), c.unidadeSaude(), c.status(), c.statusDescricao(),
+                c.ultimaMensagem(), c.ultimaMensagemDe(), c.ultimaMensagemEm(), c.naoLidas(),
+                c.atualizadoEm(), null, c.responsavelNome());
     }
 
     /** Carrega a conversa garantindo que é do paciente logado (404 caso contrário). */

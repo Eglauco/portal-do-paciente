@@ -120,6 +120,16 @@ export function observarLista(callback: () => void): () => void {
   return inscrever('/topic/chats', () => callback());
 }
 
+/** Observa a troca de atendente responsável (atualiza o nome no cabeçalho ao vivo). */
+export function observarResponsavel(
+  chatId: number | string,
+  callback: (evento: { responsavelId: number | null; responsavelNome: string | null }) => void,
+): () => void {
+  return inscrever(`/topic/chat/${chatId}/responsavel`, (msg) =>
+    callback(JSON.parse(msg.body) as { responsavelId: number | null; responsavelNome: string | null }),
+  );
+}
+
 /** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */
 export function sinalizarDigitando(chatId: number | string, de: Remetente): void {
   const cliente = garantirCliente();

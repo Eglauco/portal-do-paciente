@@ -30,6 +30,9 @@
           }
           <div class="wa__bolha-wrap" [class.wa--dir]="m.remetente === 'UNIDADE'" [class.wa--esq]="m.remetente === 'PACIENTE'">
             <div class="wa__bolha" [class.wa__bolha--unidade]="m.remetente === 'UNIDADE'">
+              @if (m.remetente === 'UNIDADE' && m.atendenteNome) {
+                <span class="wa__atendente">{{ m.atendenteNome }}</span>
+              }
               <span class="wa__texto">{{ m.texto }}</span>
               <span class="wa__rodape">
                 {{ m.enviadaEm | date: 'HH:mm' }}
@@ -53,7 +56,7 @@
                 }
               </span>
             </div>
-            @if (m.remetente === 'UNIDADE' && m.falha && chat.pacienteUsandoApp !== false) {
+            @if (m.remetente === 'UNIDADE' && m.falha && chat.pacienteUsandoApp !== false && souResponsavel()) {
               <button type="button" class="wa__reenviar" (click)="reenviar(m)">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>
                 Não enviada. Reenviar
@@ -70,7 +73,23 @@
           </svg>
           <p>O paciente não está mais utilizando o aplicativo no celular. Não é possível enviar novas mensagens.</p>
         </div>
-      } @else if (chat.status !== 'RESOLVIDO') {
+      } @else if (chat.status === 'RESOLVIDO') {
+        <div class="wa__resolvido">Conversa resolvida — reabra para enviar novas mensagens.</div>
+      } @else if (!souResponsavel()) {
+        <div class="wa__assumir" role="alert" tabindex="-1" #assumirBanner>
+          @if (chat.responsavelId == null) {
+            <p class="wa__assumir-texto">Assuma a conversa para poder responder.</p>
+            <button type="button" class="btn btn--solid" (click)="assumir()" [disabled]="assumindo()">
+              {{ assumindo() ? 'Assumindo…' : 'Assumir conversa' }}
+            </button>
+          } @else {
+            <p class="wa__assumir-texto"><b>{{ chat.responsavelNome }}</b> é responsável por esta conversa.</p>
+            <button type="button" class="btn btn--solid" (click)="assumir()" [disabled]="assumindo()">
+              {{ assumindo() ? 'Transferindo…' : 'Transferir para mim' }}
+            </button>
+          }
+        </div>
+      } @else {
         <div class="wa__input">
           <textarea
             class="wa__campo"
@@ -84,8 +103,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
           </button>
         </div>
-      } @else {
-        <div class="wa__resolvido">Conversa resolvida — reabra para enviar novas mensagens.</div>
       }
     } @else {
       <div class="wa__vazio">
@@ -103,4 +120,36 @@
       </div>
     }
   </div>
+
+  @if (promptAssumir(); as p) {
+    <div class="modal-backdrop" (click)="recusarPrompt()">
+      <div
+        class="modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="assumir-msg"
+        tabindex="-1"
+        #promptDialog
+        (keydown.escape)="recusarPrompt()"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="modal__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />
+          </svg>
+        </div>
+        <p id="assumir-msg" class="modal__message">
+          @if (p.transferir) {
+            {{ p.nome }} está com esta conversa. Deseja transferir a conversa para você?
+          } @else {
+            Deseja assumir conversa?
+          }
+        </p>
+        <div class="modal__actions">
+          <button type="button" class="btn btn--ghost" (click)="recusarPrompt()">Não</button>
+          <button type="button" class="btn btn--solid" (click)="assumir()" [disabled]="assumindo()">Sim</button>
+        </div>
+      </div>
+    </div>
+  }
 </section>

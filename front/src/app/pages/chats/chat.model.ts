@@ -18,6 +18,8 @@ export interface Chat {
   ultimaMensagemEm?: string | null;
   naoLidas: number;
   atualizadoEm: string;
+  responsavelId?: number | null;
+  responsavelNome?: string | null;
 }
 
 export interface Mensagem {
@@ -27,6 +29,8 @@ export interface Mensagem {
   enviadaEm: string;
   lida: boolean;
   entregue: boolean;
+  /** Nome do atendente que enviou (só nas mensagens da unidade). */
+  atendenteNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
   pendente?: boolean;
   /** Só no cliente: o envio falhou depois das retentativas (mostra "reenviar"). */
@@ -52,12 +56,16 @@ export interface ChatDetalhe {
    * (o back é a autoridade e responde 422 quando preciso).
    */
   pacienteUsandoApp?: boolean;
+  /** Atendente responsável pela conversa (só ele pode enviar). null = ninguém assumiu. */
+  responsavelId?: number | null;
+  responsavelNome?: string | null;
   mensagens: Mensagem[];
 }
 
 export interface ChatFiltro {
   pacienteId?: number | null;
   unidadeId?: number | null;
+  responsavelId?: number | null;
   status?: StatusChat | null;
   naoResolvidas?: boolean;
 }

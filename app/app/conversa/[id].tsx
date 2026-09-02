@@ -29,6 +29,7 @@ import {
   observarConexao,
   observarDigitando,
   observarMensagens,
+  observarResponsavel,
   sinalizarDigitando,
 } from '@/services/chat-realtime';
 
@@ -141,10 +142,16 @@ export default function ConversaScreen() {
       setConexao(e);
       setConexaoDetalhe(d);
     });
+    // Atendente assumiu/transferiu: atualiza o nome no cabeçalho ao vivo (sem esperar
+    // um novo foco da tela). null = ninguém responsável no momento.
+    const cancelarResp = observarResponsavel(id, (ev) => {
+      setDetalhe((d) => (d ? { ...d, responsavelNome: ev.responsavelNome } : d));
+    });
     return () => {
       cancelarMsg();
       cancelarDig();
       cancelarConexao();
+      cancelarResp();
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
     };
   }, [id]);
@@ -273,7 +280,9 @@ export default function ConversaScreen() {
             </Text>
           ) : conexao === 'conectado' ? (
             <Text style={styles.contatoStatus} numberOfLines={1}>
-              {detalhe?.statusDescricao ?? 'Carregando…'}
+              {detalhe?.responsavelNome
+                ? `com ${detalhe.responsavelNome}`
+                : (detalhe?.statusDescricao ?? 'Carregando…')}
             </Text>
           ) : (
             <Text style={styles.contatoStatus} numberOfLines={1}>
@@ -322,6 +331,9 @@ export default function ConversaScreen() {
                   )}
                   <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
                     <View style={[styles.bolha, daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente]}>
+                      {daUnidade && m.atendenteNome ? (
+                        <Text style={styles.atendente}>{m.atendenteNome}</Text>
+                      ) : null}
                       <Text style={styles.texto}>{m.texto}</Text>
                       <View style={styles.rodape}>
                         <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
@@ -440,6 +452,7 @@ const styles = StyleSheet.create({
     borderColor: Brand.line,
   },
   bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
+  atendente: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep, marginBottom: 2 },
   texto: { fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
   hora: { fontSize: 10.5, color: '#7C8C87' },

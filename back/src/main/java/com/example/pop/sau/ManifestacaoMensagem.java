@@ -13,6 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import com.example.pop.usuario.Usuario;
+
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -42,12 +45,9 @@ public class ManifestacaoMensagem {
     private AutorManifestacao autor;
 
     /** Admin que respondeu (quando autor = SAU); nulo nas mensagens do paciente. */
-    @Column(name = "usuario_id")
-    private Long usuarioId;
-
-    /** Nome do admin no momento da resposta (auditoria estável mesmo se o usuário mudar). */
-    @Column(name = "usuario_nome", length = 160)
-    private String usuarioNome;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;

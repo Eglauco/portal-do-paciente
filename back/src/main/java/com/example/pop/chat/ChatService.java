@@ -18,6 +18,8 @@ import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.push.PushService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
+import com.example.pop.usuario.Usuario;
+import com.example.pop.usuario.UsuarioRepository;
 
 /**
  * Regras e mapeamentos de chat compartilhados entre o lado da unidade
@@ -30,16 +32,18 @@ public class ChatService {
     private final MensagemRepository mensagemRepository;
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
+    private final UsuarioRepository usuarioRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
-            SimpMessagingTemplate messagingTemplate, PushService pushService) {
+            UsuarioRepository usuarioRepository, SimpMessagingTemplate messagingTemplate, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
+        this.usuarioRepository = usuarioRepository;
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
     }
@@ -108,7 +112,7 @@ public class ChatService {
         if (jaEnviada(chat.getId(), clienteId)) {
             return chat; // idempotente: reenvio da mesma mensagem não duplica
         }
-        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false);
+        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null);
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
@@ -119,10 +123,22 @@ public class ChatService {
         return chat;
     }
 
-    /** Registra uma mensagem da unidade (operador), publica e notifica o paciente. */
-    public Chat enviarComoUnidade(Chat chat, String texto, String clienteId) {
+    /**
+     * Registra uma mensagem da unidade (atendente), publica e notifica o paciente.
+     * Só o atendente RESPONSÁVEL pela conversa pode enviar (regra "assumir conversa").
+     */
+    public Chat enviarComoUnidade(Chat chat, String texto, String clienteId, Long usuarioId) {
         if (jaEnviada(chat.getId(), clienteId)) {
             return chat; // idempotente: mensagem já entregue quando o paciente ainda usava o app
+        }
+        // Regra "assumir conversa": só o responsável envia.
+        Usuario responsavel = chat.getResponsavel();
+        if (responsavel == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Assuma a conversa para poder responder.");
+        }
+        if (!responsavel.getId().equals(usuarioId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "O usuário " + responsavel.getNome() + " é responsável pela conversa.");
         }
         // Paciente deixou de usar o app (sessão revogada/trocou de aparelho): a
         // mensagem não chegaria a ninguém — bloqueia o envio da unidade.
@@ -131,7 +147,8 @@ public class ChatService {
                     "O paciente não está mais utilizando o aplicativo no celular.");
         }
         marcarMensagensDoPacienteComoLidas(chat.getId());
-        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true);
+        // O remetente é o próprio responsável (garantido pelo guard acima).
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel);
 
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
         chat.setAtualizadoEm(LocalDateTime.now());
@@ -143,16 +160,38 @@ public class ChatService {
         return chat;
     }
 
+    /**
+     * O atendente assume (ou transfere para si) a conversa: passa a ser o único
+     * que pode enviar. Publica a troca em tempo real para bloquear o anterior na
+     * hora e para as listas/telas refletirem o novo responsável.
+     */
+    public Chat assumir(Chat chat, Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado"));
+        chat.setResponsavel(usuario);
+        chat.setStatus(StatusChat.EM_ATENDIMENTO);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        Chat salvo = repository.save(chat);
+        ResponsavelEvento evento = new ResponsavelEvento(salvo.getId(), usuario.getId(), usuario.getNome());
+        aposCommit(() -> {
+            messagingTemplate.convertAndSend("/topic/chat/" + salvo.getId() + "/responsavel", evento);
+            messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(salvo.getId()));
+        });
+        return salvo;
+    }
+
     /** true se já existe uma mensagem com este clienteId no chat (evita duplicar em reenvios). */
     private boolean jaEnviada(Long chatId, String clienteId) {
         return clienteId != null && !clienteId.isBlank()
                 && mensagemRepository.findByChatIdAndClienteId(chatId, clienteId).isPresent();
     }
 
-    private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida) {
+    private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida,
+            Usuario usuario) {
         Mensagem mensagem = new Mensagem();
         mensagem.setChat(chat);
         mensagem.setRemetente(remetente);
+        mensagem.setUsuario(usuario);
         mensagem.setTexto(texto.trim());
         mensagem.setEnviadaEm(LocalDateTime.now());
         mensagem.setLida(lida);
@@ -234,7 +273,9 @@ public class ChatService {
                 ultima != null ? ultima.getRemetente() : null,
                 ultima != null ? ultima.getEnviadaEm() : null,
                 naoLidas,
-                chat.getAtualizadoEm());
+                chat.getAtualizadoEm(),
+                chat.getResponsavel() != null ? chat.getResponsavel().getId() : null,
+                chat.getResponsavel() != null ? chat.getResponsavel().getNome() : null);
     }
 
     public ChatDetalheResponse toDetalhe(Chat chat) {
@@ -248,10 +289,16 @@ public class ChatService {
                 chat.getStatus(),
                 chat.getStatus().getDescricao(),
                 pacienteUsandoApp(chat.getPaciente()),
+                chat.getResponsavel() != null ? chat.getResponsavel().getId() : null,
+                chat.getResponsavel() != null ? chat.getResponsavel().getNome() : null,
                 mensagens);
     }
 
     /** Sinal leve para as telas de lista recarregarem. */
     public record ChatEvento(Long chatId) {
+    }
+
+    /** Evento de troca de responsável (bloqueia o atendente anterior em tempo real). */
+    public record ResponsavelEvento(Long chatId, Long responsavelId, String responsavelNome) {
     }
 }

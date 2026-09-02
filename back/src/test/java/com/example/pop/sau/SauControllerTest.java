@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -63,11 +64,15 @@ class SauControllerTest {
     private Long outroTipoId;
     private Jwt jwt;
 
-    /** Token de admin com uid (usuário real, respeita a FK) + nome (auditoria). */
+    /** Usuário (atendente) usado nos testes: o de menor id (determinístico mesmo com o banco compartilhado). */
+    private com.example.pop.usuario.Usuario atendente() {
+        return usuarioRepository.findAll(Sort.by("id")).get(0);
+    }
+
+    /** Token de admin com o uid do atendente. O nome agora vem da relação; o claim é só compat. */
     private Jwt adminJwt() {
-        Long uid = usuarioRepository.findAll().get(0).getId();
         return Jwt.withTokenValue("t").header("alg", "none")
-                .claim("uid", uid).claim("nome", NOME_ATENDENTE).build();
+                .claim("uid", atendente().getId()).claim("nome", NOME_ATENDENTE).build();
     }
 
     @BeforeEach
@@ -133,7 +138,8 @@ class SauControllerTest {
         assertEquals(2, respondida.mensagens().size());
         MensagemSauResponse doSau = respondida.mensagens().get(1);
         assertEquals(AutorManifestacao.SAU, doSau.autor());
-        assertEquals(NOME_ATENDENTE, doSau.autorNome());
+        // O nome agora vem da relação com `usuario` (mesmo atendente que o adminJwt usa), não do claim.
+        assertEquals(atendente().getNome(), doSau.autorNome());
 
         // Para o paciente, a mensagem do SAU aparece como "Atendimento SAU" (não vaza o atendente).
         ManifestacaoDetalheResponse visaoPaciente = meuController.buscar(jwt, id);

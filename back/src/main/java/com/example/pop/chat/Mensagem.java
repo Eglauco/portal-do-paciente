@@ -13,6 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+
+import com.example.pop.usuario.Usuario;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,6 +40,11 @@ public class Mensagem {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private RemetenteMensagem remetente;
+
+    /** Atendente que enviou (quando remetente = UNIDADE); nulo nas mensagens do paciente. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;

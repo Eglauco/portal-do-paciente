@@ -2,8 +2,11 @@ package com.example.pop.chat;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.DynamicUpdate;
+
 import com.example.pop.paciente.Paciente;
 import com.example.pop.unidade.Unidade;
+import com.example.pop.usuario.Usuario;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,6 +26,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+// @DynamicUpdate: cada UPDATE só grava as colunas que ESTA transação alterou.
+// Sem isso, um envio concorrente (que não mexe em responsavel_id) regravaria a
+// linha inteira e sobrescreveria um "assumir" já committado por outro atendente,
+// revertendo o responsável (lost update). Como o chat ao vivo é livre (não é o
+// fluxo por turnos do SAU), evitamos @Version para não recusar envios simultâneos.
+@DynamicUpdate
 @Table(name = "chat", uniqueConstraints = @UniqueConstraint(
         name = "uk_chat_paciente_unidade", columnNames = { "paciente_id", "unidade_id" }))
 @Getter
@@ -46,6 +55,11 @@ public class Chat {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private StatusChat status;
+
+    /** Admin (atendente) que assumiu a conversa; só ele pode enviar. Nulo = sem responsável. */
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "responsavel_id")
+    private Usuario responsavel;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;

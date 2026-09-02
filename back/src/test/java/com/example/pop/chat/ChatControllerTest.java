@@ -11,12 +11,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.unidade.UnidadeRepository;
+import com.example.pop.usuario.Usuario;
+import com.example.pop.usuario.UsuarioRepository;
 
 @SpringBootTest
 class ChatControllerTest {
@@ -31,9 +34,29 @@ class ChatControllerTest {
     private PacienteRepository pacienteRepository;
     @Autowired
     private UnidadeRepository unidadeRepository;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     private Long unidadeQualquer() {
         return unidadeRepository.findAll().get(0).getId();
+    }
+
+    /** Cria um usuário (atendente) real — responsavel_id/usuario_id têm FK para `usuario`. */
+    private Usuario usuarioSalvo(String nome) {
+        Usuario u = new Usuario();
+        u.setNome(nome);
+        u.setEmail("atendente-" + java.util.UUID.randomUUID() + "@teste.com");
+        return usuarioRepository.save(u);
+    }
+
+    /** Token de admin (atendente) com o uid + nome do usuário. O nome vem da relação; o claim é só auditoria. */
+    private Jwt adminJwt(long uid, String nome) {
+        return Jwt.withTokenValue("t").header("alg", "none").claim("uid", uid).claim("nome", nome).build();
+    }
+
+    /** Atalho: cria o usuário e devolve o token com o id real dele. */
+    private Jwt adminJwt(Usuario u) {
+        return adminJwt(u.getId(), u.getNome());
     }
 
     /** Cria um paciente novo (nome único) com a sessão do app no estado indicado. */
@@ -54,7 +77,7 @@ class ChatControllerTest {
 
     @Test
     void listaChatsSemeados() {
-        Pagina<ChatResponse> pagina = controller.listar(null, null, null, false, 0, 50);
+        Pagina<ChatResponse> pagina = controller.listar(null, null, null, null, false, 0, 50);
         assertTrue(pagina.totalElements() >= 8, "esperado ao menos os chats semeados");
     }
 
@@ -63,7 +86,7 @@ class ChatControllerTest {
         // Garante o cenário: paciente envia e o chat fica NAO_LIDA (independe do seed).
         controller.enviarComoPaciente(2L, new MensagemRequest("Tenho uma dúvida sobre o resultado.", null));
 
-        Pagina<ChatResponse> pagina = controller.listar(null, null, StatusChat.NAO_LIDA, false, 0, 50);
+        Pagina<ChatResponse> pagina = controller.listar(null, null, null, StatusChat.NAO_LIDA, false, 0, 50);
         assertTrue(pagina.totalElements() >= 1);
         assertTrue(pagina.content().stream().allMatch(c -> c.status() == StatusChat.NAO_LIDA));
         assertTrue(pagina.content().stream().anyMatch(c -> c.naoLidas() > 0));
@@ -71,7 +94,7 @@ class ChatControllerTest {
 
     @Test
     void naoResolvidasNaoTrazResolvidos() {
-        Pagina<ChatResponse> pagina = controller.listar(null, null, null, true, 0, 50);
+        Pagina<ChatResponse> pagina = controller.listar(null, null, null, null, true, 0, 50);
         assertFalse(pagina.content().isEmpty());
         assertTrue(pagina.content().stream().noneMatch(c -> c.status() == StatusChat.RESOLVIDO));
     }
@@ -91,7 +114,9 @@ class ChatControllerTest {
     void marcarEntregueMarcaMensagensDaUnidade() {
         // Conversa nova com paciente usando o app (a unidade só pode enviar nesse caso).
         Long chatId = novaConversaComAppAtivo();
-        controller.enviar(chatId, new MensagemRequest("Resposta da unidade", null));
+        Jwt jwt = adminJwt(usuarioSalvo("Atendente A"));
+        controller.assumir(chatId, jwt);
+        controller.enviar(chatId, new MensagemRequest("Resposta da unidade", null), jwt);
 
         chatService.marcarEntregue(chatId);
 
@@ -106,6 +131,8 @@ class ChatControllerTest {
         Long unidadeId = unidadeQualquer();
         Long pacienteId = salvarPaciente(true, "dev-" + java.util.UUID.randomUUID()).getId();
         Long chatId = controller.abrir(new AbrirConversaRequest(pacienteId, unidadeId)).getBody().id();
+        Jwt jwt = adminJwt(usuarioSalvo("Atendente A"));
+        controller.assumir(chatId, jwt);
 
         // O paciente deixa de usar o app (sessão revogada / trocou de aparelho).
         Paciente p = pacienteRepository.findById(pacienteId).orElseThrow();
@@ -114,7 +141,7 @@ class ChatControllerTest {
 
         // A unidade não consegue mais enviar (422)...
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> controller.enviar(chatId, new MensagemRequest("Você está aí?", null)));
+                () -> controller.enviar(chatId, new MensagemRequest("Você está aí?", null), jwt));
         assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, ex.getStatusCode());
 
         // ...e o detalhe informa o bloqueio para a tela mostrar o aviso fixo.
@@ -183,5 +210,69 @@ class ChatControllerTest {
         assertEquals(RemetenteMensagem.PACIENTE, ultima.remetente());
         assertFalse(ultima.lida());
         assertEquals(StatusChat.NAO_LIDA, depois.status());
+    }
+
+    @Test
+    void enviarSemAssumirBloqueia() {
+        Long chatId = novaConversaComAppAtivo();
+        Jwt jwt = adminJwt(usuarioSalvo("Atendente A"));
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.enviar(chatId, new MensagemRequest("oi", null), jwt));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+    }
+
+    @Test
+    void assumirRegistraResponsavelEAtribuiMensagem() {
+        Long chatId = novaConversaComAppAtivo();
+        Usuario atendente = usuarioSalvo("Atendente A");
+        Jwt a = adminJwt(atendente);
+        ChatDetalheResponse aposAssumir = controller.assumir(chatId, a).getBody();
+        assertNotNull(aposAssumir);
+        assertEquals(atendente.getId(), aposAssumir.responsavelId());
+        assertEquals("Atendente A", aposAssumir.responsavelNome());
+
+        ChatDetalheResponse aposEnviar = controller.enviar(chatId, new MensagemRequest("Olá!", null), a).getBody();
+        MensagemResponse ultima = aposEnviar.mensagens().get(aposEnviar.mensagens().size() - 1);
+        assertEquals(RemetenteMensagem.UNIDADE, ultima.remetente());
+        assertEquals("Atendente A", ultima.atendenteNome());
+    }
+
+    @Test
+    void outroAtendenteSoEnviaAposTransferir() {
+        Long chatId = novaConversaComAppAtivo();
+        Jwt a = adminJwt(usuarioSalvo("Atendente A"));
+        Jwt b = adminJwt(usuarioSalvo("Atendente B"));
+        controller.assumir(chatId, a);
+
+        // B não é responsável: 409 citando o responsável atual.
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.enviar(chatId, new MensagemRequest("posso responder?", null), b));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Atendente A"));
+
+        // B transfere para si e passa a enviar; A não consegue mais.
+        controller.assumir(chatId, b);
+        controller.enviar(chatId, new MensagemRequest("assumido", null), b);
+        ResponseStatusException exA = assertThrows(ResponseStatusException.class,
+                () -> controller.enviar(chatId, new MensagemRequest("voltei", null), a));
+        assertEquals(HttpStatus.CONFLICT, exA.getStatusCode());
+        assertTrue(exA.getReason().contains("Atendente B"));
+    }
+
+    @Test
+    void filtraPorResponsavel() {
+        Long chatId = novaConversaComAppAtivo();
+        Usuario resp = usuarioSalvo("Atendente Filtro");
+        controller.assumir(chatId, adminJwt(resp));
+
+        // Filtrando pelo responsável: a conversa aparece e todas são desse responsável.
+        Pagina<ChatResponse> doResponsavel = controller.listar(null, null, resp.getId(), null, false, 0, 50);
+        assertTrue(doResponsavel.content().stream().anyMatch(c -> c.id().equals(chatId)));
+        assertTrue(doResponsavel.content().stream()
+                .allMatch(c -> c.responsavelId() != null && c.responsavelId().equals(resp.getId())));
+
+        // Filtrando por outro responsável: a conversa não aparece.
+        Pagina<ChatResponse> deOutro = controller.listar(null, null, resp.getId() + 999_999, null, false, 0, 50);
+        assertTrue(deOutro.content().stream().noneMatch(c -> c.id().equals(chatId)));
     }
 }

@@ -1696,6 +1696,11 @@
 .convo__hora { font-size: 0.72rem; color: var(--muted); flex-shrink: 0; }
 .convo__meta { display: flex; align-items: center; gap: 8px; }
 .convo__unidade { font-size: 0.78rem; color: var(--muted); }
+.convo__resp { display: inline-flex; align-items: center; gap: 4px; min-width: 0; font-size: 0.78rem; font-weight: 600; color: var(--brand-deep); }
+.convo__resp svg { width: 13px; height: 13px; stroke: currentColor; fill: none; flex-shrink: 0; }
+.convo__resp span, .convo__resp { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convo__resp--vazio { font-weight: 500; font-style: italic; color: var(--muted); }
+.convo__meta > .status-pill { margin-left: auto; flex-shrink: 0; }
 .convo__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .convo__previa { font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .convo__voce { color: #40514c; font-weight: 600; }
@@ -1771,6 +1776,14 @@
 .wa__enviar svg { width: 1.15rem; height: 1.15rem; stroke: currentColor; }
 .wa__enviar:disabled { opacity: 0.6; cursor: default; }
 .wa__resolvido { padding: 16px; text-align: center; font-size: 0.9rem; color: var(--muted); background: var(--surface); border-top: 1px solid var(--line); }
+
+/* Nome do atendente que enviou a mensagem (bolha da unidade). */
+.wa__atendente { display: block; font-size: 11px; font-weight: 700; color: var(--brand-deep); margin-bottom: 2px; }
+
+/* Faixa "assuma/transfira" no rodapé quando não sou o responsável. */
+.wa__assumir { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 16px; text-align: center; background: var(--surface); border-top: 1px solid var(--line); }
+.wa__assumir-texto { margin: 0; font-size: 0.9rem; color: var(--ink); line-height: 1.4; }
+.wa__assumir-texto b { color: var(--brand-deep); }
 
 /* Envio bloqueado: paciente não usa mais o app (aviso fixo no lugar do campo). */
 .wa__bloqueio {

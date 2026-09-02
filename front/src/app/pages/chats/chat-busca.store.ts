@@ -7,6 +7,7 @@ import { ChatService } from './chat.service';
 export class ChatBuscaStore {
   pacienteId: number | null = null;
   unidadeId: number | null = null;
+  responsavelId: number | null = null;
   status: StatusChat | null = null;
   naoResolvidas = false;
   page = 0;
@@ -15,6 +16,7 @@ export class ChatBuscaStore {
   limpar(): void {
     this.pacienteId = null;
     this.unidadeId = null;
+    this.responsavelId = null;
     this.status = null;
     this.naoResolvidas = false;
     this.page = 0;

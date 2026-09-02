@@ -14,6 +14,8 @@ import com.example.pop.paciente.Paciente;
 import com.example.pop.push.PushService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
+import com.example.pop.usuario.Usuario;
+import com.example.pop.usuario.UsuarioRepository;
 
 /**
  * Regras do SAU (Serviço de Atendimento ao Usuário): abertura de manifestações,
@@ -27,14 +29,17 @@ public class SauService {
     private final ManifestacaoMensagemRepository mensagemRepository;
     private final UnidadeRepository unidadeRepository;
     private final TipoManifestacaoRepository tipoRepository;
+    private final UsuarioRepository usuarioRepository;
     private final PushService pushService;
 
     public SauService(ManifestacaoRepository repository, ManifestacaoMensagemRepository mensagemRepository,
-            UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository, PushService pushService) {
+            UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
+            UsuarioRepository usuarioRepository, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.unidadeRepository = unidadeRepository;
         this.tipoRepository = tipoRepository;
+        this.usuarioRepository = usuarioRepository;
         this.pushService = pushService;
     }
 
@@ -55,7 +60,7 @@ public class SauService {
         m.setCriadoEm(agora);
         m.setAtualizadoEm(agora);
         repository.save(m);
-        criarMensagem(m, AutorManifestacao.PACIENTE, null, null, texto);
+        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto);
         return m;
     }
 
@@ -69,7 +74,7 @@ public class SauService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Aguarde a resposta do SAU antes de enviar outra mensagem.");
         }
-        criarMensagem(m, AutorManifestacao.PACIENTE, null, null, texto);
+        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto);
         m.setStatus(StatusManifestacao.AGUARDANDO_SAU);
         m.setAtualizadoEm(LocalDateTime.now());
         return salvarComVersao(m);
@@ -80,14 +85,16 @@ public class SauService {
      * ("aguardando SAU"). Fora disso — aguardando o paciente ou fechada — 409.
      * Ao responder, status vai para "aguardando paciente" e o paciente é notificado.
      */
-    public Manifestacao responderComoSau(Manifestacao m, Long usuarioId, String usuarioNome, String texto) {
+    public Manifestacao responderComoSau(Manifestacao m, Long usuarioId, String texto) {
         if (m.getStatus() != StatusManifestacao.AGUARDANDO_SAU) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     m.getStatus() == StatusManifestacao.FECHADA
                             ? "Manifestação fechada. Somente o paciente pode reabrir."
                             : "Aguarde a resposta do paciente antes de enviar outra mensagem.");
         }
-        criarMensagem(m, AutorManifestacao.SAU, usuarioId, usuarioNome, texto);
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado"));
+        criarMensagem(m, AutorManifestacao.SAU, usuario, texto);
         m.setStatus(StatusManifestacao.AGUARDANDO_PACIENTE);
         m.setAtualizadoEm(LocalDateTime.now());
         // Grava (checando a versão) ANTES do push: se perder a corrida, dá 409 e
@@ -123,13 +130,11 @@ public class SauService {
         }
     }
 
-    private void criarMensagem(Manifestacao m, AutorManifestacao autor, Long usuarioId, String usuarioNome,
-            String texto) {
+    private void criarMensagem(Manifestacao m, AutorManifestacao autor, Usuario usuario, String texto) {
         ManifestacaoMensagem msg = new ManifestacaoMensagem();
         msg.setManifestacao(m);
         msg.setAutor(autor);
-        msg.setUsuarioId(usuarioId);
-        msg.setUsuarioNome(usuarioNome);
+        msg.setUsuario(usuario);
         msg.setTexto(texto.trim());
         msg.setCriadoEm(LocalDateTime.now());
         mensagemRepository.save(msg);
@@ -167,7 +172,7 @@ public class SauService {
     private MensagemSauResponse toMensagem(Manifestacao m, ManifestacaoMensagem msg, boolean revelarAtendente) {
         String autorNome;
         if (msg.getAutor() == AutorManifestacao.SAU) {
-            autorNome = revelarAtendente && msg.getUsuarioNome() != null ? msg.getUsuarioNome() : "Atendimento SAU";
+            autorNome = revelarAtendente && msg.getUsuario() != null ? msg.getUsuario().getNome() : "Atendimento SAU";
         } else {
             autorNome = m.getPaciente().getNome();
         }

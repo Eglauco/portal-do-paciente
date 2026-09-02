@@ -29,6 +29,8 @@ export interface Mensagem {
   enviadaEm: string;
   lida: boolean;
   entregue: boolean;
+  /** Nome do atendente que enviou (só nas mensagens da unidade). */
+  atendenteNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
   pendente?: boolean;
   /** Só no cliente: o envio falhou depois das retentativas (mostra "reenviar"). */
@@ -48,6 +50,8 @@ export interface ChatDetalhe {
   unidadeSaude: Ref;
   status: StatusChat;
   statusDescricao: string;
+  /** Atendente responsável no momento (mostrado no cabeçalho da conversa). */
+  responsavelNome?: string | null;
   mensagens: Mensagem[];
 }
 

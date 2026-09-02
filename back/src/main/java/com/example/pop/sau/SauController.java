@@ -68,8 +68,7 @@ public class SauController {
     @Transactional
     public ManifestacaoDetalheResponse responder(@PathVariable Long id,
             @Valid @RequestBody MensagemSauRequest request, @AuthenticationPrincipal Jwt jwt) {
-        Manifestacao m = sauService.responderComoSau(obter(id), uidDoToken(jwt), jwt.getClaimAsString("nome"),
-                request.texto());
+        Manifestacao m = sauService.responderComoSau(obter(id), uidDoToken(jwt), request.texto());
         return sauService.toDetalhe(m, true);
     }
 

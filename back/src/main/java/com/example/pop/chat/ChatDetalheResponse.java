@@ -12,5 +12,8 @@ public record ChatDetalheResponse(
         StatusChat status,
         String statusDescricao,
         boolean pacienteUsandoApp,
+        /** Atendente responsável pela conversa (nulo = ninguém assumiu). */
+        Long responsavelId,
+        String responsavelNome,
         List<MensagemResponse> mensagens) {
 }
