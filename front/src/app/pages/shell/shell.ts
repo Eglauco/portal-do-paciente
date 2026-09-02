@@ -17,6 +17,9 @@ export class Shell {
   protected readonly unidadeNome = this.auth.unidadeNome;
   protected readonly unidadeAtualId = this.auth.unidadeId;
 
+  /** Submenu "Dashboard" (aberto por padrão para ser descoberto). */
+  protected readonly menuDashAberto = signal(true);
+
   protected readonly menuUnidadeAberto = signal(false);
   protected readonly carregandoUnidades = signal(false);
   protected readonly trocandoUnidade = signal(false);

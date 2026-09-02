@@ -27,7 +27,8 @@
             ],
             "styles": [
               "src/styles.css",
-              "src/styles/admin.css"
+              "src/styles/admin.css",
+              "src/styles/dashboards.css"
             ],
             "server": "src/main.server.ts",
             "outputMode": "server",

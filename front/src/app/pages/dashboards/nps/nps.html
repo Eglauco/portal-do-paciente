@@ -1,0 +1,65 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Dashboard · NPS</h1>
+      <p class="page-sub">{{ unidade() ?? 'Todas as unidades' }} · últimos {{ dias() }} dias</p>
+    </div>
+    <dash-periodo [dias]="dias()" (diasChange)="mudarPeriodo($event)" />
+  </header>
+
+  @if (carregando() && !dados()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando indicadores…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar</h2>
+      <button type="button" class="btn btn--solid" (click)="recarregar()">Tentar novamente</button>
+    </div>
+  } @else if (dados(); as d) {
+    <div class="stat-grid">
+      <dash-stat rotulo="Média geral" [valor]="media(d.mediaGeral)" [sub]="'de 1 a 5 estrelas'" tom="teal" />
+      <dash-stat rotulo="Taxa de resposta" [valor]="d.taxaResposta + '%'"
+        [sub]="d.respondidos + ' de ' + d.gerados" tom="green" />
+      <dash-stat rotulo="Avaliações geradas" [valor]="d.gerados" [sub]="'últimos ' + d.dias + ' dias'"
+        [delta]="delta(d.gerados, d.anterior)" tom="blue" />
+      <dash-stat rotulo="Satisfeitos" [valor]="d.satisfeitos" [sub]="'nota média 4–5'" tom="green" />
+      <dash-stat rotulo="Pendentes" [valor]="d.pendentes" [sub]="'aguardando resposta'" tom="amber" />
+      <dash-stat rotulo="Expirados" [valor]="d.expirados" [sub]="'sem resposta a tempo'" tom="red" />
+    </div>
+
+    <div class="dash-grid">
+      <div class="pnl g-8">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Avaliações geradas por dia</h2>
+          <span class="pnl__hint">últimos {{ d.dias }} dias</span>
+        </div>
+        <div class="pnl__body"><dash-line [pontos]="d.avaliacoesPorDia" cor="#7b61ff" /></div>
+      </div>
+      <div class="pnl g-4">
+        <div class="pnl__head"><h2 class="pnl__title">Situação das avaliações</h2></div>
+        <div class="pnl__body"><dash-donut [fatias]="d.porStatus" /></div>
+      </div>
+
+      <div class="pnl g-6">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Média por categoria</h2>
+          <span class="pnl__hint">1 a 5</span>
+        </div>
+        <div class="pnl__body">
+          <dash-bars [itens]="categoriaItens(d)" [escalaMax]="5" [decimais]="1" sufixo=" ★" cor="#159a8a" />
+        </div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head"><h2 class="pnl__title">Distribuição das notas</h2></div>
+        <div class="pnl__body"><dash-bars [itens]="d.distribuicaoNotas" cor="#f0a824" /></div>
+      </div>
+      <div class="pnl g-12">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Satisfação</h2>
+          <span class="pnl__hint">pela média de cada avaliação</span>
+        </div>
+        <div class="pnl__body"><dash-donut [fatias]="satisfacaoFatias(d)" /></div>
+      </div>
+    </div>
+  }
+</section>

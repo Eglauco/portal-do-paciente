@@ -1,0 +1,66 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Dashboard · Agendamentos</h1>
+      <p class="page-sub">{{ unidade() ?? 'Todas as unidades' }} · últimos {{ dias() }} dias</p>
+    </div>
+    <dash-periodo [dias]="dias()" (diasChange)="mudarPeriodo($event)" />
+  </header>
+
+  @if (carregando() && !dados()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando indicadores…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar</h2>
+      <button type="button" class="btn btn--solid" (click)="recarregar()">Tentar novamente</button>
+    </div>
+  } @else if (dados(); as d) {
+    <div class="stat-grid">
+      <dash-stat rotulo="Total no período" [valor]="d.total" [sub]="'últimos ' + d.dias + ' dias'"
+        [delta]="delta(d.total, d.anterior)" tom="teal" />
+      <dash-stat rotulo="Comparecimento" [valor]="d.taxaComparecimento + '%'"
+        [sub]="d.presencas + ' presenças · ' + d.faltas + ' faltas'" tom="green" />
+      <dash-stat rotulo="Taxa de confirmação" [valor]="d.taxaConfirmacao + '%'"
+        [sub]="d.confirmados + ' confirmados'" tom="blue" />
+      <dash-stat rotulo="Taxa de cancelamento" [valor]="d.taxaCancelamento + '%'"
+        [sub]="(d.canceladosUnidade + d.canceladosPaciente) + ' cancelados'" tom="red" />
+      <dash-stat rotulo="Aguardando confirmação" [valor]="d.aguardando" [sub]="'do paciente'" tom="amber" />
+      <dash-stat rotulo="Próximos 7 dias" [valor]="d.proximos7Dias" [sub]="'agendamentos futuros'" tom="violet" />
+    </div>
+
+    <div class="dash-grid">
+      <div class="pnl g-8">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Agendamentos por dia</h2>
+          <span class="pnl__hint">últimos {{ d.dias }} dias</span>
+        </div>
+        <div class="pnl__body"><dash-line [pontos]="d.porDia" /></div>
+      </div>
+      <div class="pnl g-4">
+        <div class="pnl__head"><h2 class="pnl__title">Por situação</h2></div>
+        <div class="pnl__body"><dash-donut [fatias]="d.porStatus" /></div>
+      </div>
+
+      <div class="pnl g-6">
+        <div class="pnl__head"><h2 class="pnl__title">Procedimentos mais agendados</h2></div>
+        <div class="pnl__body"><dash-bars [itens]="d.topProcedimentos" cor="#159a8a" /></div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head"><h2 class="pnl__title">Profissionais mais requisitados</h2></div>
+        <div class="pnl__body"><dash-bars [itens]="d.topProfissionais" cor="#3f8cff" /></div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head"><h2 class="pnl__title">Por especialidade</h2></div>
+        <div class="pnl__body"><dash-bars [itens]="d.porEspecialidade" cor="#7b61ff" /></div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Motivos de falta</h2>
+          <span class="pnl__hint">faltas justificadas</span>
+        </div>
+        <div class="pnl__body"><dash-bars [itens]="d.motivosFalta" cor="#e0524d" /></div>
+      </div>
+    </div>
+  }
+</section>

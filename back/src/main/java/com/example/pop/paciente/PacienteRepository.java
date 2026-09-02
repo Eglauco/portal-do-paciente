@@ -25,4 +25,10 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
               and lower(p.nome) like lower(concat('%', :nome, '%'))
             """)
     Page<Paciente> search(@Param("id") Long id, @Param("nome") String nome, Pageable pageable);
+
+    /** Pacientes liberados a usar o app (dashboard). */
+    long countByAtivoTrue();
+
+    /** Pacientes com sessão de app amarrada a um aparelho (= usando o app de fato). */
+    long countByDispositivoAtivoIsNotNull();
 }

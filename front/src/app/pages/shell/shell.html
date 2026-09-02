@@ -16,12 +16,32 @@
     <nav class="nav" aria-label="Menu principal">
       <p class="nav__title">Menu</p>
 
-      <a class="nav__link" routerLink="/inicio" routerLinkActive="is-active" ariaCurrentWhenActive="page">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" />
-        </svg>
-        Início
-      </a>
+      <div class="nav__group">
+        <button
+          type="button"
+          class="nav__link nav__parent"
+          [class.is-open]="menuDashAberto()"
+          (click)="menuDashAberto.set(!menuDashAberto())"
+          [attr.aria-expanded]="menuDashAberto()"
+        >
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="8" height="9" rx="1.5" /><rect x="13" y="3" width="8" height="5" rx="1.5" /><rect x="13" y="10" width="8" height="11" rx="1.5" /><rect x="3" y="14" width="8" height="7" rx="1.5" />
+          </svg>
+          Dashboard
+          <svg class="nav__caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        @if (menuDashAberto()) {
+          <div class="nav__sub">
+            <a class="nav__sublink" routerLink="/dashboards/geral" routerLinkActive="is-active" ariaCurrentWhenActive="page">Visão geral</a>
+            <a class="nav__sublink" routerLink="/dashboards/agendamentos" routerLinkActive="is-active" ariaCurrentWhenActive="page">Agendamentos</a>
+            <a class="nav__sublink" routerLink="/dashboards/chats" routerLinkActive="is-active" ariaCurrentWhenActive="page">Chats ao vivo</a>
+            <a class="nav__sublink" routerLink="/dashboards/sau" routerLinkActive="is-active" ariaCurrentWhenActive="page">SAU</a>
+            <a class="nav__sublink" routerLink="/dashboards/nps" routerLinkActive="is-active" ariaCurrentWhenActive="page">NPS</a>
+          </div>
+        }
+      </div>
 
       <a class="nav__link" routerLink="/usuarios" routerLinkActive="is-active" ariaCurrentWhenActive="page">
         <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

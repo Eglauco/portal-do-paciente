@@ -21,10 +21,32 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       {
-        path: 'inicio',
-        loadComponent: () => import('./pages/home/home').then((m) => m.Home),
-        title: 'Início — Portal do Paciente · Admin',
+        path: 'dashboards/geral',
+        loadComponent: () => import('./pages/dashboards/geral/geral').then((m) => m.DashboardGeral),
+        title: 'Dashboard · Visão geral — Portal do Paciente · Admin',
       },
+      {
+        path: 'dashboards/agendamentos',
+        loadComponent: () =>
+          import('./pages/dashboards/agendamentos/agendamentos').then((m) => m.DashboardAgendamentos),
+        title: 'Dashboard · Agendamentos — Portal do Paciente · Admin',
+      },
+      {
+        path: 'dashboards/chats',
+        loadComponent: () => import('./pages/dashboards/chats/chats').then((m) => m.DashboardChats),
+        title: 'Dashboard · Chats ao vivo — Portal do Paciente · Admin',
+      },
+      {
+        path: 'dashboards/sau',
+        loadComponent: () => import('./pages/dashboards/sau/sau').then((m) => m.DashboardSau),
+        title: 'Dashboard · SAU — Portal do Paciente · Admin',
+      },
+      {
+        path: 'dashboards/nps',
+        loadComponent: () => import('./pages/dashboards/nps/nps').then((m) => m.DashboardNps),
+        title: 'Dashboard · NPS — Portal do Paciente · Admin',
+      },
+      { path: 'inicio', redirectTo: 'dashboards/geral', pathMatch: 'full' },
       {
         path: 'usuarios',
         loadComponent: () => import('./pages/usuarios/usuarios-list').then((m) => m.UsuariosList),

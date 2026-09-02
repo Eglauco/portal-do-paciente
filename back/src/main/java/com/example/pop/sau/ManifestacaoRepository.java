@@ -1,5 +1,7 @@
 package com.example.pop.sau;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -31,4 +33,42 @@ public interface ManifestacaoRepository extends JpaRepository<Manifestacao, Long
             @Param("tipoId") Long tipoId,
             @Param("status") StatusManifestacao status,
             Pageable pageable);
+
+    // ===================== Dashboard (agregações) =====================
+
+    @Query("""
+            select count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.criadoEm between :inicio and :fim
+            """)
+    long contarCriadasPeriodo(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Série diária de manifestações criadas (data, quantidade). */
+    @Query("""
+            select cast(m.criadoEm as date), count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.criadoEm between :inicio and :fim
+            group by cast(m.criadoEm as date)
+            """)
+    List<Object[]> serieCriacao(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Retrato ATUAL: todas as manifestações da unidade agrupadas por status. */
+    @Query("""
+            select m.status, count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+            group by m.status
+            """)
+    List<Object[]> agruparPorStatus(@Param("unidadeId") Long unidadeId);
+
+    @Query("""
+            select m.tipo.nome, count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.criadoEm between :inicio and :fim
+            group by m.tipo.id, m.tipo.nome
+            order by count(m) desc, m.tipo.nome asc
+            """)
+    List<Object[]> porTipo(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 }

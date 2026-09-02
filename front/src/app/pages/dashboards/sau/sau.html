@@ -1,0 +1,65 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Dashboard · SAU</h1>
+      <p class="page-sub">{{ unidade() ?? 'Todas as unidades' }} · últimos {{ dias() }} dias</p>
+    </div>
+    <dash-periodo [dias]="dias()" (diasChange)="mudarPeriodo($event)" />
+  </header>
+
+  @if (carregando() && !dados()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando indicadores…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar</h2>
+      <button type="button" class="btn btn--solid" (click)="recarregar()">Tentar novamente</button>
+    </div>
+  } @else if (dados(); as d) {
+    <div class="stat-grid">
+      <dash-stat rotulo="Manifestações no período" [valor]="d.total" [sub]="'últimos ' + d.dias + ' dias'"
+        [delta]="delta(d.total, d.anterior)" tom="teal" />
+      <dash-stat rotulo="Aguardando o SAU" [valor]="d.aguardandoSau" [sub]="'na fila para responder'" tom="amber" />
+      <dash-stat rotulo="Aguardando paciente" [valor]="d.aguardandoPaciente" [sub]="'respondido, aguardando'" tom="blue" />
+      <dash-stat rotulo="Taxa de resolução" [valor]="d.taxaResolucao + '%'" [sub]="d.fechadas + ' fechadas'" tom="green" />
+      <dash-stat rotulo="Em aberto agora" [valor]="d.abertas" [sub]="'não fechadas'" tom="violet" />
+      <dash-stat rotulo="Respostas do SAU" [valor]="d.mensagensSau" [sub]="'mensagens no período'" tom="slate" />
+    </div>
+
+    <div class="dash-grid">
+      <div class="pnl g-8">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Manifestações abertas por dia</h2>
+          <span class="pnl__hint">últimos {{ d.dias }} dias</span>
+        </div>
+        <div class="pnl__body"><dash-line [pontos]="d.porDia" cor="#f0a824" /></div>
+      </div>
+      <div class="pnl g-4">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Situação atual</h2>
+          <span class="pnl__hint">todas</span>
+        </div>
+        <div class="pnl__body"><dash-donut [fatias]="d.porStatus" /></div>
+      </div>
+
+      <div class="pnl g-6">
+        <div class="pnl__head"><h2 class="pnl__title">Por tipo de manifestação</h2></div>
+        <div class="pnl__body"><dash-bars [itens]="d.porTipo" cor="#159a8a" /></div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Quem mais respondeu</h2>
+          <span class="pnl__hint">atendentes do SAU</span>
+        </div>
+        <div class="pnl__body"><dash-bars [itens]="d.cargaPorAtendente" cor="#3f8cff" /></div>
+      </div>
+      <div class="pnl g-12">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Mensagens por autor</h2>
+          <span class="pnl__hint">no período</span>
+        </div>
+        <div class="pnl__body"><dash-bars [itens]="autorItens(d)" cor="#7b61ff" /></div>
+      </div>
+    </div>
+  }
+</section>
