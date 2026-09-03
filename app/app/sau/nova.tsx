@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SelectBusca } from '@/components/select-busca';
 import { Brand } from '@/constants/theme';
 import {
   TipoManifestacao,
@@ -27,6 +28,9 @@ export default function NovaManifestacaoScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [alturaTeclado, setAlturaTeclado] = useState(0);
+  // Enquanto o select de unidade está aberto, o teclado é da busca DELE (em um Modal):
+  // a tela deve ignorá-lo para não reservar espaço nem rolar o formulário de fundo.
+  const selecaoUnidadeAberta = useRef(false);
 
   const [tipos, setTipos] = useState<TipoManifestacao[]>([]);
   const [tipoId, setTipoId] = useState<number | null>(null);
@@ -63,8 +67,14 @@ export default function NovaManifestacaoScreen() {
   // reservamos manualmente a altura do teclado como espaço no fim e rolamos até o
   // campo — garante que a área de escrita nunca fique atrás do teclado.
   useEffect(() => {
-    const aoMostrar = Keyboard.addListener('keyboardDidShow', (e) => setAlturaTeclado(e.endCoordinates.height));
-    const aoEsconder = Keyboard.addListener('keyboardDidHide', () => setAlturaTeclado(0));
+    const aoMostrar = Keyboard.addListener('keyboardDidShow', (e) => {
+      if (selecaoUnidadeAberta.current) return; // teclado da busca do select (Modal): ignora
+      setAlturaTeclado(e.endCoordinates.height);
+    });
+    const aoEsconder = Keyboard.addListener('keyboardDidHide', () => {
+      if (selecaoUnidadeAberta.current) return;
+      setAlturaTeclado(0);
+    });
     return () => {
       aoMostrar.remove();
       aoEsconder.remove();
@@ -168,26 +178,26 @@ export default function NovaManifestacaoScreen() {
 
             {/* Unidade */}
             <Text style={[styles.label, { marginTop: 22 }]}>Unidade</Text>
-            <View style={styles.unidades}>
-              {unidades.map((u) => {
-                const ativo = unidadeId === u.id;
-                return (
-                  <Pressable
-                    key={u.id}
-                    onPress={() => setUnidadeId(u.id)}
-                    style={[styles.unidadeRow, ativo && styles.unidadeRowAtiva]}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: ativo }}>
-                    <Ionicons
-                      name={ativo ? 'radio-button-on' : 'radio-button-off'}
-                      size={20}
-                      color={ativo ? Brand.brand : Brand.muted}
-                    />
-                    <Text style={[styles.unidadeNome, ativo && styles.unidadeNomeAtiva]}>{u.nome}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {unidades.length === 0 ? (
+              <Text style={styles.vazioTxt}>Nenhuma unidade disponível no momento. Fale com a unidade de saúde.</Text>
+            ) : (
+              <SelectBusca
+                itens={unidades}
+                valor={unidadeId}
+                onSelecionar={(id) => {
+                  setUnidadeId(id);
+                  if (erroEnvio) setErroEnvio(null);
+                }}
+                placeholder="Selecione a unidade"
+                rotulo="Selecione a unidade"
+                placeholderBusca="Buscar unidade…"
+                // Uma só unidade já vem selecionada — sem ação extra para o paciente.
+                desabilitado={unidades.length === 1}
+                onAbertoChange={(aberto) => {
+                  selecaoUnidadeAberta.current = aberto;
+                }}
+              />
+            )}
           </>
         )}
 
@@ -274,23 +284,8 @@ const styles = StyleSheet.create({
   tipoRotuloAtivo: { color: Brand.brandDeep },
   tipoDescricao: { fontSize: 12.5, color: Brand.muted },
 
-  unidadesEstado: { paddingVertical: 20, alignItems: 'center' },
   unidadesErro: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: Brand.surface, borderRadius: 12, borderWidth: 1, borderColor: Brand.line },
   unidadesErroTxt: { flex: 1, fontSize: 13, color: Brand.muted },
-  unidades: { gap: 8 },
-  unidadeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
-  },
-  unidadeRowAtiva: { borderColor: Brand.brand, backgroundColor: '#F1FAF7' },
-  unidadeNome: { flex: 1, fontSize: 14.5, color: Brand.ink },
-  unidadeNomeAtiva: { fontWeight: '700', color: Brand.brandDeep },
 
   textarea: {
     minHeight: 130,
