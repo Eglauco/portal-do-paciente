@@ -31,6 +31,7 @@ import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.motivofalta.MotivoFaltaRepository;
 import com.example.pop.nps.NpsService;
@@ -127,7 +128,7 @@ public class AgendamentoController {
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Agendamentos", colunas, dados)
+                ? exportacaoService.pdf("Agendamentos", filtrosAgendamento(status, unidadeId), colunas, dados)
                 : exportacaoService.excel("Agendamentos", colunas, dados);
         String nome = "agendamentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
@@ -135,6 +136,15 @@ public class AgendamentoController {
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosAgendamento(StatusAgendamento status, Long unidadeId) {
+        String unidade = unidadeId == null ? "Todas"
+                : unidadeRepository.findById(unidadeId).map(u -> u.getNome()).orElse("#" + unidadeId);
+        return List.of(
+                new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos"),
+                new FiltroAplicado("Unidade", unidade));
     }
 
     private static List<ColunaExport<Agendamento>> colunasAgendamento() {

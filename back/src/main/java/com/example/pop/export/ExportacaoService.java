@@ -21,6 +21,7 @@ import org.apache.poi.ss.util.WorkbookUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.FontFactory;
@@ -90,8 +91,11 @@ public class ExportacaoService {
         }
     }
 
-    /** PDF em paisagem: título + data de geração + tabela com o cabeçalho repetido nas páginas. */
-    public <T> byte[] pdf(String titulo, List<ColunaExport<T>> colunas, List<T> dados) {
+    /**
+     * PDF em paisagem: título + data de geração + os FILTROS aplicados (para saber o
+     * que estava ativo ao gerar) + tabela com o cabeçalho repetido nas páginas.
+     */
+    public <T> byte[] pdf(String titulo, List<FiltroAplicado> filtros, List<ColunaExport<T>> colunas, List<T> dados) {
         Document doc = new Document(PageSize.A4.rotate(), 24, 24, 28, 24);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
@@ -101,6 +105,19 @@ public class ExportacaoService {
             doc.add(new Paragraph(
                     "Gerado em " + LocalDateTime.now(FUSO).format(GERADO) + " · " + dados.size() + " registro(s)",
                     FontFactory.getFont(FontFactory.HELVETICA, 8, Color.GRAY)));
+
+            if (filtros != null && !filtros.isEmpty()) {
+                doc.add(new Paragraph(" "));
+                doc.add(new Paragraph("Filtros aplicados", FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9)));
+                var fonteRotulo = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8.5f);
+                var fonteValor = FontFactory.getFont(FontFactory.HELVETICA, 8.5f);
+                for (FiltroAplicado f : filtros) {
+                    Paragraph linha = new Paragraph();
+                    linha.add(new Chunk("• " + f.rotulo() + ": ", fonteRotulo));
+                    linha.add(new Chunk(nn(f.valor()), fonteValor));
+                    doc.add(linha);
+                }
+            }
             doc.add(new Paragraph(" "));
 
             if (!colunas.isEmpty()) {

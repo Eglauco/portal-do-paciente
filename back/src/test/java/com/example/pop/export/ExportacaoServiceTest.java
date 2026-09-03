@@ -28,7 +28,7 @@ class ExportacaoServiceTest {
         assertEquals('P', (char) xlsx[0]);
         assertEquals('K', (char) xlsx[1]);
 
-        byte[] pdf = service.pdf("Teste", COLUNAS, dados);
+        byte[] pdf = service.pdf("Teste", List.of(new FiltroAplicado("Status", "Todos")), COLUNAS, dados);
         assertTrue(pdf.length > 0);
         // PDF começa com "%PDF".
         assertEquals('%', (char) pdf[0]);
@@ -38,6 +38,7 @@ class ExportacaoServiceTest {
     @Test
     void geraComListaVazia() {
         assertTrue(service.excel("Vazio", COLUNAS, List.of()).length > 0);
-        assertTrue(service.pdf("Vazio", COLUNAS, List.of()).length > 0);
+        // Sem filtros também deve gerar (branch sem "Filtros aplicados").
+        assertTrue(service.pdf("Vazio", List.of(), COLUNAS, List.of()).length > 0);
     }
 }
