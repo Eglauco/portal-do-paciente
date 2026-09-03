@@ -1,13 +1,18 @@
 package com.example.pop.agendamento;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,6 +29,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
 import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.motivofalta.MotivoFaltaRepository;
 import com.example.pop.nps.NpsService;
@@ -51,11 +58,13 @@ public class AgendamentoController {
     private final MotivoFaltaRepository motivoFaltaRepository;
     private final NpsService npsService;
     private final PushService pushService;
+    private final ExportacaoService exportacaoService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
-            MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService) {
+            MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
+            ExportacaoService exportacaoService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
@@ -65,6 +74,7 @@ public class AgendamentoController {
         this.motivoFaltaRepository = motivoFaltaRepository;
         this.npsService = npsService;
         this.pushService = pushService;
+        this.exportacaoService = exportacaoService;
     }
 
     /**
@@ -95,6 +105,51 @@ public class AgendamentoController {
                 resultado.getTotalPages(),
                 resultado.isFirst(),
                 resultado.isLast());
+    }
+
+    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * Exporta os agendamentos que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Mais recentes primeiro.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) StatusAgendamento status,
+            @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) Long unidadeId) {
+        List<Agendamento> dados = repository.search(status, pacienteId, unidadeId, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Agendamento::getDataHora).reversed())
+                .toList();
+        List<ColunaExport<Agendamento>> colunas = colunasAgendamento();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Agendamentos", colunas, dados)
+                : exportacaoService.excel("Agendamentos", colunas, dados);
+        String nome = "agendamentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
+                .body(arquivo);
+    }
+
+    private static List<ColunaExport<Agendamento>> colunasAgendamento() {
+        return List.of(
+                ColunaExport.de("Data/Hora", a -> a.getDataHora() == null ? "" : a.getDataHora().format(DATA_HORA)),
+                ColunaExport.de("Paciente", a -> a.getPaciente().getNome()),
+                ColunaExport.de("Unidade", a -> a.getUnidadeSaude().getNome()),
+                ColunaExport.de("Especialidade", a -> a.getEspecialidade().getNome()),
+                ColunaExport.de("Profissional", a -> a.getProfissionalSaude().getNome()),
+                ColunaExport.de("Procedimento", a -> a.getProcedimento().getNome()),
+                ColunaExport.de("Status", a -> a.getStatusAgendamento().getDescricao()),
+                ColunaExport.de("Falta justificada", a -> a.getFaltaJustificadaEm() != null ? "Sim" : "Não"),
+                ColunaExport.de("Justificativa", Agendamento::getJustificativaFalta),
+                ColunaExport.de("Motivos da falta",
+                        a -> a.getMotivosFalta().stream().map(MotivoFalta::getMotivo).reduce((x, y) -> x + ", " + y).orElse("")));
     }
 
     @GetMapping("/{id}")

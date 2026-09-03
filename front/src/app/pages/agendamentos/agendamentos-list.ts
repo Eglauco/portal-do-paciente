@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { Agendamento, STATUS_OPTIONS, StatusAgendamento, statusLabel } from './agendamento.model';
 import { AgendamentoBuscaStore } from './agendamento-busca.store';
@@ -18,6 +19,9 @@ export class AgendamentosList {
   private readonly router = inject(Router);
   private readonly store = inject(AgendamentoBuscaStore);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = AgendamentoService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -125,5 +129,30 @@ export class AgendamentosList {
 
   protected editar(agendamento: Agendamento): void {
     this.router.navigate(['/agendamentos', agendamento.id]);
+  }
+
+  /** Exporta os agendamentos dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    this.service.exportar(formato, this.status(), this.auth.unidadeId()).subscribe({
+      next: (blob) => {
+        this.baixar(blob, `agendamentos.${formato}`);
+        this.exportando.set(null);
+      },
+      error: () => {
+        this.exportando.set(null);
+        this.toastr.error('Não foi possível exportar os dados.');
+      },
+    });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 }

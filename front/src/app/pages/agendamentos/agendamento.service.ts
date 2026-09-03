@@ -24,6 +24,18 @@ export class AgendamentoService {
     return this.http.get<Pagina<Agendamento>>(this.base, { params });
   }
 
+  /** Exporta os agendamentos dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    status: StatusAgendamento | null,
+    unidadeId: number | null = null,
+  ): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (status) params = params.set('status', status);
+    if (unidadeId != null) params = params.set('unidadeId', unidadeId);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<Agendamento> {
     return this.http.get<Agendamento>(`${this.base}/${id}`);
   }
