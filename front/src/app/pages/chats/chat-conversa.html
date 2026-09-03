@@ -15,6 +15,14 @@
           }
         </div>
         <span class="status-pill" [attr.data-st]="chat.status">{{ chat.statusDescricao }}</span>
+        <button type="button" class="wa__icone-acao" (click)="abrirLogs()" aria-label="Ver histórico da conversa" title="Histórico">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 8v4l2.5 1.5" />
+          </svg>
+        </button>
+        @if (chat.status !== 'RESOLVIDO' && souResponsavel()) {
+          <button type="button" class="btn btn--ghost wa__acao" (click)="abrirTransferir()">Transferir</button>
+        }
         @if (chat.status === 'RESOLVIDO') {
           <button type="button" class="btn btn--ghost wa__acao" (click)="reabrir()">Reabrir</button>
         } @else {
@@ -84,7 +92,7 @@
             </button>
           } @else {
             <p class="wa__assumir-texto"><b>{{ chat.responsavelNome }}</b> é responsável por esta conversa.</p>
-            <button type="button" class="btn btn--solid" (click)="assumir()" [disabled]="assumindo()">
+            <button type="button" class="btn btn--solid" (click)="confirmarTransferenciaParaMim()" [disabled]="assumindo()">
               {{ assumindo() ? 'Transferindo…' : 'Transferir para mim' }}
             </button>
           }
@@ -121,7 +129,7 @@
     }
   </div>
 
-  @if (promptAssumir(); as p) {
+  @if (perguntarAssumir(); as modo) {
     <div class="modal-backdrop" (click)="recusarPrompt()">
       <div
         class="modal"
@@ -139,8 +147,8 @@
           </svg>
         </div>
         <p id="assumir-msg" class="modal__message">
-          @if (p.transferir) {
-            {{ p.nome }} está com esta conversa. Deseja transferir a conversa para você?
+          @if (modo === 'transferir') {
+            Transferir esta conversa para você? A partir de agora, somente você poderá conversar.
           } @else {
             Deseja assumir conversa?
           }
@@ -148,6 +156,128 @@
         <div class="modal__actions">
           <button type="button" class="btn btn--ghost" (click)="recusarPrompt()">Não</button>
           <button type="button" class="btn btn--solid" (click)="assumir()" [disabled]="assumindo()">Sim</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (mostrarTransferir()) {
+    <div class="modal-backdrop" (click)="fecharTransferir()">
+      <div
+        class="modal modal--lista"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="transf-titulo"
+        tabindex="-1"
+        #transferirDialog
+        (keydown.escape)="fecharTransferir()"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 id="transf-titulo" class="modal__titulo">Transferir conversa</h2>
+
+        @if (usuarioEscolhido(); as sel) {
+          <!-- Etapa 2: confirmação do atendente escolhido -->
+          <div class="transf__confirmar">
+            <span class="convo__avatar convo__avatar--lg">{{ iniciais(sel.nome) }}</span>
+            <p id="transf-confirm-msg" class="modal__message">Transferir esta conversa para <b>{{ sel.nome }}</b>?</p>
+            <p class="transf__confirmar-email">{{ sel.email }}</p>
+          </div>
+          <div class="modal__actions">
+            <button type="button" class="btn btn--ghost" (click)="voltarLista()" [disabled]="transferindo()">Voltar</button>
+            <button
+              #confirmarBtn
+              type="button"
+              class="btn btn--solid"
+              aria-describedby="transf-confirm-msg"
+              (click)="confirmarTransferencia()"
+              [disabled]="transferindo()"
+            >
+              {{ transferindo() ? 'Transferindo…' : 'Transferir' }}
+            </button>
+          </div>
+        } @else {
+          <!-- Etapa 1: escolher o atendente -->
+          <p class="modal__sub">Escolha o atendente que vai assumir esta conversa.</p>
+
+          <input
+            #buscaTransf
+            type="search"
+            class="transf__busca"
+            placeholder="Buscar atendente…"
+            aria-label="Buscar atendente"
+            [value]="filtroTransferir()"
+            (input)="filtroTransferir.set(buscaTransf.value)"
+          />
+
+          @if (carregandoUsuarios()) {
+            <div class="transf__estado"><span class="spinner" aria-hidden="true"></span> Carregando atendentes…</div>
+          } @else if (usuariosFiltrados().length === 0) {
+            <div class="transf__estado">Nenhum atendente encontrado.</div>
+          } @else {
+            <ul class="transf__lista">
+              @for (u of usuariosFiltrados(); track u.id) {
+                <li>
+                  <button type="button" class="transf__item" (click)="selecionarUsuario(u)">
+                    <span class="convo__avatar">{{ iniciais(u.nome) }}</span>
+                    <span class="transf__meta">
+                      <b class="transf__nome">{{ u.nome }}</b>
+                      <span class="transf__email">{{ u.email }}</span>
+                    </span>
+                    <svg class="transf__seta" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <div class="modal__actions">
+            <button type="button" class="btn btn--ghost" (click)="fecharTransferir()">Cancelar</button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (mostrarLogs()) {
+    <div class="modal-backdrop" (click)="fecharLogs()">
+      <div
+        class="modal modal--lista"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logs-titulo"
+        tabindex="-1"
+        #logsDialog
+        (keydown.escape)="fecharLogs()"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 id="logs-titulo" class="modal__titulo">Histórico da conversa</h2>
+        <p class="modal__sub">Auditoria das ações dos atendentes.</p>
+
+        @if (carregandoLogs()) {
+          <div class="transf__estado"><span class="spinner" aria-hidden="true"></span> Carregando histórico…</div>
+        } @else if (erroLogs()) {
+          <div class="transf__estado">Não foi possível carregar o histórico.</div>
+        } @else if (logs().length === 0) {
+          <div class="transf__estado">Nenhum registro ainda nesta conversa.</div>
+        } @else {
+          <ul class="tl">
+            @for (log of logs(); track log.id) {
+              <li class="tl__item">
+                <span class="tl__dot tl__dot--{{ tomLog(log.tipo) }}" aria-hidden="true"></span>
+                <div class="tl__body">
+                  <p class="tl__texto">{{ descreverLog(log) }}</p>
+                  @if (log.statusAnterior && log.statusNovo) {
+                    <span class="tl__status">{{ rotuloStatus(log.statusAnterior) }} → {{ rotuloStatus(log.statusNovo) }}</span>
+                  }
+                  <time class="tl__hora">{{ log.criadoEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+
+        <div class="modal__actions">
+          <button type="button" class="btn btn--ghost" (click)="fecharLogs()">Fechar</button>
         </div>
       </div>
     </div>

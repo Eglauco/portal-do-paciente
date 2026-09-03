@@ -34,10 +34,20 @@ public class ChatController {
 
     private final ChatRepository repository;
     private final ChatService chatService;
+    private final ChatLogService chatLogService;
 
-    public ChatController(ChatRepository repository, ChatService chatService) {
+    public ChatController(ChatRepository repository, ChatService chatService, ChatLogService chatLogService) {
         this.repository = repository;
         this.chatService = chatService;
+        this.chatLogService = chatLogService;
+    }
+
+    /** Linha do tempo de auditoria da conversa (só ações de atendentes). */
+    @GetMapping("/{id}/logs")
+    @Transactional(readOnly = true)
+    public List<ChatLogResponse> logs(@PathVariable Long id) {
+        obter(id); // 404 se a conversa não existe
+        return chatLogService.listar(id);
     }
 
     @GetMapping
@@ -83,13 +93,15 @@ public class ChatController {
     /** Unidade abriu a conversa: marca as mensagens do paciente como lidas. */
     @PostMapping("/{id}/visualizar")
     @Transactional
-    public ResponseEntity<ChatDetalheResponse> visualizar(@PathVariable Long id) {
+    public ResponseEntity<ChatDetalheResponse> visualizar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         Chat chat = obter(id);
+        StatusChat antes = chat.getStatus();
         chatService.marcarMensagensDoPacienteComoLidas(chat.getId());
         if (chat.getStatus() == StatusChat.NAO_LIDA) {
             chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
             repository.save(chat);
         }
+        chatLogService.registrar(chat, TipoLogChat.VISUALIZOU, uidDoToken(jwt), null, antes, chat.getStatus());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
@@ -97,7 +109,28 @@ public class ChatController {
     @PostMapping("/{id}/assumir")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> assumir(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
-        Chat chat = chatService.assumir(obter(id), uidDoToken(jwt));
+        Chat chat = obter(id);
+        StatusChat antes = chat.getStatus();
+        Long uid = uidDoToken(jwt);
+        chat = chatService.assumir(chat, uid);
+        chatLogService.registrar(chat, TipoLogChat.ASSUMIU, uid, null, antes, chat.getStatus());
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
+    }
+
+    /**
+     * Transfere a conversa para outro atendente: o usuário indicado passa a ser o
+     * responsável (e o anterior é bloqueado ao vivo). Reaproveita a mesma regra do
+     * "assumir", só que apontando para o usuário escolhido no corpo da requisição.
+     */
+    @PostMapping("/{id}/transferir")
+    @Transactional
+    public ResponseEntity<ChatDetalheResponse> transferir(@PathVariable Long id,
+            @Valid @RequestBody TransferirRequest request, @AuthenticationPrincipal Jwt jwt) {
+        Chat chat = obter(id);
+        StatusChat antes = chat.getStatus();
+        Long origem = uidDoToken(jwt);
+        chat = chatService.assumir(chat, request.usuarioId());
+        chatLogService.registrar(chat, TipoLogChat.TRANSFERIU, origem, request.usuarioId(), antes, chat.getStatus());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
@@ -125,21 +158,25 @@ public class ChatController {
 
     @PostMapping("/{id}/resolver")
     @Transactional
-    public ResponseEntity<ChatDetalheResponse> resolver(@PathVariable Long id) {
+    public ResponseEntity<ChatDetalheResponse> resolver(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         Chat chat = obter(id);
+        StatusChat antes = chat.getStatus();
         chat.setStatus(StatusChat.RESOLVIDO);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
+        chatLogService.registrar(chat, TipoLogChat.RESOLVEU, uidDoToken(jwt), null, antes, StatusChat.RESOLVIDO);
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
     @PostMapping("/{id}/reabrir")
     @Transactional
-    public ResponseEntity<ChatDetalheResponse> reabrir(@PathVariable Long id) {
+    public ResponseEntity<ChatDetalheResponse> reabrir(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
         Chat chat = obter(id);
+        StatusChat antes = chat.getStatus();
         chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
+        chatLogService.registrar(chat, TipoLogChat.REABRIU, uidDoToken(jwt), null, antes, StatusChat.AGUARDANDO_RESPOSTA);
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 

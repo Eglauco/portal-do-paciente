@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Chat, ChatDetalhe, ChatFiltro, Pagina } from './chat.model';
+import { Chat, ChatDetalhe, ChatFiltro, ChatLog, Pagina } from './chat.model';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -41,6 +41,16 @@ export class ChatService {
   /** Assume (ou transfere para si) a conversa: o atendente passa a ser o responsável. */
   assumir(id: number): Observable<ChatDetalhe> {
     return this.http.post<ChatDetalhe>(`${this.base}/${id}/assumir`, {});
+  }
+
+  /** Transfere a conversa para outro atendente (o usuário indicado vira o responsável). */
+  transferir(id: number, usuarioId: number): Observable<ChatDetalhe> {
+    return this.http.post<ChatDetalhe>(`${this.base}/${id}/transferir`, { usuarioId });
+  }
+
+  /** Linha do tempo de auditoria da conversa (ações dos atendentes). */
+  logs(id: number): Observable<ChatLog[]> {
+    return this.http.get<ChatLog[]>(`${this.base}/${id}/logs`);
   }
 
   enviar(id: number, texto: string, clienteId?: string): Observable<ChatDetalhe> {

@@ -33,17 +33,20 @@ public class ChatService {
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ChatLogService chatLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
-            UsuarioRepository usuarioRepository, SimpMessagingTemplate messagingTemplate, PushService pushService) {
+            UsuarioRepository usuarioRepository, ChatLogService chatLogService,
+            SimpMessagingTemplate messagingTemplate, PushService pushService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.usuarioRepository = usuarioRepository;
+        this.chatLogService = chatLogService;
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
     }
@@ -150,9 +153,17 @@ public class ChatService {
         // O remetente é o próprio responsável (garantido pelo guard acima).
         Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel);
 
+        StatusChat statusAntes = chat.getStatus();
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
+
+        // Audita a mudança de status quando ela ocorre por um envio (ex.: o
+        // responsável reabriu e voltou a responder → AGUARDANDO → EM_ATENDIMENTO).
+        if (statusAntes != StatusChat.EM_ATENDIMENTO) {
+            chatLogService.registrar(chat, TipoLogChat.STATUS_ALTERADO, responsavel.getId(), null,
+                    statusAntes, StatusChat.EM_ATENDIMENTO);
+        }
 
         publicar(chat.getId(), salva);
         // Notifica o paciente (o app suprime se ele já estiver nessa conversa).

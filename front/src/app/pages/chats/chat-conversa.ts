@@ -2,9 +2,12 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { retry, throwError, timer } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
-import { ChatDetalhe, Mensagem, novoClienteId } from './chat.model';
+import { Usuario } from '../usuarios/usuario.model';
+import { UsuarioService } from '../usuarios/usuario.service';
+import { ChatDetalhe, ChatLog, Mensagem, TipoLogChat, novoClienteId, statusLabel } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
@@ -16,10 +19,12 @@ import { ChatService } from './chat.service';
 export class ChatConversa {
   private readonly service = inject(ChatService);
   private readonly realtime = inject(ChatRealtimeService);
+  private readonly usuarioService = inject(UsuarioService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
 
   protected readonly digitando = signal(false);
   private cancelamentos: (() => void)[] = [];
@@ -34,8 +39,12 @@ export class ChatConversa {
   protected readonly carregandoDetalhe = signal(false);
   protected readonly texto = signal('');
   protected readonly assumindo = signal(false);
-  /** Pergunta ao abrir: assumir (nova) ou transferir (já tem responsável). Null = sem pergunta. */
-  protected readonly promptAssumir = signal<{ transferir: boolean; nome: string | null } | null>(null);
+  /**
+   * Modal de confirmação de posse. 'assumir' = "Deseja assumir conversa?" (automático,
+   * ao abrir conversa SEM responsável); 'transferir' = "Transferir para você?" (ao
+   * clicar em "Transferir para mim", para não pegar a conversa por engano). Null = fechado.
+   */
+  protected readonly perguntarAssumir = signal<'assumir' | 'transferir' | null>(null);
 
   /** Sou o atendente responsável por esta conversa (só o responsável envia). */
   protected readonly souResponsavel = computed(() => {
@@ -44,10 +53,43 @@ export class ChatConversa {
     return !!d && d.responsavelId != null && d.responsavelId === uid;
   });
 
+  /** Modal "Transferir conversa": lista de atendentes para reatribuir a conversa. */
+  protected readonly mostrarTransferir = signal(false);
+  protected readonly usuariosTransferir = signal<Usuario[]>([]);
+  protected readonly carregandoUsuarios = signal(false);
+  protected readonly transferindo = signal(false);
+  protected readonly filtroTransferir = signal('');
+  /** Atendente escolhido, aguardando confirmação (null = ainda na lista). */
+  protected readonly usuarioEscolhido = signal<Usuario | null>(null);
+  private usuariosCarregados = false;
+
+  /** Atendentes filtrados pela busca, exceto eu mesmo (só faz sentido transferir para outro). */
+  protected readonly usuariosFiltrados = computed(() => {
+    const filtro = this.filtroTransferir().trim().toLowerCase();
+    const meuId = this.auth.usuarioId();
+    return this.usuariosTransferir()
+      .filter((u) => u.id !== meuId)
+      .filter(
+        (u) => !filtro || u.nome.toLowerCase().includes(filtro) || (u.email ?? '').toLowerCase().includes(filtro),
+      );
+  });
+
   private readonly mensagensRef = viewChild<ElementRef<HTMLElement>>('mensagens');
   private readonly bloqueioRef = viewChild<ElementRef<HTMLElement>>('bloqueio');
   private readonly assumirRef = viewChild<ElementRef<HTMLElement>>('assumirBanner');
   private readonly promptDialogRef = viewChild<ElementRef<HTMLElement>>('promptDialog');
+  private readonly transferirDialogRef = viewChild<ElementRef<HTMLElement>>('transferirDialog');
+  private readonly confirmarBtnRef = viewChild<ElementRef<HTMLElement>>('confirmarBtn');
+  private readonly logsDialogRef = viewChild<ElementRef<HTMLElement>>('logsDialog');
+
+  /** Modal de auditoria (linha do tempo) da conversa. */
+  protected readonly mostrarLogs = signal(false);
+  protected readonly logs = signal<ChatLog[]>([]);
+  protected readonly carregandoLogs = signal(false);
+  protected readonly erroLogs = signal(false);
+  protected readonly rotuloStatus = statusLabel;
+  /** Elemento que abriu o modal de histórico, para devolver o foco ao fechar (a11y). */
+  private focoAnterior: HTMLElement | null = null;
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -76,22 +118,31 @@ export class ChatConversa {
     this.observarTempoReal(id);
   }
 
-  /** Ao abrir, se não sou o responsável, pergunta se quero assumir/transferir. */
+  /**
+   * Ao abrir uma conversa SEM responsável, pergunta se quero assumir. Se OUTRO
+   * atendente já é o responsável, não pergunta ao abrir — o aviso no rodapé com
+   * "Transferir para mim" já cobre isso. Resolvida exige "Reabrir" explícito.
+   */
   private avaliarPrompt(): void {
     const d = this.detalhe();
     if (!d) return;
-    // Conversa resolvida exige "Reabrir" explícito (cabeçalho): não oferece
-    // assumir/transferir aqui — senão assumir reabriria a conversa em silêncio.
-    if (this.souResponsavel() || d.status === 'RESOLVIDO') {
-      this.promptAssumir.set(null);
+    if (this.souResponsavel() || d.status === 'RESOLVIDO' || d.responsavelId != null) {
+      this.perguntarAssumir.set(null);
       return;
     }
-    this.abrirPrompt({ transferir: d.responsavelId != null, nome: d.responsavelNome ?? null });
+    this.abrirPromptAssumir();
   }
 
-  /** Abre o modal de assumir/transferir e move o foco para ele (a11y). */
-  private abrirPrompt(valor: { transferir: boolean; nome: string | null }): void {
-    this.promptAssumir.set(valor);
+  /** Abre o modal "Deseja assumir conversa?" e move o foco para ele (a11y). */
+  private abrirPromptAssumir(): void {
+    this.perguntarAssumir.set('assumir');
+    this.focarRef(this.promptDialogRef);
+  }
+
+  /** Pede confirmação antes de trazer a conversa de outro atendente para mim. */
+  protected confirmarTransferenciaParaMim(): void {
+    if (this.assumindo()) return;
+    this.perguntarAssumir.set('transferir');
     this.focarRef(this.promptDialogRef);
   }
 
@@ -100,7 +151,7 @@ export class ChatConversa {
     const id = this.idAtual();
     if (id == null || this.assumindo()) return;
     this.assumindo.set(true);
-    this.promptAssumir.set(null);
+    this.perguntarAssumir.set(null);
     this.service.assumir(id).subscribe({
       next: (d) => {
         this.aplicarDetalhe(d);
@@ -110,9 +161,134 @@ export class ChatConversa {
     });
   }
 
-  /** Recusou assumir: fica só em modo leitura. */
+  /** Recusou assumir/transferir: fica só em modo leitura. */
   protected recusarPrompt(): void {
-    this.promptAssumir.set(null);
+    this.perguntarAssumir.set(null);
+  }
+
+  /** Abre o modal de transferência e carrega os atendentes (uma vez). */
+  protected abrirTransferir(): void {
+    this.filtroTransferir.set('');
+    this.usuarioEscolhido.set(null);
+    this.mostrarTransferir.set(true);
+    this.focarRef(this.transferirDialogRef);
+    if (this.usuariosCarregados || this.carregandoUsuarios()) return;
+    this.carregandoUsuarios.set(true);
+    this.usuarioService.listar({}, 0, 100).subscribe({
+      next: (p) => {
+        this.usuariosTransferir.set(p.content);
+        this.usuariosCarregados = true;
+        this.carregandoUsuarios.set(false);
+      },
+      error: () => this.carregandoUsuarios.set(false),
+    });
+  }
+
+  protected fecharTransferir(): void {
+    this.mostrarTransferir.set(false);
+    this.usuarioEscolhido.set(null);
+  }
+
+  /** Escolhe um atendente da lista: vai para a etapa de confirmação (ainda não transfere). */
+  protected selecionarUsuario(usuario: Usuario): void {
+    this.usuarioEscolhido.set(usuario);
+    this.focarRef(this.confirmarBtnRef);
+  }
+
+  /** Volta da confirmação para a lista de atendentes (o botão "Voltar" some do DOM). */
+  protected voltarLista(): void {
+    this.usuarioEscolhido.set(null);
+    this.focarRef(this.transferirDialogRef);
+  }
+
+  /** Confirma a transferência para o atendente escolhido; passo a ver a conversa só em leitura. */
+  protected confirmarTransferencia(): void {
+    const id = this.idAtual();
+    const usuario = this.usuarioEscolhido();
+    if (id == null || usuario?.id == null || this.transferindo()) return;
+    this.transferindo.set(true);
+    this.service.transferir(id, usuario.id).subscribe({
+      next: (d) => {
+        this.aplicarDetalhe(d); // responsável = outro → souResponsavel() false → modo leitura
+        this.transferindo.set(false);
+        this.mostrarTransferir.set(false);
+        this.usuarioEscolhido.set(null);
+        this.toastr.success(`Conversa transferida para ${usuario.nome}.`);
+        // O campo de envio sai do DOM e dá lugar ao aviso de leitura: move o foco
+        // para ele (WCAG 2.4.3), como no fluxo de perda de posse ao vivo.
+        this.focarRef(this.assumirRef);
+      },
+      error: () => {
+        this.transferindo.set(false);
+        this.toastr.error('Não foi possível transferir a conversa. Tente novamente.');
+      },
+    });
+  }
+
+  /** Abre o histórico (auditoria) da conversa e recarrega os registros. */
+  protected abrirLogs(): void {
+    const id = this.idAtual();
+    if (id == null) return;
+    this.focoAnterior = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+    this.mostrarLogs.set(true);
+    this.focarRef(this.logsDialogRef);
+    this.carregandoLogs.set(true);
+    this.erroLogs.set(false);
+    this.service.logs(id).subscribe({
+      next: (l) => {
+        this.logs.set(l);
+        this.carregandoLogs.set(false);
+      },
+      error: () => {
+        this.erroLogs.set(true);
+        this.carregandoLogs.set(false);
+      },
+    });
+  }
+
+  protected fecharLogs(): void {
+    this.mostrarLogs.set(false);
+    this.focoAnterior?.focus(); // devolve o foco ao botão de histórico (WCAG 2.4.3)
+    this.focoAnterior = null;
+  }
+
+  /** Frase descritiva de um evento do log. */
+  protected descreverLog(log: ChatLog): string {
+    const nome = log.usuarioNome ?? 'Atendente';
+    switch (log.tipo) {
+      case 'VISUALIZOU':
+        return `${nome} visualizou a conversa`;
+      case 'ASSUMIU':
+        return `${nome} assumiu a conversa`;
+      case 'TRANSFERIU':
+        return `${nome} transferiu para ${log.destinoNome ?? 'outro atendente'}`;
+      case 'RESOLVEU':
+        return `${nome} resolveu a conversa`;
+      case 'REABRIU':
+        return `${nome} reabriu a conversa`;
+      case 'STATUS_ALTERADO':
+        return `${nome} alterou o status`;
+      default:
+        return nome;
+    }
+  }
+
+  /** Cor do marcador da linha do tempo por tipo de evento. */
+  protected tomLog(tipo: TipoLogChat): string {
+    switch (tipo) {
+      case 'ASSUMIU':
+        return 'teal';
+      case 'TRANSFERIU':
+        return 'violet';
+      case 'RESOLVEU':
+        return 'green';
+      case 'REABRIU':
+        return 'amber';
+      case 'STATUS_ALTERADO':
+        return 'blue';
+      default:
+        return 'slate';
+    }
   }
 
   /** Troca de responsável em tempo real (bloqueia na hora quem deixou de ser o dono). */
@@ -125,18 +301,12 @@ export class ChatConversa {
     // Perdi a posse ao vivo (outro atendente assumiu): o campo de envio some e dá
     // lugar ao aviso — move o foco para ele para anunciar a mudança (WCAG 2.4.3).
     if (eraResponsavel && !souResponsavelAgora) this.focarRef(this.assumirRef);
-    // Mantém o texto do modal aberto coerente com o responsável atual (evita
-    // mostrar "Deseja assumir?" depois que outro atendente já assumiu).
-    if (this.promptAssumir() !== null) {
-      if (souResponsavelAgora) {
-        this.promptAssumir.set(null);
-      } else {
-        const atual = this.detalhe();
-        this.promptAssumir.set({
-          transferir: atual?.responsavelId != null,
-          nome: atual?.responsavelNome ?? null,
-        });
-      }
+    // Fecha a confirmação de posse quando deixa de fazer sentido: se eu virei o
+    // responsável (ambos os modos), ou se era "assumir" (sem dono) e agora alguém
+    // assumiu — nesse caso o rodapé passa a mostrar "Transferir para mim".
+    const modo = this.perguntarAssumir();
+    if (modo && (souResponsavelAgora || (modo === 'assumir' && this.detalhe()?.responsavelId != null))) {
+      this.perguntarAssumir.set(null);
     }
   }
 

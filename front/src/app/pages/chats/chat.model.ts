@@ -90,3 +90,16 @@ export const STATUS_OPTIONS: { value: StatusChat; label: string }[] = [
 export function statusLabel(valor: StatusChat): string {
   return STATUS_OPTIONS.find((o) => o.value === valor)?.label ?? valor;
 }
+
+/** Auditoria (log) da conversa — espelha ChatLogResponse no backend. */
+export type TipoLogChat = 'VISUALIZOU' | 'ASSUMIU' | 'TRANSFERIU' | 'RESOLVEU' | 'REABRIU' | 'STATUS_ALTERADO';
+
+export interface ChatLog {
+  id: number;
+  tipo: TipoLogChat;
+  usuarioNome: string | null;
+  destinoNome: string | null;
+  statusAnterior: StatusChat | null;
+  statusNovo: StatusChat | null;
+  criadoEm: string;
+}

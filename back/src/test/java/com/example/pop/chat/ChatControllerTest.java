@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 import com.example.pop.common.Pagina;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
@@ -274,5 +276,61 @@ class ChatControllerTest {
         // Filtrando por outro responsável: a conversa não aparece.
         Pagina<ChatResponse> deOutro = controller.listar(null, null, resp.getId() + 999_999, null, false, 0, 50);
         assertTrue(deOutro.content().stream().noneMatch(c -> c.id().equals(chatId)));
+    }
+
+    @Test
+    void transferirDefineOutroResponsavelEBloqueiaOAnterior() {
+        Long chatId = novaConversaComAppAtivo();
+        Usuario a = usuarioSalvo("Atendente A");
+        Usuario b = usuarioSalvo("Atendente B");
+        Jwt tokenA = adminJwt(a);
+        controller.assumir(chatId, tokenA);
+
+        // A transfere para B: B vira o responsável.
+        ChatDetalheResponse apos = controller.transferir(chatId, new TransferirRequest(b.getId()), tokenA).getBody();
+        assertNotNull(apos);
+        assertEquals(b.getId(), apos.responsavelId());
+        assertEquals("Atendente B", apos.responsavelNome());
+
+        // O antigo responsável (A) nao envia mais; o novo (B) sim.
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.enviar(chatId, new MensagemRequest("ainda posso?", null), tokenA));
+        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Atendente B"));
+
+        controller.enviar(chatId, new MensagemRequest("recebido por transferencia", null), adminJwt(b));
+    }
+
+    @Test
+    void logRegistraAcoesDosAtendentesNaLinhaDoTempo() {
+        Long chatId = novaConversaComAppAtivo();
+        Usuario a = usuarioSalvo("Atendente A");
+        Usuario b = usuarioSalvo("Atendente B");
+        Jwt tokenA = adminJwt(a);
+
+        controller.visualizar(chatId, tokenA);
+        controller.assumir(chatId, tokenA);
+        controller.transferir(chatId, new TransferirRequest(b.getId()), tokenA);
+        controller.resolver(chatId, adminJwt(b));
+        controller.reabrir(chatId, adminJwt(b));
+
+        List<ChatLogResponse> logs = controller.logs(chatId);
+        List<TipoLogChat> tipos = logs.stream().map(ChatLogResponse::tipo).toList();
+        assertTrue(tipos.contains(TipoLogChat.VISUALIZOU));
+        assertTrue(tipos.contains(TipoLogChat.ASSUMIU));
+        assertTrue(tipos.contains(TipoLogChat.TRANSFERIU));
+        assertTrue(tipos.contains(TipoLogChat.RESOLVEU));
+        assertTrue(tipos.contains(TipoLogChat.REABRIU));
+
+        // A transferência registra de quem (A) para quem (B).
+        ChatLogResponse transf = logs.stream().filter(l -> l.tipo() == TipoLogChat.TRANSFERIU).findFirst().orElseThrow();
+        assertEquals("Atendente A", transf.usuarioNome());
+        assertEquals("Atendente B", transf.destinoNome());
+
+        // Assumir registra a transição de status para EM_ATENDIMENTO; resolver para RESOLVIDO.
+        ChatLogResponse assumiu = logs.stream().filter(l -> l.tipo() == TipoLogChat.ASSUMIU).findFirst().orElseThrow();
+        assertEquals(StatusChat.EM_ATENDIMENTO, assumiu.statusNovo());
+        ChatLogResponse resolveu = logs.stream().filter(l -> l.tipo() == TipoLogChat.RESOLVEU).findFirst().orElseThrow();
+        assertEquals(StatusChat.RESOLVIDO, resolveu.statusNovo());
     }
 }
