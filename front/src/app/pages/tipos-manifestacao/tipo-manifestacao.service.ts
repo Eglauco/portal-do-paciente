@@ -23,6 +23,14 @@ export class TipoManifestacaoService {
     return this.http.get<Pagina<TipoManifestacao>>(this.base, { params });
   }
 
+  /** Exporta os tipos dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: TipoManifestacaoFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    if (filtro.ativo != null) params = params.set('ativo', filtro.ativo);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<TipoManifestacao> {
     return this.http.get<TipoManifestacao>(`${this.base}/${id}`);
   }

@@ -23,6 +23,14 @@ export class EspecialidadeService {
     return this.http.get<Pagina<Especialidade>>(this.base, { params });
   }
 
+  /** Exporta as especialidades dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: EspecialidadeFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
+    if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<Especialidade> {
     return this.http.get<Especialidade>(`${this.base}/${id}`);
   }

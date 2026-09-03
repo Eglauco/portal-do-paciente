@@ -3,6 +3,7 @@ import { Component, DestroyRef, afterNextRender, computed, inject, signal } from
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -29,6 +30,9 @@ export class ChatsList {
   private readonly realtime = inject(ChatRealtimeService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = ChatService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -159,6 +163,40 @@ export class ChatsList {
           this.carregado.set(true);
         },
       });
+  }
+
+  /** Exporta as conversas dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    const f = this.filtro.getRawValue();
+    this.service
+      .exportar(formato, {
+        pacienteId: f.pacienteId,
+        unidadeId: this.auth.unidadeId(),
+        responsavelId: f.responsavelId,
+        status: f.status,
+        naoResolvidas: f.naoResolvidas,
+      })
+      .subscribe({
+        next: (blob) => {
+          this.baixar(blob, `chats.${formato}`);
+          this.exportando.set(null);
+        },
+        error: () => {
+          this.exportando.set(null);
+          this.toastr.error('Não foi possível exportar os dados.');
+        },
+      });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected abrir(chat: Chat): void {

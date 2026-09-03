@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { Paciente } from './paciente.model';
 import { PacienteBuscaStore } from './paciente-busca.store';
 import { PacienteService } from './paciente.service';
@@ -15,6 +16,9 @@ export class PacientesList {
   private readonly service = inject(PacienteService);
   private readonly router = inject(Router);
   private readonly store = inject(PacienteBuscaStore);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = PacienteService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -122,6 +126,31 @@ export class PacientesList {
 
   protected editar(paciente: Paciente): void {
     this.router.navigate(['/pacientes', paciente.id]);
+  }
+
+  /** Exporta os pacientes dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }).subscribe({
+      next: (blob) => {
+        this.baixar(blob, `pacientes.${formato}`);
+        this.exportando.set(null);
+      },
+      error: () => {
+        this.exportando.set(null);
+        this.toastr.error('Não foi possível exportar os dados.');
+      },
+    });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected iniciais(nome: string): string {

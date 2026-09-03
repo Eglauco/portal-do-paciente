@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { Usuario } from './usuario.model';
 import { UsuarioBuscaStore } from './usuario-busca.store';
 import { UsuarioService } from './usuario.service';
@@ -15,6 +16,9 @@ export class UsuariosList {
   private readonly service = inject(UsuarioService);
   private readonly router = inject(Router);
   private readonly store = inject(UsuarioBuscaStore);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = UsuarioService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -135,6 +139,33 @@ export class UsuariosList {
 
   protected editar(usuario: Usuario): void {
     this.router.navigate(['/usuarios', usuario.id]);
+  }
+
+  /** Exporta os usuários dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    this.service
+      .exportar(formato, { codigo: this.codigo(), nome: this.nome(), email: this.email() })
+      .subscribe({
+        next: (blob) => {
+          this.baixar(blob, `usuarios.${formato}`);
+          this.exportando.set(null);
+        },
+        error: () => {
+          this.exportando.set(null);
+          this.toastr.error('Não foi possível exportar os dados.');
+        },
+      });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected iniciais(nome: string): string {

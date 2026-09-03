@@ -20,6 +20,15 @@ export class NpsService {
     return this.http.get<Pagina<Nps>>(this.base, { params });
   }
 
+  /** Exporta as avaliações dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: NpsFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.status) params = params.set('status', filtro.status);
+    if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
+    if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   detalhe(id: number): Observable<NpsDetalhe> {
     return this.http.get<NpsDetalhe>(`${this.base}/${id}`);
   }

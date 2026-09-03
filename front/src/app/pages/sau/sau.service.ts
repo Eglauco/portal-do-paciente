@@ -20,6 +20,15 @@ export class SauService {
     return this.http.get<Pagina<Manifestacao>>(this.base, { params });
   }
 
+  /** Exporta as manifestações dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ManifestacaoFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.tipoId) params = params.set('tipoId', filtro.tipoId);
+    if (filtro.status) params = params.set('status', filtro.status);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   detalhe(id: number): Observable<ManifestacaoDetalhe> {
     return this.http.get<ManifestacaoDetalhe>(`${this.base}/${id}`);
   }

@@ -1,10 +1,16 @@
 package com.example.pop.unidade;
 
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +24,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 
 @RestController
 @RequestMapping("/unidade")
@@ -27,9 +36,11 @@ public class UnidadeController {
     private static final int TAMANHO_MAXIMO = 100;
 
     private final UnidadeRepository repository;
+    private final ExportacaoService exportacaoService;
 
-    public UnidadeController(UnidadeRepository repository) {
+    public UnidadeController(UnidadeRepository repository, ExportacaoService exportacaoService) {
         this.repository = repository;
+        this.exportacaoService = exportacaoService;
     }
 
     /**
@@ -57,6 +68,48 @@ public class UnidadeController {
                 resultado.getTotalPages(),
                 resultado.isFirst(),
                 resultado.isLast());
+    }
+
+    /**
+     * Exporta as unidades que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenadas por código (id).
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) Long codigo,
+            @RequestParam(required = false) String nome) {
+        String filtroNome = (nome == null) ? "" : nome.trim();
+
+        List<Unidade> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Unidade::getId))
+                .toList();
+        List<ColunaExport<Unidade>> colunas = colunasUnidade();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Unidades", filtrosUnidade(codigo, filtroNome), colunas, dados)
+                : exportacaoService.excel("Unidades", colunas, dados);
+        String nomeArquivo = "unidades-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosUnidade(Long codigo, String nome) {
+        return List.of(
+                new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
+                new FiltroAplicado("Nome", (nome == null || nome.isBlank()) ? "Todos" : nome));
+    }
+
+    private static List<ColunaExport<Unidade>> colunasUnidade() {
+        return List.of(
+                ColunaExport.de("Código", u -> u.getId() == null ? "" : String.valueOf(u.getId())),
+                ColunaExport.de("Nome", Unidade::getNome));
     }
 
     @GetMapping("/{id}")

@@ -1,11 +1,18 @@
 package com.example.pop.paciente;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 
 import jakarta.validation.Valid;
 
@@ -32,10 +42,13 @@ public class PacienteController {
 
     private final PacienteRepository repository;
     private final PacienteAcessoService acessoService;
+    private final ExportacaoService exportacaoService;
 
-    public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService) {
+    public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService,
+            ExportacaoService exportacaoService) {
         this.repository = repository;
         this.acessoService = acessoService;
+        this.exportacaoService = exportacaoService;
     }
 
     /**
@@ -63,6 +76,69 @@ public class PacienteController {
                 resultado.getTotalPages(),
                 resultado.isFirst(),
                 resultado.isLast());
+    }
+
+    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * Exporta os pacientes que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) Long codigo,
+            @RequestParam(required = false) String nome) {
+        String filtroNome = (nome == null) ? "" : nome.trim();
+        List<Paciente> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Paciente::getId))
+                .toList();
+        List<ColunaExport<Paciente>> colunas = colunasPaciente();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Pacientes", filtrosPaciente(codigo, nome), colunas, dados)
+                : exportacaoService.excel("Pacientes", colunas, dados);
+        String nomeArquivo = "pacientes-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosPaciente(Long codigo, String nome) {
+        return List.of(
+                new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
+                new FiltroAplicado("Nome", (nome != null && !nome.isBlank()) ? nome.trim() : "Todos"));
+    }
+
+    private static List<ColunaExport<Paciente>> colunasPaciente() {
+        return List.of(
+                ColunaExport.de("Código", p -> String.valueOf(p.getId())),
+                ColunaExport.de("Nome", Paciente::getNome),
+                ColunaExport.de("Telefone", p -> formatarTelefone(p.getTelefone())),
+                ColunaExport.de("Liberado (app)", p -> p.isAtivo() ? "Sim" : "Não"),
+                ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"),
+                ColunaExport.de("Código expira em",
+                        p -> p.getCodigoAtivacaoExpiraEm() == null ? "" : p.getCodigoAtivacaoExpiraEm().format(DATA_HORA)));
+    }
+
+    /** Formata o telefone (só dígitos) no padrão brasileiro; devolve o valor original se não reconhecer. */
+    private static String formatarTelefone(String telefone) {
+        if (telefone == null || telefone.isBlank()) {
+            return "";
+        }
+        String digitos = telefone.replaceAll("\\D", "");
+        if (digitos.length() == 11) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 7) + "-" + digitos.substring(7);
+        }
+        if (digitos.length() == 10) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 6) + "-" + digitos.substring(6);
+        }
+        return telefone;
     }
 
     @GetMapping("/{id}")

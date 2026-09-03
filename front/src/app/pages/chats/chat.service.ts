@@ -22,6 +22,17 @@ export class ChatService {
     return this.http.get<Pagina<Chat>>(this.base, { params });
   }
 
+  /** Exporta as conversas dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ChatFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
+    if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.responsavelId) params = params.set('responsavelId', filtro.responsavelId);
+    if (filtro.status) params = params.set('status', filtro.status);
+    if (filtro.naoResolvidas) params = params.set('naoResolvidas', true);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   detalhe(id: number): Observable<ChatDetalhe> {
     return this.http.get<ChatDetalhe>(`${this.base}/${id}`);
   }

@@ -5,6 +5,18 @@
       <p class="page-sub">Publique novidades das unidades para o feed dos pacientes.</p>
     </div>
     <div class="page-head__actions">
+      <button type="button" class="btn btn--ghost" (click)="exportar('xlsx')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'xlsx' ? 'Exportando…' : 'Excel' }}
+      </button>
+      <button type="button" class="btn btn--ghost" (click)="exportar('pdf')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'pdf' ? 'Exportando…' : 'PDF' }}
+      </button>
       <a class="btn btn--ghost" routerLink="/postagens/rede-social">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />

@@ -1,10 +1,16 @@
 package com.example.pop.procedimento;
 
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +24,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 
 import jakarta.validation.Valid;
 
@@ -29,9 +38,11 @@ public class ProcedimentoController {
     private static final int TAMANHO_MAXIMO = 100;
 
     private final ProcedimentoRepository repository;
+    private final ExportacaoService exportacaoService;
 
-    public ProcedimentoController(ProcedimentoRepository repository) {
+    public ProcedimentoController(ProcedimentoRepository repository, ExportacaoService exportacaoService) {
         this.repository = repository;
+        this.exportacaoService = exportacaoService;
     }
 
     /**
@@ -59,6 +70,50 @@ public class ProcedimentoController {
                 resultado.getTotalPages(),
                 resultado.isFirst(),
                 resultado.isLast());
+    }
+
+    /**
+     * Exporta os procedimentos que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) Long codigo,
+            @RequestParam(required = false) String nome) {
+        String filtroNome = (nome == null) ? "" : nome.trim();
+        List<Procedimento> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Procedimento::getId))
+                .toList();
+        List<ColunaExport<Procedimento>> colunas = colunasProcedimento();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Procedimentos", filtrosProcedimento(codigo, filtroNome), colunas, dados)
+                : exportacaoService.excel("Procedimentos", colunas, dados);
+        String arquivoNome = "procedimentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + arquivoNome + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosProcedimento(Long codigo, String nome) {
+        return List.of(
+                new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
+                new FiltroAplicado("Nome", nome != null && !nome.isBlank() ? nome : "Todos"));
+    }
+
+    private static List<ColunaExport<Procedimento>> colunasProcedimento() {
+        return List.of(
+                ColunaExport.de("Código", p -> p.getId() == null ? "" : String.valueOf(p.getId())),
+                ColunaExport.de("Nome", Procedimento::getNome),
+                ColunaExport.de("Preparo", Procedimento::getPreparo),
+                ColunaExport.de("Horas para cancelamento",
+                        p -> p.getHorasCancelamento() == null ? "" : String.valueOf(p.getHorasCancelamento())));
     }
 
     @GetMapping("/{id}")

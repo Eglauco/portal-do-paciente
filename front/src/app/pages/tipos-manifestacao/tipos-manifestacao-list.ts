@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { TipoManifestacao } from './tipo-manifestacao.model';
 import { TipoManifestacaoBuscaStore } from './tipo-manifestacao-busca.store';
 import { TipoManifestacaoService } from './tipo-manifestacao.service';
@@ -15,6 +16,9 @@ export class TiposManifestacaoList {
   private readonly service = inject(TipoManifestacaoService);
   private readonly router = inject(Router);
   private readonly store = inject(TipoManifestacaoBuscaStore);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = TipoManifestacaoService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -122,6 +126,32 @@ export class TiposManifestacaoList {
 
   protected editar(tipo: TipoManifestacao): void {
     this.router.navigate(['/tipos-manifestacao', tipo.id]);
+  }
+
+  /** Exporta os tipos dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    const ativo = this.situacao() === '' ? null : this.situacao() === 'true';
+    this.exportando.set(formato);
+    this.service.exportar(formato, { nome: this.nome(), ativo }).subscribe({
+      next: (blob) => {
+        this.baixar(blob, `tipos-manifestacao.${formato}`);
+        this.exportando.set(null);
+      },
+      error: () => {
+        this.exportando.set(null);
+        this.toastr.error('Não foi possível exportar os dados.');
+      },
+    });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected updateNome(event: Event): void {

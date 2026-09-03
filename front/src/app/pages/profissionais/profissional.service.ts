@@ -23,6 +23,14 @@ export class ProfissionalSaudeService {
     return this.http.get<Pagina<ProfissionalSaude>>(this.base, { params });
   }
 
+  /** Exporta os profissionais dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ProfissionalSaudeFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
+    if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<ProfissionalSaude> {
     return this.http.get<ProfissionalSaude>(`${this.base}/${id}`);
   }

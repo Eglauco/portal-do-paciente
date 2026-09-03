@@ -27,6 +27,14 @@ export class CategoriaNpsService {
     return this.http.get<Pagina<CategoriaNps>>(this.base, { params });
   }
 
+  /** Exporta as categorias dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: CategoriaNpsFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
+    if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<CategoriaNps> {
     return this.http.get<CategoriaNps>(`${this.base}/${id}`);
   }

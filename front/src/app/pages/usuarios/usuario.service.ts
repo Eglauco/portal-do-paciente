@@ -25,6 +25,15 @@ export class UsuarioService {
     return this.http.get<Pagina<Usuario>>(this.base, { params });
   }
 
+  /** Exporta os usuários dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: UsuarioFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
+    if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    if (filtro.email?.trim()) params = params.set('email', filtro.email.trim());
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<Usuario> {
     return this.http.get<Usuario>(`${this.base}/${id}`);
   }

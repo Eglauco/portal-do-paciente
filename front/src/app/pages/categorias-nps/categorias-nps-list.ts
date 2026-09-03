@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { CategoriaNps } from './categoria-nps.model';
 import { CategoriaNpsBuscaStore } from './categoria-nps-busca.store';
 import { CategoriaNpsService } from './categoria-nps.service';
@@ -15,6 +16,9 @@ export class CategoriasNpsList {
   private readonly service = inject(CategoriaNpsService);
   private readonly router = inject(Router);
   private readonly store = inject(CategoriaNpsBuscaStore);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = CategoriaNpsService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -122,6 +126,31 @@ export class CategoriasNpsList {
 
   protected editar(categoria: CategoriaNps): void {
     this.router.navigate(['/categorias-nps', categoria.id]);
+  }
+
+  /** Exporta as categorias dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }).subscribe({
+      next: (blob) => {
+        this.baixar(blob, `categorias-nps.${formato}`);
+        this.exportando.set(null);
+      },
+      error: () => {
+        this.exportando.set(null);
+        this.toastr.error('Não foi possível exportar os dados.');
+      },
+    });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected updateCodigo(event: Event): void {

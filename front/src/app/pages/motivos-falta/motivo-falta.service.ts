@@ -27,6 +27,14 @@ export class MotivoFaltaService {
     return this.http.get<Pagina<MotivoFalta>>(this.base, { params });
   }
 
+  /** Exporta os motivos de falta dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: MotivoFaltaFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
+    if (filtro.motivo?.trim()) params = params.set('motivo', filtro.motivo.trim());
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<MotivoFalta> {
     return this.http.get<MotivoFalta>(`${this.base}/${id}`);
   }

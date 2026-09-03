@@ -34,6 +34,17 @@ export class PostagemService {
     return this.http.get<Pagina<Postagem>>(this.base, { params });
   }
 
+  /** Exporta as postagens dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: PostagemFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.titulo) params = params.set('titulo', filtro.titulo);
+    if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.comentarios !== null && filtro.comentarios !== undefined) {
+      params = params.set('comentarios', filtro.comentarios);
+    }
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<PostagemDetalhe> {
     return this.http.get<PostagemDetalhe>(`${this.base}/${id}`);
   }

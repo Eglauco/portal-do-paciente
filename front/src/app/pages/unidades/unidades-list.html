@@ -4,12 +4,26 @@
       <h1 class="page-title">Unidades de Saúde</h1>
       <p class="page-sub">Cadastre e organize as unidades da rede.</p>
     </div>
-    <a class="btn btn--solid" routerLink="/unidades/novo">
-      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
-      Nova unidade
-    </a>
+    <div class="page-head__actions">
+      <button type="button" class="btn btn--ghost" (click)="exportar('xlsx')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'xlsx' ? 'Exportando…' : 'Excel' }}
+      </button>
+      <button type="button" class="btn btn--ghost" (click)="exportar('pdf')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'pdf' ? 'Exportando…' : 'PDF' }}
+      </button>
+      <a class="btn btn--solid" routerLink="/unidades/novo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Nova unidade
+      </a>
+    </div>
   </header>
 
   <!-- Filtros -->

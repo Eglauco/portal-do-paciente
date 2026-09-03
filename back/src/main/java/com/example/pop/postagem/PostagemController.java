@@ -1,14 +1,19 @@
 package com.example.pop.postagem;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,6 +32,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 import com.example.pop.push.PushService;
 import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
@@ -48,16 +56,18 @@ public class PostagemController {
     private final UnidadeRepository unidadeRepository;
     private final StorageService storageService;
     private final PushService pushService;
+    private final ExportacaoService exportacaoService;
 
     public PostagemController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, UnidadeRepository unidadeRepository,
-            StorageService storageService, PushService pushService) {
+            StorageService storageService, PushService pushService, ExportacaoService exportacaoService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
         this.unidadeRepository = unidadeRepository;
         this.storageService = storageService;
         this.pushService = pushService;
+        this.exportacaoService = exportacaoService;
     }
 
     @GetMapping
@@ -76,6 +86,60 @@ public class PostagemController {
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
+    }
+
+    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * Exporta as postagens que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Mais recentes primeiro.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) String titulo,
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) Boolean comentarios) {
+        List<Postagem> dados = repository.search(titulo == null ? "" : titulo, unidadeId, comentarios, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Postagem::getCriadoEm).reversed())
+                .toList();
+        List<ColunaExport<Postagem>> colunas = colunasPostagem();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Rede Social", filtrosPostagem(titulo, unidadeId, comentarios), colunas, dados)
+                : exportacaoService.excel("Rede Social", colunas, dados);
+        String nome = "postagens-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosPostagem(String titulo, Long unidadeId, Boolean comentarios) {
+        String unidade = unidadeId == null ? "Todas"
+                : unidadeRepository.findById(unidadeId).map(Unidade::getNome).orElse("#" + unidadeId);
+        String comentariosLabel = comentarios == null ? "Todos" : (comentarios ? "Habilitados" : "Desabilitados");
+        return List.of(
+                new FiltroAplicado("Título", titulo == null || titulo.isBlank() ? "Todos" : titulo),
+                new FiltroAplicado("Comentários", comentariosLabel),
+                new FiltroAplicado("Unidade", unidade));
+    }
+
+    /** Colunas da exportação — todas as informações úteis da tela, incluindo as contagens. */
+    private List<ColunaExport<Postagem>> colunasPostagem() {
+        return List.of(
+                ColunaExport.de("Título", Postagem::getTitulo),
+                ColunaExport.de("Descrição", Postagem::getDescricao),
+                ColunaExport.de("Unidade", p -> p.getUnidadeSaude().getNome()),
+                ColunaExport.de("Curtidas", p -> String.valueOf(curtidaRepository.countByPostagemId(p.getId()))),
+                ColunaExport.de("Comentários", p -> String.valueOf(comentarioRepository.countByPostagemId(p.getId()))),
+                ColunaExport.de("Total de curtidas visível", p -> p.isMostrarTotalCurtidas() ? "Sim" : "Não"),
+                ColunaExport.de("Comentários habilitados", p -> p.isHabilitarComentarios() ? "Sim" : "Não"),
+                ColunaExport.de("Publicado em", p -> p.getCriadoEm() == null ? "" : p.getCriadoEm().format(DATA_HORA)));
     }
 
     @GetMapping("/{id}")

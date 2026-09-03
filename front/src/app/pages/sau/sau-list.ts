@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { TipoManifestacao } from '../tipos-manifestacao/tipo-manifestacao.model';
 import { TipoManifestacaoService } from '../tipos-manifestacao/tipo-manifestacao.service';
@@ -23,6 +24,9 @@ export class SauList {
   private readonly router = inject(Router);
   private readonly store = inject(SauBuscaStore);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = SauService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -136,6 +140,34 @@ export class SauList {
           this.carregado.set(true);
         },
       });
+  }
+
+  /** Exporta as manifestações dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    const f = this.filtro.getRawValue();
+    this.exportando.set(formato);
+    this.service
+      .exportar(formato, { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status })
+      .subscribe({
+        next: (blob) => {
+          this.baixar(blob, `sau.${formato}`);
+          this.exportando.set(null);
+        },
+        error: () => {
+          this.exportando.set(null);
+          this.toastr.error('Não foi possível exportar os dados.');
+        },
+      });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected abrir(m: Manifestacao): void {

@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -23,6 +24,9 @@ export class NpsList {
   private readonly router = inject(Router);
   private readonly store = inject(NpsBuscaStore);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = NpsService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -138,5 +142,33 @@ export class NpsList {
 
   protected abrir(nps: Nps): void {
     this.router.navigate(['/nps', nps.id]);
+  }
+
+  /** Exporta as avaliações dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    const f = this.filtro.getRawValue();
+    this.service
+      .exportar(formato, { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() })
+      .subscribe({
+        next: (blob) => {
+          this.baixar(blob, `nps.${formato}`);
+          this.exportando.set(null);
+        },
+        error: () => {
+          this.exportando.set(null);
+          this.toastr.error('Não foi possível exportar os dados.');
+        },
+      });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 }

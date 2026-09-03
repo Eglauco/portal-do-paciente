@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
+import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { Postagem } from './postagem.model';
 import { PostagemBuscaStore } from './postagem-busca.store';
@@ -25,6 +26,9 @@ export class PostagensList {
   private readonly router = inject(Router);
   private readonly store = inject(PostagemBuscaStore);
   private readonly auth = inject(AuthService);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = PostagemService.TAMANHOS;
   protected readonly comentariosOpcoes = COMENTARIOS_OPCOES;
@@ -134,5 +138,33 @@ export class PostagensList {
 
   protected editar(p: Postagem): void {
     this.router.navigate(['/postagens', p.id]);
+  }
+
+  /** Exporta as postagens dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    const f = this.filtro.getRawValue();
+    this.service
+      .exportar(formato, { titulo: f.titulo, unidadeId: this.auth.unidadeId(), comentarios: f.comentarios })
+      .subscribe({
+        next: (blob) => {
+          this.baixar(blob, `postagens.${formato}`);
+          this.exportando.set(null);
+        },
+        error: () => {
+          this.exportando.set(null);
+          this.toastr.error('Não foi possível exportar os dados.');
+        },
+      });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 }

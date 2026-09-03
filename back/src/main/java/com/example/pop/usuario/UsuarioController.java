@@ -1,11 +1,17 @@
 package com.example.pop.usuario;
 
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
+
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,6 +27,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 
@@ -38,12 +47,14 @@ public class UsuarioController {
     private final UsuarioRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final UnidadeRepository unidadeRepository;
+    private final ExportacaoService exportacaoService;
 
     public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder,
-            UnidadeRepository unidadeRepository) {
+            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.unidadeRepository = unidadeRepository;
+        this.exportacaoService = exportacaoService;
     }
 
     /**
@@ -73,6 +84,53 @@ public class UsuarioController {
                 resultado.getTotalPages(),
                 resultado.isFirst(),
                 resultado.isLast());
+    }
+
+    /**
+     * Exporta os usuários que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) Long codigo,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String email) {
+        String filtroNome = (nome == null) ? "" : nome.trim();
+        String filtroEmail = (email == null) ? "" : email.trim();
+
+        List<Usuario> dados = repository.search(codigo, filtroNome, filtroEmail, Pageable.unpaged())
+                .getContent().stream()
+                .sorted(Comparator.comparing(Usuario::getId))
+                .toList();
+        List<ColunaExport<Usuario>> colunas = colunasUsuario();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Usuários", filtrosUsuario(codigo, nome, email), colunas, dados)
+                : exportacaoService.excel("Usuários", colunas, dados);
+        String arquivoNome = "usuarios-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + arquivoNome + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosUsuario(Long codigo, String nome, String email) {
+        return List.of(
+                new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
+                new FiltroAplicado("Nome", (nome != null && !nome.isBlank()) ? nome.trim() : "Todos"),
+                new FiltroAplicado("E-mail", (email != null && !email.isBlank()) ? email.trim() : "Todos"));
+    }
+
+    private static List<ColunaExport<Usuario>> colunasUsuario() {
+        return List.of(
+                ColunaExport.de("Código", u -> u.getId() == null ? "" : String.valueOf(u.getId())),
+                ColunaExport.de("Nome", Usuario::getNome),
+                ColunaExport.de("E-mail", Usuario::getEmail),
+                ColunaExport.de("Unidade", u -> u.getUnidade() == null ? "" : u.getUnidade().getNome()));
     }
 
     @GetMapping("/{id}")

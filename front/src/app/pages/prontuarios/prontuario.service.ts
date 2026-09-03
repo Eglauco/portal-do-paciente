@@ -30,6 +30,15 @@ export class ProntuarioService {
     return this.http.get<Pagina<Prontuario>>(this.base, { params });
   }
 
+  /** Exporta os prontuários dos filtros atuais em Excel ou PDF (arquivo binário). */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ProntuarioFiltro = {}): Observable<Blob> {
+    let params = new HttpParams().set('formato', formato);
+    if (filtro.numero) params = params.set('numero', filtro.numero);
+    if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
+    if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
+    return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
   buscarPorId(id: number): Observable<ProntuarioDetalhe> {
     return this.http.get<ProntuarioDetalhe>(`${this.base}/${id}`);
   }

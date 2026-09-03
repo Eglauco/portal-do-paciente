@@ -1,12 +1,17 @@
 package com.example.pop.sau;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,6 +26,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.export.ColunaExport;
+import com.example.pop.export.ExportacaoService;
+import com.example.pop.export.FiltroAplicado;
+import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
 
@@ -33,10 +42,18 @@ public class SauController {
 
     private final ManifestacaoRepository repository;
     private final SauService sauService;
+    private final UnidadeRepository unidadeRepository;
+    private final TipoManifestacaoRepository tipoRepository;
+    private final ExportacaoService exportacaoService;
 
-    public SauController(ManifestacaoRepository repository, SauService sauService) {
+    public SauController(ManifestacaoRepository repository, SauService sauService,
+            UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
+            ExportacaoService exportacaoService) {
         this.repository = repository;
         this.sauService = sauService;
+        this.unidadeRepository = unidadeRepository;
+        this.tipoRepository = tipoRepository;
+        this.exportacaoService = exportacaoService;
     }
 
     /** Lista com filtros opcionais de unidade, tipo e status (mais recentes primeiro). */
@@ -53,6 +70,63 @@ public class SauController {
         List<ManifestacaoResponse> content = resultado.getContent().stream().map(sauService::toResponse).toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
+    }
+
+    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /**
+     * Exporta as manifestações que batem com os MESMOS filtros da tela (todos os
+     * registros, sem paginação) em Excel (padrão) ou PDF. Mais recentes primeiro.
+     */
+    @GetMapping("/exportar")
+    public ResponseEntity<byte[]> exportar(
+            @RequestParam(defaultValue = "xlsx") String formato,
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) Long tipoId,
+            @RequestParam(required = false) StatusManifestacao status) {
+        List<ManifestacaoResponse> dados = repository.search(unidadeId, tipoId, status, Pageable.unpaged())
+                .getContent().stream()
+                .map(sauService::toResponse)
+                .sorted(Comparator.comparing(ManifestacaoResponse::atualizadoEm).reversed())
+                .toList();
+        List<ColunaExport<ManifestacaoResponse>> colunas = colunasSau();
+
+        boolean pdf = "pdf".equalsIgnoreCase(formato);
+        byte[] arquivo = pdf
+                ? exportacaoService.pdf("Manifestações (SAU)", filtrosSau(unidadeId, tipoId, status), colunas, dados)
+                : exportacaoService.excel("Manifestações (SAU)", colunas, dados);
+        String nome = "sau-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+
+        return ResponseEntity.ok()
+                .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
+                .body(arquivo);
+    }
+
+    /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
+    private List<FiltroAplicado> filtrosSau(Long unidadeId, Long tipoId, StatusManifestacao status) {
+        String unidade = unidadeId == null ? "Todas"
+                : unidadeRepository.findById(unidadeId).map(u -> u.getNome()).orElse("#" + unidadeId);
+        String tipo = tipoId == null ? "Todos"
+                : tipoRepository.findById(tipoId).map(TipoManifestacao::getNome).orElse("#" + tipoId);
+        return List.of(
+                new FiltroAplicado("Unidade", unidade),
+                new FiltroAplicado("Tipo", tipo),
+                new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos"));
+    }
+
+    private static List<ColunaExport<ManifestacaoResponse>> colunasSau() {
+        return List.of(
+                ColunaExport.de("Aberta em", m -> m.criadoEm() == null ? "" : m.criadoEm().format(DATA_HORA)),
+                ColunaExport.de("Atualizada em", m -> m.atualizadoEm() == null ? "" : m.atualizadoEm().format(DATA_HORA)),
+                ColunaExport.de("Paciente", m -> m.paciente().nome()),
+                ColunaExport.de("Unidade", m -> m.unidadeSaude().nome()),
+                ColunaExport.de("Tipo", m -> m.tipo().nome()),
+                ColunaExport.de("Status", ManifestacaoResponse::statusDescricao),
+                ColunaExport.de("Avaliação", m -> m.avaliacaoNota() == null ? "" : m.avaliacaoNota() + "/5"),
+                ColunaExport.de("Última resposta de", m -> m.ultimaMensagemDe() == null ? ""
+                        : (m.ultimaMensagemDe() == AutorManifestacao.SAU ? "SAU" : "Paciente")),
+                ColunaExport.de("Última mensagem", ManifestacaoResponse::ultimaMensagem));
     }
 
     @GetMapping("/{id}")

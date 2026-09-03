@@ -1,5 +1,6 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { MotivoFalta } from './motivo-falta.model';
 import { MotivoFaltaBuscaStore } from './motivo-falta-busca.store';
 import { MotivoFaltaService } from './motivo-falta.service';
@@ -15,6 +16,9 @@ export class MotivosFaltaList {
   private readonly service = inject(MotivoFaltaService);
   private readonly router = inject(Router);
   private readonly store = inject(MotivoFaltaBuscaStore);
+  private readonly toastr = inject(ToastrService);
+
+  protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
 
   protected readonly tamanhos = MotivoFaltaService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -122,6 +126,31 @@ export class MotivosFaltaList {
 
   protected editar(motivo: MotivoFalta): void {
     this.router.navigate(['/motivos-falta', motivo.id]);
+  }
+
+  /** Exporta os motivos de falta dos filtros atuais (mesmos da tela) em Excel ou PDF. */
+  protected exportar(formato: 'xlsx' | 'pdf'): void {
+    if (this.exportando()) return;
+    this.exportando.set(formato);
+    this.service.exportar(formato, { codigo: this.codigo(), motivo: this.motivo() }).subscribe({
+      next: (blob) => {
+        this.baixar(blob, `motivos-falta.${formato}`);
+        this.exportando.set(null);
+      },
+      error: () => {
+        this.exportando.set(null);
+        this.toastr.error('Não foi possível exportar os dados.');
+      },
+    });
+  }
+
+  private baixar(blob: Blob, nome: string): void {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nome;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   protected updateCodigo(event: Event): void {
