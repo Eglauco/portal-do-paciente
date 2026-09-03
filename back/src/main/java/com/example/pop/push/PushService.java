@@ -13,6 +13,8 @@ import org.springframework.web.client.RestClient;
 
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.chat.Chat;
+import com.example.pop.notificacao.NotificacaoService;
+import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.nps.Nps;
 import com.example.pop.postagem.Postagem;
 
@@ -31,10 +33,12 @@ public class PushService {
     private static final DateTimeFormatter DATA_FMT = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
 
     private final DispositivoRepository repository;
+    private final NotificacaoService notificacaoService;
     private RestClient restClient;
 
-    public PushService(DispositivoRepository repository) {
+    public PushService(DispositivoRepository repository, NotificacaoService notificacaoService) {
         this.repository = repository;
+        this.notificacaoService = notificacaoService;
     }
 
     // Criado sob demanda (evita abrir conexão na inicialização/testes).
@@ -51,6 +55,7 @@ public class PushService {
                 + " em " + a.getDataHora().format(DATA_FMT)
                 + ". Toque para confirmar ou cancelar.";
         Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId());
+        notificacaoService.registrar(a.getPaciente().getId(), TipoNotificacao.AGENDAMENTO, "Novo agendamento", corpo, a.getId());
         notificarPaciente(a.getPaciente().getId(), "Novo agendamento", corpo, data);
     }
 
@@ -59,6 +64,7 @@ public class PushService {
         String corpo = "Você foi marcado como falta na consulta de " + a.getEspecialidade().getNome()
                 + " em " + a.getDataHora().format(DATA_FMT) + ". Toque para justificar.";
         Map<String, Object> data = Map.of("tipo", "FALTA", "agendamentoId", a.getId());
+        notificacaoService.registrar(a.getPaciente().getId(), TipoNotificacao.FALTA, "Falta registrada", corpo, a.getId());
         notificarPaciente(a.getPaciente().getId(), "Falta registrada", corpo, data);
     }
 
@@ -73,14 +79,16 @@ public class PushService {
     public void notificarNpsPendente(Nps nps) {
         String especialidade = nps.getAgendamento().getEspecialidade().getNome();
         String corpo = "Como foi seu atendimento de " + especialidade + "? Toque para avaliar.";
-        notificarPaciente(nps.getAgendamento().getPaciente().getId(),
-                "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
+        Long pacienteId = nps.getAgendamento().getPaciente().getId();
+        notificacaoService.registrar(pacienteId, TipoNotificacao.NPS, "Avalie seu atendimento", corpo, null);
+        notificarPaciente(pacienteId, "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
     }
 
     /** Nova publicação (postagem) no feed das unidades — broadcast (todos os aparelhos). */
     public void notificarNovaPostagem(Postagem p) {
         String corpo = p.getUnidadeSaude().getNome() + " publicou: " + p.getTitulo();
         Map<String, Object> data = Map.of("tipo", "POSTAGEM", "postagemId", p.getId());
+        notificacaoService.registrarParaTodos(TipoNotificacao.POSTAGEM, "Nova publicação", corpo, p.getId());
         notificarTodos("Nova publicação", corpo, data);
     }
 
@@ -90,6 +98,7 @@ public class PushService {
         String corpo = novo
                 ? "Seu atendimento foi registrado. Confira os documentos no prontuário."
                 : "Um novo documento foi adicionado ao seu prontuário.";
+        notificacaoService.registrar(pacienteId, TipoNotificacao.PRONTUARIO, titulo, corpo, null);
         notificarPaciente(pacienteId, titulo, corpo, Map.of("tipo", "PRONTUARIO"));
     }
 

@@ -7,9 +7,13 @@ import java.util.Map;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Ref;
+import com.example.pop.notificacao.NotificacaoService;
+import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.push.PushService;
 import com.example.pop.unidade.Unidade;
@@ -31,16 +35,18 @@ public class SauService {
     private final TipoManifestacaoRepository tipoRepository;
     private final UsuarioRepository usuarioRepository;
     private final PushService pushService;
+    private final NotificacaoService notificacaoService;
 
     public SauService(ManifestacaoRepository repository, ManifestacaoMensagemRepository mensagemRepository,
             UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
-            UsuarioRepository usuarioRepository, PushService pushService) {
+            UsuarioRepository usuarioRepository, PushService pushService, NotificacaoService notificacaoService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.unidadeRepository = unidadeRepository;
         this.tipoRepository = tipoRepository;
         this.usuarioRepository = usuarioRepository;
         this.pushService = pushService;
+        this.notificacaoService = notificacaoService;
     }
 
     /** Abre uma manifestação (cria + a 1ª mensagem do paciente). Status inicial: aguardando SAU. */
@@ -100,9 +106,18 @@ public class SauService {
         // Grava (checando a versão) ANTES do push: se perder a corrida, dá 409 e
         // não dispara notificação de uma mensagem que não foi persistida.
         salvarComVersao(m);
-        pushService.notificarPaciente(m.getPaciente().getId(), "Resposta do SAU",
-                "O atendimento respondeu sua manifestação (" + m.getTipo().getNome() + ").",
-                Map.of("tipo", "SAU", "manifestacaoId", m.getId()));
+        // Captura os dados AINDA na transação (tipo/paciente são LAZY) e só grava a
+        // notificação + dispara o push DEPOIS do commit. Como registrar roda em
+        // REQUIRES_NEW (comita na hora), fazê-lo antes do commit poderia deixar uma
+        // notificação órfã se o tx de negócio revertesse — igual ao padrão do chat.
+        String corpoSau = "O atendimento respondeu sua manifestação (" + m.getTipo().getNome() + ").";
+        Long pacienteId = m.getPaciente().getId();
+        Long manifestacaoId = m.getId();
+        aposCommit(() -> {
+            notificacaoService.registrar(pacienteId, TipoNotificacao.SAU, "Resposta do SAU", corpoSau, manifestacaoId);
+            pushService.notificarPaciente(pacienteId, "Resposta do SAU", corpoSau,
+                    Map.of("tipo", "SAU", "manifestacaoId", manifestacaoId));
+        });
         return m;
     }
 
@@ -127,6 +142,20 @@ public class SauService {
         } catch (OptimisticLockingFailureException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "A manifestação acabou de ser atualizada. Recarregue e tente novamente.");
+        }
+    }
+
+    /** Executa a ação após o commit da transação atual (ou imediatamente, se não houver). */
+    private void aposCommit(Runnable acao) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    acao.run();
+                }
+            });
+        } else {
+            acao.run();
         }
     }
 
