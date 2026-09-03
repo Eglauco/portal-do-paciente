@@ -61,6 +61,11 @@ export class DashboardSau {
     return ((atual - anterior) / anterior) * 100;
   }
 
+  /** Média formatada (1 casa); "—" quando não houve avaliação no período. */
+  protected media(valor: number, avaliacoes: number): string {
+    return avaliacoes > 0 ? valor.toFixed(1) : '—';
+  }
+
   protected autorItens(d: SauDashboard): { rotulo: string; valor: number }[] {
     return [
       { rotulo: 'Paciente', valor: d.mensagensPaciente },

@@ -12,5 +12,12 @@ public record SauDashboard(
         List<SerieDiaria> porDia,
         List<Fatia> porStatus,
         List<ItemContagem> porTipo,
-        List<ItemContagem> cargaPorAtendente) {
+        List<ItemContagem> cargaPorAtendente,
+        // Avaliação do atendimento (nota 1-5) — período por avaliadoEm.
+        double mediaAvaliacao, double mediaAvaliacaoAnterior,
+        long avaliacoesPeriodo,
+        long satisfeitos, long neutros, long insatisfeitos,
+        double percentualAvaliadas,
+        List<SerieDiaria> avaliacoesPorDia,
+        List<ItemContagem> distribuicaoNotas) {
 }

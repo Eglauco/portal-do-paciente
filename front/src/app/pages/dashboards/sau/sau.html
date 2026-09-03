@@ -61,5 +61,36 @@
         <div class="pnl__body"><dash-bars [itens]="autorItens(d)" cor="#7b61ff" /></div>
       </div>
     </div>
+
+    <!-- Avaliação do atendimento (nota 1-5 que o paciente dá ao encerrar) -->
+    <h2 class="dash-secao">Avaliação do atendimento</h2>
+    <div class="stat-grid">
+      <dash-stat rotulo="Média das avaliações" [valor]="media(d.mediaAvaliacao, d.avaliacoesPeriodo)"
+        [sub]="'de 1 a 5 estrelas'"
+        [delta]="d.avaliacoesPeriodo > 0 ? delta(d.mediaAvaliacao, d.mediaAvaliacaoAnterior) : null" tom="amber" />
+      <dash-stat rotulo="Avaliações no período" [valor]="d.avaliacoesPeriodo" [sub]="'últimos ' + d.dias + ' dias'"
+        tom="teal" />
+      <dash-stat rotulo="Satisfeitos" [valor]="d.satisfeitos" [sub]="'notas 4–5'" tom="green" />
+      <dash-stat rotulo="Insatisfeitos" [valor]="d.insatisfeitos" [sub]="'notas 1–2'" tom="red" />
+      <dash-stat rotulo="Adesão à avaliação" [valor]="d.percentualAvaliadas + '%'"
+        [sub]="'das fechadas foram avaliadas'" tom="violet" />
+    </div>
+
+    <div class="dash-grid">
+      <div class="pnl g-6">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Distribuição das notas</h2>
+          <span class="pnl__hint">no período</span>
+        </div>
+        <div class="pnl__body"><dash-bars [itens]="d.distribuicaoNotas" cor="#f0a824" /></div>
+      </div>
+      <div class="pnl g-6">
+        <div class="pnl__head">
+          <h2 class="pnl__title">Avaliações por dia</h2>
+          <span class="pnl__hint">últimos {{ d.dias }} dias</span>
+        </div>
+        <div class="pnl__body"><dash-line [pontos]="d.avaliacoesPorDia" cor="#159a8a" /></div>
+      </div>
+    </div>
   }
 </section>

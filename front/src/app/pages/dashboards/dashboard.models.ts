@@ -98,6 +98,16 @@ export interface SauDashboard {
   porStatus: Fatia[];
   porTipo: ItemContagem[];
   cargaPorAtendente: ItemContagem[];
+  // Avaliação do atendimento (nota 1-5)
+  mediaAvaliacao: number;
+  mediaAvaliacaoAnterior: number;
+  avaliacoesPeriodo: number;
+  satisfeitos: number;
+  neutros: number;
+  insatisfeitos: number;
+  percentualAvaliadas: number;
+  avaliacoesPorDia: SerieDiaria[];
+  distribuicaoNotas: ItemContagem[];
 }
 
 export interface NpsDashboard {

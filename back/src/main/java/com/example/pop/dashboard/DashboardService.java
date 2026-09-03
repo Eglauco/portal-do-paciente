@@ -194,6 +194,28 @@ public class DashboardService {
         Map<AutorManifestacao, Long> aut = contagens(
                 manifestacaoMensagemRepository.agruparPorAutorPeriodo(unidadeId, j.inicio(), j.fim()));
 
+        // ---- Avaliação do atendimento (nota 1-5), no período por avaliadoEm ----
+        Double mediaAtual = manifestacaoRepository.mediaAvaliacaoPeriodo(unidadeId, j.inicio(), j.fim());
+        Double mediaAnt = manifestacaoRepository.mediaAvaliacaoPeriodo(unidadeId, j.inicioAnterior(), j.inicio());
+        long avaliacoesPeriodo = manifestacaoRepository.contarAvaliadasPeriodo(unidadeId, j.inicio(), j.fim());
+
+        Map<Integer, Long> notas = new HashMap<>();
+        for (Object[] r : manifestacaoRepository.distribuicaoAvaliacoes(unidadeId, j.inicio(), j.fim())) {
+            if (r[0] != null) {
+                notas.put(((Number) r[0]).intValue(), ((Number) r[1]).longValue());
+            }
+        }
+        List<ItemContagem> distribuicaoNotas = new ArrayList<>();
+        for (int n = 1; n <= 5; n++) {
+            distribuicaoNotas.add(new ItemContagem(n + (n == 1 ? " estrela" : " estrelas"), notas.getOrDefault(n, 0L)));
+        }
+        long satisfeitos = notas.getOrDefault(4, 0L) + notas.getOrDefault(5, 0L);
+        long neutros = notas.getOrDefault(3, 0L);
+        long insatisfeitos = notas.getOrDefault(1, 0L) + notas.getOrDefault(2, 0L);
+
+        // Adesão à avaliação: das fechadas (retrato atual), quantas foram avaliadas.
+        double percentualAvaliadas = taxa(manifestacaoRepository.contarAvaliadas(unidadeId), fechadas);
+
         return new SauDashboard(
                 dias,
                 total, anterior,
@@ -203,7 +225,13 @@ public class DashboardService {
                 serieDiaria(manifestacaoRepository.serieCriacao(unidadeId, j.inicio(), j.fim()), j),
                 fatias(StatusManifestacao.values(), st, StatusManifestacao::getDescricao),
                 itens(manifestacaoRepository.porTipo(unidadeId, j.inicio(), j.fim())),
-                itens(manifestacaoMensagemRepository.cargaPorAtendente(unidadeId, j.inicio(), j.fim())));
+                itens(manifestacaoMensagemRepository.cargaPorAtendente(unidadeId, j.inicio(), j.fim())),
+                round1(mediaAtual == null ? 0.0 : mediaAtual), round1(mediaAnt == null ? 0.0 : mediaAnt),
+                avaliacoesPeriodo,
+                satisfeitos, neutros, insatisfeitos,
+                percentualAvaliadas,
+                serieDiaria(manifestacaoRepository.serieAvaliacoes(unidadeId, j.inicio(), j.fim()), j),
+                distribuicaoNotas);
     }
 
     // ===================== NPS =====================

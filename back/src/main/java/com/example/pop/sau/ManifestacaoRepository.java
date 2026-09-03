@@ -71,4 +71,52 @@ public interface ManifestacaoRepository extends JpaRepository<Manifestacao, Long
             """)
     List<Object[]> porTipo(@Param("unidadeId") Long unidadeId,
             @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    // ---------------- Avaliação do atendimento SAU (nota 1-5, por avaliadoEm) ----------------
+
+    /** Média das notas avaliadas no período (nulo quando não houve avaliação). */
+    @Query("""
+            select avg(m.avaliacaoNota) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.avaliadoEm between :inicio and :fim
+            """)
+    Double mediaAvaliacaoPeriodo(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Quantas manifestações foram avaliadas no período. */
+    @Query("""
+            select count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.avaliadoEm between :inicio and :fim
+            """)
+    long contarAvaliadasPeriodo(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Distribuição das notas (nota, quantidade) no período. */
+    @Query("""
+            select m.avaliacaoNota, count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.avaliadoEm between :inicio and :fim
+            group by m.avaliacaoNota
+            """)
+    List<Object[]> distribuicaoAvaliacoes(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Série diária de avaliações (data da avaliação, quantidade). */
+    @Query("""
+            select cast(m.avaliadoEm as date), count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.avaliadoEm between :inicio and :fim
+            group by cast(m.avaliadoEm as date)
+            """)
+    List<Object[]> serieAvaliacoes(@Param("unidadeId") Long unidadeId,
+            @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /** Retrato ATUAL: total de manifestações já avaliadas e total já fechadas (adesão à avaliação). */
+    @Query("""
+            select count(m) from Manifestacao m
+            where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
+              and m.avaliadoEm is not null
+            """)
+    long contarAvaliadas(@Param("unidadeId") Long unidadeId);
 }
