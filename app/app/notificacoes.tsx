@@ -1,86 +1,182 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import {
+  Notificacao,
+  TipoNotificacao,
+  listarNotificacoes,
+  marcarNotificacaoLida,
+} from '@/services/notificacoes-lista';
+import { navegarNotificacao } from '@/services/rota-notificacao';
 
-type Tipo = 'agendamento' | 'exame' | 'chat' | 'nps' | 'sistema';
-
-interface Notificacao {
-  id: string;
-  tipo: Tipo;
-  titulo: string;
-  descricao: string;
-  hora: string;
-  naoLida?: boolean;
-}
-
-const ESTILO_TIPO: Record<Tipo, { icon: string; fg: string; bg: string }> = {
-  agendamento: { icon: 'calendar', fg: '#0E8C7F', bg: '#DCF1EC' },
-  exame: { icon: 'flask', fg: '#2F6DF6', bg: '#E9F0FE' },
-  chat: { icon: 'chatbubble-ellipses', fg: '#7A5AF5', bg: '#EFEAFE' },
-  nps: { icon: 'star', fg: '#A5741A', bg: '#FBF0D6' },
-  sistema: { icon: 'shield-checkmark', fg: '#0A7D5A', bg: '#E3F6EC' },
+const ESTILO_TIPO: Record<TipoNotificacao, { icon: string; fg: string; bg: string }> = {
+  AGENDAMENTO: { icon: 'calendar', fg: '#0E8C7F', bg: '#DCF1EC' },
+  FALTA: { icon: 'alert-circle', fg: '#C2410C', bg: '#FCE9DF' },
+  NPS: { icon: 'star', fg: '#A5741A', bg: '#FBF0D6' },
+  POSTAGEM: { icon: 'newspaper', fg: '#2F6DF6', bg: '#E9F0FE' },
+  PRONTUARIO: { icon: 'document-text', fg: '#0A7D5A', bg: '#E3F6EC' },
+  SAU: { icon: 'megaphone', fg: '#7A5AF5', bg: '#EFEAFE' },
 };
 
-const GRUPOS: { titulo: string; itens: Notificacao[] }[] = [
-  {
-    titulo: 'Hoje',
-    itens: [
-      { id: '1', tipo: 'exame', titulo: 'Resultado disponível', descricao: 'Seu Hemograma completo já está no Prontuário.', hora: '08:05', naoLida: true },
-      { id: '2', tipo: 'chat', titulo: 'Nova mensagem da unidade', descricao: 'Unidade de Saúde 01 respondeu sua conversa.', hora: '08:05', naoLida: true },
-      { id: '3', tipo: 'agendamento', titulo: 'Lembrete de consulta', descricao: 'Cardiologia com Dr. Rafael Lima em 26/08 às 14:30.', hora: '07:30' },
-    ],
-  },
-  {
-    titulo: 'Ontem',
-    itens: [
-      { id: '4', tipo: 'agendamento', titulo: 'Consulta remarcada', descricao: 'Dermatologia remarcada para 02/09 às 10:15.', hora: '09:17' },
-      { id: '5', tipo: 'nps', titulo: 'Avalie seu atendimento', descricao: 'Como foi sua consulta de Clínico Geral? Dê uma nota.', hora: '18:40' },
-    ],
-  },
-  {
-    titulo: 'Anteriores',
-    itens: [
-      { id: '6', tipo: 'exame', titulo: 'Coleta agendada', descricao: 'Exame de sangue agendado para 28/08 às 08:00.', hora: '20 ago' },
-      { id: '7', tipo: 'sistema', titulo: 'Bem-vindo ao Portal do Paciente', descricao: 'Seu cadastro foi ativado com sucesso.', hora: '15 ago' },
-    ],
-  },
-];
+const doisDigitos = (n: number) => String(n).padStart(2, '0');
+
+/** Rótulo do grupo (Hoje / Ontem / Anteriores) a partir da data. */
+function grupoDe(iso: string): 'Hoje' | 'Ontem' | 'Anteriores' {
+  const d = new Date(iso);
+  const agora = new Date();
+  if (d.toDateString() === agora.toDateString()) return 'Hoje';
+  const ontem = new Date(agora);
+  ontem.setDate(agora.getDate() - 1);
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem';
+  return 'Anteriores';
+}
+
+/** Hora curta: HH:mm em Hoje/Ontem, dd/mm em Anteriores. */
+function horaDe(iso: string, grupo: string): string {
+  const d = new Date(iso);
+  if (grupo === 'Anteriores') return `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}`;
+  return `${doisDigitos(d.getHours())}:${doisDigitos(d.getMinutes())}`;
+}
+
+const ORDEM_GRUPOS = ['Hoje', 'Ontem', 'Anteriores'] as const;
 
 export default function NotificacoesScreen() {
+  const [itens, setItens] = useState<Notificacao[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(false);
+  const [atualizando, setAtualizando] = useState(false);
+  const jaCarregou = useRef(false);
+
+  const carregar = useCallback(async (mostrarSpinner: boolean) => {
+    try {
+      if (mostrarSpinner) setCarregando(true);
+      setErro(false);
+      const dados = await listarNotificacoes();
+      setItens(dados);
+      jaCarregou.current = true;
+    } catch {
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
+    } finally {
+      setCarregando(false);
+      setAtualizando(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar(!jaCarregou.current);
+    }, [carregar]),
+  );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
+
+  const aoAtualizar = () => {
+    setAtualizando(true);
+    carregar(false);
+  };
+
+  const aoTocar = (n: Notificacao) => {
+    // Marca como lida na hora (some o ponto) e persiste; navega para a origem.
+    if (!n.lida) {
+      setItens((atual) => atual.map((x) => (x.id === n.id ? { ...x, lida: true } : x)));
+      void marcarNotificacaoLida(n.id).catch(() => {});
+    }
+    navegarNotificacao(n.tipo, n.referenciaId);
+  };
+
+  // Agrupa preservando a ordem (backend já devolve do mais recente ao mais antigo).
+  const grupos = ORDEM_GRUPOS.map((titulo) => ({
+    titulo,
+    itens: itens.filter((n) => grupoDe(n.criadoEm) === titulo),
+  })).filter((g) => g.itens.length > 0);
+
   return (
     <View style={styles.screen}>
-      <ScreenHeader
-        title="Notificações"
-        action={<Text style={styles.marcar}>Marcar lidas</Text>}
-      />
-      <ScrollView contentContainerStyle={styles.content}>
-        {GRUPOS.map((grupo) => (
-          <View key={grupo.titulo} style={styles.grupo}>
-            <Text style={styles.grupoTitulo}>{grupo.titulo}</Text>
-            {grupo.itens.map((n) => {
-              const e = ESTILO_TIPO[n.tipo];
-              return (
-                <View key={n.id} style={[styles.item, n.naoLida && styles.itemNaoLido]}>
-                  <View style={[styles.icon, { backgroundColor: e.bg }]}>
-                    <Ionicons name={e.icon as any} size={18} color={e.fg} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.itemTop}>
-                      <Text style={styles.titulo} numberOfLines={1}>
-                        {n.titulo}
-                      </Text>
-                      <Text style={styles.hora}>{n.hora}</Text>
-                    </View>
-                    <Text style={styles.descricao}>{n.descricao}</Text>
-                  </View>
-                  {n.naoLida && <View style={styles.dot} />}
-                </View>
-              );
-            })}
+      <ScreenHeader title="Notificações" />
+      <ScrollView
+        contentContainerStyle={[styles.content, itens.length === 0 && styles.vazioContent]}
+        refreshControl={
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+        }>
+        {carregando ? (
+          <View style={styles.estado}>
+            <ActivityIndicator color={Brand.brand} />
+            <Text style={styles.estadoTxt}>Carregando notificações…</Text>
           </View>
-        ))}
+        ) : erro ? (
+          <View style={styles.estado}>
+            <View style={styles.estadoIcone}>
+              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+            </View>
+            <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
+            <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
+            <Pressable style={styles.estadoBtn} onPress={() => carregar(true)}>
+              <Ionicons name="refresh" size={16} color="#fff" />
+              <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
+            </Pressable>
+          </View>
+        ) : itens.length === 0 ? (
+          <View style={styles.estado}>
+            <View style={styles.estadoIcone}>
+              <Ionicons name="notifications-off-outline" size={26} color={Brand.muted} />
+            </View>
+            <Text style={styles.estadoTitulo}>Nenhuma notificação</Text>
+            <Text style={styles.estadoTxt}>
+              Quando houver novidades sobre seus atendimentos, elas aparecem aqui.
+            </Text>
+          </View>
+        ) : (
+          grupos.map((grupo) => (
+            <View key={grupo.titulo} style={styles.grupo}>
+              <Text style={styles.grupoTitulo}>{grupo.titulo}</Text>
+              {grupo.itens.map((n) => {
+                const e = ESTILO_TIPO[n.tipo];
+                return (
+                  <Pressable
+                    key={n.id}
+                    onPress={() => aoTocar(n)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${n.titulo}${n.lida ? '' : ', não lida'}`}
+                    style={({ pressed }) => [
+                      styles.item,
+                      !n.lida && styles.itemNaoLido,
+                      pressed && styles.itemPressed,
+                    ]}>
+                    <View style={[styles.icon, { backgroundColor: e.bg }]}>
+                      <Ionicons name={e.icon as never} size={18} color={e.fg} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.itemTop}>
+                        <Text style={[styles.titulo, !n.lida && styles.tituloForte]} numberOfLines={1}>
+                          {n.titulo}
+                        </Text>
+                        <Text style={styles.hora}>{horaDe(n.criadoEm, grupo.titulo)}</Text>
+                      </View>
+                      <Text style={styles.descricao} numberOfLines={2}>
+                        {n.corpo}
+                      </Text>
+                    </View>
+                    {!n.lida && <View style={styles.dot} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -88,8 +184,8 @@ export default function NotificacoesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Brand.bg },
-  marcar: { fontSize: 13, fontWeight: '600', color: Brand.brandDeep },
   content: { padding: 16, paddingBottom: 40 },
+  vazioContent: { flexGrow: 1 },
   grupo: { marginBottom: 20 },
   grupoTitulo: {
     fontSize: 12,
@@ -112,6 +208,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   itemNaoLido: { borderColor: '#CDE9E1', backgroundColor: '#F6FCFA' },
+  itemPressed: { backgroundColor: '#EEF3F1' },
   icon: {
     width: 40,
     height: 40,
@@ -121,7 +218,21 @@ const styles = StyleSheet.create({
   },
   itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   titulo: { flex: 1, fontSize: 14.5, fontWeight: '700', color: Brand.ink },
+  tituloForte: { fontWeight: '800' },
   hora: { fontSize: 11.5, color: Brand.muted },
   descricao: { fontSize: 13, color: '#40514C', marginTop: 2, lineHeight: 18 },
   dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: Brand.brand },
+
+  estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
+  estadoIcone: {
+    width: 56, height: 56, borderRadius: 18, backgroundColor: Brand.bg,
+    borderWidth: 1, borderColor: Brand.line, alignItems: 'center', justifyContent: 'center',
+  },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6, height: 44,
+    paddingHorizontal: 18, borderRadius: 14, backgroundColor: Brand.brand,
+  },
+  estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

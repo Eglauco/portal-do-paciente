@@ -1,11 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
+import { contarNaoLidas } from '@/services/notificacoes-lista';
 
 const FOTO_PACIENTE = 'https://i.pravatar.cc/160?img=47';
 
@@ -14,6 +17,22 @@ export function TopBar() {
   const router = useRouter();
   const { sessao } = useSessao();
   const primeiroNome = sessao?.nome?.trim().split(/\s+/)[0] ?? 'Paciente';
+  const [naoLidas, setNaoLidas] = useState(0);
+
+  const atualizarContagem = useCallback(() => {
+    contarNaoLidas()
+      .then(setNaoLidas)
+      .catch(() => {}); // silencioso: badge some se falhar
+  }, []);
+
+  // Recarrega ao focar a aba e quando chega um push (app aberto) ou volta ao foco.
+  // (o wrapper evita devolver a Promise como "cleanup" para o useFocusEffect)
+  useFocusEffect(
+    useCallback(() => {
+      atualizarContagem();
+    }, [atualizarContagem]),
+  );
+  useAtualizarComPush(atualizarContagem);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -41,9 +60,15 @@ export function TopBar() {
         style={({ pressed }) => [styles.bell, pressed && styles.bellPressed]}
         onPress={() => router.push('/notificacoes')}
         accessibilityRole="button"
-        accessibilityLabel="Notificações">
+        accessibilityLabel={
+          naoLidas > 0 ? `Notificações, ${naoLidas} não lidas` : 'Notificações'
+        }>
         <Ionicons name="notifications-outline" size={22} color={Brand.ink} />
-        <View style={styles.badge} />
+        {naoLidas > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeTxt}>{naoLidas > 99 ? '99+' : naoLidas}</Text>
+          </View>
+        )}
       </Pressable>
     </View>
   );
@@ -111,13 +136,22 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 10,
-    right: 11,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     backgroundColor: '#E0952A',
     borderWidth: 2,
     borderColor: Brand.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+    lineHeight: 12,
   },
 });

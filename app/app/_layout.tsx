@@ -2,17 +2,19 @@ import '@/constants/polyfills';
 
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { router, Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
+import { notificarAtualizacao } from '@/services/atualizacao';
 import { ehChatAtivo } from '@/services/chat-ativo';
 import { registrarParaPush } from '@/services/notificacoes';
+import { navegarNotificacao } from '@/services/rota-notificacao';
 
 // Mantém a splash nativa até sabermos se o paciente já está logado (sem piscar o login).
 SplashScreen.preventAutoHideAsync();
@@ -52,43 +54,12 @@ Notifications.setNotificationHandler({
   },
 });
 
-/** Ao tocar na notificação, leva o paciente para a tela certa. */
+/** Ao tocar na notificação push, leva o paciente para a tela certa. */
 function tratarToque(resposta: Notifications.NotificationResponse) {
   const dados = resposta.notification.request.content.data as DadosNotificacao;
-  switch (dados?.tipo) {
-    case 'AGENDAMENTO':
-    case 'FALTA':
-      // Falta registrada: leva o paciente à lista de agendamentos para justificar.
-      router.navigate('/(tabs)/agendamentos');
-      break;
-    case 'CHAT':
-      if (dados.chatId != null) {
-        router.navigate({ pathname: '/conversa/[id]', params: { id: String(dados.chatId) } });
-      } else {
-        router.navigate('/(tabs)/chat');
-      }
-      break;
-    case 'NPS':
-      router.navigate('/(tabs)/nps');
-      break;
-    case 'SAU':
-      if (dados.manifestacaoId != null) {
-        router.navigate({ pathname: '/sau/[id]', params: { id: String(dados.manifestacaoId) } });
-      } else {
-        router.navigate('/(tabs)/sau');
-      }
-      break;
-    case 'PRONTUARIO':
-      router.navigate('/(tabs)/prontuario');
-      break;
-    case 'POSTAGEM':
-      if (dados.postagemId != null) {
-        router.navigate({ pathname: '/postagem/[id]', params: { id: String(dados.postagemId) } });
-      } else {
-        router.navigate('/(tabs)/novidades');
-      }
-      break;
-  }
+  // Cada push traz só o id relevante do seu tipo; a rota é compartilhada com a lista.
+  const id = dados?.chatId ?? dados?.manifestacaoId ?? dados?.postagemId ?? dados?.agendamentoId ?? null;
+  navegarNotificacao(dados?.tipo, id);
 }
 
 /**
@@ -143,7 +114,24 @@ export default function RootLayout() {
 
     // Toque na notificação com o app aberto/em segundo plano.
     const sub = Notifications.addNotificationResponseReceivedListener(tratarToque);
-    return () => sub.remove();
+
+    // Notificação chegou com o app em primeiro plano: atualiza a tela em foco.
+    const recebido = Notifications.addNotificationReceivedListener(() => notificarAtualizacao());
+
+    // App voltou de fato do SEGUNDO PLANO (ex.: paciente tocou na notificação):
+    // atualiza. Só dispara em background→active — ignora o 'inactive' transitório
+    // (diálogo de permissão, central de controle, alternador de apps).
+    let estadoApp = AppState.currentState;
+    const appState = AppState.addEventListener('change', (estado) => {
+      if (estadoApp === 'background' && estado === 'active') notificarAtualizacao();
+      estadoApp = estado;
+    });
+
+    return () => {
+      sub.remove();
+      recebido.remove();
+      appState.remove();
+    };
   }, []);
 
   return (
