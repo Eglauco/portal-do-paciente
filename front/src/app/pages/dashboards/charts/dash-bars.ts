@@ -9,8 +9,8 @@ import { Component, computed, input } from '@angular/core';
     } @else {
       <ul class="bars">
         @for (it of itens(); track it.rotulo) {
-          <li class="bars__row">
-            <span class="bars__lbl" [title]="it.rotulo">{{ it.rotulo }}</span>
+          <li class="bars__row" [title]="it.rotulo + ': ' + rotuloValor(it.valor)">
+            <span class="bars__lbl">{{ it.rotulo }}</span>
             <span class="bars__track">
               <span class="bars__fill" [style.width.%]="largura(it.valor)" [style.background]="cor()"></span>
             </span>

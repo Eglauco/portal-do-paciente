@@ -23,7 +23,9 @@ import { cor } from './palette';
                 stroke-width="5"
                 [attr.stroke-dasharray]="s.dasharray"
                 [attr.stroke-dashoffset]="s.dashoffset"
-              />
+              >
+                <title>{{ s.rotulo }}: {{ s.valor }} ({{ s.pctLabel }})</title>
+              </circle>
             }
           }
           <text x="21" y="20.5" text-anchor="middle" class="donut__total">{{ geo().total }}</text>
