@@ -1,5 +1,6 @@
 package com.example.pop.push;
 
+import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -41,10 +43,14 @@ public class PushService {
         this.notificacaoService = notificacaoService;
     }
 
-    // Criado sob demanda (evita abrir conexão na inicialização/testes).
+    // Criado sob demanda (evita abrir conexão na inicialização/testes). Com timeouts:
+    // uma API de push travada não pode segurar a thread do job nem a conexão de BD.
     private synchronized RestClient client() {
         if (restClient == null) {
-            restClient = RestClient.create();
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(Duration.ofSeconds(5));
+            factory.setReadTimeout(Duration.ofSeconds(10));
+            restClient = RestClient.builder().requestFactory(factory).build();
         }
         return restClient;
     }

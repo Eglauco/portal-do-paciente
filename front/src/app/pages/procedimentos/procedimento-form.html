@@ -64,6 +64,27 @@
         }
         <span id="horas-hint" class="field-hint">Quantas horas antes da consulta o paciente ainda pode cancelar.</span>
       </div>
+
+      <div class="form-field">
+        <label class="label" for="horasNps">
+          Disparar NPS (horas após presença) <span class="req" aria-hidden="true">*</span>
+        </label>
+        <input
+          id="horasNps"
+          class="input"
+          type="number"
+          min="0"
+          formControlName="horasNps"
+          placeholder="Ex.: 24 (0 = na hora)"
+          [class.input--error]="invalido('horasNps')"
+          [attr.aria-invalid]="invalido('horasNps')"
+          aria-describedby="nps-hint nps-erro"
+        />
+        @if (invalido('horasNps')) {
+          <span id="nps-erro" class="field-error">Informe as horas (0 ou mais).</span>
+        }
+        <span id="nps-hint" class="field-hint">Quantas horas após a presença do paciente o NPS é enviado. 0 = dispara na hora.</span>
+      </div>
     </div>
 
     <div class="form-field">

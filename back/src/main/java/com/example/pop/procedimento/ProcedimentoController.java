@@ -138,6 +138,7 @@ public class ProcedimentoController {
                     existente.setNome(procedimento.getNome());
                     existente.setPreparo(procedimento.getPreparo());
                     existente.setHorasCancelamento(procedimento.getHorasCancelamento());
+                    existente.setHorasNps(procedimento.getHorasNps());
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

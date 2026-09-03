@@ -54,7 +54,7 @@ class LembreteFlowTest {
     @Test
     void disparaUmaVezGeraPopupComCancelamentoEReconhece() {
         // Procedimento com prazo de cancelamento de 1h (para o pop-up poder cancelar).
-        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc Lembrete Teste", null, 1));
+        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc Lembrete Teste", null, 1, 0));
 
         // Agendamento CONFIRMADO daqui a 2h nesse procedimento (paciente/unidade/etc. do seed = id 1).
         LocalDateTime dh = LocalDateTime.now(FUSO).plusHours(2).withNano(0);

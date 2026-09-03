@@ -19,6 +19,31 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Carrega o NPS garantindo que é do paciente (via agendamento.paciente). Escopo do app. */
     Optional<Nps> findByIdAndAgendamento_Paciente_Id(Long id, Long pacienteId);
 
+    /** Como acima, mas só se JÁ foi disparado (o paciente não acessa NPS ainda agendado). */
+    Optional<Nps> findByIdAndAgendamento_Paciente_IdAndDisparadoEmNotNull(Long id, Long pacienteId);
+
+    /** Ids dos NPS agendados cuja hora de disparo já chegou e ainda não foram disparados. */
+    @Query("""
+            select n.id from Nps n
+            where n.status = com.example.pop.nps.StatusNps.PENDENTE
+              and n.disparadoEm is null
+              and n.dispararEm is not null
+              and n.dispararEm <= :agora
+            """)
+    List<Long> idsParaDisparar(@Param("agora") LocalDateTime agora);
+
+    /** Lista do app: só NPS já disparados (visíveis ao paciente), opcionalmente por status. */
+    @Query("""
+            select n from Nps n
+            where n.agendamento.paciente.id = :pacienteId
+              and n.disparadoEm is not null
+              and (:status is null or n.status = :status)
+            """)
+    Page<Nps> searchDisparadosDoPaciente(
+            @Param("status") StatusNps status,
+            @Param("pacienteId") Long pacienteId,
+            Pageable pageable);
+
     @Query("""
             select n from Nps n
             where (:status is null or n.status = :status)

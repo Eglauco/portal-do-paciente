@@ -60,7 +60,7 @@ class AgendamentoCancelamentoPrazoTest {
         String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-prazo")).token());
         // Procedimento com prazo de 24h de antecedência.
-        procedimentoId = procedimentoRepository.save(new Procedimento(null, "Proc Prazo Teste", null, 24)).getId();
+        procedimentoId = procedimentoRepository.save(new Procedimento(null, "Proc Prazo Teste", null, 24, 0)).getId();
     }
 
     @AfterEach

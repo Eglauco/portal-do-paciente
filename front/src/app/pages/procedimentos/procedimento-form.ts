@@ -28,6 +28,9 @@ export class ProcedimentoForm implements PodeSair {
     horasCancelamento: new FormControl<number | null>(24, {
       validators: [Validators.required, Validators.min(0)],
     }),
+    horasNps: new FormControl<number | null>(0, {
+      validators: [Validators.required, Validators.min(0)],
+    }),
   });
 
   protected readonly editando = signal(false);
@@ -63,6 +66,7 @@ export class ProcedimentoForm implements PodeSair {
             nome: procedimento.nome,
             preparo: procedimento.preparo ?? '',
             horasCancelamento: procedimento.horasCancelamento ?? 24,
+            horasNps: procedimento.horasNps ?? 0,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -123,7 +127,7 @@ export class ProcedimentoForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome' | 'horasCancelamento'): boolean {
+  protected invalido(campo: 'nome' | 'horasCancelamento' | 'horasNps'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
   }
@@ -139,6 +143,7 @@ export class ProcedimentoForm implements PodeSair {
       nome: this.form.controls.nome.value,
       preparo: this.form.controls.preparo.value.trim() || undefined,
       horasCancelamento: this.form.controls.horasCancelamento.value ?? 0,
+      horasNps: this.form.controls.horasNps.value ?? 0,
     };
     const requisicao = this.editando()
       ? this.service.atualizar(this.codigo()!, dados)

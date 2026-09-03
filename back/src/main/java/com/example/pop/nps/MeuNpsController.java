@@ -55,7 +55,8 @@ public class MeuNpsController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
-        Page<Nps> resultado = repository.search(status, pacienteId, null, pageable);
+        // Só NPS já disparados: os agendados (aguardando as horas) ficam ocultos.
+        Page<Nps> resultado = repository.searchDisparadosDoPaciente(status, pacienteId, pageable);
         List<NpsResponse> content = resultado.getContent().stream().map(NpsResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
@@ -81,7 +82,8 @@ public class MeuNpsController {
     /** Carrega o NPS garantindo que é do paciente logado (404 caso contrário). */
     private Nps meuNps(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return repository.findByIdAndAgendamento_Paciente_Id(id, pacienteId)
+        // Só NPS já disparado é acessível ao paciente (agendado não existe para ele ainda).
+        return repository.findByIdAndAgendamento_Paciente_IdAndDisparadoEmNotNull(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "NPS não encontrado"));
     }
 }

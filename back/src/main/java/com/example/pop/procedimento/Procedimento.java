@@ -36,4 +36,10 @@ public class Procedimento {
     @Min(0)
     @Column(name = "horas_cancelamento", nullable = false)
     private Integer horasCancelamento;
+
+    /** Horas APÓS a presença do paciente para disparar o NPS (0 = na hora). */
+    @NotNull
+    @Min(0)
+    @Column(name = "horas_nps", nullable = false)
+    private Integer horasNps;
 }
