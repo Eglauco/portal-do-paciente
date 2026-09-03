@@ -1,7 +1,14 @@
 import { fetchMeu } from '@/services/sessao';
 
 // Tipos gravados pelo backend (o chat NÃO entra nesta lista).
-export type TipoNotificacao = 'AGENDAMENTO' | 'FALTA' | 'NPS' | 'POSTAGEM' | 'PRONTUARIO' | 'SAU';
+export type TipoNotificacao =
+  | 'AGENDAMENTO'
+  | 'FALTA'
+  | 'NPS'
+  | 'POSTAGEM'
+  | 'PRONTUARIO'
+  | 'SAU'
+  | 'LEMBRETE';
 
 /** Uma notificação do histórico do paciente (tela "Notificações"). */
 export interface Notificacao {

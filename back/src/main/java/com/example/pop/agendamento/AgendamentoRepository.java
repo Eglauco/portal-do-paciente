@@ -15,6 +15,23 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     /** Carrega um agendamento garantindo que é do paciente informado (escopo do app). */
     Optional<Agendamento> findByIdAndPacienteId(Long id, Long pacienteId);
 
+    /**
+     * Agendamentos de um procedimento que estão na janela de disparo de um lembrete:
+     * status ativo (informado), ainda por acontecer (dataHora >= agora) e já dentro
+     * da antecedência (dataHora <= limite = agora + horas). O job filtra os que ainda
+     * não dispararam pelo registro de disparo.
+     */
+    @Query("""
+            select a from Agendamento a
+            where a.procedimento.id = :procedimentoId
+              and a.statusAgendamento in :status
+              and a.dataHora >= :agora
+              and a.dataHora <= :limite
+            """)
+    List<Agendamento> paraLembrete(@Param("procedimentoId") Long procedimentoId,
+            @Param("status") List<StatusAgendamento> status,
+            @Param("agora") LocalDateTime agora, @Param("limite") LocalDateTime limite);
+
     @Query(value = """
             select a from Agendamento a
             where (:status is null or a.statusAgendamento = :status)

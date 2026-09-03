@@ -2464,6 +2464,29 @@
 .sau-avaliacao__comentario { margin: 0; color: var(--muted); font-style: italic; line-height: 1.5; }
 .status-pill--nota { background: #fbf0d6; color: #8a5d0f; }
 
+/* Lembretes do procedimento (form) */
+.lembretes-panel { margin-top: 1.25rem; }
+.lembretes-sub { margin: 0 0 1rem; }
+.lembretes-vazio { color: var(--muted); font-size: 0.9rem; margin: 0 0 1.25rem; }
+.lembretes-lista { list-style: none; margin: 0 0 1.25rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.lembrete-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0.8rem; border: 1px solid var(--line); border-radius: 0.75rem; background: var(--surface);
+}
+.lembrete-item__horas {
+  flex-shrink: 0; font-size: 0.75rem; font-weight: 700; color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 12%, white); padding: 0.2rem 0.55rem; border-radius: 999px;
+}
+.lembrete-item__texto { flex: 1; font-size: 0.9rem; color: var(--ink); word-break: break-word; }
+.lembrete-item__excluir {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; border-radius: 0.6rem; border: 1px solid var(--line);
+  background: var(--surface); color: #b23b4e; cursor: pointer;
+}
+.lembrete-item__excluir:hover { background: #fbe9ec; border-color: #f0c6cd; }
+.lembrete-item__excluir svg { width: 1.05rem; height: 1.05rem; }
+.lembrete-add { border-top: 1px solid var(--line); padding-top: 1rem; }
+
 /* Detalhe — aviso quando não é a vez do SAU */
 .sau-estado-vez {
   display: flex; align-items: center; gap: 0.7rem;

@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
+import { LembretePopup } from '@/components/lembrete-popup';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
 import { notificarAtualizacao } from '@/services/atualizacao';
@@ -83,18 +84,22 @@ function Navegacao() {
   }, [sessao, carregando, segments, roteador]);
 
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
-      <Stack.Screen name="perfil" options={{ headerShown: false }} />
-      <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
-      <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="sau/nova" options={{ headerShown: false }} />
-      <Stack.Screen name="sau/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-    </Stack>
+    <>
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
+        <Stack.Screen name="perfil" options={{ headerShown: false }} />
+        <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
+        <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="sau/nova" options={{ headerShown: false }} />
+        <Stack.Screen name="sau/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      </Stack>
+      {/* Pop-up fixo de lembrete: só com sessão (usa endpoints do paciente). */}
+      {sessao && <LembretePopup />}
+    </>
   );
 }
 

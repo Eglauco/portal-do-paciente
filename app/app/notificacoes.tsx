@@ -29,6 +29,7 @@ const ESTILO_TIPO: Record<TipoNotificacao, { icon: string; fg: string; bg: strin
   POSTAGEM: { icon: 'newspaper', fg: '#2F6DF6', bg: '#E9F0FE' },
   PRONTUARIO: { icon: 'document-text', fg: '#0A7D5A', bg: '#E3F6EC' },
   SAU: { icon: 'megaphone', fg: '#7A5AF5', bg: '#EFEAFE' },
+  LEMBRETE: { icon: 'alarm', fg: '#0E8C7F', bg: '#DCF1EC' },
 };
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');

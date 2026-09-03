@@ -62,6 +62,16 @@ public class NotificacaoService {
         }
     }
 
+    /**
+     * Grava a notificação na transação do CHAMADOR (não best-effort): usado pelo job
+     * de lembretes, onde a notificação é o objetivo — se falhar, o disparo é revertido
+     * e tenta de novo na próxima execução.
+     */
+    @Transactional
+    public void registrarParaPaciente(Paciente paciente, TipoNotificacao tipo, String titulo, String corpo, Long referenciaId) {
+        repository.save(montar(paciente, tipo, titulo, corpo, referenciaId));
+    }
+
     private Notificacao montar(Paciente paciente, TipoNotificacao tipo, String titulo, String corpo, Long referenciaId) {
         Notificacao n = new Notificacao();
         n.setPaciente(paciente);

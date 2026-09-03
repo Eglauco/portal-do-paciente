@@ -3,6 +3,8 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { Lembrete } from './lembrete.model';
+import { LembreteService } from './lembrete.service';
 import { ProcedimentoService } from './procedimento.service';
 
 @Component({
@@ -12,6 +14,7 @@ import { ProcedimentoService } from './procedimento.service';
 })
 export class ProcedimentoForm implements PodeSair {
   private readonly service = inject(ProcedimentoService);
+  private readonly lembreteService = inject(LembreteService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
@@ -37,6 +40,17 @@ export class ProcedimentoForm implements PodeSair {
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
 
+  // Lembretes (só ao editar um procedimento existente).
+  protected readonly lembretes = signal<Lembrete[]>([]);
+  protected readonly carregandoLembretes = signal(false);
+  protected readonly salvandoLembrete = signal(false);
+  protected readonly lembreteForm = new FormGroup({
+    texto: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(300)] }),
+    horasAntecedencia: new FormControl<number | null>(24, {
+      validators: [Validators.required, Validators.min(1), Validators.max(8760)],
+    }),
+  });
+
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
@@ -52,7 +66,56 @@ export class ProcedimentoForm implements PodeSair {
           }),
         error: () => this.erroCarregar.set(true),
       });
+      this.carregarLembretes(id);
     }
+  }
+
+  private carregarLembretes(procedimentoId: number): void {
+    this.carregandoLembretes.set(true);
+    this.lembreteService.listar(procedimentoId).subscribe({
+      next: (lembretes) => {
+        this.lembretes.set(lembretes);
+        this.carregandoLembretes.set(false);
+      },
+      error: () => this.carregandoLembretes.set(false),
+    });
+  }
+
+  protected adicionarLembrete(): void {
+    const id = this.codigo();
+    if (id == null || this.lembreteForm.invalid || this.salvandoLembrete()) {
+      this.lembreteForm.markAllAsTouched();
+      return;
+    }
+    this.salvandoLembrete.set(true);
+    const req = {
+      texto: this.lembreteForm.controls.texto.value.trim(),
+      horasAntecedencia: this.lembreteForm.controls.horasAntecedencia.value!,
+    };
+    this.lembreteService.criar(id, req).subscribe({
+      next: (lembrete) => {
+        this.lembretes.update((atual) => [lembrete, ...atual]);
+        this.lembreteForm.reset({ texto: '', horasAntecedencia: 24 });
+        this.salvandoLembrete.set(false);
+        this.toastr.success('Lembrete adicionado');
+      },
+      error: () => {
+        this.salvandoLembrete.set(false);
+        this.toastr.error('Não foi possível adicionar o lembrete.');
+      },
+    });
+  }
+
+  protected async removerLembrete(lembrete: Lembrete): Promise<void> {
+    const confirmado = await this.confirmar('Deseja excluir este lembrete?');
+    if (!confirmado) return;
+    this.lembreteService.excluir(lembrete.id).subscribe({
+      next: () => {
+        this.lembretes.update((atual) => atual.filter((l) => l.id !== lembrete.id));
+        this.toastr.success('Lembrete excluído');
+      },
+      error: () => this.toastr.error('Não foi possível excluir o lembrete.'),
+    });
   }
 
   podeSair(): boolean | Promise<boolean> {

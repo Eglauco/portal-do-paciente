@@ -16,4 +16,7 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
 
     /** Carrega garantindo que a notificação é do paciente logado (escopo do app). */
     Optional<Notificacao> findByIdAndPacienteId(Long id, Long pacienteId);
+
+    /** Notificações de um tipo ainda não lidas (ex.: lembretes pendentes de pop-up). */
+    java.util.List<Notificacao> findByPacienteIdAndTipoAndLidaFalseOrderByCriadoEmDesc(Long pacienteId, TipoNotificacao tipo);
 }

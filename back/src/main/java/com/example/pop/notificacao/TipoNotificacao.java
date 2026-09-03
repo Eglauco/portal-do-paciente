@@ -11,5 +11,6 @@ public enum TipoNotificacao {
     NPS,
     POSTAGEM,
     PRONTUARIO,
-    SAU
+    SAU,
+    LEMBRETE
 }

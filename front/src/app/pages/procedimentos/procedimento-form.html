@@ -85,6 +85,68 @@
       </button>
     </div>
   </form>
+
+  <!-- Lembretes (só ao editar um procedimento já existente) -->
+  @if (editando()) {
+    <section class="panel form-card lembretes-panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Lembretes</h2>
+      </div>
+      <p class="field-hint lembretes-sub">
+        Mensagens enviadas ao paciente antes do agendamento (push + notificação), conforme a antecedência em horas.
+      </p>
+
+      @if (carregandoLembretes()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando lembretes…</p></div>
+      } @else if (lembretes().length === 0) {
+        <p class="lembretes-vazio">Nenhum lembrete cadastrado ainda.</p>
+      } @else {
+        <ul class="lembretes-lista">
+          @for (l of lembretes(); track l.id) {
+            <li class="lembrete-item">
+              <span class="lembrete-item__horas">{{ l.horasAntecedencia }}h antes</span>
+              <span class="lembrete-item__texto">{{ l.texto }}</span>
+              <button
+                type="button"
+                class="lembrete-item__excluir"
+                (click)="removerLembrete(l)"
+                [attr.aria-label]="'Excluir lembrete: ' + l.texto"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <form class="lembrete-add" [formGroup]="lembreteForm" (submit)="adicionarLembrete(); $event.preventDefault()">
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="label" for="lembrete-texto">Mensagem <span class="req" aria-hidden="true">*</span></label>
+            <input
+              id="lembrete-texto"
+              class="input"
+              formControlName="texto"
+              placeholder="Ex.: Sua consulta é amanhã. Não esqueça o preparo."
+              maxlength="300"
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-field form-field--sm">
+            <label class="label" for="lembrete-horas">Antecedência (horas) <span class="req" aria-hidden="true">*</span></label>
+            <input id="lembrete-horas" class="input" type="number" min="1" max="8760" formControlName="horasAntecedencia" placeholder="Ex.: 24" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn--solid" [disabled]="salvandoLembrete() || lembreteForm.invalid">
+            {{ salvandoLembrete() ? 'Adicionando…' : 'Adicionar lembrete' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
 </section>
 
 <!-- Diálogo de confirmação (Sim / Não) -->

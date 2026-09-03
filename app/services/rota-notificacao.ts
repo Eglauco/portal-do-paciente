@@ -10,7 +10,8 @@ export function navegarNotificacao(tipo: string | undefined, id: number | null |
   switch (tipo) {
     case 'AGENDAMENTO':
     case 'FALTA':
-      // Falta registrada: leva à lista de agendamentos para justificar.
+    case 'LEMBRETE':
+      // Agendamento / falta / lembrete: leva à lista de agendamentos.
       router.navigate('/(tabs)/agendamentos');
       break;
     case 'CHAT':
