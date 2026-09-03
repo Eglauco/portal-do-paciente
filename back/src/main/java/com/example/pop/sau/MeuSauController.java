@@ -83,13 +83,13 @@ public class MeuSauController {
             @Valid @RequestBody AbrirManifestacaoRequest request) {
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         Manifestacao m = sauService.abrir(paciente, request.unidadeId(), request.tipoId(), request.texto());
-        return sauService.toDetalhe(m, false);
+        return sauService.toDetalhe(m);
     }
 
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ManifestacaoDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        return sauService.toDetalhe(minha(jwt, id), false);
+        return sauService.toDetalhe(minha(jwt, id));
     }
 
     /** Paciente responde na thread (reabre se estava fechada). */
@@ -98,7 +98,16 @@ public class MeuSauController {
     public ManifestacaoDetalheResponse responder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody MensagemSauRequest request) {
         Manifestacao m = sauService.responderComoPaciente(minha(jwt, id), request.texto());
-        return sauService.toDetalhe(m, false);
+        return sauService.toDetalhe(m);
+    }
+
+    /** Paciente encerra a conversa avaliando o atendimento (nota obrigatória 1-5). */
+    @PostMapping("/{id}/encerrar")
+    @Transactional
+    public ManifestacaoDetalheResponse encerrar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @Valid @RequestBody EncerrarSauRequest request) {
+        Manifestacao m = sauService.encerrarPeloPaciente(minha(jwt, id), request.nota(), request.comentario());
+        return sauService.toDetalhe(m);
     }
 
     /** Carrega a manifestação garantindo que é do paciente logado (404 caso contrário). */

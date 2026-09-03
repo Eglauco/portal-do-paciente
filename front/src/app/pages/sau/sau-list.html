@@ -88,6 +88,11 @@
                   <span class="convo__unidade">{{ m.unidadeSaude.nome }}</span>
                   <span class="status-pill status-pill--tipo">{{ m.tipo.nome }}</span>
                   <span class="status-pill" [attr.data-st]="m.status">{{ m.statusDescricao }}</span>
+                  @if (m.avaliacaoNota) {
+                    <span class="status-pill status-pill--nota" [attr.aria-label]="'Avaliação ' + m.avaliacaoNota + ' de 5'">
+                      ★ {{ m.avaliacaoNota }}/5
+                    </span>
+                  }
                 </span>
                 <span class="convo__linha">
                   <span class="convo__previa">

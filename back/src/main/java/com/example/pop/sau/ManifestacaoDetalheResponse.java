@@ -1,5 +1,6 @@
 package com.example.pop.sau;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import com.example.pop.common.Ref;
@@ -12,5 +13,9 @@ public record ManifestacaoDetalheResponse(
         Ref tipo,
         StatusManifestacao status,
         String statusDescricao,
+        /** Avaliação do atendimento (nulos até o paciente encerrar e avaliar). */
+        Integer avaliacaoNota,
+        String avaliacaoComentario,
+        LocalDateTime avaliadoEm,
         List<MensagemSauResponse> mensagens) {
 }

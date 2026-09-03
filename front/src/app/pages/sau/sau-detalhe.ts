@@ -23,6 +23,7 @@ export class SauDetalhe {
   protected readonly enviando = signal(false);
   protected readonly fechando = signal(false);
   protected readonly texto = signal('');
+  protected readonly estrelas = [1, 2, 3, 4, 5];
 
   /** É a vez do SAU responder (fluxo alternado de 1 mensagem por vez). */
   protected readonly podeResponder = computed(() => this.detalhe()?.status === 'AGUARDANDO_SAU');

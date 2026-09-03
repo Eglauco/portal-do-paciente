@@ -2,6 +2,9 @@ package com.example.pop.sau;
 
 import java.time.LocalDateTime;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import com.example.pop.paciente.Paciente;
 import com.example.pop.unidade.Unidade;
 
@@ -54,6 +57,18 @@ public class Manifestacao {
 
     @Column(name = "atualizado_em", nullable = false)
     private LocalDateTime atualizadoEm;
+
+    /** Avaliação do atendimento (1-5), preenchida quando o paciente encerra e avalia. */
+    @Column(name = "avaliacao_nota")
+    @JdbcTypeCode(SqlTypes.SMALLINT)
+    private Integer avaliacaoNota;
+
+    @Column(name = "avaliacao_comentario", length = 500)
+    private String avaliacaoComentario;
+
+    /** Quando foi avaliada. Não-nulo = encerrada e avaliada (definitiva, não reabre). */
+    @Column(name = "avaliado_em")
+    private LocalDateTime avaliadoEm;
 
     /**
      * Trava otimista: garante a regra de "1 mensagem por vez" sob concorrência.

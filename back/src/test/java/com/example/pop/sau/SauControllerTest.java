@@ -141,9 +141,10 @@ class SauControllerTest {
         // O nome agora vem da relação com `usuario` (mesmo atendente que o adminJwt usa), não do claim.
         assertEquals(atendente().getNome(), doSau.autorNome());
 
-        // Para o paciente, a mensagem do SAU aparece como "Atendimento SAU" (não vaza o atendente).
+        // O paciente agora também vê o nome do atendente que respondeu (no app: nome em
+        // negrito + "Atendimento SAU" como papel).
         ManifestacaoDetalheResponse visaoPaciente = meuController.buscar(jwt, id);
-        assertEquals("Atendimento SAU", visaoPaciente.mensagens().get(1).autorNome());
+        assertEquals(atendente().getNome(), visaoPaciente.mensagens().get(1).autorNome());
 
         // Paciente responde: volta para "aguardando SAU".
         ManifestacaoDetalheResponse reaberta = meuController.responder(jwt, id,
@@ -160,6 +161,32 @@ class SauControllerTest {
                 new MensagemSauRequest("Ainda tenho uma dúvida."));
         assertEquals(StatusManifestacao.AGUARDANDO_SAU, reabertaPosFechamento.status());
         assertEquals(4, reabertaPosFechamento.mensagens().size());
+    }
+
+    @Test
+    void pacienteEncerraEAvaliaEProibeReabrir() {
+        ManifestacaoDetalheResponse aberta = meuController.abrir(jwt,
+                new AbrirManifestacaoRequest(tipoId, unidadeId, "Quero encerrar mais tarde."));
+        Long id = aberta.id();
+
+        // SAU responde: fica "aguardando paciente" (é a vez do paciente).
+        sauController.responder(id, new MensagemSauRequest("Retorno do SAU."), adminJwt());
+
+        // Paciente encerra avaliando (nota 5 + comentário) → FECHADA e avaliada.
+        ManifestacaoDetalheResponse encerrada = meuController.encerrar(jwt, id,
+                new EncerrarSauRequest(5, "Ótimo atendimento"));
+        assertEquals(StatusManifestacao.FECHADA, encerrada.status());
+        assertEquals(5, encerrada.avaliacaoNota());
+        assertEquals("Ótimo atendimento", encerrada.avaliacaoComentario());
+        assertNotNull(encerrada.avaliadoEm());
+
+        // Avaliada = definitiva: reabrir (responder) e reavaliar dão 409.
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> meuController.responder(jwt, id, new MensagemSauRequest("Reabrir?")))
+                .getStatusCode().value());
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> meuController.encerrar(jwt, id, new EncerrarSauRequest(3, null)))
+                .getStatusCode().value());
     }
 
     @Test

@@ -76,6 +76,10 @@ public class SauService {
      * "aguardando SAU", o paciente já enviou e precisa esperar — 409.
      */
     public Manifestacao responderComoPaciente(Manifestacao m, String texto) {
+        if (m.getAvaliadoEm() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Esta conversa foi encerrada e avaliada; não é possível reabri-la.");
+        }
         if (m.getStatus() == StatusManifestacao.AGUARDANDO_SAU) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Aguarde a resposta do SAU antes de enviar outra mensagem.");
@@ -121,12 +125,44 @@ public class SauService {
         return m;
     }
 
-    /** SAU marca como fechada (só o SAU fecha; pode fechar a qualquer momento enquanto aberta). */
+    /**
+     * SAU marca como fechada (pode fechar a qualquer momento enquanto aberta). O
+     * paciente é avisado para AVALIAR o atendimento (obrigatório para finalizar) ou
+     * REABRIR a conversa — enquanto não avaliar, ainda pode responder e reabrir.
+     */
     public Manifestacao fechar(Manifestacao m) {
         if (m.getStatus() == StatusManifestacao.FECHADA) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Manifestação já está fechada.");
         }
         m.setStatus(StatusManifestacao.FECHADA);
+        m.setAtualizadoEm(LocalDateTime.now());
+        Manifestacao salva = salvarComVersao(m);
+        String corpo = "Sua manifestação (" + m.getTipo().getNome()
+                + ") foi encerrada pelo SAU. Avalie o atendimento ou reabra a conversa.";
+        Long pacienteId = m.getPaciente().getId();
+        Long manifestacaoId = m.getId();
+        aposCommit(() -> {
+            notificacaoService.registrar(pacienteId, TipoNotificacao.SAU, "Manifestação encerrada", corpo, manifestacaoId);
+            pushService.notificarPaciente(pacienteId, "Manifestação encerrada", corpo,
+                    Map.of("tipo", "SAU", "manifestacaoId", manifestacaoId));
+        });
+        return salva;
+    }
+
+    /**
+     * Paciente encerra a conversa avaliando o atendimento (nota 1-5 obrigatória +
+     * comentário opcional). A partir daqui a manifestação fica FECHADA e avaliada —
+     * definitiva, não reabre. Só é possível avaliar uma vez.
+     */
+    public Manifestacao encerrarPeloPaciente(Manifestacao m, int nota, String comentario) {
+        if (m.getAvaliadoEm() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta conversa já foi encerrada e avaliada.");
+        }
+        String texto = comentario == null || comentario.isBlank() ? null : comentario.trim();
+        m.setStatus(StatusManifestacao.FECHADA);
+        m.setAvaliacaoNota(nota);
+        m.setAvaliacaoComentario(texto);
+        m.setAvaliadoEm(LocalDateTime.now());
         m.setAtualizadoEm(LocalDateTime.now());
         return salvarComVersao(m);
     }
@@ -179,29 +215,33 @@ public class SauService {
                 m.getStatus(), m.getStatus().getDescricao(),
                 ultima != null ? ultima.getTexto() : null,
                 ultima != null ? ultima.getAutor() : null,
+                m.getAvaliacaoNota(),
                 m.getAtualizadoEm(), m.getCriadoEm());
     }
 
     /**
-     * Detalhe + thread. {@code revelarAtendente}=true (CRUD do admin) mostra o nome
-     * do atendente que respondeu; =false (app do paciente) mostra "Atendimento SAU".
+     * Detalhe + thread. O nome do atendente que respondeu é sempre revelado — tanto
+     * no CRUD do admin quanto no app do paciente (o paciente vê "Nome do atendente"
+     * em destaque e "Atendimento SAU" como papel). Sem atendente vinculado (caso
+     * raro), cai para "Atendimento SAU".
      */
-    public ManifestacaoDetalheResponse toDetalhe(Manifestacao m, boolean revelarAtendente) {
+    public ManifestacaoDetalheResponse toDetalhe(Manifestacao m) {
         List<MensagemSauResponse> mensagens = mensagemRepository.findByManifestacaoIdOrderByCriadoEmAsc(m.getId())
-                .stream().map(msg -> toMensagem(m, msg, revelarAtendente)).toList();
+                .stream().map(msg -> toMensagem(m, msg)).toList();
         return new ManifestacaoDetalheResponse(
                 m.getId(),
                 new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
                 m.getStatus(), m.getStatus().getDescricao(),
+                m.getAvaliacaoNota(), m.getAvaliacaoComentario(), m.getAvaliadoEm(),
                 mensagens);
     }
 
-    private MensagemSauResponse toMensagem(Manifestacao m, ManifestacaoMensagem msg, boolean revelarAtendente) {
+    private MensagemSauResponse toMensagem(Manifestacao m, ManifestacaoMensagem msg) {
         String autorNome;
         if (msg.getAutor() == AutorManifestacao.SAU) {
-            autorNome = revelarAtendente && msg.getUsuario() != null ? msg.getUsuario().getNome() : "Atendimento SAU";
+            autorNome = msg.getUsuario() != null ? msg.getUsuario().getNome() : "Atendimento SAU";
         } else {
             autorNome = m.getPaciente().getNome();
         }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AvaliacaoSauModal } from '@/components/avaliacao-sau-modal';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
@@ -20,8 +22,12 @@ import {
   MensagemSau,
   StatusManifestacao,
   buscarManifestacao,
+  encerrarManifestacao,
   responderManifestacao,
 } from '@/services/sau';
+
+const ESTRELAS = [1, 2, 3, 4, 5];
+const COR_ESTRELA = '#F2A900';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -55,6 +61,11 @@ export default function ManifestacaoScreen() {
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [alturaTeclado, setAlturaTeclado] = useState(0);
+  const [mostrarAvaliar, setMostrarAvaliar] = useState(false);
+  const [encerrando, setEncerrando] = useState(false);
+  const [erroEncerrar, setErroEncerrar] = useState<string | null>(null);
+  const [perguntarEncerrar, setPerguntarEncerrar] = useState(false);
+  const [reabrindo, setReabrindo] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
 
@@ -112,7 +123,10 @@ export default function ManifestacaoScreen() {
       const atualizado = await responderManifestacao(id, limpo);
       setDetalhe(atualizado);
       setTexto('');
+      setReabrindo(false);
       Keyboard.dismiss();
+      // Pergunta se deseja encerrar ou aguardar a resposta do SAU.
+      setPerguntarEncerrar(true);
     } catch {
       // Falha de rede ou 409 (fora de vez): avisa o paciente e preserva o texto.
       // Recarrega para sincronizar o status — sem apagar a thread se o resync falhar.
@@ -123,11 +137,40 @@ export default function ManifestacaoScreen() {
     }
   };
 
+  const abrirAvaliar = () => {
+    setErroEncerrar(null);
+    setPerguntarEncerrar(false);
+    setMostrarAvaliar(true);
+  };
+
+  const encerrar = async (nota: number, comentario: string) => {
+    if (!id || encerrando) return;
+    try {
+      setEncerrando(true);
+      setErroEncerrar(null);
+      const atualizado = await encerrarManifestacao(id, nota, comentario);
+      setDetalhe(atualizado);
+      setMostrarAvaliar(false);
+      setReabrindo(false);
+      Keyboard.dismiss();
+    } catch {
+      // Mantém o modal aberto (preserva a nota digitada) e mostra o erro nele.
+      setErroEncerrar('Não foi possível encerrar agora. Tente novamente.');
+    } finally {
+      setEncerrando(false);
+    }
+  };
+
   const mensagens = detalhe?.mensagens ?? [];
   const status = detalhe ? CORES_STATUS[detalhe.status] : null;
+  const avaliada = detalhe?.avaliadoEm != null;
   const fechada = detalhe?.status === 'FECHADA';
-  // Fluxo alternado: é a vez do paciente quando aguarda o paciente ou está fechada (responder reabre).
-  const podeResponder = detalhe?.status === 'AGUARDANDO_PACIENTE' || fechada;
+  const aguardandoPaciente = detalhe?.status === 'AGUARDANDO_PACIENTE';
+  // Onde estamos no fluxo (avaliada = definitiva; fechada s/ nota = avaliar ou reabrir).
+  const mostrarResponder = !avaliada && (aguardandoPaciente || (fechada && reabrindo));
+  const mostrarAvaliarReabrir = fechada && !avaliada && !reabrindo;
+  const mostrarAguardando = !avaliada && !fechada && !aguardandoPaciente; // aguardando SAU
+  const mostrarEncerrar = !avaliada && !fechada; // conversa aberta: pode encerrar a qualquer momento
 
   return (
     <View style={styles.screen}>
@@ -179,6 +222,11 @@ export default function ManifestacaoScreen() {
           {/* Histórico estilo e-mail */}
           {mensagens.map((m: MensagemSau) => {
             const doSau = m.autor === 'SAU';
+            // Papel embaixo do nome. Para o SAU é "Atendimento SAU" com o nome do
+            // atendente em negrito acima; se não houver nome (autorNome já é o papel),
+            // não repete a mesma linha duas vezes.
+            const papel = doSau ? 'Atendimento SAU' : 'Você';
+            const mostrarPapel = m.autorNome !== papel;
             return (
               <View key={m.id} style={[styles.card, doSau && styles.cardSau]}>
                 <View style={styles.cardCab}>
@@ -187,7 +235,7 @@ export default function ManifestacaoScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.autorNome} numberOfLines={1}>{m.autorNome}</Text>
-                    <Text style={styles.autorPapel}>{doSau ? 'Atendimento SAU' : 'Você'}</Text>
+                    {mostrarPapel && <Text style={styles.autorPapel}>{papel}</Text>}
                   </View>
                 </View>
                 <Text style={styles.cardData}>{dataHora(m.criadoEm)}</Text>
@@ -196,11 +244,54 @@ export default function ManifestacaoScreen() {
             );
           })}
 
-          {/* Responder (só quando é a vez do paciente) ou aviso de estado */}
-          {podeResponder ? (
+          {/* Encerrada e avaliada (definitiva): mostra a nota dada */}
+          {avaliada && (
+            <View style={styles.avaliacaoCard}>
+              <View style={styles.avaliacaoTopo}>
+                <Ionicons name="checkmark-circle" size={18} color={Brand.brand} />
+                <Text style={styles.avaliacaoTitulo}>Atendimento encerrado e avaliado</Text>
+              </View>
+              <View style={styles.estrelasVer} accessibilityLabel={`Nota ${detalhe?.avaliacaoNota} de 5 estrelas`}>
+                {ESTRELAS.map((n) => (
+                  <Ionicons
+                    key={n}
+                    name={(detalhe?.avaliacaoNota ?? 0) >= n ? 'star' : 'star-outline'}
+                    size={22}
+                    color={(detalhe?.avaliacaoNota ?? 0) >= n ? COR_ESTRELA : '#CBD6D1'}
+                  />
+                ))}
+              </View>
+              {!!detalhe?.avaliacaoComentario && (
+                <Text style={styles.avaliacaoComentario}>{detalhe.avaliacaoComentario}</Text>
+              )}
+            </View>
+          )}
+
+          {/* Fechada pelo SAU e ainda não avaliada: avaliar ou reabrir */}
+          {mostrarAvaliarReabrir && (
+            <View style={styles.encerradaBox}>
+              <View style={styles.encerradaTopo}>
+                <Ionicons name="lock-closed-outline" size={18} color={Brand.muted} />
+                <Text style={styles.encerradaTxt}>
+                  Esta conversa foi encerrada. Avalie o atendimento ou reabra para continuar.
+                </Text>
+              </View>
+              <Pressable style={styles.enviar} onPress={abrirAvaliar}>
+                <Ionicons name="star" size={17} color="#fff" />
+                <Text style={styles.enviarTxt}>Avaliar atendimento</Text>
+              </Pressable>
+              <Pressable style={styles.btnGhost} onPress={() => setReabrindo(true)}>
+                <Ionicons name="refresh" size={16} color={Brand.brandDeep} />
+                <Text style={styles.btnGhostTxt}>Reabrir e continuar</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Responder (vez do paciente, ou reabrindo uma conversa fechada) */}
+          {mostrarResponder && (
             <View style={styles.responder}>
               <Text style={styles.responderLabel}>
-                {fechada ? 'Responder (reabre a manifestação)' : 'Responder'}
+                {reabrindo ? 'Responder (reabre a manifestação)' : 'Responder'}
               </Text>
               <TextInput
                 style={styles.textarea}
@@ -235,7 +326,10 @@ export default function ManifestacaoScreen() {
                 )}
               </Pressable>
             </View>
-          ) : (
+          )}
+
+          {/* Aguardando o SAU */}
+          {mostrarAguardando && (
             <View style={styles.aguardando}>
               <Ionicons name="time-outline" size={20} color={Brand.muted} />
               <Text style={styles.aguardandoTxt}>
@@ -243,8 +337,49 @@ export default function ManifestacaoScreen() {
               </Text>
             </View>
           )}
+
+          {/* Encerrar a qualquer momento (conversa aberta) */}
+          {mostrarEncerrar && (
+            <Pressable style={[styles.btnGhost, { marginTop: 14 }]} onPress={abrirAvaliar}>
+              <Ionicons name="close-circle-outline" size={16} color={Brand.brandDeep} />
+              <Text style={styles.btnGhostTxt}>Encerrar conversa</Text>
+            </Pressable>
+          )}
         </ScrollView>
       )}
+
+      {/* Pergunta pós-envio: encerrar ou aguardar o SAU */}
+      <Modal
+        visible={perguntarEncerrar}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setPerguntarEncerrar(false)}>
+        <View style={styles.promptBackdrop}>
+          <View style={styles.promptCard} accessibilityViewIsModal accessibilityRole="alert">
+            <Text style={styles.promptTitulo}>Mensagem enviada</Text>
+            <Text style={styles.promptTexto}>
+              Deseja encerrar a conversa e avaliar o atendimento, ou aguardar a resposta do SAU?
+            </Text>
+            <Pressable style={styles.enviar} onPress={abrirAvaliar}>
+              <Ionicons name="star" size={17} color="#fff" />
+              <Text style={styles.enviarTxt}>Encerrar e avaliar</Text>
+            </Pressable>
+            <Pressable style={styles.btnGhost} onPress={() => setPerguntarEncerrar(false)}>
+              <Text style={styles.btnGhostTxt}>Aguardar resposta do SAU</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Avaliação (encerrar) */}
+      <AvaliacaoSauModal
+        visivel={mostrarAvaliar}
+        processando={encerrando}
+        erro={erroEncerrar}
+        onEnviar={encerrar}
+        onFechar={() => setMostrarAvaliar(false)}
+      />
     </View>
   );
 }
@@ -331,6 +466,61 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface,
   },
   aguardandoTxt: { flex: 1, fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+
+  // Botão secundário (reabrir / encerrar / aguardar)
+  btnGhost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    marginTop: 10,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.surface,
+  },
+  btnGhostTxt: { color: Brand.brandDeep, fontSize: 14.5, fontWeight: '800' },
+
+  // Encerrada pelo SAU (avaliar ou reabrir)
+  encerradaBox: {
+    marginTop: 4,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Brand.line,
+    backgroundColor: Brand.surface,
+  },
+  encerradaTopo: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
+  encerradaTxt: { flex: 1, fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+
+  // Avaliação final (definitiva)
+  avaliacaoCard: {
+    marginTop: 4,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#CDEAE1',
+    backgroundColor: '#F1FAF7',
+    alignItems: 'center',
+    gap: 8,
+  },
+  avaliacaoTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avaliacaoTitulo: { fontSize: 14.5, fontWeight: '800', color: Brand.brandDeep },
+  estrelasVer: { flexDirection: 'row', gap: 4 },
+  avaliacaoComentario: { fontSize: 14, color: '#40514C', lineHeight: 20, textAlign: 'center', marginTop: 2 },
+
+  // Pergunta pós-envio (encerrar ou aguardar)
+  promptBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(7,46,43,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  promptCard: { width: '100%', maxWidth: 400, backgroundColor: Brand.surface, borderRadius: 24, padding: 22 },
+  promptTitulo: { fontSize: 18, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
+  promptTexto: { fontSize: 14, color: Brand.muted, lineHeight: 20, marginTop: 6, marginBottom: 6 },
 
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink },

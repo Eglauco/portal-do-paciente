@@ -877,6 +877,13 @@
   margin-bottom: 1.75rem;
 }
 
+.page-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .page-title {
   margin: 0;
   font-family: var(--font-display);
@@ -2448,6 +2455,14 @@
 .sau-responder { display: flex; flex-direction: column; gap: 0.7rem; }
 .sau-responder__campo { width: 100%; min-height: 8rem; resize: vertical; }
 .sau-responder__acoes { display: flex; justify-content: flex-end; }
+
+/* Detalhe — avaliação do atendimento dada pelo paciente ao encerrar */
+.sau-avaliacao { display: flex; flex-direction: column; gap: 0.6rem; }
+.sau-avaliacao__nota { display: flex; align-items: center; gap: 0.15rem; }
+.sau-star { width: 1.3rem; height: 1.3rem; flex-shrink: 0; }
+.sau-avaliacao__num { margin-left: 0.5rem; font-weight: 700; color: var(--ink); }
+.sau-avaliacao__comentario { margin: 0; color: var(--muted); font-style: italic; line-height: 1.5; }
+.status-pill--nota { background: #fbf0d6; color: #8a5d0f; }
 
 /* Detalhe — aviso quando não é a vez do SAU */
 .sau-estado-vez {

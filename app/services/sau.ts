@@ -45,6 +45,10 @@ export interface ManifestacaoDetalhe {
   tipo: Ref;
   status: StatusManifestacao;
   statusDescricao: string;
+  /** Avaliação do atendimento (null até o paciente encerrar e avaliar). */
+  avaliacaoNota: number | null;
+  avaliacaoComentario: string | null;
+  avaliadoEm: string | null;
   mensagens: MensagemSau[];
 }
 
@@ -109,7 +113,7 @@ export async function buscarManifestacao(id: number | string): Promise<Manifesta
   return comoJson<ManifestacaoDetalhe>(resposta);
 }
 
-/** Paciente responde na thread (reabre se estava fechada). */
+/** Paciente responde na thread (reabre se estava fechada e ainda não avaliada). */
 export async function responderManifestacao(
   id: number | string,
   texto: string,
@@ -118,6 +122,20 @@ export async function responderManifestacao(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto }),
+  });
+  return comoJson<ManifestacaoDetalhe>(resposta);
+}
+
+/** Paciente encerra a conversa avaliando o atendimento (nota 1-5 + comentário opcional). */
+export async function encerrarManifestacao(
+  id: number | string,
+  nota: number,
+  comentario: string,
+): Promise<ManifestacaoDetalhe> {
+  const resposta = await fetchMeu(`/meu/sau/${id}/encerrar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nota, comentario: comentario.trim() || null }),
   });
   return comoJson<ManifestacaoDetalhe>(resposta);
 }

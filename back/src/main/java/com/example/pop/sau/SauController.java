@@ -59,7 +59,7 @@ public class SauController {
     @Transactional(readOnly = true)
     public ResponseEntity<ManifestacaoDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(m -> ResponseEntity.ok(sauService.toDetalhe(m, true)))
+                .map(m -> ResponseEntity.ok(sauService.toDetalhe(m)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -69,14 +69,14 @@ public class SauController {
     public ManifestacaoDetalheResponse responder(@PathVariable Long id,
             @Valid @RequestBody MensagemSauRequest request, @AuthenticationPrincipal Jwt jwt) {
         Manifestacao m = sauService.responderComoSau(obter(id), uidDoToken(jwt), request.texto());
-        return sauService.toDetalhe(m, true);
+        return sauService.toDetalhe(m);
     }
 
     /** SAU marca a manifestação como fechada. */
     @PostMapping("/{id}/fechar")
     @Transactional
     public ManifestacaoDetalheResponse fechar(@PathVariable Long id) {
-        return sauService.toDetalhe(sauService.fechar(obter(id)), true);
+        return sauService.toDetalhe(sauService.fechar(obter(id)));
     }
 
     private Manifestacao obter(Long id) {

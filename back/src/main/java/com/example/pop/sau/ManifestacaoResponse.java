@@ -14,6 +14,8 @@ public record ManifestacaoResponse(
         String statusDescricao,
         String ultimaMensagem,
         AutorManifestacao ultimaMensagemDe,
+        /** Nota do atendimento (1-5) quando o paciente já avaliou; senão nulo. */
+        Integer avaliacaoNota,
         LocalDateTime atualizadoEm,
         LocalDateTime criadoEm) {
 }

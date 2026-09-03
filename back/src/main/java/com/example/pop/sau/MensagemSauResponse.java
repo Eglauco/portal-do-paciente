@@ -3,9 +3,9 @@ package com.example.pop.sau;
 import java.time.LocalDateTime;
 
 /**
- * Uma mensagem da thread. {@code autorNome} depende de quem lê: para o paciente,
- * as do SAU aparecem como "Atendimento SAU"; para o admin, o nome do atendente
- * que respondeu (auditoria).
+ * Uma mensagem da thread. {@code autorNome}: nas do paciente, o nome do paciente;
+ * nas do SAU, o nome do atendente que respondeu (mostrado ao admin e ao paciente),
+ * ou "Atendimento SAU" quando não há atendente vinculado.
  */
 public record MensagemSauResponse(
         Long id,

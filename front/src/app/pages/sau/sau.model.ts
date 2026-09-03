@@ -16,6 +16,8 @@ export interface Manifestacao {
   statusDescricao: string;
   ultimaMensagem?: string | null;
   ultimaMensagemDe?: AutorManifestacao | null;
+  /** Nota do atendimento (1-5) quando o paciente já avaliou. */
+  avaliacaoNota?: number | null;
   atualizadoEm: string;
   criadoEm: string;
 }
@@ -35,6 +37,10 @@ export interface ManifestacaoDetalhe {
   tipo: Ref;
   status: StatusManifestacao;
   statusDescricao: string;
+  /** Avaliação do atendimento pelo paciente (null enquanto não avaliada). */
+  avaliacaoNota?: number | null;
+  avaliacaoComentario?: string | null;
+  avaliadoEm?: string | null;
   mensagens: MensagemSau[];
 }
 
