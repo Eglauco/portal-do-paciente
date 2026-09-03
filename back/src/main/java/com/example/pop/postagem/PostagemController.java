@@ -210,6 +210,7 @@ public class PostagemController {
         return new PostagemResponse(
                 p.getId(),
                 p.getTitulo(),
+                p.getDescricao(),
                 new Ref(p.getUnidadeSaude().getId(), p.getUnidadeSaude().getNome()),
                 p.isMostrarTotalCurtidas(),
                 p.isHabilitarComentarios(),

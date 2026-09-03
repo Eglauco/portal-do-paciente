@@ -284,6 +284,11 @@ export const routes: Routes = [
         title: 'Nova postagem — Portal do Paciente · Admin',
       },
       {
+        path: 'postagens/rede-social',
+        loadComponent: () => import('./pages/postagens/rede-social').then((m) => m.RedeSocial),
+        title: 'Rede Social — Portal do Paciente · Admin',
+      },
+      {
         path: 'postagens/:id',
         loadComponent: () => import('./pages/postagens/postagem-form').then((m) => m.PostagemForm),
         canDeactivate: [pendingChangesGuard],

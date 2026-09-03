@@ -7,6 +7,7 @@ export interface Ref {
 export interface Postagem {
   id: number;
   titulo: string;
+  descricao: string | null;
   unidadeSaude: Ref;
   mostrarTotalCurtidas: boolean;
   habilitarComentarios: boolean;

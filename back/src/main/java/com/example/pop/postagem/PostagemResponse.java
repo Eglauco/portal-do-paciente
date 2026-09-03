@@ -8,6 +8,7 @@ import com.example.pop.common.Ref;
 public record PostagemResponse(
         Long id,
         String titulo,
+        String descricao,
         Ref unidadeSaude,
         boolean mostrarTotalCurtidas,
         boolean habilitarComentarios,

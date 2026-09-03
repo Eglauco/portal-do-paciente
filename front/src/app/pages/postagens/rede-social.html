@@ -1,0 +1,93 @@
+<section class="rs">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Rede Social — visualização</h1>
+      <p class="page-sub">
+        Prévia do feed como o paciente vê@if (unidadeNome()) { — {{ unidadeNome() }}}.
+      </p>
+    </div>
+    <a class="btn btn--ghost" routerLink="/postagens">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="m15 6-6 6 6 6" />
+      </svg>
+      Voltar
+    </a>
+  </header>
+
+  <!-- Moldura de celular: coluna estreita centralizada, feed idêntico ao app -->
+  <div class="rs-phone">
+    @if (loading()) {
+      <div class="rs-state">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Carregando feed…</p>
+      </div>
+    } @else if (error()) {
+      <div class="rs-state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h2>Não foi possível carregar</h2>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="carregar()">Tentar novamente</button>
+      </div>
+    } @else if (posts().length === 0) {
+      <div class="rs-state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" />
+          </svg>
+        </span>
+        <h2>Nenhuma novidade ainda</h2>
+        <p>As postagens da unidade aparecerão aqui.</p>
+      </div>
+    } @else {
+      <div class="rs-feed">
+        <div class="rs-feed__topo">
+          <h2 class="rs-feed__titulo">Novidades</h2>
+          <p class="rs-feed__sub">Fique por dentro das suas unidades de saúde.</p>
+        </div>
+
+        @for (p of posts(); track p.id) {
+          <article class="rs-card">
+            <div class="rs-card__head">
+              <span class="rs-card__avatar" aria-hidden="true">{{ iniciais(p.unidadeSaude.nome) }}</span>
+              <span class="rs-card__unidade">{{ p.unidadeSaude.nome }}</span>
+              <span class="rs-card__tempo">{{ p.tempo }}</span>
+            </div>
+
+            <img class="rs-card__img" [src]="p.url" [alt]="p.titulo" loading="lazy" />
+
+            <div class="rs-card__acoes">
+              <span class="rs-card__acao">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+                </svg>
+              </span>
+              @if (p.habilitarComentarios) {
+                <span class="rs-card__acao">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-6.1A8.4 8.4 0 1 1 21 11.5Z" />
+                  </svg>
+                  @if (p.totalComentarios > 0) {
+                    <span class="rs-card__contagem">{{ p.totalComentarios }}<span class="sr-only"> comentários</span></span>
+                  }
+                </span>
+              }
+            </div>
+
+            @if (p.mostrarTotalCurtidas) {
+              <p class="rs-card__curtidas">
+                {{ p.totalCurtidas }} {{ p.totalCurtidas === 1 ? 'curtida' : 'curtidas' }}
+              </p>
+            }
+
+            <p class="rs-card__legenda">
+              <span class="rs-card__legenda-unidade">{{ p.unidadeSaude.nome }} </span>{{ p.titulo }}
+            </p>
+            @if (p.descricao) {
+              <p class="rs-card__descricao">{{ p.descricao }}</p>
+            }
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>
