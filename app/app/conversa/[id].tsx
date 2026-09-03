@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
   buscarConversa,
   ChatDetalhe,
@@ -97,7 +98,7 @@ export default function ConversaScreen() {
       // Confirma a entrega das mensagens da unidade que chegaram neste aparelho.
       confirmarEntrega(id);
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
     }
@@ -112,6 +113,10 @@ export default function ConversaScreen() {
       };
     }, [carregar, id]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: re-sincroniza a conversa
+  // (o carregar já usa o ref jaCarregou, então não pisca o spinner).
+  useAtualizarComPush(() => carregar());
 
   // Tempo real (WebSocket/STOMP): mensagens, "digitando…" e recibo de leitura.
   useEffect(() => {

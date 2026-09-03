@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { ManifestacaoItem, StatusManifestacao, listarManifestacoes } from '@/services/sau';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
@@ -54,7 +55,7 @@ export default function SauScreen() {
       setItens(dados);
       jaCarregou.current = true;
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
       setAtualizando(false);
@@ -66,6 +67,9 @@ export default function SauScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
 
   const aoAtualizar = () => {
     setAtualizando(true);

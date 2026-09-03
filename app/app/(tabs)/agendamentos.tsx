@@ -7,6 +7,7 @@ import { AgendamentoModal } from '@/components/agendamento-modal';
 import { FaltaModal } from '@/components/falta-modal';
 import { Agendamento, MotivoFalta } from '@/constants/agendamentos';
 import { Brand, Status } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
   cancelarAgendamento,
   confirmarAgendamento,
@@ -86,7 +87,7 @@ export default function AgendamentosScreen() {
         }
       }
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
       setAtualizando(false);
@@ -99,6 +100,9 @@ export default function AgendamentosScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
 
   const aoAtualizar = () => {
     setAtualizando(true);

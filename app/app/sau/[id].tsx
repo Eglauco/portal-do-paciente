@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
   ManifestacaoDetalhe,
   MensagemSau,
@@ -79,6 +80,10 @@ export default function ManifestacaoScreen() {
       carregar();
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner
+  // (o carregar já usa o ref jaCarregou, então não pisca o spinner).
+  useAtualizarComPush(() => carregar());
 
   // Reserva a altura do teclado no fim (edge-to-edge não redimensiona a tela) e
   // rola até o campo de resposta para ele não ficar coberto.

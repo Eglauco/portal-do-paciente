@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { NpsModal, NpsModalDados } from '@/components/nps-modal';
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
   buscarNps,
   CategoriaNps,
@@ -46,7 +47,7 @@ export default function NpsScreen() {
       setLista(dados);
       jaCarregou.current = true;
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
       setAtualizando(false);
@@ -58,6 +59,9 @@ export default function NpsScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
 
   const aoAtualizar = () => {
     setAtualizando(true);

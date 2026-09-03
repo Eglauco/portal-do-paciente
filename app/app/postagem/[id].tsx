@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EdicaoComentario } from '@/components/comentario-edicao';
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import {
   buscarPostagem,
@@ -69,32 +70,52 @@ export default function PostagemDetalheScreen() {
   const dispositivoId = useRef('');
   const page = useRef(0);
   const temMais = useRef(false);
+  const jaCarregou = useRef(false);
+
+  const carregar = useCallback(async () => {
+    if (!id) return;
+    try {
+      setErro(false);
+      if (!dispositivoId.current) dispositivoId.current = await obterDispositivoId();
+      const p = await buscarPostagem(id, dispositivoId.current);
+      setPost(p);
+      if (p.habilitarComentarios) {
+        const pagina = await listarComentarios(id, 0, TAMANHO);
+        setComentarios(Array.isArray(pagina.content) ? pagina.content : []);
+        page.current = 0;
+        temMais.current = pagina.last === false;
+      } else {
+        setComentarios([]);
+        page.current = 0;
+        temMais.current = false;
+      }
+      jaCarregou.current = true;
+    } catch {
+      // Só mostra a tela de erro no 1º carregamento; num resync silencioso
+      // (push/foreground) preserva o conteúdo já exibido.
+      if (!jaCarregou.current) setErro(true);
+    } finally {
+      setCarregando(false);
+    }
+  }, [id]);
 
   useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  // No resync silencioso (push/foreground) atualiza SÓ a postagem (curtidas/conteúdo),
+  // sem recarregar os comentários — assim não colapsa as páginas que o paciente já rolou.
+  const atualizarSilencioso = useCallback(async () => {
     if (!id) return;
-    let ativo = true;
-    (async () => {
-      try {
-        dispositivoId.current = await obterDispositivoId();
-        const p = await buscarPostagem(id, dispositivoId.current);
-        if (!ativo) return;
-        setPost(p);
-        if (p.habilitarComentarios) {
-          const pagina = await listarComentarios(id, 0, TAMANHO);
-          if (!ativo) return;
-          setComentarios(Array.isArray(pagina.content) ? pagina.content : []);
-          temMais.current = pagina.last === false;
-        }
-      } catch {
-        if (ativo) setErro(true);
-      } finally {
-        if (ativo) setCarregando(false);
-      }
-    })();
-    return () => {
-      ativo = false;
-    };
+    try {
+      if (!dispositivoId.current) dispositivoId.current = await obterDispositivoId();
+      setPost(await buscarPostagem(id, dispositivoId.current));
+    } catch {
+      // mantém o conteúdo atual
+    }
   }, [id]);
+
+  useAtualizarComPush(() => atualizarSilencioso());
 
   const carregarMais = async () => {
     if (!id || !post?.habilitarComentarios || carregandoMais || !temMais.current) return;

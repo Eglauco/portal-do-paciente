@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { ChatItem, listarChats } from '@/services/chat';
 import { observarLista } from '@/services/chat-realtime';
 
@@ -57,7 +58,7 @@ export default function ChatScreen() {
       setChats(dados);
       jaCarregou.current = true;
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
       setAtualizando(false);
@@ -69,6 +70,9 @@ export default function ChatScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
 
   // Atualiza a lista em tempo real quando chega qualquer mensagem nova.
   useEffect(() => {

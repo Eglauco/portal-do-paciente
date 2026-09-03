@@ -14,6 +14,7 @@ import {
 
 import { ComentariosSheet } from '@/components/comentarios-sheet';
 import { Brand } from '@/constants/theme';
+import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { curtir, listarFeed, Postagem } from '@/services/feed';
 import { obterDispositivoId } from '@/services/identidade';
 
@@ -57,7 +58,7 @@ export default function NovidadesScreen() {
       setPosts(dados);
       jaCarregou.current = true;
     } catch {
-      setErro(true);
+      if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
       setCarregando(false);
       setAtualizando(false);
@@ -69,6 +70,9 @@ export default function NovidadesScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
+  useAtualizarComPush(() => carregar(false));
 
   const aoAtualizar = () => {
     setAtualizando(true);
