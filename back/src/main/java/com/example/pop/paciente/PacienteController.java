@@ -291,21 +291,6 @@ public class PacienteController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Libera o paciente (global) e gera um código de ativação para dar a ele (mostrado uma vez). */
-    @PostMapping("/{id}/gerar-codigo")
-    public ResponseEntity<GerarCodigoResponse> gerarCodigo(@PathVariable Long id) {
-        Paciente paciente = repository.findById(id).orElse(null);
-        if (paciente == null) {
-            return ResponseEntity.notFound().build();
-        }
-        if (paciente.getTelefone() == null || paciente.getTelefone().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Informe o telefone do paciente antes de gerar o código");
-        }
-        String codigo = acessoService.gerarCodigo(paciente);
-        return ResponseEntity.ok(new GerarCodigoResponse(codigo, paciente.getCodigoAtivacaoExpiraEm()));
-    }
-
     /** Revoga o acesso do paciente ao app (desativa e desloga o aparelho). */
     @PostMapping("/{id}/revogar-acesso")
     public ResponseEntity<Void> revogarAcesso(@PathVariable Long id) {

@@ -2,6 +2,8 @@ package com.example.pop.pacienteauth;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -12,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -27,10 +30,11 @@ import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.perfil.PerfilRepository;
 import com.example.pop.usuario.UsuarioController;
 import com.example.pop.usuario.UsuarioRequest;
+import com.example.pop.verificacao.VerificacaoService;
 
 import jakarta.servlet.Filter;
 
-/** Cadeia de filtros real: /paciente-auth/ativar público, /paciente-auth/me e /paciente/** protegidos. */
+/** Cadeia de filtros real: /paciente-auth/solicitar-codigo e /ativar públicos, /me e /paciente/** protegidos. */
 @SpringBootTest
 class PacienteAuthMvcTest {
 
@@ -52,10 +56,12 @@ class PacienteAuthMvcTest {
     private AuthController authController;
     @Autowired
     private PerfilRepository perfilRepository;
+    /** Twilio Verify mockado: aprova qualquer código no teste. */
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private MockMvc mvc;
     private Long pacienteId;
-    private String codigo;
     private Long adminId;
     private String adminToken;
 
@@ -64,7 +70,7 @@ class PacienteAuthMvcTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL)).getId();
-        codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         // Admin de teste (para as chamadas /paciente/** que agora exigem role ADMIN).
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
         adminId = usuarioController
@@ -81,7 +87,7 @@ class PacienteAuthMvcTest {
 
     @Test
     void ativarPublicoEMeProtegido() throws Exception {
-        String corpo = "{\"telefone\":\"" + TEL + "\",\"codigo\":\"" + codigo + "\",\"dispositivoId\":\"dev-mvc\"}";
+        String corpo = "{\"telefone\":\"" + TEL + "\",\"codigo\":\"000000\",\"dispositivoId\":\"dev-mvc\"}";
         MvcResult res = mvc.perform(post("/paciente-auth/ativar")
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isOk()).andReturn();
@@ -116,17 +122,19 @@ class PacienteAuthMvcTest {
     }
 
     /**
-     * Segurança (Fase 4): emitir o código de ativação é ação do back-office e
-     * NÃO pode ser feita sem o token de admin — senão qualquer um pegaria o
-     * código e faria a tomada da conta do paciente.
+     * O paciente pede o próprio código (self-service): endpoint PÚBLICO, sem admin.
+     * Telefone cadastrado → 204; telefone desconhecido → 404 com orientação.
      */
     @Test
-    void gerarCodigoExigeAdmin() throws Exception {
-        // Sem token → 401 (não entrega o código).
-        mvc.perform(post("/paciente/" + pacienteId + "/gerar-codigo")).andExpect(status().isUnauthorized());
-        // Com o token do admin → 200.
-        mvc.perform(post("/paciente/" + pacienteId + "/gerar-codigo")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk());
+    void solicitarCodigoEhPublico() throws Exception {
+        String corpo = "{\"telefone\":\"" + TEL + "\"}";
+        mvc.perform(post("/paciente-auth/solicitar-codigo")
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isNoContent());
+
+        String desconhecido = "{\"telefone\":\"11900000000\"}";
+        mvc.perform(post("/paciente-auth/solicitar-codigo")
+                        .contentType(MediaType.APPLICATION_JSON).content(desconhecido))
+                .andExpect(status().isNotFound());
     }
 }

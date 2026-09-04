@@ -19,6 +19,7 @@ import {
   TipoNotificacao,
   listarNotificacoes,
   marcarNotificacaoLida,
+  marcarTodasLidas,
 } from '@/services/notificacoes-lista';
 import { navegarNotificacao } from '@/services/rota-notificacao';
 
@@ -59,6 +60,7 @@ export default function NotificacoesScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
+  const [marcandoTodas, setMarcandoTodas] = useState(false);
   const jaCarregou = useRef(false);
 
   const carregar = useCallback(async (mostrarSpinner: boolean) => {
@@ -99,6 +101,23 @@ export default function NotificacoesScreen() {
     navegarNotificacao(n.tipo, n.referenciaId);
   };
 
+  // Marca todas de uma vez: atualiza a tela na hora (otimista) e persiste; reverte se falhar.
+  const marcarTodas = async () => {
+    if (marcandoTodas) return;
+    const anteriores = itens;
+    setMarcandoTodas(true);
+    setItens((atual) => atual.map((x) => (x.lida ? x : { ...x, lida: true })));
+    try {
+      await marcarTodasLidas();
+    } catch {
+      setItens(anteriores);
+    } finally {
+      setMarcandoTodas(false);
+    }
+  };
+
+  const qtdNaoLidas = itens.filter((n) => !n.lida).length;
+
   // Agrupa preservando a ordem (backend já devolve do mais recente ao mais antigo).
   const grupos = ORDEM_GRUPOS.map((titulo) => ({
     titulo,
@@ -108,6 +127,29 @@ export default function NotificacoesScreen() {
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Notificações" />
+      {qtdNaoLidas > 0 && (
+        <View style={styles.barra}>
+          <Text style={styles.barraInfo}>
+            {qtdNaoLidas} não lida{qtdNaoLidas > 1 ? 's' : ''}
+          </Text>
+          <Pressable
+            onPress={marcarTodas}
+            disabled={marcandoTodas}
+            accessibilityRole="button"
+            accessibilityLabel="Marcar todas como lidas"
+            accessibilityState={{ busy: marcandoTodas, disabled: marcandoTodas }}
+            style={({ pressed }) => [styles.barraBtn, pressed && styles.barraBtnPressed]}>
+            {marcandoTodas ? (
+              <ActivityIndicator size="small" color={Brand.brand} />
+            ) : (
+              <>
+                <Ionicons name="checkmark-done" size={16} color={Brand.brand} />
+                <Text style={styles.barraBtnTxt}>Marcar todas como lidas</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      )}
       <ScrollView
         contentContainerStyle={[styles.content, itens.length === 0 && styles.vazioContent]}
         refreshControl={
@@ -185,6 +227,28 @@ export default function NotificacoesScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Brand.bg },
+  barra: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: Brand.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Brand.line,
+  },
+  barraInfo: { fontSize: 13, fontWeight: '600', color: Brand.muted },
+  barraBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 34,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#EAF6F2',
+  },
+  barraBtnPressed: { backgroundColor: '#DCEFE9' },
+  barraBtnTxt: { fontSize: 13, fontWeight: '700', color: Brand.brand },
   content: { padding: 16, paddingBottom: 40 },
   vazioContent: { flexGrow: 1 },
   grupo: { marginBottom: 20 },

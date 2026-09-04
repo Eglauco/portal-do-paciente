@@ -1,5 +1,7 @@
 package com.example.pop.pacienteauth;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -25,6 +28,7 @@ import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.prontuario.Prontuario;
 import com.example.pop.prontuario.ProntuarioRepository;
+import com.example.pop.verificacao.VerificacaoService;
 
 import jakarta.servlet.Filter;
 
@@ -56,6 +60,8 @@ class MeusEndpointsMvcTest {
     private ChatRepository chatRepository;
     @Autowired
     private NpsRepository npsRepository;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private MockMvc mvc;
     private Long pacienteId;
@@ -66,8 +72,8 @@ class MeusEndpointsMvcTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente Meu", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        token = authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-meu")).token();
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-meu")).token();
     }
 
     @AfterEach

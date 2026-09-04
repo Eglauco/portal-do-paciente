@@ -30,17 +30,35 @@ function mascararTelefone(valor: string): string {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { ativar } = useSessao();
+  const { solicitarCodigo, ativar } = useSessao();
 
+  const [etapa, setEtapa] = useState<'telefone' | 'codigo'>('telefone');
   const [telefone, setTelefone] = useState('');
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
   const [entrando, setEntrando] = useState(false);
 
-  const podeEntrar = telefone.replace(/\D/g, '').length >= 10 && codigo.length === 6 && !entrando;
+  const telefoneValido = telefone.replace(/\D/g, '').length >= 10;
+  const podeEntrar = codigo.length === 6 && !entrando;
+
+  async function pedirCodigo() {
+    if (enviando || !telefoneValido) return;
+    setErro(null);
+    setEnviando(true);
+    try {
+      await solicitarCodigo(telefone);
+      setCodigo('');
+      setEtapa('codigo');
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível enviar o código. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
+  }
 
   async function entrar() {
-    if (entrando) return;
+    if (entrando || codigo.length !== 6) return;
     setErro(null);
     setEntrando(true);
     try {
@@ -52,6 +70,12 @@ export default function LoginScreen() {
     }
   }
 
+  function voltarParaTelefone() {
+    setEtapa('telefone');
+    setCodigo('');
+    setErro(null);
+  }
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
@@ -59,12 +83,7 @@ export default function LoginScreen() {
       {/* Faixa de marca */}
       <SafeAreaView edges={['top']} style={styles.brand}>
         <View style={styles.brandGlow} pointerEvents="none" />
-        <Ionicons
-          name="pulse"
-          size={220}
-          color="rgba(127,224,195,0.10)"
-          style={styles.brandWatermark}
-        />
+        <Ionicons name="pulse" size={220} color="rgba(127,224,195,0.10)" style={styles.brandWatermark} />
 
         <View style={styles.wordmark}>
           <View style={styles.mark}>
@@ -91,92 +110,137 @@ export default function LoginScreen() {
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Entrar no aplicativo</Text>
-          <Text style={styles.subtitle}>
-            Use o telefone que você informou na unidade e o código que a recepção te passou.
-          </Text>
+          {etapa === 'telefone' ? (
+            <>
+              <Text style={styles.title}>Entrar no aplicativo</Text>
+              <Text style={styles.subtitle}>
+                Informe o telefone do seu cadastro. Enviaremos um código de acesso por SMS para confirmar que é você.
+              </Text>
 
-          {/* Telefone */}
-          <Text style={styles.label}>Telefone</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="call-outline" size={20} color={Brand.muted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              value={telefone}
-              onChangeText={(t) => {
-                setTelefone(mascararTelefone(t));
-                if (erro) setErro(null);
-              }}
-              placeholder="(11) 99999-0000"
-              placeholderTextColor="#9AAAA5"
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              inputMode="tel"
-              maxLength={15}
-              returnKeyType="next"
-            />
-          </View>
+              {/* Telefone */}
+              <Text style={styles.label}>Telefone</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="call-outline" size={20} color={Brand.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={telefone}
+                  onChangeText={(t) => {
+                    setTelefone(mascararTelefone(t));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="(11) 99999-0000"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="phone-pad"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  maxLength={15}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (telefoneValido) pedirCodigo();
+                  }}
+                />
+              </View>
 
-          {/* Código */}
-          <Text style={styles.label}>Código de acesso</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons
-              name="key-outline"
-              size={20}
-              color={Brand.muted}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={[styles.input, styles.codeInput]}
-              value={codigo}
-              onChangeText={(t) => {
-                setCodigo(t.replace(/\D/g, '').slice(0, 6));
-                if (erro) setErro(null);
-              }}
-              placeholder="000000"
-              placeholderTextColor="#9AAAA5"
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={6}
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                if (podeEntrar) entrar();
-              }}
-            />
-          </View>
-          <Text style={styles.hint}>São 6 números. O código vale por 48 horas.</Text>
+              {erro && (
+                <View style={styles.erroBox}>
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
 
-          {erro && (
-            <View style={styles.erroBox}>
-              <Ionicons name="alert-circle" size={18} color="#B23B4E" />
-              <Text style={styles.erroTxt}>{erro}</Text>
-            </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                  (!telefoneValido || enviando) && styles.primaryBtnOff,
+                ]}
+                onPress={pedirCodigo}
+                disabled={!telefoneValido || enviando}
+                accessibilityRole="button"
+                accessibilityLabel="Receber código"
+                accessibilityState={{ busy: enviando, disabled: !telefoneValido || enviando }}>
+                {enviando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Receber código</Text>
+                )}
+              </Pressable>
+
+              <View style={styles.foot}>
+                <Ionicons name="information-circle-outline" size={18} color={Brand.muted} />
+                <Text style={styles.footText}>
+                  Telefone não cadastrado? Procure a recepção da sua unidade de saúde.
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <Pressable style={styles.backRow} onPress={voltarParaTelefone} accessibilityRole="button">
+                <Ionicons name="chevron-back" size={20} color={Brand.brandDeep} />
+                <Text style={styles.backTxt}>Trocar telefone</Text>
+              </Pressable>
+
+              <Text style={styles.title}>Digite o código</Text>
+              <Text style={styles.subtitle}>
+                Enviamos um código por SMS para {telefone}.
+              </Text>
+
+              <Text style={styles.label}>Código de acesso</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="key-outline" size={20} color={Brand.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.codeInput]}
+                  value={codigo}
+                  onChangeText={(t) => {
+                    setCodigo(t.replace(/\D/g, '').slice(0, 6));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="000000"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (podeEntrar) entrar();
+                  }}
+                />
+              </View>
+              <Text style={styles.hint}>São 6 números e o código expira em alguns minutos.</Text>
+
+              {erro && (
+                <View style={styles.erroBox}>
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                  !podeEntrar && styles.primaryBtnOff,
+                ]}
+                onPress={entrar}
+                disabled={!podeEntrar}
+                accessibilityRole="button"
+                accessibilityLabel="Entrar"
+                accessibilityState={{ busy: entrando, disabled: !podeEntrar }}>
+                {entrando ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Entrar</Text>}
+              </Pressable>
+
+              <Pressable
+                style={styles.linkBtn}
+                onPress={pedirCodigo}
+                disabled={enviando}
+                accessibilityRole="button">
+                <Text style={styles.linkTxt}>
+                  {enviando ? 'Reenviando…' : 'Reenviar código por SMS'}
+                </Text>
+              </Pressable>
+            </>
           )}
-
-          {/* Entrar */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryBtn,
-              pressed && styles.primaryBtnPressed,
-              !podeEntrar && styles.primaryBtnOff,
-            ]}
-            onPress={entrar}
-            disabled={!podeEntrar}
-            accessibilityRole="button">
-            {entrando ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Entrar</Text>
-            )}
-          </Pressable>
-
-          {/* Rodapé */}
-          <View style={styles.foot}>
-            <Ionicons name="information-circle-outline" size={18} color={Brand.muted} />
-            <Text style={styles.footText}>
-              Ainda não tem código? Procure a recepção da sua unidade de saúde.
-            </Text>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -354,6 +418,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  linkBtn: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  linkTxt: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.brandDeep,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    marginBottom: 18,
+    marginLeft: -4,
+  },
+  backTxt: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Brand.brandDeep,
   },
   foot: {
     flexDirection: 'row',

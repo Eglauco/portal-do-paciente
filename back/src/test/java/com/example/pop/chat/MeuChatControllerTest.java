@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.pop.common.Ref;
 import com.example.pop.paciente.PacienteController;
@@ -22,6 +25,7 @@ import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
 import com.example.pop.unidade.UnidadeRepository;
+import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
 class MeuChatControllerTest {
@@ -42,6 +46,8 @@ class MeuChatControllerTest {
     private UnidadeRepository unidadeRepository;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     private Long unidadeId;
@@ -55,8 +61,8 @@ class MeuChatControllerTest {
             pacienteRepository.deleteById(p.getId());
         });
         pacienteId = pacienteController.criar(new PacienteRequest("Chat Paciente", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-meuchat")).token());
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-meuchat")).token());
         unidadeId = unidadeAtual();
     }
 

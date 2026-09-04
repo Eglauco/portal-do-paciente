@@ -3,6 +3,8 @@ package com.example.pop.notificacao;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 
@@ -13,12 +15,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
+import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
 class MeuNotificacaoControllerTest {
@@ -39,6 +43,8 @@ class MeuNotificacaoControllerTest {
     private NotificacaoRepository notificacaoRepository;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     private Jwt jwt;
@@ -52,8 +58,8 @@ class MeuNotificacaoControllerTest {
             pacienteRepository.deleteById(p.getId());
         });
         pacienteId = pacienteController.criar(new PacienteRequest("Notif Paciente", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-notif")).token());
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-notif")).token());
     }
 
     @AfterEach
@@ -87,6 +93,19 @@ class MeuNotificacaoControllerTest {
         NotificacaoResponse relida = controller.listar(jwt, 0, 50).content().stream()
                 .filter(n -> n.id().equals(alvo)).findFirst().orElseThrow();
         assertTrue(relida.lida());
+    }
+
+    @Test
+    void marcarTodasComoLidasZeraContador() {
+        notificacaoService.registrar(pacienteId, TipoNotificacao.AGENDAMENTO, "Novo agendamento", "corpo 1", 10L);
+        notificacaoService.registrar(pacienteId, TipoNotificacao.NPS, "Avalie seu atendimento", "corpo 2", null);
+        notificacaoService.registrar(pacienteId, TipoNotificacao.SAU, "Resposta do SAU", "corpo 3", 20L);
+        assertEquals(3L, controller.naoLidas(jwt).total());
+
+        controller.marcarTodasLidas(jwt);
+
+        assertEquals(0L, controller.naoLidas(jwt).total());
+        assertTrue(controller.listar(jwt, 0, 50).content().stream().allMatch(NotificacaoResponse::lida));
     }
 
     @Test

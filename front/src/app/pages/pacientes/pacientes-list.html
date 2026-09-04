@@ -126,6 +126,7 @@
                 [attr.aria-label]="'Editar ' + p.nome"
                 (click)="editar(p)"
                 (keydown.enter)="editar(p)"
+                (keydown.space)="$event.preventDefault(); editar(p)"
               >
                 <td class="mono">{{ p.id }}</td>
                 <td>

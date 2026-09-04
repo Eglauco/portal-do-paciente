@@ -2,6 +2,8 @@ package com.example.pop.agendamento;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.paciente.PacienteController;
@@ -22,6 +25,7 @@ import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
 import com.example.pop.procedimento.Procedimento;
 import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
 class AgendamentoCancelamentoPrazoTest {
@@ -45,6 +49,8 @@ class AgendamentoCancelamentoPrazoTest {
     private PacienteRepository pacienteRepository;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     private Long procedimentoId;
@@ -57,8 +63,8 @@ class AgendamentoCancelamentoPrazoTest {
             pacienteRepository.deleteById(p.getId());
         });
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente Prazo", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-prazo")).token());
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-prazo")).token());
         // Procedimento com prazo de 24h de antecedência.
         procedimentoId = procedimentoRepository.save(new Procedimento(null, "Proc Prazo Teste", null, 24, 0)).getId();
     }

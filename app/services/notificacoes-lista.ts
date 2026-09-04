@@ -59,3 +59,11 @@ export async function marcarNotificacaoLida(id: number): Promise<void> {
     throw new Error(`Falha ao marcar como lida (${resposta.status})`);
   }
 }
+
+/** Marca TODAS as notificações do paciente como lidas (botão "marcar todas como lidas"). */
+export async function marcarTodasLidas(): Promise<void> {
+  const resposta = await fetchMeu('/meu/notificacoes/marcar-todas-lidas', { method: 'POST' });
+  if (!resposta.ok) {
+    throw new Error(`Falha ao marcar todas como lidas (${resposta.status})`);
+  }
+}

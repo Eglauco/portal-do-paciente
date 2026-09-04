@@ -48,6 +48,13 @@ public class MeuNotificacaoController {
         service.marcarLida(id, pacienteId);
     }
 
+    /** Marca TODAS as notificações do paciente como lidas (botão "marcar todas como lidas"). */
+    @PostMapping("/marcar-todas-lidas")
+    public void marcarTodasLidas(@AuthenticationPrincipal Jwt jwt) {
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
+        service.marcarTodasLidas(pacienteId);
+    }
+
     public record ContagemNaoLidas(long total) {
     }
 }

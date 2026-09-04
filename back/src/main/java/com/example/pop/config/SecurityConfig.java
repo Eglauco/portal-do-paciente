@@ -51,7 +51,7 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Públicos (sem token).
-                        .requestMatchers("/auth/login", "/paciente-auth/ativar").permitAll()
+                        .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
                         .requestMatchers("/feed/**", "/dispositivo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()

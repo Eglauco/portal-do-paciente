@@ -6,6 +6,7 @@ import {
   carregarSessao,
   registrarInvalidacao,
   sair as sairServico,
+  solicitarCodigo as solicitarCodigoServico,
   type SessaoPaciente,
 } from '@/services/sessao';
 
@@ -14,6 +15,8 @@ interface SessaoContexto {
   sessao: SessaoPaciente | null;
   /** Enquanto lê a sessão guardada no aparelho (evita piscar a tela de login). */
   carregando: boolean;
+  /** Pede o código de ativação por SMS para o telefone principal. */
+  solicitarCodigo: (telefone: string) => Promise<void>;
   ativar: (telefone: string, codigo: string) => Promise<void>;
   sair: () => Promise<void>;
 }
@@ -45,6 +48,10 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     if (sessao) registrarParaPush().catch(() => {});
   }, [sessao?.pacienteId]);
 
+  async function solicitarCodigo(telefone: string) {
+    await solicitarCodigoServico(telefone);
+  }
+
   async function ativar(telefone: string, codigo: string) {
     setSessao(await ativarServico(telefone, codigo));
   }
@@ -55,7 +62,9 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Contexto.Provider value={{ sessao, carregando, ativar, sair }}>{children}</Contexto.Provider>
+    <Contexto.Provider value={{ sessao, carregando, solicitarCodigo, ativar, sair }}>
+      {children}
+    </Contexto.Provider>
   );
 }
 

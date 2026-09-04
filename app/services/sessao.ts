@@ -67,6 +67,29 @@ export async function carregarSessao(): Promise<SessaoPaciente | null> {
 }
 
 /**
+ * Pede o código de ativação (OTP) por SMS para o telefone PRINCIPAL do cadastro.
+ * Telefone não cadastrado → mensagem para procurar a unidade.
+ */
+export async function solicitarCodigo(telefone: string): Promise<void> {
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/solicitar-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefone }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (resposta.status === 404) {
+    throw new Error('Telefone não encontrado no cadastro. Entre em contato com a sua unidade de saúde.');
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível enviar o código agora. Tente novamente.');
+  }
+}
+
+/**
  * Ativa o app: envia telefone + código + id do aparelho e guarda o token.
  * Erros trazem uma mensagem amigável para exibir ao paciente.
  */

@@ -13,11 +13,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { NgxMaskDirective } from 'ngx-mask';
 import { ToastrService } from 'ngx-toastr';
-import { switchMap } from 'rxjs';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { CepService } from '../../shared/cep.service';
 import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
-import { CodigoAtivacao, PacienteEntrada } from './paciente.model';
+import { PacienteEntrada } from './paciente.model';
 import { PacienteService } from './paciente.service';
 
 const SEXOS = [
@@ -96,11 +95,9 @@ export class PacienteForm implements PodeSair {
   protected readonly erroCarregar = signal(false);
   protected readonly buscandoCep = signal(false);
 
-  // Acesso ao app
+  // Acesso ao app (o paciente ativa sozinho por OTP; aqui o admin só revoga).
   protected readonly ativo = signal(false);
-  protected readonly gerandoCodigo = signal(false);
   protected readonly revogando = signal(false);
-  protected readonly codigoAtivacao = signal<CodigoAtivacao | null>(null);
 
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
@@ -270,50 +267,6 @@ export class PacienteForm implements PodeSair {
     if (e?.status === 409) return e.error?.message ?? 'Já existe um paciente com um dos dados únicos.';
     if (e?.status === 400) return e.error?.message ?? 'Verifique os dados informados (CPF/CNS inválido?).';
     return 'Não foi possível salvar o paciente.';
-  }
-
-  /** Garante que os dados estão salvos e gera um novo código de ativação. */
-  protected gerarCodigo(): void {
-    if (this.gerandoCodigo()) return;
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      return;
-    }
-    if (!this.form.controls.telefone.value.trim()) {
-      this.toastr.error('Informe o telefone do paciente para gerar o código.');
-      return;
-    }
-    const id = this.codigo()!;
-    this.gerandoCodigo.set(true);
-    this.service
-      .atualizar(id, this.valores())
-      .pipe(switchMap(() => this.service.gerarCodigo(id)))
-      .subscribe({
-        next: (codigo) => {
-          this.form.markAsPristine();
-          this.ativo.set(true);
-          this.codigoAtivacao.set(codigo);
-          this.gerandoCodigo.set(false);
-        },
-        error: (e) => {
-          this.gerandoCodigo.set(false);
-          this.toastr.error(this.mensagemErro(e));
-        },
-      });
-  }
-
-  protected copiarCodigo(): void {
-    const codigo = this.codigoAtivacao()?.codigo;
-    if (codigo) {
-      navigator.clipboard?.writeText(codigo).then(
-        () => this.toastr.success('Código copiado'),
-        () => {},
-      );
-    }
-  }
-
-  protected fecharCodigo(): void {
-    this.codigoAtivacao.set(null);
   }
 
   protected async revogar(): Promise<void> {

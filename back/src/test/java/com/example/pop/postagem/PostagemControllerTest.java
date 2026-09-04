@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 
@@ -15,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
@@ -24,6 +27,7 @@ import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
 import com.example.pop.usuario.UsuarioRepository;
+import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
 class PostagemControllerTest {
@@ -47,6 +51,8 @@ class PostagemControllerTest {
     private UsuarioRepository usuarioRepository;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     /** Token do paciente logado — comentar/responder derivam o autor dele. */
@@ -62,8 +68,8 @@ class PostagemControllerTest {
     void setup() {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        String token = authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-post")).token();
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        String token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-post")).token();
         jwt = jwtDecoder.decode(token);
     }
 
@@ -219,8 +225,7 @@ class PostagemControllerTest {
         String tel2 = "11933332222";
         pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         Long outroId = pacienteController.criar(new PacienteRequest("Maria Outra", tel2)).getId();
-        String cod2 = pacienteController.gerarCodigo(outroId).getBody().codigo();
-        Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, cod2, "dev-outro")).token());
+        Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro")).token());
 
         Long id = controller.criar(new PostagemRequest("Regras", "teste", true, true, 1L, IMG)).id();
         ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "meu comentário"), jwt);

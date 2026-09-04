@@ -2,7 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { CodigoAtivacao, Pagina, Paciente, PacienteEntrada, PacienteFiltro } from './paciente.model';
+import { Pagina, Paciente, PacienteEntrada, PacienteFiltro } from './paciente.model';
 
 @Injectable({ providedIn: 'root' })
 export class PacienteService {
@@ -49,11 +49,6 @@ export class PacienteService {
 
   excluir(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
-  }
-
-  /** Libera o paciente e gera um código de ativação (mostrado uma vez). */
-  gerarCodigo(id: number): Observable<CodigoAtivacao> {
-    return this.http.post<CodigoAtivacao>(`${this.base}/${id}/gerar-codigo`, {});
   }
 
   /** Revoga o acesso do paciente ao app. */

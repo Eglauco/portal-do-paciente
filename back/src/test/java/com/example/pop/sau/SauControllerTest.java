@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 
@@ -17,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
@@ -28,6 +31,7 @@ import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
 import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.UsuarioRepository;
+import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
 class SauControllerTest {
@@ -57,6 +61,8 @@ class SauControllerTest {
     private TipoManifestacaoController tipoController;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     private Long unidadeId;
@@ -80,8 +86,8 @@ class SauControllerTest {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> apagarManifestacoes(p.getId()));
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Ana Manifestante", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-sau")).token());
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-sau")).token());
         unidadeId = unidadeRepository.findAll().get(0).getId();
         List<TipoManifestacao> tipos = tipoRepository.findByAtivoTrueOrderByNome();
         tipoId = tipos.get(0).getId();
@@ -211,9 +217,8 @@ class SauControllerTest {
         String tel2 = "11955550002";
         pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         Long outroId = pacienteController.criar(new PacienteRequest("Outro Paciente", tel2)).getId();
-        String cod2 = pacienteController.gerarCodigo(outroId).getBody().codigo();
         Jwt jwtOutro = jwtDecoder.decode(
-                authController.ativar(new AtivarPacienteRequest(tel2, cod2, "dev-outro-sau")).token());
+                authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro-sau")).token());
 
         assertEquals(404, assertThrows(ResponseStatusException.class,
                 () -> meuController.buscar(jwtOutro, id)).getStatusCode().value());

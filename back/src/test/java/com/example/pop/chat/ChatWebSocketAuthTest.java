@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.security.Principal;
 
@@ -18,12 +20,14 @@ import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
+import com.example.pop.verificacao.VerificacaoService;
 
 /**
  * Fase 4B: segurança do WebSocket do chat. CONNECT exige token válido; um
@@ -44,6 +48,8 @@ class ChatWebSocketAuthTest {
     private PacienteRepository pacienteRepository;
     @Autowired
     private ChatRepository chatRepository;
+    @MockitoBean
+    private VerificacaoService verificacao;
 
     private Long pacienteId;
     private String token;
@@ -52,8 +58,8 @@ class ChatWebSocketAuthTest {
     void setup() {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente WS", TEL)).getId();
-        String codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
-        token = authController.ativar(new AtivarPacienteRequest(TEL, codigo, "dev-ws")).token();
+        when(verificacao.checar(anyString(), anyString())).thenReturn(true);
+        token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-ws")).token();
     }
 
     @AfterEach

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.example.pop.paciente.Paciente;
@@ -36,6 +38,13 @@ public class PacienteAuthController {
         this.acessoService = acessoService;
         this.jwtEncoder = jwtEncoder;
         this.expiracaoDias = expiracaoDias;
+    }
+
+    /** O paciente pede o código de ativação (SMS) para o seu telefone principal. */
+    @PostMapping("/solicitar-codigo")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request) {
+        acessoService.solicitarCodigo(request.telefone());
     }
 
     /** Ativa o app: valida telefone + código, amarra o aparelho e devolve um token de longa duração. */

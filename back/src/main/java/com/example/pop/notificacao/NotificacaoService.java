@@ -111,4 +111,10 @@ public class NotificacaoService {
             }
         });
     }
+
+    /** Marca TODAS as não lidas do paciente como lidas (botão "marcar todas como lidas"). */
+    @Transactional
+    public void marcarTodasLidas(Long pacienteId) {
+        repository.marcarTodasLidas(pacienteId, LocalDateTime.now());
+    }
 }

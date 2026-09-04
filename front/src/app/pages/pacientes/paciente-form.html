@@ -18,6 +18,15 @@
     }
   </header>
 
+  @if (erroCarregar()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar o paciente</h2>
+      <p>Verifique se o servidor está disponível e tente novamente.</p>
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Voltar</button>
+    </div>
+  }
+
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     @if (editando()) {
       <div class="form-field form-field--sm">
@@ -194,7 +203,7 @@
       <div class="form-field">
         <span class="label">Telefones adicionais</span>
         <div class="tel-lista" formArrayName="telefonesAdicionais">
-          @for (ctrl of telefonesAdicionais.controls; track $index) {
+          @for (ctrl of telefonesAdicionais.controls; track ctrl) {
             <div class="tel-lista__item">
               <input
                 class="input"
@@ -240,6 +249,7 @@
             class="input"
             formControlName="cep"
             mask="00000-000"
+            [validation]="false"
             placeholder="00000-000"
             inputmode="numeric"
             autocomplete="off"
@@ -295,23 +305,20 @@
         <div>
           <h2 class="acesso-app__title">Acesso ao aplicativo</h2>
           <p class="acesso-app__sub">
-            Gere um código para o paciente ativar o app pelo telefone. Vale por 48 horas e serve uma única vez.
-            A liberação dá acesso aos dados do paciente em todas as unidades.
+            O paciente ativa o app sozinho: no aplicativo ele informa o telefone principal e recebe um código
+            por WhatsApp ou SMS. Aqui você pode revogar o acesso (desloga o aparelho atual).
           </p>
         </div>
-        <span class="sit" [class.sit--off]="!ativo()">{{ ativo() ? 'Liberado' : 'Não liberado' }}</span>
+        <span class="sit" [class.sit--off]="!ativo()">{{ ativo() ? 'Aparelho conectado' : 'Sem aparelho' }}</span>
       </header>
 
-      <div class="acesso-app__actions">
-        <button type="button" class="btn btn--solid" (click)="gerarCodigo()" [disabled]="gerandoCodigo()">
-          {{ gerandoCodigo() ? 'Gerando…' : (ativo() ? 'Gerar novo código' : 'Liberar e gerar código') }}
-        </button>
-        @if (ativo()) {
+      @if (ativo()) {
+        <div class="acesso-app__actions">
           <button type="button" class="btn btn--danger" (click)="revogar()" [disabled]="revogando()">
             {{ revogando() ? 'Revogando…' : 'Revogar acesso' }}
           </button>
-        }
-      </div>
+        </div>
+      }
     </section>
   }
 </section>
@@ -336,32 +343,6 @@
       <div class="modal__actions">
         <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
         <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
-      </div>
-    </div>
-  </div>
-}
-
-<!-- Código de ativação gerado (mostrado uma única vez) -->
-@if (codigoAtivacao(); as ativacao) {
-  <div class="modal-backdrop" (click)="fecharCodigo()">
-    <div
-      class="modal modal--codigo"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="codigo-title"
-      (click)="$event.stopPropagation()"
-    >
-      <h2 id="codigo-title" class="codigo__title">Código de ativação</h2>
-      <p class="codigo__hint">
-        Informe este código ao paciente. No app, ele digita o telefone e este código para entrar.
-      </p>
-      <div class="codigo__box">
-        <span class="codigo__value">{{ ativacao.codigo }}</span>
-        <button type="button" class="btn btn--ghost btn--sm" (click)="copiarCodigo()">Copiar</button>
-      </div>
-      <p class="codigo__exp">Válido por 48 horas · uso único</p>
-      <div class="modal__actions">
-        <button type="button" class="btn btn--solid" (click)="fecharCodigo()">Concluir</button>
       </div>
     </div>
   </div>

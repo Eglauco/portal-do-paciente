@@ -53,12 +53,6 @@ export interface PacienteEntrada {
   telefonesAdicionais: string[];
 }
 
-/** Código de ativação gerado para o paciente (mostrado uma única vez). */
-export interface CodigoAtivacao {
-  codigo: string;
-  expiraEm: string;
-}
-
 export interface PacienteFiltro {
   codigo?: string;
   nome?: string;
