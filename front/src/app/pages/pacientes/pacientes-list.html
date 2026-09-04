@@ -29,7 +29,7 @@
   <!-- Filtros -->
   <form class="filters" (submit)="buscar($event)">
     <p class="section-label">Filtros</p>
-    <div class="filters__row2">
+    <div class="filters__chat">
       <input
         class="input"
         placeholder="Código"
@@ -45,6 +45,24 @@
         [value]="nome()"
         (input)="updateNome($event)"
       />
+      <input
+        class="input"
+        placeholder="CPF"
+        inputmode="numeric"
+        aria-label="CPF"
+        [value]="cpf()"
+        (input)="updateCpf($event)"
+      />
+      <input
+        class="input"
+        placeholder="Prontuário"
+        aria-label="Prontuário"
+        [value]="prontuario()"
+        (input)="updateProntuario($event)"
+      />
+    </div>
+    <div class="filters__chat-acoes">
+      <span></span>
       <div class="filters__actions">
         <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
         <button type="submit" class="btn btn--solid">
@@ -96,6 +114,7 @@
             <tr>
               <th class="col-cod">Código</th>
               <th>Nome</th>
+              <th>CPF</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -115,6 +134,7 @@
                     <b>{{ p.nome }}</b>
                   </span>
                 </td>
+                <td class="mono muted-cell">{{ formatarCpf(p.cpf) || '—' }}</td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

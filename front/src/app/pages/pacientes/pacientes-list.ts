@@ -25,6 +25,8 @@ export class PacientesList {
 
   protected readonly codigo = signal(this.store.codigo);
   protected readonly nome = signal(this.store.nome);
+  protected readonly cpf = signal(this.store.cpf);
+  protected readonly prontuario = signal(this.store.prontuario);
 
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly loading = signal(false);
@@ -72,6 +74,8 @@ export class PacientesList {
     this.store.limpar();
     this.codigo.set('');
     this.nome.set('');
+    this.cpf.set('');
+    this.prontuario.set('');
     this.page.set(0);
     this.carregar();
   }
@@ -99,12 +103,20 @@ export class PacientesList {
   private carregar(): void {
     this.store.codigo = this.codigo();
     this.store.nome = this.nome();
+    this.store.cpf = this.cpf();
+    this.store.prontuario = this.prontuario();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size()).subscribe({
+    this.service
+      .listar(
+        { codigo: this.codigo(), nome: this.nome(), cpf: this.cpf(), prontuario: this.prontuario() },
+        this.page(),
+        this.size(),
+      )
+      .subscribe({
       next: (pagina) => {
         this.pacientes.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -132,7 +144,14 @@ export class PacientesList {
   protected exportar(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }).subscribe({
+    this.service
+      .exportar(formato, {
+        codigo: this.codigo(),
+        nome: this.nome(),
+        cpf: this.cpf(),
+        prontuario: this.prontuario(),
+      })
+      .subscribe({
       next: (blob) => {
         this.baixar(blob, `pacientes.${formato}`);
         this.exportando.set(null);
@@ -169,5 +188,23 @@ export class PacientesList {
 
   protected updateNome(event: Event): void {
     this.nome.set((event.target as HTMLInputElement).value);
+  }
+
+  protected updateCpf(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const apenasDigitos = input.value.replace(/\D/g, '').slice(0, 11);
+    if (input.value !== apenasDigitos) input.value = apenasDigitos;
+    this.cpf.set(apenasDigitos);
+  }
+
+  protected updateProntuario(event: Event): void {
+    this.prontuario.set((event.target as HTMLInputElement).value);
+  }
+
+  /** Formata o CPF (só dígitos) como 000.000.000-00 para exibir na tabela. */
+  protected formatarCpf(cpf: string | null | undefined): string {
+    const d = (cpf ?? '').replace(/\D/g, '');
+    if (d.length !== 11) return d;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
   }
 }

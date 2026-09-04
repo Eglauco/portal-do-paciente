@@ -1,0 +1,40 @@
+/* Agrupamento por seção (fieldset sem a moldura padrão do navegador). */
+.form-card fieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  min-width: 0; /* evita que o fieldset force largura mínima e quebre o grid */
+}
+
+.form-card legend.section-label {
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+/* Campo que ocupa a linha inteira do grid. */
+.form-field--wide {
+  grid-column: 1 / -1;
+}
+
+/* Lista de telefones adicionais. */
+.tel-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tel-lista__item {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tel-lista__item .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tel-lista__add {
+  margin-top: 0.5rem;
+  align-self: flex-start;
+}

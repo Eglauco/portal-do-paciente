@@ -20,6 +20,8 @@ export class PacienteService {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
+    if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
     return this.http.get<Pagina<Paciente>>(this.base, { params });
   }
 
@@ -28,6 +30,8 @@ export class PacienteService {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
+    if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

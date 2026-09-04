@@ -1,13 +1,57 @@
+/** Sexo do paciente (chave do enum no backend). */
+export type Sexo = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
+
 export interface Paciente {
   id?: number;
   nome: string;
   telefone?: string | null;
+  codigoIntegracao?: string | null;
+  prontuario?: string | null;
+  sexo?: Sexo | null;
+  /** Data ISO (yyyy-MM-dd). */
+  dataNascimento?: string | null;
+  rg?: string | null;
+  cpf?: string | null;
+  nomeMae?: string | null;
+  nomePai?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+  complemento?: string | null;
+  email?: string | null;
+  cns?: string | null;
+  telefonesAdicionais?: string[];
   /** Liberado para acessar o app. */
   ativo?: boolean;
 }
 
 /** Campos aceitos ao criar/editar (ativo/código são geridos pelo backend). */
-export type PacienteEntrada = Pick<Paciente, 'nome' | 'telefone'>;
+export interface PacienteEntrada {
+  nome: string;
+  telefone?: string | null;
+  codigoIntegracao?: string | null;
+  prontuario?: string | null;
+  sexo?: Sexo | null;
+  /** Data ISO (yyyy-MM-dd) ou null. */
+  dataNascimento?: string | null;
+  rg?: string | null;
+  cpf?: string | null;
+  nomeMae?: string | null;
+  nomePai?: string | null;
+  rua?: string | null;
+  numero?: string | null;
+  bairro?: string | null;
+  municipio?: string | null;
+  uf?: string | null;
+  cep?: string | null;
+  complemento?: string | null;
+  email?: string | null;
+  cns?: string | null;
+  telefonesAdicionais: string[];
+}
 
 /** Código de ativação gerado para o paciente (mostrado uma única vez). */
 export interface CodigoAtivacao {
@@ -18,6 +62,8 @@ export interface CodigoAtivacao {
 export interface PacienteFiltro {
   codigo?: string;
   nome?: string;
+  cpf?: string;
+  prontuario?: string;
 }
 
 export interface Pagina<T> {

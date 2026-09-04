@@ -1,30 +1,92 @@
-import { Component, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, afterNextRender, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  AbstractControl,
+  FormArray,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgSelectModule } from '@ng-select/ng-select';
+import { NgxMaskDirective } from 'ngx-mask';
 import { ToastrService } from 'ngx-toastr';
 import { switchMap } from 'rxjs';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { CepService } from '../../shared/cep.service';
 import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
-import { CodigoAtivacao } from './paciente.model';
+import { CodigoAtivacao, PacienteEntrada } from './paciente.model';
 import { PacienteService } from './paciente.service';
+
+const SEXOS = [
+  { value: 'MASCULINO', label: 'Masculino' },
+  { value: 'FEMININO', label: 'Feminino' },
+  { value: 'OUTRO', label: 'Outro' },
+  { value: 'NAO_INFORMADO', label: 'Prefiro não informar' },
+];
+
+const UFS = [
+  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
+  'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+];
+
+/** Data no formato dd/mm/aaaa: opcional, mas se preenchida precisa ser válida e não futura. */
+function dataNascimentoValidator(control: AbstractControl): ValidationErrors | null {
+  const v = ((control.value ?? '') as string).trim();
+  if (!v) return null;
+  const m = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return { dataInvalida: true };
+  const dia = +m[1];
+  const mes = +m[2];
+  const ano = +m[3];
+  const data = new Date(ano, mes - 1, dia);
+  const real = data.getFullYear() === ano && data.getMonth() === mes - 1 && data.getDate() === dia;
+  if (!real || ano < 1900 || data.getTime() > Date.now()) return { dataInvalida: true };
+  return null;
+}
 
 @Component({
   selector: 'app-paciente-form',
-  imports: [ReactiveFormsModule, TelefoneBrDirective],
+  imports: [ReactiveFormsModule, NgxMaskDirective, NgSelectModule, TelefoneBrDirective],
   templateUrl: './paciente-form.html',
+  styleUrl: './paciente-form.css',
 })
 export class PacienteForm implements PodeSair {
   private readonly service = inject(PacienteService);
+  private readonly cepService = inject(CepService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
 
+  protected readonly sexos = SEXOS;
+  protected readonly ufs = UFS;
+
   protected readonly form = new FormGroup({
+    codigoIntegracao: new FormControl('', { nonNullable: true }),
+    prontuario: new FormControl('', { nonNullable: true }),
     nome: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
     }),
+    sexo: new FormControl<string | null>(null),
+    dataNascimento: new FormControl('', { nonNullable: true, validators: [dataNascimentoValidator] }),
+    rg: new FormControl('', { nonNullable: true }),
+    cpf: new FormControl('', { nonNullable: true }),
+    cns: new FormControl('', { nonNullable: true }),
+    nomeMae: new FormControl('', { nonNullable: true }),
+    nomePai: new FormControl('', { nonNullable: true }),
+    email: new FormControl('', { nonNullable: true, validators: [Validators.email] }),
     telefone: new FormControl('', { nonNullable: true }),
+    telefonesAdicionais: new FormArray<FormControl<string>>([]),
+    cep: new FormControl('', { nonNullable: true }),
+    rua: new FormControl('', { nonNullable: true }),
+    numero: new FormControl('', { nonNullable: true }),
+    bairro: new FormControl('', { nonNullable: true }),
+    municipio: new FormControl('', { nonNullable: true }),
+    uf: new FormControl<string | null>(null),
+    complemento: new FormControl('', { nonNullable: true }),
   });
 
   protected readonly editando = signal(false);
@@ -32,6 +94,7 @@ export class PacienteForm implements PodeSair {
   protected readonly salvando = signal(false);
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
+  protected readonly buscandoCep = signal(false);
 
   // Acesso ao app
   protected readonly ativo = signal(false);
@@ -42,21 +105,102 @@ export class PacienteForm implements PodeSair {
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
+  /** Evita disparar a busca de CEP enquanto o formulário é preenchido pelo carregamento. */
+  private preenchendo = false;
 
   constructor() {
+    // Autopreenchimento de endereço ao completar o CEP (só em digitação do usuário).
+    this.form.controls.cep.valueChanges.pipe(takeUntilDestroyed()).subscribe((cep) => {
+      if (this.preenchendo) return;
+      if ((cep ?? '').replace(/\D/g, '').length === 8) this.buscarCep();
+    });
+
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
-      const id = Number(idParam);
       this.editando.set(true);
-      this.codigo.set(id);
-      this.service.buscarPorId(id).subscribe({
-        next: (paciente) => {
-          this.form.patchValue({ nome: paciente.nome, telefone: paciente.telefone ?? '' });
-          this.ativo.set(!!paciente.ativo);
-        },
-        error: () => this.erroCarregar.set(true),
-      });
+      this.codigo.set(Number(idParam));
     }
+    // Só carrega no navegador (evita chamada sem token no SSR/prerender).
+    afterNextRender(() => {
+      if (this.editando() && this.codigo() != null) this.carregar(this.codigo()!);
+    });
+  }
+
+  protected get telefonesAdicionais(): FormArray<FormControl<string>> {
+    return this.form.controls.telefonesAdicionais;
+  }
+
+  protected adicionarTelefone(valor = ''): void {
+    this.telefonesAdicionais.push(new FormControl(valor, { nonNullable: true }));
+    this.form.markAsDirty();
+  }
+
+  protected removerTelefone(indice: number): void {
+    this.telefonesAdicionais.removeAt(indice);
+    this.form.markAsDirty();
+  }
+
+  private setTelefonesAdicionais(numeros: string[]): void {
+    this.telefonesAdicionais.clear();
+    numeros.forEach((n) => this.telefonesAdicionais.push(new FormControl(n, { nonNullable: true })));
+  }
+
+  private carregar(id: number): void {
+    this.service.buscarPorId(id).subscribe({
+      next: (p) => {
+        this.preenchendo = true;
+        this.form.patchValue({
+          codigoIntegracao: p.codigoIntegracao ?? '',
+          prontuario: p.prontuario ?? '',
+          nome: p.nome,
+          sexo: p.sexo ?? null,
+          dataNascimento: this.isoParaData(p.dataNascimento ?? null),
+          rg: p.rg ?? '',
+          cpf: p.cpf ?? '',
+          cns: p.cns ?? '',
+          nomeMae: p.nomeMae ?? '',
+          nomePai: p.nomePai ?? '',
+          email: p.email ?? '',
+          telefone: p.telefone ?? '',
+          cep: p.cep ?? '',
+          rua: p.rua ?? '',
+          numero: p.numero ?? '',
+          bairro: p.bairro ?? '',
+          municipio: p.municipio ?? '',
+          uf: p.uf ?? null,
+          complemento: p.complemento ?? '',
+        });
+        this.setTelefonesAdicionais(p.telefonesAdicionais ?? []);
+        this.preenchendo = false;
+        this.ativo.set(!!p.ativo);
+      },
+      error: () => this.erroCarregar.set(true),
+    });
+  }
+
+  private buscarCep(): void {
+    this.buscandoCep.set(true);
+    this.cepService.buscar(this.form.controls.cep.value).subscribe((end) => {
+      this.buscandoCep.set(false);
+      if (!end) return;
+      this.form.patchValue({
+        rua: end.logradouro || this.form.controls.rua.value,
+        bairro: end.bairro || this.form.controls.bairro.value,
+        municipio: end.municipio || this.form.controls.municipio.value,
+        uf: end.uf || this.form.controls.uf.value,
+      });
+      this.form.markAsDirty();
+    });
+  }
+
+  private isoParaData(iso: string | null): string {
+    const m = (iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+  }
+
+  private dataParaIso(valor: string): string | null {
+    const m = (valor ?? '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : null;
   }
 
   podeSair(): boolean | Promise<boolean> {
@@ -64,15 +208,37 @@ export class PacienteForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome'): boolean {
-    const control = this.form.controls[campo];
-    return control.invalid && (control.touched || control.dirty);
+  protected invalido(campo: string): boolean {
+    const control = this.form.get(campo);
+    return !!control && control.invalid && (control.touched || control.dirty);
   }
 
-  private valores() {
+  private valores(): PacienteEntrada {
+    const f = this.form.getRawValue();
+    const texto = (v: string) => (v.trim() ? v.trim() : null);
     return {
-      nome: this.form.controls.nome.value.trim(),
-      telefone: this.form.controls.telefone.value.trim() || null,
+      nome: f.nome.trim(),
+      telefone: texto(f.telefone),
+      codigoIntegracao: texto(f.codigoIntegracao),
+      prontuario: texto(f.prontuario),
+      sexo: (f.sexo as PacienteEntrada['sexo']) ?? null,
+      dataNascimento: this.dataParaIso(f.dataNascimento),
+      rg: texto(f.rg),
+      cpf: texto(f.cpf),
+      cns: texto(f.cns),
+      nomeMae: texto(f.nomeMae),
+      nomePai: texto(f.nomePai),
+      email: texto(f.email),
+      rua: texto(f.rua),
+      numero: texto(f.numero),
+      bairro: texto(f.bairro),
+      municipio: texto(f.municipio),
+      uf: f.uf ?? null,
+      cep: texto(f.cep),
+      complemento: texto(f.complemento),
+      telefonesAdicionais: this.telefonesAdicionais.controls
+        .map((c) => (c.value ?? '').trim())
+        .filter((v) => v.length > 0),
     };
   }
 
@@ -94,14 +260,19 @@ export class PacienteForm implements PodeSair {
       },
       error: (e) => {
         this.salvando.set(false);
-        this.toastr.error(
-          e?.status === 409 ? 'Já existe um paciente com este telefone.' : 'Não foi possível salvar o paciente.',
-        );
+        this.toastr.error(this.mensagemErro(e));
       },
     });
   }
 
-  /** Garante que o telefone está salvo e gera um novo código de ativação. */
+  /** Mensagem amigável a partir da resposta do backend (409 = dado único; 400 = validação). */
+  private mensagemErro(e: { status?: number; error?: { message?: string } }): string {
+    if (e?.status === 409) return e.error?.message ?? 'Já existe um paciente com um dos dados únicos.';
+    if (e?.status === 400) return e.error?.message ?? 'Verifique os dados informados (CPF/CNS inválido?).';
+    return 'Não foi possível salvar o paciente.';
+  }
+
+  /** Garante que os dados estão salvos e gera um novo código de ativação. */
   protected gerarCodigo(): void {
     if (this.gerandoCodigo()) return;
     if (this.form.invalid) {
@@ -126,9 +297,7 @@ export class PacienteForm implements PodeSair {
         },
         error: (e) => {
           this.gerandoCodigo.set(false);
-          this.toastr.error(
-            e?.status === 409 ? 'Já existe um paciente com este telefone.' : 'Não foi possível gerar o código.',
-          );
+          this.toastr.error(this.mensagemErro(e));
         },
       });
   }

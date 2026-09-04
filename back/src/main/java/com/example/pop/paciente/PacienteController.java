@@ -2,8 +2,10 @@ package com.example.pop.paciente;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -59,14 +61,18 @@ public class PacienteController {
     public Pagina<Paciente> listar(
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String prontuario,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         String filtroNome = (nome == null) ? "" : nome.trim();
+        String filtroCpf = digitos(cpf);
+        String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
-        Page<Paciente> resultado = repository.search(codigo, filtroNome, pageable);
+        Page<Paciente> resultado = repository.search(codigo, filtroNome, filtroCpf, filtroProntuario, pageable);
 
         return new Pagina<>(
                 resultado.getContent(),
@@ -88,9 +94,13 @@ public class PacienteController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String cpf,
+            @RequestParam(required = false) String prontuario) {
         String filtroNome = (nome == null) ? "" : nome.trim();
-        List<Paciente> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
+        String filtroCpf = digitos(cpf);
+        String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
+        List<Paciente> dados = repository.search(codigo, filtroNome, filtroCpf, filtroProntuario, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Paciente::getId))
                 .toList();
@@ -98,7 +108,7 @@ public class PacienteController {
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Pacientes", filtrosPaciente(codigo, nome), colunas, dados)
+                ? exportacaoService.pdf("Pacientes", filtrosPaciente(codigo, nome, cpf, prontuario), colunas, dados)
                 : exportacaoService.excel("Pacientes", colunas, dados);
         String nomeArquivo = "pacientes-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
@@ -109,21 +119,41 @@ public class PacienteController {
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosPaciente(Long codigo, String nome) {
+    private List<FiltroAplicado> filtrosPaciente(Long codigo, String nome, String cpf, String prontuario) {
         return List.of(
                 new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
-                new FiltroAplicado("Nome", (nome != null && !nome.isBlank()) ? nome.trim() : "Todos"));
+                new FiltroAplicado("Nome", (nome != null && !nome.isBlank()) ? nome.trim() : "Todos"),
+                new FiltroAplicado("CPF", (cpf != null && !cpf.isBlank()) ? formatarCpf(digitos(cpf)) : "Todos"),
+                new FiltroAplicado("Prontuário", (prontuario != null && !prontuario.isBlank()) ? prontuario.trim() : "Todos"));
     }
 
     private static List<ColunaExport<Paciente>> colunasPaciente() {
         return List.of(
                 ColunaExport.de("Código", p -> String.valueOf(p.getId())),
                 ColunaExport.de("Nome", Paciente::getNome),
+                ColunaExport.de("CPF", p -> formatarCpf(p.getCpf())),
+                ColunaExport.de("Prontuário", p -> p.getProntuario() == null ? "" : p.getProntuario()),
+                ColunaExport.de("Cód. integração", p -> p.getCodigoIntegracao() == null ? "" : p.getCodigoIntegracao()),
                 ColunaExport.de("Telefone", p -> formatarTelefone(p.getTelefone())),
+                ColunaExport.de("E-mail", p -> p.getEmail() == null ? "" : p.getEmail()),
                 ColunaExport.de("Liberado (app)", p -> p.isAtivo() ? "Sim" : "Não"),
                 ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"),
                 ColunaExport.de("Código expira em",
                         p -> p.getCodigoAtivacaoExpiraEm() == null ? "" : p.getCodigoAtivacaoExpiraEm().format(DATA_HORA)));
+    }
+
+    /** Formata o CPF (só dígitos) como 000.000.000-00; devolve vazio se não tiver 11 dígitos. */
+    private static String formatarCpf(String cpf) {
+        if (cpf == null || cpf.length() != 11) {
+            return cpf == null ? "" : cpf;
+        }
+        return cpf.substring(0, 3) + "." + cpf.substring(3, 6) + "." + cpf.substring(6, 9) + "-" + cpf.substring(9);
+    }
+
+    /** Só os dígitos de um filtro (ou "" quando vazio). */
+    private static String digitos(String valor) {
+        String d = Documentos.somenteDigitos(valor);
+        return d == null ? "" : d;
     }
 
     /** Formata o telefone (só dígitos) no padrão brasileiro; devolve o valor original se não reconhecer. */
@@ -152,9 +182,9 @@ public class PacienteController {
     @ResponseStatus(HttpStatus.CREATED)
     public Paciente criar(@Valid @RequestBody PacienteRequest dados) {
         Paciente paciente = new Paciente();
-        paciente.setNome(dados.nome());
-        paciente.setTelefone(PacienteAcessoService.normalizarTelefone(dados.telefone()));
+        aplicar(paciente, dados);
         paciente.setAtivo(false); // a liberação é feita depois, via "gerar código"
+        validarUnicidade(paciente, null);
         return salvarUnico(paciente);
     }
 
@@ -162,12 +192,94 @@ public class PacienteController {
     public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @Valid @RequestBody PacienteRequest dados) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(dados.nome());
-                    existente.setTelefone(PacienteAcessoService.normalizarTelefone(dados.telefone()));
+                    aplicar(existente, dados);
                     // ativo/código/aparelho são geridos por gerar-codigo/revogar, não pelo corpo.
+                    validarUnicidade(existente, id);
                     return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Copia o request para a entidade, normalizando dígitos e validando CPF/CNS. */
+    private void aplicar(Paciente p, PacienteRequest r) {
+        p.setNome(r.nome().trim());
+        p.setTelefone(Documentos.somenteDigitos(r.telefone()));
+        p.setCodigoIntegracao(limpar(r.codigoIntegracao()));
+        p.setProntuario(limpar(r.prontuario()));
+        p.setSexo(r.sexo());
+        p.setDataNascimento(r.dataNascimento());
+        p.setRg(limpar(r.rg()));
+        p.setCpf(Documentos.somenteDigitos(r.cpf()));
+        p.setNomeMae(limpar(r.nomeMae()));
+        p.setNomePai(limpar(r.nomePai()));
+        p.setRua(limpar(r.rua()));
+        p.setNumero(limpar(r.numero()));
+        p.setBairro(limpar(r.bairro()));
+        p.setMunicipio(limpar(r.municipio()));
+        p.setUf(limparUf(r.uf()));
+        p.setCep(Documentos.somenteDigitos(r.cep()));
+        p.setComplemento(limpar(r.complemento()));
+        p.setEmail(limparEmail(r.email()));
+        p.setCns(Documentos.somenteDigitos(r.cns()));
+        p.setTelefonesAdicionais(normalizarTelefones(r.telefonesAdicionais()));
+
+        if (p.getCpf() != null && !Documentos.cpfValido(p.getCpf())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF inválido");
+        }
+        if (p.getCns() != null && !Documentos.cnsValido(p.getCns())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CNS inválido");
+        }
+    }
+
+    /** Bloqueia duplicidade nos campos únicos (ignorando o próprio registro na edição). */
+    private void validarUnicidade(Paciente p, Long idAtual) {
+        Long id = (idAtual == null) ? -1L : idAtual;
+        if (p.getTelefone() != null && repository.existsByTelefoneAndIdNot(p.getTelefone(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este telefone");
+        }
+        if (p.getCpf() != null && repository.existsByCpfAndIdNot(p.getCpf(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este CPF");
+        }
+        if (p.getCns() != null && repository.existsByCnsAndIdNot(p.getCns(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este CNS");
+        }
+        if (p.getCodigoIntegracao() != null && repository.existsByCodigoIntegracaoAndIdNot(p.getCodigoIntegracao(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este código de integração");
+        }
+        if (p.getProntuario() != null && repository.existsByProntuarioAndIdNot(p.getProntuario(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este prontuário");
+        }
+    }
+
+    /** Trim; null quando vazio (evita gravar "" e colidir nos índices únicos). */
+    private static String limpar(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String t = valor.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String limparUf(String uf) {
+        String t = limpar(uf);
+        return t == null ? null : t.toUpperCase();
+    }
+
+    private static String limparEmail(String email) {
+        String t = limpar(email);
+        return t == null ? null : t.toLowerCase();
+    }
+
+    /** Telefones adicionais: só dígitos, sem vazios nem repetidos. */
+    private static List<String> normalizarTelefones(List<String> brutos) {
+        if (brutos == null) {
+            return new ArrayList<>();
+        }
+        return brutos.stream()
+                .map(Documentos::somenteDigitos)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     @DeleteMapping("/{id}")
@@ -209,7 +321,9 @@ public class PacienteController {
         try {
             return repository.save(paciente);
         } catch (DataIntegrityViolationException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este telefone");
+            // Rede de segurança para corridas: os campos únicos já são checados antes.
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Já existe um paciente com um dos dados únicos (telefone, CPF, CNS, código de integração ou prontuário)");
         }
     }
 }

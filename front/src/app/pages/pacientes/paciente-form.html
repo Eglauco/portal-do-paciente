@@ -26,37 +26,260 @@
       </div>
     }
 
-    <div class="form-grid">
-      <div class="form-field">
-        <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
-        <input
-          id="nome"
-          class="input"
-          formControlName="nome"
-          placeholder="Nome do paciente"
-          autocomplete="off"
-          [class.input--error]="invalido('nome')"
-        />
-        @if (invalido('nome')) {
-          <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
-        }
+    <!-- Identificação -->
+    <fieldset class="form-field">
+      <legend class="section-label">Identificação</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="codigoIntegracao">Código de integração</label>
+          <input id="codigoIntegracao" class="input" formControlName="codigoIntegracao" autocomplete="off" placeholder="Ex.: ID no sistema externo" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="prontuario">Prontuário</label>
+          <input id="prontuario" class="input" formControlName="prontuario" autocomplete="off" placeholder="Número do prontuário" />
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Dados pessoais -->
+    <fieldset class="form-field">
+      <legend class="section-label">Dados pessoais</legend>
+      <div class="form-grid">
+        <div class="form-field form-field--wide">
+          <label class="label" for="nome">
+            Nome <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+          </label>
+          <input
+            id="nome"
+            class="input"
+            formControlName="nome"
+            placeholder="Nome completo"
+            autocomplete="off"
+            aria-required="true"
+            [attr.aria-invalid]="invalido('nome')"
+            [attr.aria-describedby]="invalido('nome') ? 'nome-erro' : null"
+            [class.input--error]="invalido('nome')"
+          />
+          @if (invalido('nome')) {
+            <span id="nome-erro" class="field-error" role="alert">Informe o nome (mínimo 3 caracteres).</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="sexo">Sexo</label>
+          <ng-select
+            labelForId="sexo"
+            formControlName="sexo"
+            [items]="sexos"
+            bindLabel="label"
+            bindValue="value"
+            placeholder="Selecione"
+            notFoundText="Sem opções"
+          ></ng-select>
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="dataNascimento">Data de nascimento</label>
+          <input
+            id="dataNascimento"
+            class="input"
+            formControlName="dataNascimento"
+            mask="00/00/0000"
+            [dropSpecialCharacters]="false"
+            [validation]="false"
+            placeholder="dd/mm/aaaa"
+            inputmode="numeric"
+            autocomplete="off"
+            [class.input--error]="invalido('dataNascimento')"
+            [attr.aria-invalid]="invalido('dataNascimento')"
+            [attr.aria-describedby]="invalido('dataNascimento') ? 'data-erro' : null"
+          />
+          @if (invalido('dataNascimento')) {
+            <span id="data-erro" class="field-error" role="alert">Data inválida.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="cpf">CPF</label>
+          <input
+            id="cpf"
+            class="input"
+            formControlName="cpf"
+            mask="000.000.000-00"
+            placeholder="000.000.000-00"
+            inputmode="numeric"
+            autocomplete="off"
+            [class.input--error]="invalido('cpf')"
+            [attr.aria-invalid]="invalido('cpf')"
+            [attr.aria-describedby]="invalido('cpf') ? 'cpf-erro' : null"
+          />
+          @if (invalido('cpf')) {
+            <span id="cpf-erro" class="field-error" role="alert">CPF incompleto.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="rg">RG</label>
+          <input id="rg" class="input" formControlName="rg" maxlength="20" autocomplete="off" placeholder="RG" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="cns">CNS</label>
+          <input
+            id="cns"
+            class="input"
+            formControlName="cns"
+            mask="000 0000 0000 0000"
+            placeholder="Cartão Nacional de Saúde"
+            inputmode="numeric"
+            autocomplete="off"
+            [class.input--error]="invalido('cns')"
+            [attr.aria-invalid]="invalido('cns')"
+            [attr.aria-describedby]="invalido('cns') ? 'cns-erro' : null"
+          />
+          @if (invalido('cns')) {
+            <span id="cns-erro" class="field-error" role="alert">CNS incompleto.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="nomeMae">Nome da mãe</label>
+          <input id="nomeMae" class="input" formControlName="nomeMae" autocomplete="off" placeholder="Nome da mãe" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="nomePai">Nome do pai</label>
+          <input id="nomePai" class="input" formControlName="nomePai" autocomplete="off" placeholder="Nome do pai" />
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Contato -->
+    <fieldset class="form-field">
+      <legend class="section-label">Contato</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="telefone">Telefone principal</label>
+          <input
+            id="telefone"
+            class="input"
+            formControlName="telefone"
+            appTelefoneBr
+            placeholder="(11) 99999-0000"
+            inputmode="tel"
+            maxlength="15"
+            autocomplete="off"
+          />
+          <span class="field-hint">Usado pelo paciente para entrar no aplicativo.</span>
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="email">E-mail</label>
+          <input
+            id="email"
+            type="email"
+            class="input"
+            formControlName="email"
+            placeholder="email@exemplo.com"
+            autocomplete="off"
+            [class.input--error]="invalido('email')"
+            [attr.aria-invalid]="invalido('email')"
+            [attr.aria-describedby]="invalido('email') ? 'email-erro' : null"
+          />
+          @if (invalido('email')) {
+            <span id="email-erro" class="field-error" role="alert">Informe um e-mail válido.</span>
+          }
+        </div>
       </div>
 
       <div class="form-field">
-        <label class="label" for="telefone">Telefone</label>
-        <input
-          id="telefone"
-          class="input"
-          formControlName="telefone"
-          appTelefoneBr
-          placeholder="(11) 99999-0000"
-          inputmode="tel"
-          maxlength="15"
-          autocomplete="off"
-        />
-        <span class="field-hint">Usado pelo paciente para entrar no aplicativo.</span>
+        <span class="label">Telefones adicionais</span>
+        <div class="tel-lista" formArrayName="telefonesAdicionais">
+          @for (ctrl of telefonesAdicionais.controls; track $index) {
+            <div class="tel-lista__item">
+              <input
+                class="input"
+                [formControlName]="$index"
+                appTelefoneBr
+                placeholder="(11) 99999-0000"
+                inputmode="tel"
+                maxlength="15"
+                autocomplete="off"
+                [attr.aria-label]="'Telefone adicional ' + ($index + 1)"
+              />
+              <button
+                type="button"
+                class="btn btn--ghost btn--sm"
+                (click)="removerTelefone($index)"
+                [attr.aria-label]="'Remover telefone adicional ' + ($index + 1)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14" />
+                </svg>
+                Remover
+              </button>
+            </div>
+          }
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm tel-lista__add" (click)="adicionarTelefone()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Adicionar telefone
+        </button>
       </div>
-    </div>
+    </fieldset>
+
+    <!-- Endereço -->
+    <fieldset class="form-field">
+      <legend class="section-label">Endereço</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="cep">CEP</label>
+          <input
+            id="cep"
+            class="input"
+            formControlName="cep"
+            mask="00000-000"
+            placeholder="00000-000"
+            inputmode="numeric"
+            autocomplete="off"
+            [attr.aria-busy]="buscandoCep()"
+          />
+          <span class="field-hint">{{ buscandoCep() ? 'Buscando endereço…' : 'Preenche o endereço automaticamente.' }}</span>
+        </div>
+
+        <div class="form-field form-field--wide">
+          <label class="label" for="rua">Rua</label>
+          <input id="rua" class="input" formControlName="rua" autocomplete="off" placeholder="Logradouro" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="numero">Número</label>
+          <input id="numero" class="input" formControlName="numero" maxlength="20" autocomplete="off" placeholder="Nº" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="bairro">Bairro</label>
+          <input id="bairro" class="input" formControlName="bairro" autocomplete="off" placeholder="Bairro" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="municipio">Município</label>
+          <input id="municipio" class="input" formControlName="municipio" autocomplete="off" placeholder="Cidade" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="uf">UF</label>
+          <ng-select
+            labelForId="uf"
+            formControlName="uf"
+            [items]="ufs"
+            placeholder="UF"
+            notFoundText="Sem opções"
+          ></ng-select>
+        </div>
+        <div class="form-field form-field--wide">
+          <label class="label" for="complemento">Complemento</label>
+          <input id="complemento" class="input" formControlName="complemento" autocomplete="off" placeholder="Apto, bloco, referência…" />
+        </div>
+      </div>
+    </fieldset>
 
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>

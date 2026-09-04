@@ -5,6 +5,7 @@ import { provideClientHydration } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import { provideToastr } from 'ngx-toastr';
+import { provideEnvironmentNgxMask } from 'ngx-mask';
 import { authInterceptor } from './core/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -14,6 +15,7 @@ export const appConfig: ApplicationConfig = {
     provideClientHydration(),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     provideAnimations(),
+    provideEnvironmentNgxMask(),
     provideToastr({
       positionClass: 'toast-top-right',
       timeOut: 3000,
