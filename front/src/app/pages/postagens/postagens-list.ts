@@ -16,6 +16,11 @@ const COMENTARIOS_OPCOES = [
   { value: false, label: 'Desabilitados' },
 ];
 
+const NOVO_COMENTARIO_OPCOES = [
+  { value: true, label: 'Com novo comentário' },
+  { value: false, label: 'Sem novo comentário' },
+];
+
 @Component({
   selector: 'app-postagens-list',
   imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink],
@@ -32,10 +37,12 @@ export class PostagensList {
 
   protected readonly tamanhos = PostagemService.TAMANHOS;
   protected readonly comentariosOpcoes = COMENTARIOS_OPCOES;
+  protected readonly novoComentarioOpcoes = NOVO_COMENTARIO_OPCOES;
 
   protected readonly filtro = new FormGroup({
     titulo: new FormControl<string>(this.store.titulo, { nonNullable: true }),
     comentarios: new FormControl<boolean | null>(this.store.comentarios),
+    novoComentario: new FormControl<boolean | null>(this.store.novoComentario),
   });
 
   protected readonly size = signal(this.store.size);
@@ -79,7 +86,7 @@ export class PostagensList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ titulo: '', comentarios: null });
+    this.filtro.reset({ titulo: '', comentarios: null, novoComentario: null });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -109,13 +116,23 @@ export class PostagensList {
     const f = this.filtro.getRawValue();
     this.store.titulo = f.titulo;
     this.store.comentarios = f.comentarios;
+    this.store.novoComentario = f.novoComentario;
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ titulo: f.titulo, unidadeId: this.auth.unidadeId(), comentarios: f.comentarios }, this.page(), this.size())
+      .listar(
+        {
+          titulo: f.titulo,
+          unidadeId: this.auth.unidadeId(),
+          comentarios: f.comentarios,
+          novoComentario: f.novoComentario,
+        },
+        this.page(),
+        this.size(),
+      )
       .subscribe({
         next: (pagina) => {
           this.registros.set(pagina.content);
@@ -146,7 +163,12 @@ export class PostagensList {
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, { titulo: f.titulo, unidadeId: this.auth.unidadeId(), comentarios: f.comentarios })
+      .exportar(formato, {
+        titulo: f.titulo,
+        unidadeId: this.auth.unidadeId(),
+        comentarios: f.comentarios,
+        novoComentario: f.novoComentario,
+      })
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `postagens.${formato}`);

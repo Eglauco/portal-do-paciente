@@ -41,10 +41,22 @@
         <input id="f-titulo" type="text" class="input" formControlName="titulo" placeholder="Buscar por título" />
       </div>
       <div class="form-field">
-        <label class="label">Comentários</label>
+        <label class="label" for="f-comentarios">Comentários</label>
         <ng-select
+          labelForId="f-comentarios"
           formControlName="comentarios"
           [items]="comentariosOpcoes"
+          bindLabel="label"
+          bindValue="value"
+          placeholder="Todos"
+        ></ng-select>
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-novo-comentario">Comentários novos</label>
+        <ng-select
+          labelForId="f-novo-comentario"
+          formControlName="novoComentario"
+          [items]="novoComentarioOpcoes"
           bindLabel="label"
           bindValue="value"
           placeholder="Todos"
@@ -113,14 +125,21 @@
               <tr
                 tabindex="0"
                 role="button"
-                [attr.aria-label]="'Editar postagem ' + p.titulo"
+                [attr.aria-label]="'Editar postagem ' + p.titulo + (p.novoComentario ? ' — com comentário novo' : '')"
                 (click)="editar(p)"
                 (keydown.enter)="editar(p)"
               >
                 <td class="col-thumb">
                   <img class="post-thumb" [src]="p.url" [alt]="p.titulo" loading="lazy" />
                 </td>
-                <td><b>{{ p.titulo }}</b></td>
+                <td>
+                  <span class="cell-post-titulo">
+                    <b>{{ p.titulo }}</b>
+                    @if (p.novoComentario) {
+                      <span class="pill-novo">Novo comentário</span>
+                    }
+                  </span>
+                </td>
                 <td class="muted-cell">{{ p.unidadeSaude.nome }}</td>
                 <td class="muted-cell">{{ p.totalCurtidas }}</td>
                 <td class="muted-cell">

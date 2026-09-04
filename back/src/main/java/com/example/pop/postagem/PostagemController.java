@@ -75,13 +75,15 @@ public class PostagemController {
             @RequestParam(required = false) String titulo,
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Boolean comentarios,
+            @RequestParam(required = false) Boolean novoComentario,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
-        Page<Postagem> resultado = repository.search(titulo == null ? "" : titulo, unidadeId, comentarios, pageable);
+        Page<Postagem> resultado = repository.search(titulo == null ? "" : titulo, unidadeId, comentarios,
+                novoComentario, pageable);
         List<PostagemResponse> content = resultado.getContent().stream().map(this::toResponse).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
@@ -99,8 +101,10 @@ public class PostagemController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) String titulo,
             @RequestParam(required = false) Long unidadeId,
-            @RequestParam(required = false) Boolean comentarios) {
-        List<Postagem> dados = repository.search(titulo == null ? "" : titulo, unidadeId, comentarios, Pageable.unpaged())
+            @RequestParam(required = false) Boolean comentarios,
+            @RequestParam(required = false) Boolean novoComentario) {
+        List<Postagem> dados = repository
+                .search(titulo == null ? "" : titulo, unidadeId, comentarios, novoComentario, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Postagem::getCriadoEm).reversed())
                 .toList();
@@ -108,7 +112,8 @@ public class PostagemController {
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Rede Social", filtrosPostagem(titulo, unidadeId, comentarios), colunas, dados)
+                ? exportacaoService.pdf("Rede Social", filtrosPostagem(titulo, unidadeId, comentarios, novoComentario),
+                        colunas, dados)
                 : exportacaoService.excel("Rede Social", colunas, dados);
         String nome = "postagens-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
@@ -119,13 +124,16 @@ public class PostagemController {
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosPostagem(String titulo, Long unidadeId, Boolean comentarios) {
+    private List<FiltroAplicado> filtrosPostagem(String titulo, Long unidadeId, Boolean comentarios,
+            Boolean novoComentario) {
         String unidade = unidadeId == null ? "Todas"
                 : unidadeRepository.findById(unidadeId).map(Unidade::getNome).orElse("#" + unidadeId);
         String comentariosLabel = comentarios == null ? "Todos" : (comentarios ? "Habilitados" : "Desabilitados");
+        String novoLabel = novoComentario == null ? "Todos" : (novoComentario ? "Com novos" : "Sem novos");
         return List.of(
                 new FiltroAplicado("Título", titulo == null || titulo.isBlank() ? "Todos" : titulo),
                 new FiltroAplicado("Comentários", comentariosLabel),
+                new FiltroAplicado("Comentários novos", novoLabel),
                 new FiltroAplicado("Unidade", unidade));
     }
 
@@ -137,6 +145,7 @@ public class PostagemController {
                 ColunaExport.de("Unidade", p -> p.getUnidadeSaude().getNome()),
                 ColunaExport.de("Curtidas", p -> String.valueOf(curtidaRepository.countByPostagemId(p.getId()))),
                 ColunaExport.de("Comentários", p -> String.valueOf(comentarioRepository.countByPostagemId(p.getId()))),
+                ColunaExport.de("Comentário novo", p -> p.temComentarioNovo() ? "Sim" : "Não"),
                 ColunaExport.de("Total de curtidas visível", p -> p.isMostrarTotalCurtidas() ? "Sim" : "Não"),
                 ColunaExport.de("Comentários habilitados", p -> p.isHabilitarComentarios() ? "Sim" : "Não"),
                 ColunaExport.de("Publicado em", p -> p.getCriadoEm() == null ? "" : p.getCriadoEm().format(DATA_HORA)));
@@ -145,7 +154,15 @@ public class PostagemController {
     @GetMapping("/{id}")
     public ResponseEntity<PostagemDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(p -> ResponseEntity.ok(toDetalhe(p)))
+                .map(p -> {
+                    // Abrir a postagem (o admin vê os comentários aqui) zera o status "comentário novo".
+                    // Update pontual com o "high-water mark" (o último comentário que ele viu): não
+                    // sobrescreve ultimo_comentario_paciente_em se chegar comentário novo em paralelo.
+                    if (p.temComentarioNovo()) {
+                        repository.marcarComentariosVistos(p.getId(), p.getUltimoComentarioPacienteEm());
+                    }
+                    return ResponseEntity.ok(toDetalhe(p));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -281,7 +298,8 @@ public class PostagemController {
                 storageService.urlVisualizacao(p.getUrl(), VALIDADE_IMAGEM),
                 p.getCriadoEm(),
                 curtidaRepository.countByPostagemId(p.getId()),
-                comentarioRepository.countByPostagemId(p.getId()));
+                comentarioRepository.countByPostagemId(p.getId()),
+                p.temComentarioNovo());
     }
 
     private PostagemDetalheResponse toDetalhe(Postagem p) {

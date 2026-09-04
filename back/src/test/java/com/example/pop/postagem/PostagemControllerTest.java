@@ -266,8 +266,45 @@ class PostagemControllerTest {
     void filtraPorTitulo() {
         PostagemDetalheResponse criada = controller.criar(new PostagemRequest(
                 "Semana da Saúde 2026", "Programação especial", false, true, 1L, IMG));
-        Pagina<PostagemResponse> pagina = controller.listar("Semana da Saúde", null, null, 0, 10);
+        Pagina<PostagemResponse> pagina = controller.listar("Semana da Saúde", null, null, null, 0, 10);
         assertTrue(pagina.content().stream().anyMatch(p -> p.id().equals(criada.id())));
         controller.excluir(criada.id());
+    }
+
+    @Test
+    void statusComentarioNovoMarcaEZeraAoAbrir() {
+        Long id = controller.criar(new PostagemRequest("Novidade", "texto", true, true, 1L, IMG)).id();
+
+        // Sem comentário → não é novo.
+        assertFalse(novoNaLista(id), "recém-criada não deve estar como 'novo comentário'");
+
+        // Paciente comenta → vira "novo comentário".
+        feedController.comentar(id, new ComentarRequest("João", "primeiro!"), jwt);
+        assertTrue(novoNaLista(id), "comentário de paciente marca a postagem como nova");
+        // Filtro "com novos" traz; "sem novos" não traz.
+        assertTrue(controller.listar(null, null, null, true, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
+        assertFalse(controller.listar(null, null, null, false, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
+
+        // Admin abre a postagem (buscar lista os comentários) → zera o status.
+        assertEquals(200, controller.buscar(id).getStatusCode().value());
+        assertFalse(novoNaLista(id), "abrir a postagem zera o status");
+
+        // Resposta do próprio admin NÃO remarca; resposta de paciente remarca.
+        var raiz = feedController.comentarios(id, 0, 20, jwt).content().get(0);
+        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "obrigado"), adminJwt());
+        assertFalse(novoNaLista(id), "resposta do admin não marca como novo");
+        feedController.responder(id, raiz.id(), new ComentarRequest("João", "de nada"), jwt);
+        assertTrue(novoNaLista(id), "resposta de paciente marca como novo");
+
+        controller.excluir(id);
+    }
+
+    /** True se a postagem aparece com "novo comentário" na listagem do admin. */
+    private boolean novoNaLista(Long id) {
+        return controller.listar(null, null, null, null, 0, 100).content().stream()
+                .filter(p -> p.id().equals(id))
+                .findFirst()
+                .map(PostagemResponse::novoComentario)
+                .orElse(false);
     }
 }

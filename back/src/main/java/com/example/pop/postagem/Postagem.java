@@ -51,4 +51,18 @@ public class Postagem {
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
+
+    /** Quando um paciente comentou/respondeu pela última vez (marca "comentário novo"). */
+    @Column(name = "ultimo_comentario_paciente_em")
+    private LocalDateTime ultimoComentarioPacienteEm;
+
+    /** Quando o admin abriu a postagem pela última vez (zera "comentário novo"). */
+    @Column(name = "comentarios_vistos_em")
+    private LocalDateTime comentariosVistosEm;
+
+    /** Há comentário de paciente ainda não visto pelo admin? */
+    public boolean temComentarioNovo() {
+        return ultimoComentarioPacienteEm != null
+                && (comentariosVistosEm == null || ultimoComentarioPacienteEm.isAfter(comentariosVistosEm));
+    }
 }

@@ -151,7 +151,9 @@ public class FeedController {
         comentario.setPacienteId(paciente.getId());
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(comentario), paciente.getId(), null);
+        Comentario salvo = comentarioRepository.save(comentario);
+        marcarComentarioNovo(postagem);
+        return ComentarioResponse.from(salvo, paciente.getId(), null);
     }
 
     /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
@@ -178,7 +180,9 @@ public class FeedController {
         resposta.setPacienteId(paciente.getId());
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(resposta), paciente.getId(), null);
+        Comentario salva = comentarioRepository.save(resposta);
+        marcarComentarioNovo(postagem);
+        return ComentarioResponse.from(salva, paciente.getId(), null);
     }
 
     /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
@@ -220,6 +224,12 @@ public class FeedController {
     }
 
     // ---------- helpers ----------
+
+    /** Marca a postagem com "comentário novo" (um paciente comentou) para o admin ver na lista. */
+    private void marcarComentarioNovo(Postagem postagem) {
+        postagem.setUltimoComentarioPacienteEm(LocalDateTime.now());
+        repository.save(postagem);
+    }
 
     /** Id do paciente a partir do claim do token (sem validar sessão); nulo se não autenticado. */
     private Long pacienteIdDoToken(Jwt jwt) {

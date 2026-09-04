@@ -2157,6 +2157,34 @@
   background: #eceef1;
 }
 
+/* Selo de atenção: postagem com comentário novo para o admin analisar. */
+.pill-novo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8a5a00;
+  background: #fff3d6;
+}
+.pill-novo::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: #e0940a;
+}
+
+/* Célula de título que empilha o selo de "comentário novo" abaixo do título. */
+.cell-post-titulo {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
 /* Formulário */
 .post-layout { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
 @media (max-width: 800px) { .post-layout { grid-template-columns: 1fr; } }

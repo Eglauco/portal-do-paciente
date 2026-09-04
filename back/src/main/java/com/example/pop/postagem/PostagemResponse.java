@@ -15,5 +15,6 @@ public record PostagemResponse(
         String url,
         LocalDateTime criadoEm,
         long totalCurtidas,
-        long totalComentarios) {
+        long totalComentarios,
+        boolean novoComentario) {
 }

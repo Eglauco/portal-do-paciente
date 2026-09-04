@@ -31,6 +31,9 @@ export class PostagemService {
     if (filtro.comentarios !== null && filtro.comentarios !== undefined) {
       params = params.set('comentarios', filtro.comentarios);
     }
+    if (filtro.novoComentario !== null && filtro.novoComentario !== undefined) {
+      params = params.set('novoComentario', filtro.novoComentario);
+    }
     return this.http.get<Pagina<Postagem>>(this.base, { params });
   }
 
@@ -41,6 +44,9 @@ export class PostagemService {
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.comentarios !== null && filtro.comentarios !== undefined) {
       params = params.set('comentarios', filtro.comentarios);
+    }
+    if (filtro.novoComentario !== null && filtro.novoComentario !== undefined) {
+      params = params.set('novoComentario', filtro.novoComentario);
     }
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }

@@ -7,6 +7,7 @@ export class PostagemBuscaStore {
   titulo = '';
   unidadeId: number | null = null;
   comentarios: boolean | null = null;
+  novoComentario: boolean | null = null;
   page = 0;
   size = PostagemService.TAMANHO_PADRAO;
 
@@ -14,6 +15,7 @@ export class PostagemBuscaStore {
     this.titulo = '';
     this.unidadeId = null;
     this.comentarios = null;
+    this.novoComentario = null;
     this.page = 0;
     this.size = PostagemService.TAMANHO_PADRAO;
   }

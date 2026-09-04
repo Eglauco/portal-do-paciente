@@ -15,6 +15,8 @@ export interface Postagem {
   criadoEm: string;
   totalCurtidas: number;
   totalComentarios: number;
+  /** Há comentário de paciente novo (não visto pelo admin) para analisar. */
+  novoComentario: boolean;
 }
 
 /** Detalhe (edição). */
@@ -64,6 +66,8 @@ export interface PostagemFiltro {
   titulo?: string | null;
   unidadeId?: number | null;
   comentarios?: boolean | null;
+  /** true = só com comentário novo; false = só sem; null = todos. */
+  novoComentario?: boolean | null;
 }
 
 export interface Pagina<T> {
