@@ -12,7 +12,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 import com.example.pop.common.Pagina;
+import com.example.pop.perfil.PerfilRepository;
 
 @SpringBootTest
 class UsuarioControllerTest {
@@ -22,6 +25,14 @@ class UsuarioControllerTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private PerfilRepository perfilRepository;
+
+    /** Id do perfil "Administrador" semeado na V44 (usado nos cadastros de teste). */
+    private Long adminPerfilId() {
+        return perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
+    }
 
     @Test
     void paginaPadraoTraz10Registros() {
@@ -57,31 +68,38 @@ class UsuarioControllerTest {
 
     @Test
     void criaComSenhaEValidaRegras() {
+        List<Long> perfis = List.of(adminPerfilId());
         Usuario novo = controller.criar(
-                new UsuarioRequest("Teste Senha", "teste.senha@unidadesaude.com.br", "segredo123", 1L));
+                new UsuarioRequest("Teste Senha", "teste.senha@unidadesaude.com.br", "segredo123", 1L, perfis));
         Long id = novo.getId();
         assertNotNull(id);
         assertTrue(passwordEncoder.matches("segredo123", novo.getSenhaHash()), "a senha deve ser guardada com hash");
         assertNotNull(novo.getUnidade(), "o usuário deve ficar vinculado à unidade");
         assertEquals(1L, novo.getUnidade().getId());
+        assertFalse(novo.getPerfis().isEmpty(), "o usuário deve ficar vinculado a ao menos um perfil");
 
         // E-mail duplicado → 409
         ResponseStatusException dup = assertThrows(ResponseStatusException.class, () -> controller
-                .criar(new UsuarioRequest("Outro", "teste.senha@unidadesaude.com.br", "segredo123", 1L)));
+                .criar(new UsuarioRequest("Outro", "teste.senha@unidadesaude.com.br", "segredo123", 1L, perfis)));
         assertEquals(409, dup.getStatusCode().value());
 
         // Senha curta → 400
         ResponseStatusException curta = assertThrows(ResponseStatusException.class,
-                () -> controller.criar(new UsuarioRequest("Curta", "curta@unidadesaude.com.br", "123", 1L)));
+                () -> controller.criar(new UsuarioRequest("Curta", "curta@unidadesaude.com.br", "123", 1L, perfis)));
         assertEquals(400, curta.getStatusCode().value());
+
+        // Sem perfil → 400
+        ResponseStatusException semPerfil = assertThrows(ResponseStatusException.class, () -> controller
+                .criar(new UsuarioRequest("Sem Perfil", "sem.perfil@unidadesaude.com.br", "segredo123", 1L, List.of())));
+        assertEquals(400, semPerfil.getStatusCode().value());
 
         // Editar sem senha mantém o hash; com senha, troca.
         String hashAntigo = novo.getSenhaHash();
-        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "", 1L));
+        controller.atualizar(id, new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "", 1L, perfis));
         assertEquals(hashAntigo, controller.buscar(id).getBody().getSenhaHash());
 
         controller.atualizar(id,
-                new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "novaSenha123", 1L));
+                new UsuarioRequest("Teste Senha 2", "teste.senha@unidadesaude.com.br", "novaSenha123", 1L, perfis));
         assertTrue(passwordEncoder.matches("novaSenha123", controller.buscar(id).getBody().getSenhaHash()));
 
         controller.excluir(id);

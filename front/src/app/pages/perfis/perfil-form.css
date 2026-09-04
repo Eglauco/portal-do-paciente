@@ -1,0 +1,22 @@
+/* Grade de telas (checkboxes) do formulário de perfil. */
+.telas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.6rem 1.25rem;
+}
+
+.telas-grid .check {
+  color: var(--text, inherit);
+}
+
+.telas-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Indicador de foco visível no checkbox custom (o input real é invisível). */
+.check input:focus-visible + .check__box {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}

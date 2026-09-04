@@ -17,11 +17,14 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
+
 import com.example.pop.auth.AuthController;
 import com.example.pop.auth.LoginRequest;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
+import com.example.pop.perfil.PerfilRepository;
 import com.example.pop.usuario.UsuarioController;
 import com.example.pop.usuario.UsuarioRequest;
 
@@ -47,6 +50,8 @@ class PacienteAuthMvcTest {
     private UsuarioController usuarioController;
     @Autowired
     private AuthController authController;
+    @Autowired
+    private PerfilRepository perfilRepository;
 
     private MockMvc mvc;
     private Long pacienteId;
@@ -61,7 +66,10 @@ class PacienteAuthMvcTest {
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL)).getId();
         codigo = pacienteController.gerarCodigo(pacienteId).getBody().codigo();
         // Admin de teste (para as chamadas /paciente/** que agora exigem role ADMIN).
-        adminId = usuarioController.criar(new UsuarioRequest("Admin Paci MVC", ADMIN_EMAIL, ADMIN_SENHA, 1L)).getId();
+        Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
+        adminId = usuarioController
+                .criar(new UsuarioRequest("Admin Paci MVC", ADMIN_EMAIL, ADMIN_SENHA, 1L, List.of(adminPerfilId)))
+                .getId();
         adminToken = authController.login(new LoginRequest(ADMIN_EMAIL, ADMIN_SENHA)).token();
     }
 

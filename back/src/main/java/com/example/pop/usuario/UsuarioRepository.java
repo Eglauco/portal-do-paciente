@@ -14,6 +14,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    /** Quantos usuários têm o perfil informado (usado para bloquear a exclusão de um perfil em uso). */
+    long countByPerfis_Id(Long perfilId);
+
     @Query(value = """
             select u from Usuario u
             left join fetch u.unidade

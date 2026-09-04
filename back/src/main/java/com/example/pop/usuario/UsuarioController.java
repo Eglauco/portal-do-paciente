@@ -2,7 +2,9 @@ package com.example.pop.usuario;
 
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -30,6 +32,8 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.perfil.Perfil;
+import com.example.pop.perfil.PerfilRepository;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 
@@ -47,13 +51,16 @@ public class UsuarioController {
     private final UsuarioRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final UnidadeRepository unidadeRepository;
+    private final PerfilRepository perfilRepository;
     private final ExportacaoService exportacaoService;
 
     public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder,
-            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService) {
+            UnidadeRepository unidadeRepository, PerfilRepository perfilRepository,
+            ExportacaoService exportacaoService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.unidadeRepository = unidadeRepository;
+        this.perfilRepository = perfilRepository;
         this.exportacaoService = exportacaoService;
     }
 
@@ -149,11 +156,16 @@ public class UsuarioController {
         }
         String senha = validarSenhaObrigatoria(request.senha());
 
+        Unidade unidade = resolverUnidade(request.unidadeSaudeId());
+        Set<Perfil> perfis = resolverPerfis(request.perfilIds());
+        validarUnidadeNosPerfis(unidade, perfis);
+
         Usuario usuario = new Usuario();
         usuario.setNome(request.nome().trim());
         usuario.setEmail(email);
         usuario.setSenhaHash(passwordEncoder.encode(senha));
-        usuario.setUnidade(resolverUnidade(request.unidadeSaudeId()));
+        usuario.setUnidade(unidade);
+        usuario.setPerfis(perfis);
         return salvarUnico(usuario);
     }
 
@@ -168,9 +180,13 @@ public class UsuarioController {
                     if (emailDeOutro) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um usuário com este e-mail");
                     }
+                    Unidade unidade = resolverUnidade(request.unidadeSaudeId());
+                    Set<Perfil> perfis = resolverPerfis(request.perfilIds());
+                    validarUnidadeNosPerfis(unidade, perfis);
                     existente.setNome(request.nome().trim());
                     existente.setEmail(email);
-                    existente.setUnidade(resolverUnidade(request.unidadeSaudeId()));
+                    existente.setUnidade(unidade);
+                    existente.setPerfis(perfis);
                     // Senha em branco na edição = mantém a atual. Não normalizamos a senha
                     // (é comparada crua no login), só validamos o tamanho.
                     String senha = request.senha();
@@ -188,6 +204,32 @@ public class UsuarioController {
         }
         return unidadeRepository.findById(unidadeSaudeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade de saúde não encontrada"));
+    }
+
+    /** Resolve e valida os perfis informados (todos precisam existir). */
+    private Set<Perfil> resolverPerfis(List<Long> perfilIds) {
+        if (perfilIds == null || perfilIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione ao menos um perfil de acesso");
+        }
+        List<Perfil> encontrados = perfilRepository.findAllById(perfilIds);
+        if (encontrados.size() != perfilIds.stream().distinct().count()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Algum perfil informado não existe");
+        }
+        return new HashSet<>(encontrados);
+    }
+
+    /**
+     * A unidade ativa do usuário precisa estar entre as unidades dos perfis dele
+     * (mesma regra do /auth/unidade). Fecha a inconsistência no cadastro/edição.
+     */
+    private void validarUnidadeNosPerfis(Unidade unidade, Set<Perfil> perfis) {
+        boolean coberta = perfis.stream()
+                .flatMap(p -> p.getUnidades().stream())
+                .anyMatch(u -> u.getId().equals(unidade.getId()));
+        if (!coberta) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A unidade ativa precisa estar entre as unidades dos perfis selecionados");
+        }
     }
 
     /** Salva tratando a violação do índice único de e-mail como 409 (fecha a corrida TOCTOU). */

@@ -1,13 +1,18 @@
 package com.example.pop.auth;
 
 import java.time.Instant;
+import java.util.List;
 
-/** Resposta do login: token JWT + dados básicos do usuário (incluindo a unidade ativa). */
+import com.example.pop.common.Ref;
+
+/** Resposta do login: token JWT + dados básicos do usuário (unidade ativa + permissões efetivas). */
 public record LoginResponse(
         String token,
         String nome,
         String email,
         Long unidadeSaudeId,
         String unidadeSaudeNome,
-        Instant expiraEm) {
+        Instant expiraEm,
+        List<String> telas,
+        List<Ref> unidades) {
 }

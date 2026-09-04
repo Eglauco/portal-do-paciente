@@ -5,6 +5,12 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+/** Unidade de saúde (referência leve id + nome). */
+export interface UnidadeRef {
+  id: number;
+  nome: string;
+}
+
 interface LoginResponse {
   token: string;
   nome: string;
@@ -12,6 +18,8 @@ interface LoginResponse {
   unidadeSaudeId: number | null;
   unidadeSaudeNome: string | null;
   expiraEm: string;
+  telas: string[];
+  unidades: UnidadeRef[];
 }
 
 interface UsuarioLogadoResponse {
@@ -19,6 +27,8 @@ interface UsuarioLogadoResponse {
   email: string;
   unidadeSaudeId: number | null;
   unidadeSaudeNome: string | null;
+  telas: string[];
+  unidades: UnidadeRef[];
 }
 
 export interface UsuarioLogado {
@@ -26,7 +36,36 @@ export interface UsuarioLogado {
   email: string;
   unidadeSaudeId: number | null;
   unidadeSaudeNome: string | null;
+  /** Telas liberadas (união dos perfis do usuário). */
+  telas: string[];
+  /** Unidades de saúde acessíveis (união dos perfis). */
+  unidades: UnidadeRef[];
 }
+
+/**
+ * Ordem das telas → rota inicial. Ao entrar (ou quando barrado por uma tela sem
+ * acesso), o usuário cai na primeira tela liberada desta lista.
+ */
+const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
+  ['DASHBOARD', '/dashboards/geral'],
+  ['AGENDAMENTOS', '/agendamentos'],
+  ['CHATS', '/chats'],
+  ['SAU', '/sau'],
+  ['TIPOS_MANIFESTACAO', '/tipos-manifestacao'],
+  ['NPS', '/nps'],
+  ['CATEGORIAS_NPS', '/categorias-nps'],
+  ['PACIENTES', '/pacientes'],
+  ['PRONTUARIOS', '/prontuarios'],
+  ['POSTAGENS', '/postagens'],
+  ['ESPECIALIDADES', '/especialidades'],
+  ['PROFISSIONAIS', '/profissionais'],
+  ['PROCEDIMENTOS', '/procedimentos'],
+  ['MOTIVOS_FALTA', '/motivos-falta'],
+  ['UNIDADES', '/unidades'],
+  ['USUARIOS', '/usuarios'],
+  ['PERFIS', '/perfis'],
+  ['CONFIGURACOES', '/configuracoes'],
+];
 
 const CHAVE_TOKEN = 'pop.token';
 const CHAVE_USUARIO = 'pop.usuario';
@@ -44,6 +83,22 @@ export class AuthService {
   /** Unidade de saúde ativa do usuário (usada como filtro/valor fixo nos CRUDs). */
   readonly unidadeId = computed(() => this._usuario()?.unidadeSaudeId ?? null);
   readonly unidadeNome = computed(() => this._usuario()?.unidadeSaudeNome ?? null);
+  /** Telas liberadas para o usuário (união dos perfis). */
+  readonly telas = computed(() => this._usuario()?.telas ?? []);
+  /** Unidades de saúde acessíveis ao usuário (união dos perfis). */
+  readonly unidadesAcessiveis = computed<UnidadeRef[]>(() => this._usuario()?.unidades ?? []);
+
+  /** True se o usuário tem acesso à tela informada (chave do enum, ex.: 'AGENDAMENTOS'). */
+  temTela(chave: string): boolean {
+    return (this._usuario()?.telas ?? []).includes(chave);
+  }
+
+  /** Primeira rota liberada para o usuário (ou a tela "sem permissão" quando nenhuma). */
+  rotaInicial(): string {
+    const telas = this._usuario()?.telas ?? [];
+    const par = TELA_ROTA.find(([chave]) => telas.includes(chave));
+    return par ? par[1] : '/sem-permissao';
+  }
 
   /** Id do usuário logado (claim "uid" do token) — usado no chat para saber quem é o responsável. */
   usuarioId(): number | null {
@@ -66,18 +121,31 @@ export class AuthService {
 
   /** Troca a unidade ativa (persiste no backend) e atualiza a sessão local. */
   trocarUnidade(unidadeSaudeId: number): Observable<UsuarioLogadoResponse> {
-    return this.http.put<UsuarioLogadoResponse>(`${this.base}/unidade`, { unidadeSaudeId }).pipe(
-      tap((u) => {
-        const atualizado: UsuarioLogado = {
-          nome: u.nome,
-          email: u.email,
-          unidadeSaudeId: u.unidadeSaudeId,
-          unidadeSaudeNome: u.unidadeSaudeNome,
-        };
-        this._usuario.set(atualizado);
-        this.gravarUsuario(atualizado);
-      }),
-    );
+    return this.http
+      .put<UsuarioLogadoResponse>(`${this.base}/unidade`, { unidadeSaudeId })
+      .pipe(tap((u) => this.aplicarUsuario(u)));
+  }
+
+  /**
+   * Recarrega o usuário do backend (/auth/me) para refletir telas/unidades atuais
+   * (ex.: perfil alterado por outro admin, ou sessão antiga sem esses campos).
+   */
+  sincronizar(): Observable<UsuarioLogadoResponse> {
+    return this.http.get<UsuarioLogadoResponse>(`${this.base}/me`).pipe(tap((u) => this.aplicarUsuario(u)));
+  }
+
+  /** Atualiza a sessão local (signal + storage) a partir da resposta do backend. */
+  private aplicarUsuario(u: UsuarioLogadoResponse): void {
+    const atualizado: UsuarioLogado = {
+      nome: u.nome,
+      email: u.email,
+      unidadeSaudeId: u.unidadeSaudeId,
+      unidadeSaudeNome: u.unidadeSaudeNome,
+      telas: u.telas ?? [],
+      unidades: u.unidades ?? [],
+    };
+    this._usuario.set(atualizado);
+    this.gravarUsuario(atualizado);
   }
 
   logout(): void {
@@ -103,6 +171,8 @@ export class AuthService {
       email: r.email,
       unidadeSaudeId: r.unidadeSaudeId,
       unidadeSaudeNome: r.unidadeSaudeNome,
+      telas: r.telas ?? [],
+      unidades: r.unidades ?? [],
     };
     this._usuario.set(usuario);
     if (!this.ehNavegador) return;

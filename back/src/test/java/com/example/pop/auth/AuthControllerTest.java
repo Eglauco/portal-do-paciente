@@ -14,6 +14,9 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
+import com.example.pop.perfil.PerfilRepository;
 import com.example.pop.usuario.UsuarioController;
 import com.example.pop.usuario.UsuarioRequest;
 
@@ -36,11 +39,16 @@ class AuthControllerTest {
     @Autowired
     private JwtDecoder jwtDecoder;
 
+    @Autowired
+    private PerfilRepository perfilRepository;
+
     private Long usuarioId;
 
     @BeforeEach
     void criarUsuario() {
-        usuarioId = usuarioController.criar(new UsuarioRequest("Auth Controller Test", EMAIL, SENHA, 1L)).getId();
+        Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
+        usuarioId = usuarioController
+                .criar(new UsuarioRequest("Auth Controller Test", EMAIL, SENHA, 1L, List.of(adminPerfilId))).getId();
     }
 
     @AfterEach

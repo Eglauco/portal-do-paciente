@@ -28,22 +28,29 @@
 
     <div class="form-grid">
       <div class="form-field">
-        <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="nome">
+          Nome <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </label>
         <input
           id="nome"
           class="input"
           formControlName="nome"
           placeholder="Nome completo"
           autocomplete="off"
+          aria-required="true"
+          [attr.aria-invalid]="invalido('nome')"
+          [attr.aria-describedby]="invalido('nome') ? 'nome-erro' : null"
           [class.input--error]="invalido('nome')"
         />
         @if (invalido('nome')) {
-          <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
+          <span id="nome-erro" class="field-error" role="alert">Informe o nome (mínimo 3 caracteres).</span>
         }
       </div>
 
       <div class="form-field">
-        <label class="label" for="email">E-mail <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="email">
+          E-mail <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </label>
         <input
           id="email"
           type="email"
@@ -51,15 +58,20 @@
           formControlName="email"
           placeholder="nome@unidadesaude.com.br"
           autocomplete="off"
+          aria-required="true"
+          [attr.aria-invalid]="invalido('email')"
+          [attr.aria-describedby]="invalido('email') ? 'email-erro' : null"
           [class.input--error]="invalido('email')"
         />
         @if (invalido('email')) {
-          <span class="field-error">Informe um e-mail válido.</span>
+          <span id="email-erro" class="field-error" role="alert">Informe um e-mail válido.</span>
         }
       </div>
 
       <div class="form-field">
-        <label class="label" for="unidade">Unidade de saúde <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="unidade">
+          Unidade de saúde <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </label>
         <ng-select
           labelForId="unidade"
           formControlName="unidadeSaudeId"
@@ -68,15 +80,43 @@
           bindValue="id"
           placeholder="Selecione a unidade"
           notFoundText="Nenhuma unidade encontrada"
+          [attr.aria-required]="true"
+          [attr.aria-invalid]="invalido('unidadeSaudeId')"
+          [attr.aria-describedby]="invalido('unidadeSaudeId') ? 'unidade-erro' : null"
         ></ng-select>
         @if (invalido('unidadeSaudeId')) {
-          <span class="field-error">Selecione a unidade de saúde.</span>
+          <span id="unidade-erro" class="field-error" role="alert">Selecione a unidade de saúde.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="perfis">
+          Perfis de acesso <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </label>
+        <ng-select
+          labelForId="perfis"
+          formControlName="perfilIds"
+          [items]="perfis()"
+          bindLabel="nome"
+          bindValue="id"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          placeholder="Selecione um ou mais perfis"
+          notFoundText="Nenhum perfil encontrado"
+          [attr.aria-required]="true"
+          [attr.aria-invalid]="invalido('perfilIds')"
+          [attr.aria-describedby]="invalido('perfilIds') ? 'perfis-erro' : 'perfis-dica'"
+        ></ng-select>
+        @if (invalido('perfilIds')) {
+          <span id="perfis-erro" class="field-error" role="alert">Selecione ao menos um perfil de acesso.</span>
+        } @else {
+          <span id="perfis-dica" class="field-hint">A permissão do usuário é a união das telas dos perfis selecionados.</span>
         }
       </div>
 
       <div class="form-field">
         <label class="label" for="senha">
-          Senha @if (!editando()) { <span class="req" aria-hidden="true">*</span> }
+          Senha @if (!editando()) { <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span> }
         </label>
         <div class="pass-field">
           <input
@@ -86,6 +126,9 @@
             formControlName="senha"
             [placeholder]="editando() ? 'Deixe em branco para manter a atual' : 'Mínimo de 6 caracteres'"
             autocomplete="new-password"
+            [attr.aria-required]="!editando()"
+            [attr.aria-invalid]="invalido('senha')"
+            [attr.aria-describedby]="invalido('senha') ? 'senha-erro' : (editando() ? 'senha-dica' : null)"
             [class.input--error]="invalido('senha')"
           />
           <button
@@ -108,9 +151,9 @@
           </button>
         </div>
         @if (invalido('senha')) {
-          <span class="field-error">A senha deve ter ao menos 6 caracteres.</span>
+          <span id="senha-erro" class="field-error" role="alert">A senha deve ter ao menos 6 caracteres.</span>
         } @else if (editando()) {
-          <span class="field-hint">Deixe em branco para manter a senha atual.</span>
+          <span id="senha-dica" class="field-hint">Deixe em branco para manter a senha atual.</span>
         }
       </div>
     </div>

@@ -1,5 +1,9 @@
 package com.example.pop.usuario;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import com.example.pop.perfil.Perfil;
 import com.example.pop.unidade.Unidade;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -10,6 +14,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -44,4 +50,11 @@ public class Usuario {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "unidade_id")
     private Unidade unidade;
+
+    /** Perfis de acesso do usuário (a permissão efetiva é a união dos perfis). */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "usuario_perfil",
+            joinColumns = @JoinColumn(name = "usuario_id"),
+            inverseJoinColumns = @JoinColumn(name = "perfil_id"))
+    private Set<Perfil> perfis = new HashSet<>();
 }

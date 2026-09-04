@@ -1,0 +1,151 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar perfil' : 'Cadastro de perfil' }}</h1>
+      <p class="page-sub">
+        {{ editando()
+          ? 'Atualize as telas liberadas e as unidades deste perfil de acesso.'
+          : 'Defina as telas liberadas e as unidades que este perfil de acesso enxerga.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <div class="page-head__actions">
+        <button type="button" class="btn btn--ghost" (click)="duplicar()" [disabled]="duplicando()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" />
+          </svg>
+          {{ duplicando() ? 'Duplicando…' : 'Duplicar' }}
+        </button>
+        <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+          </svg>
+          {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+        </button>
+      </div>
+    }
+  </header>
+
+  @if (erroCarregar()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar o perfil</h2>
+      <p>Verifique se o servidor está disponível e tente novamente.</p>
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Voltar</button>
+    </div>
+  } @else {
+    <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+      @if (editando()) {
+        <div class="form-field form-field--sm">
+          <label class="label" for="codigo">Código</label>
+          <input id="codigo" class="input input--readonly" [value]="codigo()" readonly tabindex="-1" />
+        </div>
+      }
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="nome">
+            Nome <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+          </label>
+          <input
+            id="nome"
+            class="input"
+            formControlName="nome"
+            placeholder="Ex.: Recepção, Gestor SAU…"
+            autocomplete="off"
+            aria-required="true"
+            [attr.aria-invalid]="invalido('nome')"
+            [attr.aria-describedby]="invalido('nome') ? 'nome-erro' : null"
+            [class.input--error]="invalido('nome')"
+          />
+          @if (invalido('nome')) {
+            <span id="nome-erro" class="field-error" role="alert">Informe o nome (mínimo 3 caracteres).</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="unidades">
+            Unidades de saúde <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+          </label>
+          <ng-select
+            labelForId="unidades"
+            formControlName="unidadeIds"
+            [items]="unidades()"
+            bindLabel="nome"
+            bindValue="id"
+            [multiple]="true"
+            [closeOnSelect]="false"
+            placeholder="Selecione uma ou mais unidades"
+            notFoundText="Nenhuma unidade encontrada"
+            [attr.aria-required]="true"
+            [attr.aria-invalid]="invalido('unidadeIds')"
+            [attr.aria-describedby]="invalido('unidadeIds') ? 'unidades-erro' : null"
+          ></ng-select>
+          @if (invalido('unidadeIds')) {
+            <span id="unidades-erro" class="field-error" role="alert">Selecione ao menos uma unidade de saúde.</span>
+          }
+        </div>
+      </div>
+
+      <fieldset
+        class="form-field telas-fieldset"
+        [attr.aria-invalid]="telasInvalido()"
+        [attr.aria-describedby]="telasInvalido() ? 'telas-erro' : null"
+      >
+        <legend class="label">
+          Telas liberadas <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </legend>
+        <div class="telas-toolbar">
+          <button type="button" class="btn btn--ghost btn--sm" (click)="marcarTodasTelas()">Marcar todas</button>
+          <button type="button" class="btn btn--ghost btn--sm" (click)="limparTelas()">Limpar</button>
+        </div>
+        <div class="telas-grid">
+          @for (t of telasCatalogo(); track t.chave) {
+            <label class="check">
+              <input type="checkbox" [checked]="telaMarcada(t.chave)" (change)="alternarTela(t.chave)" />
+              <span class="check__box" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+              </span>
+              {{ t.descricao }}
+            </label>
+          }
+        </div>
+        @if (telasInvalido()) {
+          <span id="telas-erro" class="field-error" role="alert">Selecione ao menos uma tela.</span>
+        }
+      </fieldset>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+        <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando…' : 'Salvar' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div
+      class="modal"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-msg"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

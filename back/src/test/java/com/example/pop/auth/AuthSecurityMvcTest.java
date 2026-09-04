@@ -18,6 +18,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.List;
+
+import com.example.pop.perfil.PerfilRepository;
 import com.example.pop.usuario.UsuarioController;
 import com.example.pop.usuario.UsuarioRequest;
 
@@ -44,13 +47,18 @@ class AuthSecurityMvcTest {
     @Autowired
     private UsuarioController usuarioController;
 
+    @Autowired
+    private PerfilRepository perfilRepository;
+
     private MockMvc mvc;
     private Long usuarioId;
 
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
-        usuarioId = usuarioController.criar(new UsuarioRequest("Auth MVC Test", EMAIL, SENHA, 1L)).getId();
+        Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
+        usuarioId = usuarioController
+                .criar(new UsuarioRequest("Auth MVC Test", EMAIL, SENHA, 1L, List.of(adminPerfilId))).getId();
     }
 
     @AfterEach

@@ -3,6 +3,8 @@ export interface Usuario {
   nome: string;
   email: string;
   unidade?: { id: number; nome: string } | null;
+  /** Perfis de acesso do usuário (a permissão efetiva é a união deles). */
+  perfis?: { id: number; nome: string }[];
 }
 
 /** Dados de criação/edição. `senha` é obrigatória na criação e opcional na edição. */
@@ -11,6 +13,7 @@ export interface UsuarioRequest {
   email: string;
   senha?: string;
   unidadeSaudeId: number;
+  perfilIds: number[];
 }
 
 export interface UsuarioFiltro {

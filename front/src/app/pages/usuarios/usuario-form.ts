@@ -1,11 +1,12 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, afterNextRender, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
-import { Unidade } from '../unidades/unidade.model';
-import { UnidadeService } from '../unidades/unidade.service';
+import { Perfil } from '../perfis/perfil.model';
+import { PerfilService } from '../perfis/perfil.service';
 import { UsuarioService } from './usuario.service';
 
 @Component({
@@ -15,12 +16,15 @@ import { UsuarioService } from './usuario.service';
 })
 export class UsuarioForm implements PodeSair {
   private readonly service = inject(UsuarioService);
-  private readonly unidadeService = inject(UnidadeService);
+  private readonly perfilService = inject(PerfilService);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
 
-  protected readonly unidades = signal<Unidade[]>([]);
+  /** Unidades que o perfil do usuário logado libera (só essas podem ser vinculadas). */
+  protected readonly unidades = this.auth.unidadesAcessiveis;
+  protected readonly perfis = signal<Perfil[]>([]);
 
   protected readonly form = new FormGroup({
     nome: new FormControl('', {
@@ -36,6 +40,7 @@ export class UsuarioForm implements PodeSair {
       validators: [Validators.minLength(6)],
     }),
     unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    perfilIds: new FormControl<number[]>([], { nonNullable: true, validators: [Validators.required] }),
   });
 
   protected readonly editando = signal(false);
@@ -53,26 +58,33 @@ export class UsuarioForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
-    this.unidadeService.listar({}, 0, 100).subscribe({ next: (p) => this.unidades.set(p.content) });
-
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
-      const id = Number(idParam);
       this.editando.set(true);
-      this.codigo.set(id);
-      this.service.buscarPorId(id).subscribe({
+      this.codigo.set(Number(idParam));
+    } else {
+      // Na criação a senha é obrigatória (na edição, em branco = mantém a atual).
+      this.form.controls.senha.addValidators(Validators.required);
+      this.form.controls.senha.updateValueAndValidity();
+    }
+    // Só carrega no navegador (evita chamadas sem token no SSR/prerender).
+    afterNextRender(() => this.carregar());
+  }
+
+  private carregar(): void {
+    // Multi-select precisa de todos os perfis (uma página grande basta).
+    this.perfilService.listar({}, 0, 100).subscribe({ next: (p) => this.perfis.set(p.content), error: () => {} });
+    if (this.editando() && this.codigo() != null) {
+      this.service.buscarPorId(this.codigo()!).subscribe({
         next: (usuario) =>
           this.form.patchValue({
             nome: usuario.nome,
             email: usuario.email,
             unidadeSaudeId: usuario.unidade?.id ?? null,
+            perfilIds: usuario.perfis?.map((p) => p.id) ?? [],
           }),
         error: () => this.erroCarregar.set(true),
       });
-    } else {
-      // Na criação a senha é obrigatória (na edição, em branco = mantém a atual).
-      this.form.controls.senha.addValidators(Validators.required);
-      this.form.controls.senha.updateValueAndValidity();
     }
   }
 
@@ -86,7 +98,7 @@ export class UsuarioForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome' | 'email' | 'senha' | 'unidadeSaudeId'): boolean {
+  protected invalido(campo: 'nome' | 'email' | 'senha' | 'unidadeSaudeId' | 'perfilIds'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
   }
@@ -104,6 +116,7 @@ export class UsuarioForm implements PodeSair {
       nome: this.form.controls.nome.value.trim(),
       email: this.form.controls.email.value.trim(),
       unidadeSaudeId: this.form.controls.unidadeSaudeId.value!,
+      perfilIds: this.form.controls.perfilIds.value,
       // Só envia quando preenchida; em branco na edição = mantém a atual.
       ...(senhaBruta.trim() ? { senha: senhaBruta } : {}),
     };

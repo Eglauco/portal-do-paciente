@@ -77,9 +77,11 @@ public class AuthController {
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
 
-        Long unidadeId = usuario.getUnidade() == null ? null : usuario.getUnidade().getId();
-        String unidadeNome = usuario.getUnidade() == null ? null : usuario.getUnidade().getNome();
-        return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira);
+        Unidade ativa = Permissoes.unidadeAtivaEfetiva(usuario);
+        Long unidadeId = ativa == null ? null : ativa.getId();
+        String unidadeNome = ativa == null ? null : ativa.getNome();
+        return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira,
+                Permissoes.telas(usuario), Permissoes.unidades(usuario));
     }
 
     /** Dados do usuário autenticado (recarrega do banco para refletir a unidade atual). */
@@ -95,6 +97,10 @@ public class AuthController {
         Usuario usuario = usuarioLogado(jwt);
         Unidade unidade = unidadeRepository.findById(request.unidadeSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade de saúde não encontrada"));
+        // Só permite ativar uma unidade que os perfis do usuário liberam.
+        if (!Permissoes.podeAcessarUnidade(usuario, unidade.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Unidade fora do seu perfil de acesso");
+        }
         usuario.setUnidade(unidade);
         return UsuarioLogadoResponse.from(usuarioRepository.save(usuario));
     }
