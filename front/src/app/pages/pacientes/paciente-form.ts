@@ -94,6 +94,8 @@ export class PacienteForm implements PodeSair {
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
   protected readonly buscandoCep = signal(false);
+  /** Foto (pré-assinada) do paciente para o avatar do form; null se não tiver. */
+  protected readonly fotoUrl = signal<string | null>(null);
 
   // Acesso ao app (o paciente ativa sozinho por OTP; aqui o admin só revoga).
   protected readonly ativo = signal(false);
@@ -170,6 +172,7 @@ export class PacienteForm implements PodeSair {
         this.setTelefonesAdicionais(p.telefonesAdicionais ?? []);
         this.preenchendo = false;
         this.ativo.set(!!p.ativo);
+        this.fotoUrl.set(p.fotoUrl ?? null);
       },
       error: () => this.erroCarregar.set(true),
     });
@@ -208,6 +211,15 @@ export class PacienteForm implements PodeSair {
   protected invalido(campo: string): boolean {
     const control = this.form.get(campo);
     return !!control && control.invalid && (control.touched || control.dirty);
+  }
+
+  /** Iniciais do nome (fallback do avatar quando o paciente não tem foto). */
+  protected iniciais(nome: string | null | undefined): string {
+    const partes = (nome ?? '').trim().split(/\s+/).filter(Boolean);
+    if (partes.length === 0) return '—';
+    const a = partes[0].charAt(0);
+    const b = partes.length > 1 ? partes[partes.length - 1].charAt(0) : '';
+    return (a + b).toUpperCase();
   }
 
   private valores(): PacienteEntrada {

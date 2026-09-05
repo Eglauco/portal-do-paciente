@@ -30,6 +30,7 @@ import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 
@@ -47,14 +48,16 @@ public class NpsController {
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final ExportacaoService exportacaoService;
+    private final StorageService storageService;
 
     public NpsController(NpsRepository repository, NpsService npsService, PacienteRepository pacienteRepository,
-            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService) {
+            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService, StorageService storageService) {
         this.repository = repository;
         this.npsService = npsService;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.exportacaoService = exportacaoService;
+        this.storageService = storageService;
     }
 
     @GetMapping
@@ -84,23 +87,30 @@ public class NpsController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) StatusNps status,
             @RequestParam(required = false) Long pacienteId,
-            @RequestParam(required = false) Long unidadeId) {
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> colunas) {
         List<Nps> dados = repository.search(status, pacienteId, unidadeId, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Nps::getCriadoEm).reversed())
                 .toList();
-        List<ColunaExport<Nps>> colunas = colunasNps();
+        List<ColunaExport<Nps>> cols = ExportacaoService.filtrar(colunasNps(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("NPS", filtrosNps(status, pacienteId, unidadeId), colunas, dados)
-                : exportacaoService.excel("NPS", colunas, dados);
+                ? exportacaoService.pdf("NPS", filtrosNps(status, pacienteId, unidadeId), cols, dados)
+                : exportacaoService.excel("NPS", cols, dados);
         String nome = "nps-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasNps().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -115,26 +125,37 @@ public class NpsController {
                 new FiltroAplicado("Unidade", unidade));
     }
 
+    /** Todas as colunas disponíveis do NPS (o usuário escolhe quais exportar). */
     private static List<ColunaExport<Nps>> colunasNps() {
         return List.of(
+                ColunaExport.de("Código", n -> String.valueOf(n.getId())),
                 ColunaExport.de("Atendimento",
                         n -> n.getAgendamento().getDataHora() == null ? "" : n.getAgendamento().getDataHora().format(DATA_HORA)),
                 ColunaExport.de("Paciente", n -> n.getAgendamento().getPaciente().getNome()),
                 ColunaExport.de("Unidade", n -> n.getAgendamento().getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", n -> n.getAgendamento().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", n -> n.getAgendamento().getProfissionalSaude().getNome()),
+                ColunaExport.de("Procedimento", n -> n.getAgendamento().getProcedimento().getNome()),
+                ColunaExport.de("Status do atendimento", n -> n.getAgendamento().getStatusAgendamento().getDescricao()),
                 ColunaExport.de("Média", n -> n.getMedia() == null ? "" : String.format(Locale.forLanguageTag("pt-BR"), "%.1f", n.getMedia())),
+                ColunaExport.de("Nota (legado)", n -> n.getNota() == null ? "" : String.valueOf(n.getNota())),
                 ColunaExport.de("Status", n -> n.getStatus().getDescricao()),
                 ColunaExport.de("Gerado em", n -> n.getCriadoEm() == null ? "" : n.getCriadoEm().format(DATA_HORA)),
+                ColunaExport.de("Disparo agendado", n -> n.getDispararEm() == null ? "" : n.getDispararEm().format(DATA_HORA)),
+                ColunaExport.de("Disparado em", n -> n.getDisparadoEm() == null ? "" : n.getDisparadoEm().format(DATA_HORA)),
                 ColunaExport.de("Respondido em", n -> n.getRespondidoEm() == null ? "" : n.getRespondidoEm().format(DATA_HORA)),
-                ColunaExport.de("Observação", Nps::getObservacao));
+                ColunaExport.de("Observação", n -> texto(n.getObservacao())));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
     }
 
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ResponseEntity<NpsDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(nps -> ResponseEntity.ok(NpsDetalheResponse.from(nps)))
+                .map(nps -> ResponseEntity.ok(NpsDetalheResponse.from(nps, fotoDoNps(nps))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -144,7 +165,8 @@ public class NpsController {
     public ResponseEntity<NpsDetalheResponse> responder(@PathVariable Long id,
             @Valid @RequestBody ResponderNpsRequest request) {
         Nps nps = obter(id);
-        return ResponseEntity.ok(NpsDetalheResponse.from(npsService.responder(nps, request)));
+        Nps respondido = npsService.responder(nps, request);
+        return ResponseEntity.ok(NpsDetalheResponse.from(respondido, fotoDoNps(respondido)));
     }
 
     @PostMapping("/{id}/expirar")
@@ -152,11 +174,17 @@ public class NpsController {
     public ResponseEntity<NpsDetalheResponse> expirar(@PathVariable Long id) {
         Nps nps = obter(id);
         nps.setStatus(StatusNps.EXPIRADO);
-        return ResponseEntity.ok(NpsDetalheResponse.from(repository.save(nps)));
+        Nps salvo = repository.save(nps);
+        return ResponseEntity.ok(NpsDetalheResponse.from(salvo, fotoDoNps(salvo)));
     }
 
     private Nps obter(Long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "NPS não encontrado"));
+    }
+
+    /** Foto pré-assinada do paciente do atendimento (avatar da tela de detalhe do NPS). */
+    private String fotoDoNps(Nps nps) {
+        return storageService.urlFotoPaciente(nps.getAgendamento().getPaciente().getFotoUrl());
     }
 }

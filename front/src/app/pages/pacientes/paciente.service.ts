@@ -8,7 +8,7 @@ import { Pagina, Paciente, PacienteEntrada, PacienteFiltro } from './paciente.mo
 export class PacienteService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = `${environment.apiUrl}/paciente`;
+  readonly base = `${environment.apiUrl}/paciente`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
@@ -25,13 +25,14 @@ export class PacienteService {
     return this.http.get<Pagina<Paciente>>(this.base, { params });
   }
 
-  /** Exporta os pacientes dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: PacienteFiltro = {}): Observable<Blob> {
+  /** Exporta os pacientes dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: PacienteFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
     if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

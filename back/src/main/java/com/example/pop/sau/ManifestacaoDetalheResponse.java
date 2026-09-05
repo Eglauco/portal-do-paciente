@@ -9,6 +9,8 @@ import com.example.pop.common.Ref;
 public record ManifestacaoDetalheResponse(
         Long id,
         Ref paciente,
+        /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+        String pacienteFotoUrl,
         Ref unidadeSaude,
         Ref tipo,
         StatusManifestacao status,

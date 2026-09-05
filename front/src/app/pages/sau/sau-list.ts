@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { AuthService } from '../../core/auth.service';
 import { TipoManifestacao } from '../tipos-manifestacao/tipo-manifestacao.model';
 import { TipoManifestacaoService } from '../tipos-manifestacao/tipo-manifestacao.service';
@@ -15,7 +16,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-sau-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RelatorioColunasModal],
   templateUrl: './sau-list.html',
 })
 export class SauList {
@@ -27,6 +28,9 @@ export class SauList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = SauService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -142,13 +146,21 @@ export class SauList {
       });
   }
 
-  /** Exporta as manifestações dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (mesmos filtros da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     const f = this.filtro.getRawValue();
     this.exportando.set(formato);
     this.service
-      .exportar(formato, { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status })
+      .exportar(formato, { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status }, colunas)
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `sau.${formato}`);

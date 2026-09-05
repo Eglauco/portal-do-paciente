@@ -32,6 +32,7 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
 
@@ -45,12 +46,14 @@ public class PacienteController {
     private final PacienteRepository repository;
     private final PacienteAcessoService acessoService;
     private final ExportacaoService exportacaoService;
+    private final StorageService storageService;
 
     public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService,
-            ExportacaoService exportacaoService) {
+            ExportacaoService exportacaoService, StorageService storageService) {
         this.repository = repository;
         this.acessoService = acessoService;
         this.exportacaoService = exportacaoService;
+        this.storageService = storageService;
     }
 
     /**
@@ -73,6 +76,9 @@ public class PacienteController {
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
         Page<Paciente> resultado = repository.search(codigo, filtroNome, filtroCpf, filtroProntuario, pageable);
+        // Avatar da lista: troca a URL crua da foto pela GET pré-assinada (só p/ exibição;
+        // as entidades já estão destacadas fora de transação, então não persiste nada).
+        resultado.getContent().forEach(p -> p.setFotoUrl(storageService.urlFotoPaciente(p.getFotoUrl())));
 
         return new Pagina<>(
                 resultado.getContent(),
@@ -85,6 +91,7 @@ public class PacienteController {
     }
 
     private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /**
      * Exporta os pacientes que batem com os MESMOS filtros da tela (todos os
@@ -96,7 +103,8 @@ public class PacienteController {
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String cpf,
-            @RequestParam(required = false) String prontuario) {
+            @RequestParam(required = false) String prontuario,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroCpf = digitos(cpf);
         String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
@@ -104,18 +112,24 @@ public class PacienteController {
                 .getContent().stream()
                 .sorted(Comparator.comparing(Paciente::getId))
                 .toList();
-        List<ColunaExport<Paciente>> colunas = colunasPaciente();
+        List<ColunaExport<Paciente>> cols = ExportacaoService.filtrar(colunasPaciente(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Pacientes", filtrosPaciente(codigo, nome, cpf, prontuario), colunas, dados)
-                : exportacaoService.excel("Pacientes", colunas, dados);
+                ? exportacaoService.pdf("Pacientes", filtrosPaciente(codigo, nome, cpf, prontuario), cols, dados)
+                : exportacaoService.excel("Pacientes", cols, dados);
         String nomeArquivo = "pacientes-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasPaciente().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -127,19 +141,58 @@ public class PacienteController {
                 new FiltroAplicado("Prontuário", (prontuario != null && !prontuario.isBlank()) ? prontuario.trim() : "Todos"));
     }
 
+    /** Todas as colunas disponíveis do paciente (o usuário escolhe quais exportar). */
     private static List<ColunaExport<Paciente>> colunasPaciente() {
         return List.of(
                 ColunaExport.de("Código", p -> String.valueOf(p.getId())),
                 ColunaExport.de("Nome", Paciente::getNome),
+                ColunaExport.de("Sexo", p -> sexoLabel(p.getSexo())),
+                ColunaExport.de("Data de nascimento", p -> p.getDataNascimento() == null ? "" : p.getDataNascimento().format(DATA)),
+                ColunaExport.de("RG", p -> texto(p.getRg())),
                 ColunaExport.de("CPF", p -> formatarCpf(p.getCpf())),
-                ColunaExport.de("Prontuário", p -> p.getProntuario() == null ? "" : p.getProntuario()),
-                ColunaExport.de("Cód. integração", p -> p.getCodigoIntegracao() == null ? "" : p.getCodigoIntegracao()),
+                ColunaExport.de("CNS", p -> texto(p.getCns())),
+                ColunaExport.de("Nome da mãe", p -> texto(p.getNomeMae())),
+                ColunaExport.de("Nome do pai", p -> texto(p.getNomePai())),
+                ColunaExport.de("Cód. integração", p -> texto(p.getCodigoIntegracao())),
+                ColunaExport.de("Prontuário", p -> texto(p.getProntuario())),
                 ColunaExport.de("Telefone", p -> formatarTelefone(p.getTelefone())),
-                ColunaExport.de("E-mail", p -> p.getEmail() == null ? "" : p.getEmail()),
+                ColunaExport.de("Telefones adicionais", p -> p.getTelefonesAdicionais() == null ? ""
+                        : p.getTelefonesAdicionais().stream().map(PacienteController::formatarTelefone)
+                                .collect(java.util.stream.Collectors.joining("; "))),
+                ColunaExport.de("E-mail", p -> texto(p.getEmail())),
+                ColunaExport.de("Rua", p -> texto(p.getRua())),
+                ColunaExport.de("Número", p -> texto(p.getNumero())),
+                ColunaExport.de("Bairro", p -> texto(p.getBairro())),
+                ColunaExport.de("Município", p -> texto(p.getMunicipio())),
+                ColunaExport.de("UF", p -> texto(p.getUf())),
+                ColunaExport.de("CEP", p -> formatarCep(p.getCep())),
+                ColunaExport.de("Complemento", p -> texto(p.getComplemento())),
                 ColunaExport.de("Liberado (app)", p -> p.isAtivo() ? "Sim" : "Não"),
                 ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"),
                 ColunaExport.de("Código expira em",
                         p -> p.getCodigoAtivacaoExpiraEm() == null ? "" : p.getCodigoAtivacaoExpiraEm().format(DATA_HORA)));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
+    }
+
+    private static String sexoLabel(Sexo s) {
+        if (s == null) {
+            return "";
+        }
+        return switch (s) {
+            case MASCULINO -> "Masculino";
+            case FEMININO -> "Feminino";
+            case OUTRO -> "Outro";
+            case NAO_INFORMADO -> "Não informado";
+        };
+    }
+
+    /** Formata o CEP (só dígitos) como 00000-000; devolve o valor original se não tiver 8 dígitos. */
+    private static String formatarCep(String cep) {
+        String d = cep == null ? "" : cep.replaceAll("\\D", "");
+        return d.length() == 8 ? d.substring(0, 5) + "-" + d.substring(5) : texto(cep);
     }
 
     /** Formata o CPF (só dígitos) como 000.000.000-00; devolve vazio se não tiver 11 dígitos. */
@@ -174,7 +227,12 @@ public class PacienteController {
     @GetMapping("/{id}")
     public ResponseEntity<Paciente> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(ResponseEntity::ok)
+                .map(p -> {
+                    // Foto só p/ exibição no form (avatar): URL crua → GET pré-assinada.
+                    // aplicar()/PacienteRequest não tocam fotoUrl, então salvar não persiste a assinada.
+                    p.setFotoUrl(storageService.urlFotoPaciente(p.getFotoUrl()));
+                    return ResponseEntity.ok(p);
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

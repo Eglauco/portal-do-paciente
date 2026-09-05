@@ -9,7 +9,7 @@ export class UsuarioService {
   private readonly http = inject(HttpClient);
 
   // Base da API. Em produção viria de environment; aqui aponta para o backend local.
-  private readonly base = `${environment.apiUrl}/usuario`;
+  readonly base = `${environment.apiUrl}/usuario`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
@@ -25,12 +25,13 @@ export class UsuarioService {
     return this.http.get<Pagina<Usuario>>(this.base, { params });
   }
 
-  /** Exporta os usuários dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: UsuarioFiltro = {}): Observable<Blob> {
+  /** Exporta os usuários dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: UsuarioFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.email?.trim()) params = params.set('email', filtro.email.trim());
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

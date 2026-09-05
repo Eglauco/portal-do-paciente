@@ -11,6 +11,7 @@ import 'react-native-reanimated';
 
 import { LembretePopup } from '@/components/lembrete-popup';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { PerfilFotoProvider } from '@/hooks/use-perfil-foto';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
 import { notificarAtualizacao } from '@/services/atualizacao';
 import { ehChatAtivo } from '@/services/chat-ativo';
@@ -142,7 +143,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <SessaoProvider>
-        <Navegacao />
+        <PerfilFotoProvider>
+          <Navegacao />
+        </PerfilFotoProvider>
       </SessaoProvider>
       <StatusBar style="auto" />
     </ThemeProvider>

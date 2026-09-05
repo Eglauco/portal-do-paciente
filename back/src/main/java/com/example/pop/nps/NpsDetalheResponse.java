@@ -10,6 +10,8 @@ import com.example.pop.common.Ref;
 public record NpsDetalheResponse(
         Long id,
         Ref paciente,
+        /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+        String pacienteFotoUrl,
         Ref unidadeSaude,
         Ref especialidade,
         Ref profissionalSaude,
@@ -24,6 +26,11 @@ public record NpsDetalheResponse(
         LocalDateTime respondidoEm) {
 
     public static NpsDetalheResponse from(Nps nps) {
+        return from(nps, null);
+    }
+
+    /** {@code pacienteFotoUrl}: foto pré-assinada do paciente (avatar), ou null. */
+    public static NpsDetalheResponse from(Nps nps, String pacienteFotoUrl) {
         Agendamento a = nps.getAgendamento();
         List<CategoriaNotaResponse> notas = nps.getNotasCategorias().stream()
                 .sorted((x, y) -> x.getCategoria().getNome().compareToIgnoreCase(y.getCategoria().getNome()))
@@ -32,6 +39,7 @@ public record NpsDetalheResponse(
         return new NpsDetalheResponse(
                 nps.getId(),
                 new Ref(a.getPaciente().getId(), a.getPaciente().getNome()),
+                pacienteFotoUrl,
                 new Ref(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 new Ref(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 new Ref(a.getProfissionalSaude().getId(), a.getProfissionalSaude().getNome()),

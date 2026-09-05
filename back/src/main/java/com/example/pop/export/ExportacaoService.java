@@ -53,6 +53,17 @@ public class ExportacaoService {
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
     private static final DateTimeFormatter GERADO = DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
 
+    /**
+     * Filtra as colunas mantendo só as selecionadas (casando pelo título), na ordem
+     * DEFINIDA. Seleção nula/vazia → todas as colunas (retrocompatível).
+     */
+    public static <T> List<ColunaExport<T>> filtrar(List<ColunaExport<T>> todas, List<String> selecionadas) {
+        if (selecionadas == null || selecionadas.isEmpty()) {
+            return todas;
+        }
+        return todas.stream().filter(c -> selecionadas.contains(c.titulo())).toList();
+    }
+
     public static final String TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     // Paleta da marca (mesma do app/front).

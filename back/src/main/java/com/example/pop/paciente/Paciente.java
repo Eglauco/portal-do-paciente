@@ -106,6 +106,10 @@ public class Paciente {
     @Column(name = "numero", length = 20)
     private List<String> telefonesAdicionais = new ArrayList<>();
 
+    /** Foto do paciente (URL do objeto no S3, pasta "foto-paciente"). Alterável pelo app. */
+    @Column(name = "foto_url", length = 512)
+    private String fotoUrl;
+
     /** Liberado (globalmente) para acessar o app. */
     @Column(nullable = false)
     private boolean ativo = false;

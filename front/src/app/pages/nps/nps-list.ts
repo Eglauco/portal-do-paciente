@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Nps, STATUS_OPTIONS, StatusNps, statusLabel } from './nps.model';
@@ -15,7 +16,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-nps-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, RelatorioColunasModal],
   templateUrl: './nps-list.html',
 })
 export class NpsList {
@@ -27,6 +28,9 @@ export class NpsList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = NpsService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -144,13 +148,21 @@ export class NpsList {
     this.router.navigate(['/nps', nps.id]);
   }
 
-  /** Exporta as avaliações dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (mesmos filtros da tela) em Excel ou PDF. */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() })
+      .exportar(formato, { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, colunas)
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `nps.${formato}`);

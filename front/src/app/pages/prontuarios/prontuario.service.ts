@@ -13,7 +13,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class ProntuarioService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/prontuario`;
+  readonly base = `${environment.apiUrl}/prontuario`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -30,12 +30,13 @@ export class ProntuarioService {
     return this.http.get<Pagina<Prontuario>>(this.base, { params });
   }
 
-  /** Exporta os prontuários dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ProntuarioFiltro = {}): Observable<Blob> {
+  /** Exporta os prontuários dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ProntuarioFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.numero) params = params.set('numero', filtro.numero);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

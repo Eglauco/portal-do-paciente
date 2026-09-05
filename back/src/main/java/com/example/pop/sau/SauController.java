@@ -83,24 +83,31 @@ public class SauController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Long tipoId,
-            @RequestParam(required = false) StatusManifestacao status) {
+            @RequestParam(required = false) StatusManifestacao status,
+            @RequestParam(required = false) List<String> colunas) {
         List<ManifestacaoResponse> dados = repository.search(unidadeId, tipoId, status, Pageable.unpaged())
                 .getContent().stream()
                 .map(sauService::toResponse)
                 .sorted(Comparator.comparing(ManifestacaoResponse::atualizadoEm).reversed())
                 .toList();
-        List<ColunaExport<ManifestacaoResponse>> colunas = colunasSau();
+        List<ColunaExport<ManifestacaoResponse>> cols = ExportacaoService.filtrar(colunasSau(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Manifestações (SAU)", filtrosSau(unidadeId, tipoId, status), colunas, dados)
-                : exportacaoService.excel("Manifestações (SAU)", colunas, dados);
+                ? exportacaoService.pdf("Manifestações (SAU)", filtrosSau(unidadeId, tipoId, status), cols, dados)
+                : exportacaoService.excel("Manifestações (SAU)", cols, dados);
         String nome = "sau-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasSau().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -117,16 +124,23 @@ public class SauController {
 
     private static List<ColunaExport<ManifestacaoResponse>> colunasSau() {
         return List.of(
+                ColunaExport.de("Código", m -> String.valueOf(m.id())),
                 ColunaExport.de("Aberta em", m -> m.criadoEm() == null ? "" : m.criadoEm().format(DATA_HORA)),
                 ColunaExport.de("Atualizada em", m -> m.atualizadoEm() == null ? "" : m.atualizadoEm().format(DATA_HORA)),
-                ColunaExport.de("Paciente", m -> m.paciente().nome()),
-                ColunaExport.de("Unidade", m -> m.unidadeSaude().nome()),
-                ColunaExport.de("Tipo", m -> m.tipo().nome()),
+                ColunaExport.de("Cód. paciente",
+                        m -> m.paciente() == null || m.paciente().id() == null ? "" : String.valueOf(m.paciente().id())),
+                ColunaExport.de("Paciente", m -> texto(m.paciente() == null ? null : m.paciente().nome())),
+                ColunaExport.de("Unidade", m -> texto(m.unidadeSaude() == null ? null : m.unidadeSaude().nome())),
+                ColunaExport.de("Tipo", m -> texto(m.tipo() == null ? null : m.tipo().nome())),
                 ColunaExport.de("Status", ManifestacaoResponse::statusDescricao),
                 ColunaExport.de("Avaliação", m -> m.avaliacaoNota() == null ? "" : m.avaliacaoNota() + "/5"),
                 ColunaExport.de("Última resposta de", m -> m.ultimaMensagemDe() == null ? ""
                         : (m.ultimaMensagemDe() == AutorManifestacao.SAU ? "SAU" : "Paciente")),
                 ColunaExport.de("Última mensagem", ManifestacaoResponse::ultimaMensagem));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
     }
 
     @GetMapping("/{id}")

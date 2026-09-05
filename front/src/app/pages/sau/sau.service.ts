@@ -7,7 +7,7 @@ import { Manifestacao, ManifestacaoDetalhe, ManifestacaoFiltro, Pagina } from '.
 @Injectable({ providedIn: 'root' })
 export class SauService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/sau`;
+  readonly base = `${environment.apiUrl}/sau`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -20,12 +20,13 @@ export class SauService {
     return this.http.get<Pagina<Manifestacao>>(this.base, { params });
   }
 
-  /** Exporta as manifestações dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ManifestacaoFiltro = {}): Observable<Blob> {
+  /** Exporta as manifestações dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ManifestacaoFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.tipoId) params = params.set('tipoId', filtro.tipoId);
     if (filtro.status) params = params.set('status', filtro.status);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

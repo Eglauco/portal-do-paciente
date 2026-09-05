@@ -1,9 +1,14 @@
 package com.example.pop.postagem;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -30,6 +35,7 @@ import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -41,21 +47,25 @@ public class FeedController {
     private static final int TAMANHO_MAXIMO = 100;
     /** Janela em que o autor ainda pode editar o próprio comentário (fonte única no response). */
     private static final int JANELA_EDICAO_MIN = ComentarioResponse.JANELA_EDICAO_MINUTOS;
+    /** Validade da URL da foto do autor exibida junto ao comentário. */
+    private static final Duration VALIDADE_FOTO = Duration.ofHours(6);
 
     private final PostagemRepository repository;
     private final CurtidaRepository curtidaRepository;
     private final ComentarioRepository comentarioRepository;
     private final StorageService storageService;
     private final PacienteAcessoService acessoService;
+    private final PacienteRepository pacienteRepository;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, StorageService storageService,
-            PacienteAcessoService acessoService) {
+            PacienteAcessoService acessoService, PacienteRepository pacienteRepository) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
         this.storageService = storageService;
         this.acessoService = acessoService;
+        this.pacienteRepository = pacienteRepository;
     }
 
     @GetMapping("/feed")
@@ -122,14 +132,24 @@ public class FeedController {
                 .findByPostagemIdAndComentarioPaiIsNullOrderByCriadoEmDesc(id, pageable);
 
         // Carrega as respostas dos comentários-raiz desta página em uma única consulta.
-        List<Long> raizes = resultado.getContent().stream().map(Comentario::getId).toList();
+        List<Comentario> raizesList = resultado.getContent();
+        List<Long> raizes = raizesList.stream().map(Comentario::getId).toList();
         Map<Long, List<Comentario>> porPai = raizes.isEmpty()
                 ? Map.of()
                 : comentarioRepository.findByComentarioPaiIdInOrderByCriadoEmAsc(raizes).stream()
                         .collect(Collectors.groupingBy(r -> r.getComentarioPai().getId()));
 
-        List<ComentarioResponse> content = resultado.getContent().stream()
-                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()), pacienteAtual, adminAtual))
+        // Fotos dos autores só para leitor AUTENTICADO: o feed é público e o nome já é
+        // anonimizado por LGPD ("Mariana D."), então não expomos o rosto a acesso anônimo.
+        // (raízes + respostas resolvidas de uma vez, quando há foto a resolver.)
+        List<Comentario> todos = new ArrayList<>(raizesList);
+        porPai.values().forEach(todos::addAll);
+        boolean autenticado = pacienteAtual != null || adminAtual != null;
+        Function<Long, String> fotoDoPaciente = autenticado ? resolverFotos(todos) : pid -> null;
+
+        List<ComentarioResponse> content = raizesList.stream()
+                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()),
+                        pacienteAtual, adminAtual, fotoDoPaciente))
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -153,7 +173,7 @@ public class FeedController {
         comentario.setCriadoEm(LocalDateTime.now());
         Comentario salvo = comentarioRepository.save(comentario);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salvo, paciente.getId(), null);
+        return ComentarioResponse.from(salvo, paciente.getId(), null, umaFoto(paciente));
     }
 
     /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
@@ -182,7 +202,7 @@ public class FeedController {
         resposta.setCriadoEm(LocalDateTime.now());
         Comentario salva = comentarioRepository.save(resposta);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salva, paciente.getId(), null);
+        return ComentarioResponse.from(salva, paciente.getId(), null, umaFoto(paciente));
     }
 
     /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
@@ -199,7 +219,7 @@ public class FeedController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null);
+        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null, umaFoto(paciente));
     }
 
     /**
@@ -280,6 +300,29 @@ public class FeedController {
         }
         String sobrenome = partes[partes.length - 1];
         return partes[0] + " " + Character.toUpperCase(sobrenome.charAt(0)) + ".";
+    }
+
+    /**
+     * Resolve a foto (URL pré-assinada) de cada autor pelo {@code pacienteId}, buscando
+     * os pacientes de uma vez. Sem paciente (comentário do admin/antigo) ou sem foto → null.
+     */
+    private Function<Long, String> resolverFotos(List<Comentario> comentarios) {
+        Set<Long> ids = comentarios.stream().map(Comentario::getPacienteId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return pid -> null;
+        }
+        Map<Long, String> fotos = pacienteRepository.findAllById(ids).stream()
+                .filter(p -> p.getFotoUrl() != null)
+                .collect(Collectors.toMap(Paciente::getId,
+                        p -> storageService.urlVisualizacao(p.getFotoUrl(), VALIDADE_FOTO)));
+        return pid -> pid == null ? null : fotos.get(pid);
+    }
+
+    /** Resolver de foto para um único comentário/resposta do paciente logado. */
+    private Function<Long, String> umaFoto(Paciente paciente) {
+        String foto = storageService.urlVisualizacao(paciente.getFotoUrl(), VALIDADE_FOTO);
+        return pid -> foto;
     }
 
     private Postagem obter(Long id) {

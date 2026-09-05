@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EdicaoComentario } from '@/components/comentario-edicao';
+import { AvatarFoto } from '@/components/avatar-paciente';
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
@@ -357,9 +358,13 @@ export default function PostagemDetalheScreen() {
   const renderComentario = ({ item }: { item: Comentario }) => (
     <View>
       <View style={styles.item}>
-        <View style={styles.itemAvatar}>
-          <Text style={styles.itemAvatarTxt}>{iniciais(item.autor)}</Text>
-        </View>
+        <AvatarFoto
+          fotoUrl={item.fotoUrl}
+          iniciais={iniciais(item.autor)}
+          tamanho={34}
+          estiloCirculo={styles.itemAvatar}
+          estiloTexto={styles.itemAvatarTxt}
+        />
         {renderCorpo(item, null)}
       </View>
 
@@ -367,9 +372,13 @@ export default function PostagemDetalheScreen() {
         <View style={styles.respostas}>
           {item.respostas.map((r) => (
             <View key={r.id} style={styles.itemResposta}>
-              <View style={styles.itemAvatarSm}>
-                <Text style={styles.itemAvatarTxtSm}>{iniciais(r.autor)}</Text>
-              </View>
+              <AvatarFoto
+                fotoUrl={r.fotoUrl}
+                iniciais={iniciais(r.autor)}
+                tamanho={28}
+                estiloCirculo={styles.itemAvatarSm}
+                estiloTexto={styles.itemAvatarTxtSm}
+              />
               {renderCorpo(r, item.id)}
             </View>
           ))}

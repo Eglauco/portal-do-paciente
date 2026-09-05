@@ -78,24 +78,31 @@ public class EspecialidadeController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         List<Especialidade> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Especialidade::getId))
                 .toList();
-        List<ColunaExport<Especialidade>> colunas = colunasEspecialidade();
+        List<ColunaExport<Especialidade>> cols = ExportacaoService.filtrar(colunasEspecialidade(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Especialidades", filtrosEspecialidade(codigo, nome), colunas, dados)
-                : exportacaoService.excel("Especialidades", colunas, dados);
+                ? exportacaoService.pdf("Especialidades", filtrosEspecialidade(codigo, nome), cols, dados)
+                : exportacaoService.excel("Especialidades", cols, dados);
         String nomeArquivo = "especialidades-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasEspecialidade().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */

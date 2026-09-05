@@ -34,7 +34,11 @@
       @for (msg of m.mensagens; track msg.id) {
         <article class="sau-msg" [class.sau-msg--sau]="msg.autor === 'SAU'">
           <header class="sau-msg__cab">
-            <span class="sau-msg__avatar" [class.sau-msg__avatar--sau]="msg.autor === 'SAU'">{{ iniciais(msg.autorNome) }}</span>
+            @if (msg.autor !== 'SAU' && m.pacienteFotoUrl) {
+              <img class="sau-msg__avatar av-foto" [src]="m.pacienteFotoUrl" (error)="m.pacienteFotoUrl = null" alt="" />
+            } @else {
+              <span class="sau-msg__avatar" [class.sau-msg__avatar--sau]="msg.autor === 'SAU'">{{ iniciais(msg.autorNome) }}</span>
+            }
             <div class="sau-msg__quem">
               <b class="sau-msg__nome">{{ msg.autorNome }}</b>
               <span class="sau-msg__papel">{{ msg.autor === 'SAU' ? 'Atendimento SAU' : 'Paciente' }}</span>

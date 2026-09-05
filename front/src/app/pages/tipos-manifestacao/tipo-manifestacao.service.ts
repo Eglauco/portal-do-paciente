@@ -7,7 +7,7 @@ import { Pagina, TipoManifestacao, TipoManifestacaoFiltro } from './tipo-manifes
 @Injectable({ providedIn: 'root' })
 export class TipoManifestacaoService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/tipo-manifestacao`;
+  readonly base = `${environment.apiUrl}/tipo-manifestacao`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -23,11 +23,16 @@ export class TipoManifestacaoService {
     return this.http.get<Pagina<TipoManifestacao>>(this.base, { params });
   }
 
-  /** Exporta os tipos dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: TipoManifestacaoFiltro = {}): Observable<Blob> {
+  /** Exporta os tipos dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: TipoManifestacaoFiltro = {},
+    colunas: string[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.ativo != null) params = params.set('ativo', filtro.ativo);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

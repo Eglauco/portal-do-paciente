@@ -5,7 +5,11 @@
         <button type="button" class="wa__voltar" (click)="voltar()" aria-label="Voltar para a pesquisa">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
         </button>
-        <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
+        @if (chat.pacienteFotoUrl) {
+          <img class="convo__avatar convo__avatar--lg av-foto" [src]="chat.pacienteFotoUrl" (error)="chat.pacienteFotoUrl = null" alt="" />
+        } @else {
+          <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
+        }
         <div class="wa__cabecalho-info">
           <b class="wa__cabecalho-nome">{{ chat.paciente.nome }}</b>
           @if (digitando()) {

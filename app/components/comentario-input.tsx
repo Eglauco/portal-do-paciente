@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { forwardRef, memo, useImperativeHandle, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AvatarPaciente } from '@/components/avatar-paciente';
 import { Brand } from '@/constants/theme';
 
 export interface ComentarioInputHandle {
@@ -57,9 +58,13 @@ export const ComentarioInput = memo(
           </View>
         ) : null}
         <View style={[styles.input, { paddingBottom }]}>
-          <View style={styles.inputAvatar}>
-            <Text style={styles.inputAvatarTxt}>{autorIniciais}</Text>
-          </View>
+          <AvatarPaciente
+            iniciais={autorIniciais}
+            tamanho={34}
+            estiloCirculo={styles.inputAvatar}
+            estiloTexto={styles.inputAvatarTxt}
+            estiloFoto={styles.inputAvatarFoto}
+          />
           <TextInput
             ref={campoRef}
             style={styles.campo}
@@ -119,6 +124,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   inputAvatarTxt: { color: Brand.onBrand, fontSize: 12, fontWeight: '800' },
+  inputAvatarFoto: { marginBottom: 4 },
   campo: {
     flex: 1,
     minHeight: 42,

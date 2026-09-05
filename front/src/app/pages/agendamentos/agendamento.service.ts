@@ -7,7 +7,7 @@ import { Agendamento, AgendamentoRequest, Pagina, StatusAgendamento } from './ag
 @Injectable({ providedIn: 'root' })
 export class AgendamentoService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/agendamento`;
+  readonly base = `${environment.apiUrl}/agendamento`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -24,15 +24,17 @@ export class AgendamentoService {
     return this.http.get<Pagina<Agendamento>>(this.base, { params });
   }
 
-  /** Exporta os agendamentos dos filtros atuais em Excel ou PDF (arquivo binário). */
+  /** Exporta os agendamentos dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
   exportar(
     formato: 'xlsx' | 'pdf',
     status: StatusAgendamento | null,
     unidadeId: number | null = null,
+    colunas: string[] = [],
   ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (status) params = params.set('status', status);
     if (unidadeId != null) params = params.set('unidadeId', unidadeId);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

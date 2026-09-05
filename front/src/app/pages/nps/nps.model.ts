@@ -29,6 +29,8 @@ export interface CategoriaNota {
 export interface NpsDetalhe {
   id: number;
   paciente: Ref;
+  /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+  pacienteFotoUrl?: string | null;
   unidadeSaude: Ref;
   especialidade: Ref;
   profissionalSaude: Ref;

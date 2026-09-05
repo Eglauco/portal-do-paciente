@@ -1,0 +1,45 @@
+<div class="modal-backdrop" (click)="fechar.emit()">
+  <div
+    class="modal modal--colunas"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="rel-colunas-titulo"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 id="rel-colunas-titulo" class="modal__titulo">Exportar {{ rotuloFormato() }}</h2>
+    <p class="modal__sub">Selecione os campos que devem aparecer no relatório.</p>
+
+    @if (carregando()) {
+      <div class="rel-colunas__estado"><span class="spinner" aria-hidden="true"></span> Carregando campos…</div>
+    } @else if (erro()) {
+      <div class="rel-colunas__estado">Não foi possível carregar os campos. Tente novamente.</div>
+    } @else {
+      <label class="rel-colunas__todos">
+        <input type="checkbox" [checked]="todasMarcadas()" (change)="alternarTodas()" />
+        <span>Selecionar todos</span>
+      </label>
+      <ul class="rel-colunas__lista">
+        @for (c of colunas(); track c) {
+          <li>
+            <label class="rel-colunas__item">
+              <input type="checkbox" [checked]="marcada(c)" (change)="alternar(c)" />
+              <span>{{ c }}</span>
+            </label>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="modal__actions">
+      <button type="button" class="btn btn--ghost" (click)="fechar.emit()">Cancelar</button>
+      <button
+        type="button"
+        class="btn btn--solid"
+        (click)="confirmar()"
+        [disabled]="carregando() || erro() || !podeExportar()"
+      >
+        Exportar {{ rotuloFormato() }}
+      </button>
+    </div>
+  </div>
+</div>

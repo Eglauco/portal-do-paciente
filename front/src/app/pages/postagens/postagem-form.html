@@ -134,7 +134,11 @@
           @for (c of comentarios(); track c.id) {
             <li class="coment">
               <div class="coment__row">
-                <span class="coment__avatar">{{ iniciais(c.autor) }}</span>
+                @if (c.fotoUrl) {
+                  <img class="coment__avatar av-foto" [src]="c.fotoUrl" (error)="c.fotoUrl = null" alt="" />
+                } @else {
+                  <span class="coment__avatar">{{ iniciais(c.autor) }}</span>
+                }
                 <div class="coment__body">
                   @if (editandoComentario() === c.id) {
                     <textarea
@@ -185,7 +189,11 @@
                   @for (r of c.respostas; track r.id) {
                     <li class="coment coment--resposta">
                       <div class="coment__row">
-                        <span class="coment__avatar">{{ iniciais(r.autor) }}</span>
+                        @if (r.fotoUrl) {
+                          <img class="coment__avatar av-foto" [src]="r.fotoUrl" (error)="r.fotoUrl = null" alt="" />
+                        } @else {
+                          <span class="coment__avatar">{{ iniciais(r.autor) }}</span>
+                        }
                         <div class="coment__body">
                           @if (editandoComentario() === r.id) {
                             <textarea

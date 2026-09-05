@@ -2,10 +2,12 @@ package com.example.pop.postagem;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.function.Function;
 
 public record ComentarioResponse(
         Long id,
         String autor,
+        String fotoUrl,
         String texto,
         LocalDateTime criadoEm,
         boolean editado,
@@ -17,15 +19,18 @@ public record ComentarioResponse(
     public static final int JANELA_EDICAO_MINUTOS = 15;
 
     /**
-     * Comentário/resposta sem filhos aninhados. O "dono" é conferido contra o
-     * paciente logado ({@code pacienteAtual}) OU o admin logado ({@code adminAtual});
-     * qualquer um pode ser nulo conforme quem está lendo (app = paciente, front = admin).
+     * Comentário/resposta sem filhos aninhados. {@code fotoDoPaciente} resolve a foto
+     * (URL pré-assinada) pelo {@code pacienteId} do autor — null quando não é do paciente
+     * ou não tem foto. O "dono" é conferido contra o paciente logado ({@code pacienteAtual})
+     * OU o admin logado ({@code adminAtual}); qualquer um pode ser nulo conforme quem lê.
      */
-    public static ComentarioResponse from(Comentario c, Long pacienteAtual, Long adminAtual) {
+    public static ComentarioResponse from(Comentario c, Long pacienteAtual, Long adminAtual,
+            Function<Long, String> fotoDoPaciente) {
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
+                fotoDoPaciente.apply(c.getPacienteId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,
@@ -35,12 +40,15 @@ public record ComentarioResponse(
     }
 
     /** Comentário-raiz com suas respostas (as respostas não aninham mais níveis). */
-    public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual, Long adminAtual) {
-        List<ComentarioResponse> filhos = respostas.stream().map(r -> from(r, pacienteAtual, adminAtual)).toList();
+    public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual,
+            Long adminAtual, Function<Long, String> fotoDoPaciente) {
+        List<ComentarioResponse> filhos = respostas.stream()
+                .map(r -> from(r, pacienteAtual, adminAtual, fotoDoPaciente)).toList();
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
+                fotoDoPaciente.apply(c.getPacienteId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,

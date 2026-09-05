@@ -102,7 +102,8 @@ public class UsuarioController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
-            @RequestParam(required = false) String email) {
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroEmail = (email == null) ? "" : email.trim();
 
@@ -110,18 +111,24 @@ public class UsuarioController {
                 .getContent().stream()
                 .sorted(Comparator.comparing(Usuario::getId))
                 .toList();
-        List<ColunaExport<Usuario>> colunas = colunasUsuario();
+        List<ColunaExport<Usuario>> cols = ExportacaoService.filtrar(colunasUsuario(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Usuários", filtrosUsuario(codigo, nome, email), colunas, dados)
-                : exportacaoService.excel("Usuários", colunas, dados);
+                ? exportacaoService.pdf("Usuários", filtrosUsuario(codigo, nome, email), cols, dados)
+                : exportacaoService.excel("Usuários", cols, dados);
         String arquivoNome = "usuarios-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + arquivoNome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasUsuario().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -132,12 +139,17 @@ public class UsuarioController {
                 new FiltroAplicado("E-mail", (email != null && !email.isBlank()) ? email.trim() : "Todos"));
     }
 
+    /** Todas as colunas disponíveis do usuário (o usuário escolhe quais exportar). */
     private static List<ColunaExport<Usuario>> colunasUsuario() {
         return List.of(
                 ColunaExport.de("Código", u -> u.getId() == null ? "" : String.valueOf(u.getId())),
                 ColunaExport.de("Nome", Usuario::getNome),
                 ColunaExport.de("E-mail", Usuario::getEmail),
-                ColunaExport.de("Unidade", u -> u.getUnidade() == null ? "" : u.getUnidade().getNome()));
+                ColunaExport.de("Unidade", u -> u.getUnidade() == null ? "" : u.getUnidade().getNome()),
+                ColunaExport.de("Perfis", u -> u.getPerfis() == null ? "" : u.getPerfis().stream()
+                        .map(Perfil::getNome)
+                        .sorted()
+                        .collect(java.util.stream.Collectors.joining("; "))));
     }
 
     @GetMapping("/{id}")

@@ -16,6 +16,7 @@ import com.example.pop.common.Ref;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.push.PushService;
+import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.Usuario;
@@ -36,11 +37,12 @@ public class ChatService {
     private final ChatLogService chatLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
+    private final StorageService storageService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
             UsuarioRepository usuarioRepository, ChatLogService chatLogService,
-            SimpMessagingTemplate messagingTemplate, PushService pushService) {
+            SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
@@ -49,6 +51,7 @@ public class ChatService {
         this.chatLogService = chatLogService;
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
+        this.storageService = storageService;
     }
 
     /**
@@ -277,6 +280,7 @@ public class ChatService {
         return new ChatResponse(
                 chat.getId(),
                 new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
+                storageService.urlFotoPaciente(chat.getPaciente().getFotoUrl()),
                 new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
                 chat.getStatus(),
                 chat.getStatus().getDescricao(),
@@ -296,6 +300,7 @@ public class ChatService {
         return new ChatDetalheResponse(
                 chat.getId(),
                 new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
+                storageService.urlFotoPaciente(chat.getPaciente().getFotoUrl()),
                 new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
                 chat.getStatus(),
                 chat.getStatus().getDescricao(),

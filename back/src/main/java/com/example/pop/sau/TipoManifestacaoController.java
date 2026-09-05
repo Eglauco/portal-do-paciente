@@ -75,23 +75,30 @@ public class TipoManifestacaoController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) String nome,
-            @RequestParam(required = false) Boolean ativo) {
+            @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) List<String> colunas) {
         List<TipoManifestacao> dados = repository.search(nome == null ? "" : nome.trim(), ativo, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(TipoManifestacao::getNome, String.CASE_INSENSITIVE_ORDER))
                 .toList();
-        List<ColunaExport<TipoManifestacao>> colunas = colunasTipoManifestacao();
+        List<ColunaExport<TipoManifestacao>> cols = ExportacaoService.filtrar(colunasTipoManifestacao(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Tipos de manifestação", filtrosTipoManifestacao(nome, ativo), colunas, dados)
-                : exportacaoService.excel("Tipos de manifestação", colunas, dados);
+                ? exportacaoService.pdf("Tipos de manifestação", filtrosTipoManifestacao(nome, ativo), cols, dados)
+                : exportacaoService.excel("Tipos de manifestação", cols, dados);
         String nomeArquivo = "tipos-manifestacao-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasTipoManifestacao().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */

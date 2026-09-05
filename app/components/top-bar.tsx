@@ -7,15 +7,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
 import { contarNaoLidas } from '@/services/notificacoes-lista';
-
-const FOTO_PACIENTE = 'https://i.pravatar.cc/160?img=47';
 
 export function TopBar() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { sessao } = useSessao();
+  const { fotoUrl } = usePerfilFoto();
   const primeiroNome = sessao?.nome?.trim().split(/\s+/)[0] ?? 'Paciente';
   const [naoLidas, setNaoLidas] = useState(0);
 
@@ -41,15 +41,13 @@ export function TopBar() {
         onPress={() => router.push('/perfil')}
         accessibilityRole="button"
         accessibilityLabel="Abrir perfil">
-        <View style={styles.avatarRing}>
-          <Image
-            source={FOTO_PACIENTE}
-            style={styles.avatar}
-            contentFit="cover"
-            transition={200}
-            placeholder={{ blurhash: 'L6Pj0^i_.AyE_3t7t7R**0o#DgR4' }}
-          />
-        </View>
+        {fotoUrl ? (
+          <Image source={fotoUrl} style={styles.avatar} contentFit="cover" transition={200} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarVazio]}>
+            <Ionicons name="person" size={24} color={Brand.muted} />
+          </View>
+        )}
         <View>
           <Text style={styles.hello}>Olá,</Text>
           <Text style={styles.name}>{primeiroNome}</Text>
@@ -96,20 +94,16 @@ const styles = StyleSheet.create({
   leftPressed: {
     backgroundColor: '#EAF2EF',
   },
-  avatarRing: {
+  avatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    padding: 2,
-    backgroundColor: Brand.surface,
-    borderWidth: 2,
-    borderColor: Brand.glow,
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
     backgroundColor: Brand.line,
+  },
+  avatarVazio: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E7F3EF',
   },
   hello: {
     fontSize: 12,

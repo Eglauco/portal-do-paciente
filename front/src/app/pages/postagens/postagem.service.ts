@@ -15,7 +15,7 @@ import {
 @Injectable({ providedIn: 'root' })
 export class PostagemService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/postagem`;
+  readonly base = `${environment.apiUrl}/postagem`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -37,8 +37,8 @@ export class PostagemService {
     return this.http.get<Pagina<Postagem>>(this.base, { params });
   }
 
-  /** Exporta as postagens dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: PostagemFiltro = {}): Observable<Blob> {
+  /** Exporta as postagens dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: PostagemFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.titulo) params = params.set('titulo', filtro.titulo);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
@@ -48,6 +48,7 @@ export class PostagemService {
     if (filtro.novoComentario !== null && filtro.novoComentario !== undefined) {
       params = params.set('novoComentario', filtro.novoComentario);
     }
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

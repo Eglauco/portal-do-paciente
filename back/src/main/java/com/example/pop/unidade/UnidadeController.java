@@ -78,25 +78,32 @@ public class UnidadeController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
 
         List<Unidade> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Unidade::getId))
                 .toList();
-        List<ColunaExport<Unidade>> colunas = colunasUnidade();
+        List<ColunaExport<Unidade>> cols = ExportacaoService.filtrar(colunasUnidade(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Unidades", filtrosUnidade(codigo, filtroNome), colunas, dados)
-                : exportacaoService.excel("Unidades", colunas, dados);
+                ? exportacaoService.pdf("Unidades", filtrosUnidade(codigo, filtroNome), cols, dados)
+                : exportacaoService.excel("Unidades", cols, dados);
         String nomeArquivo = "unidades-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasUnidade().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */

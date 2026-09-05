@@ -8,7 +8,7 @@ import { CategoriaNps, CategoriaNpsFiltro, Pagina } from './categoria-nps.model'
 export class CategoriaNpsService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = `${environment.apiUrl}/categoria-nps`;
+  readonly base = `${environment.apiUrl}/categoria-nps`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
@@ -27,11 +27,12 @@ export class CategoriaNpsService {
     return this.http.get<Pagina<CategoriaNps>>(this.base, { params });
   }
 
-  /** Exporta as categorias dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: CategoriaNpsFiltro = {}): Observable<Blob> {
+  /** Exporta as categorias dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: CategoriaNpsFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

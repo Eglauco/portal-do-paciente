@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvaliacaoSauModal } from '@/components/avaliacao-sau-modal';
+import { AvatarPaciente } from '@/components/avatar-paciente';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
@@ -230,9 +231,18 @@ export default function ManifestacaoScreen() {
             return (
               <View key={m.id} style={[styles.card, doSau && styles.cardSau]}>
                 <View style={styles.cardCab}>
-                  <View style={[styles.avatar, doSau && styles.avatarSau]}>
-                    <Text style={[styles.avatarTxt, doSau && styles.avatarTxtSau]}>{iniciais(m.autorNome)}</Text>
-                  </View>
+                  {doSau ? (
+                    <View style={[styles.avatar, styles.avatarSau]}>
+                      <Text style={[styles.avatarTxt, styles.avatarTxtSau]}>{iniciais(m.autorNome)}</Text>
+                    </View>
+                  ) : (
+                    <AvatarPaciente
+                      iniciais={iniciais(m.autorNome)}
+                      tamanho={40}
+                      estiloCirculo={styles.avatar}
+                      estiloTexto={styles.avatarTxt}
+                    />
+                  )}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.autorNome} numberOfLines={1}>{m.autorNome}</Text>
                     {mostrarPapel && <Text style={styles.autorPapel}>{papel}</Text>}

@@ -102,25 +102,32 @@ public class PostagemController {
             @RequestParam(required = false) String titulo,
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Boolean comentarios,
-            @RequestParam(required = false) Boolean novoComentario) {
+            @RequestParam(required = false) Boolean novoComentario,
+            @RequestParam(required = false) List<String> colunas) {
         List<Postagem> dados = repository
                 .search(titulo == null ? "" : titulo, unidadeId, comentarios, novoComentario, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Postagem::getCriadoEm).reversed())
                 .toList();
-        List<ColunaExport<Postagem>> colunas = colunasPostagem();
+        List<ColunaExport<Postagem>> cols = ExportacaoService.filtrar(colunasPostagem(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
                 ? exportacaoService.pdf("Rede Social", filtrosPostagem(titulo, unidadeId, comentarios, novoComentario),
-                        colunas, dados)
-                : exportacaoService.excel("Rede Social", colunas, dados);
+                        cols, dados)
+                : exportacaoService.excel("Rede Social", cols, dados);
         String nome = "postagens-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasPostagem().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -140,6 +147,7 @@ public class PostagemController {
     /** Colunas da exportação — todas as informações úteis da tela, incluindo as contagens. */
     private List<ColunaExport<Postagem>> colunasPostagem() {
         return List.of(
+                ColunaExport.de("Código", p -> String.valueOf(p.getId())),
                 ColunaExport.de("Título", Postagem::getTitulo),
                 ColunaExport.de("Descrição", Postagem::getDescricao),
                 ColunaExport.de("Unidade", p -> p.getUnidadeSaude().getNome()),
@@ -148,7 +156,11 @@ public class PostagemController {
                 ColunaExport.de("Comentário novo", p -> p.temComentarioNovo() ? "Sim" : "Não"),
                 ColunaExport.de("Total de curtidas visível", p -> p.isMostrarTotalCurtidas() ? "Sim" : "Não"),
                 ColunaExport.de("Comentários habilitados", p -> p.isHabilitarComentarios() ? "Sim" : "Não"),
-                ColunaExport.de("Publicado em", p -> p.getCriadoEm() == null ? "" : p.getCriadoEm().format(DATA_HORA)));
+                ColunaExport.de("Publicado em", p -> p.getCriadoEm() == null ? "" : p.getCriadoEm().format(DATA_HORA)),
+                ColunaExport.de("Último comentário do paciente em",
+                        p -> p.getUltimoComentarioPacienteEm() == null ? "" : p.getUltimoComentarioPacienteEm().format(DATA_HORA)),
+                ColunaExport.de("Comentários vistos em",
+                        p -> p.getComentariosVistosEm() == null ? "" : p.getComentariosVistosEm().format(DATA_HORA)));
     }
 
     @GetMapping("/{id}")
@@ -244,7 +256,7 @@ public class PostagemController {
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId));
+                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId, pid -> null));
     }
 
     /** Edita o próprio comentário do admin — permitido só até 15 min após criar. */
@@ -264,7 +276,7 @@ public class PostagemController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId);
+        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null);
     }
 
     /** Id do usuário admin a partir do claim "uid" do token; nulo se ausente. */

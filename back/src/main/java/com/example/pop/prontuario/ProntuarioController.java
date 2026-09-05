@@ -31,6 +31,7 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.push.PushService;
 import com.example.pop.storage.StorageService;
@@ -93,23 +94,30 @@ public class ProntuarioController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) String numero,
             @RequestParam(required = false) Long pacienteId,
-            @RequestParam(required = false) Long unidadeId) {
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> colunas) {
         List<Prontuario> dados = repository.search(numero == null ? "" : numero, pacienteId, unidadeId, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Prontuario::getId).reversed())
                 .toList();
-        List<ColunaExport<Prontuario>> colunas = colunasProntuario();
+        List<ColunaExport<Prontuario>> cols = ExportacaoService.filtrar(colunasProntuario(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Prontuários", filtrosProntuario(numero, pacienteId, unidadeId), colunas, dados)
-                : exportacaoService.excel("Prontuários", colunas, dados);
+                ? exportacaoService.pdf("Prontuários", filtrosProntuario(numero, pacienteId, unidadeId), cols, dados)
+                : exportacaoService.excel("Prontuários", cols, dados);
         String nome = "prontuarios-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasProntuario().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -128,6 +136,9 @@ public class ProntuarioController {
         return List.of(
                 ColunaExport.de("Nº atendimento", Prontuario::getNumeroAtendimento),
                 ColunaExport.de("Paciente", p -> p.getAgendamento().getPaciente().getNome()),
+                ColunaExport.de("CPF do paciente", p -> formatarCpf(p.getAgendamento().getPaciente().getCpf())),
+                ColunaExport.de("Prontuário do paciente", p -> texto(p.getAgendamento().getPaciente().getProntuario())),
+                ColunaExport.de("Telefone do paciente", p -> formatarTelefone(p.getAgendamento().getPaciente().getTelefone())),
                 ColunaExport.de("Especialidade", p -> p.getAgendamento().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", p -> p.getAgendamento().getProfissionalSaude().getNome()),
                 ColunaExport.de("Procedimento", p -> p.getAgendamento().getProcedimento().getNome()),
@@ -135,7 +146,44 @@ public class ProntuarioController {
                 ColunaExport.de("Atendimento",
                         p -> p.getAgendamento().getDataHora() == null ? "" : p.getAgendamento().getDataHora().format(DATA_HORA)),
                 ColunaExport.de("Status", p -> p.getAgendamento().getStatusAgendamento().getDescricao()),
-                ColunaExport.de("Documentos", p -> String.valueOf(p.getDocumentos().size())));
+                ColunaExport.de("Justificativa da falta", p -> texto(p.getAgendamento().getJustificativaFalta())),
+                ColunaExport.de("Falta justificada em",
+                        p -> p.getAgendamento().getFaltaJustificadaEm() == null ? ""
+                                : p.getAgendamento().getFaltaJustificadaEm().format(DATA_HORA)),
+                ColunaExport.de("Motivos da falta", p -> p.getAgendamento().getMotivosFalta() == null ? ""
+                        : p.getAgendamento().getMotivosFalta().stream().map(MotivoFalta::getMotivo)
+                                .collect(java.util.stream.Collectors.joining("; "))),
+                ColunaExport.de("Documentos", p -> String.valueOf(p.getDocumentos().size())),
+                ColunaExport.de("Nomes dos documentos", p -> p.getDocumentos() == null ? ""
+                        : p.getDocumentos().stream().map(Documento::getNome)
+                                .collect(java.util.stream.Collectors.joining("; "))));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
+    }
+
+    /** Formata o CPF (só dígitos) como 000.000.000-00; devolve vazio se não tiver 11 dígitos. */
+    private static String formatarCpf(String cpf) {
+        if (cpf == null || cpf.length() != 11) {
+            return cpf == null ? "" : cpf;
+        }
+        return cpf.substring(0, 3) + "." + cpf.substring(3, 6) + "." + cpf.substring(6, 9) + "-" + cpf.substring(9);
+    }
+
+    /** Formata o telefone (só dígitos) no padrão brasileiro; devolve o valor original se não reconhecer. */
+    private static String formatarTelefone(String telefone) {
+        if (telefone == null || telefone.isBlank()) {
+            return "";
+        }
+        String digitos = telefone.replaceAll("\\D", "");
+        if (digitos.length() == 11) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 7) + "-" + digitos.substring(7);
+        }
+        if (digitos.length() == 10) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 6) + "-" + digitos.substring(6);
+        }
+        return telefone;
     }
 
     @GetMapping("/{id}")

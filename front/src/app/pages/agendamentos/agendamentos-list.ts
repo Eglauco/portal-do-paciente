@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { AuthService } from '../../core/auth.service';
 import { Agendamento, STATUS_OPTIONS, StatusAgendamento, statusLabel } from './agendamento.model';
 import { AgendamentoBuscaStore } from './agendamento-busca.store';
@@ -11,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-agendamentos-list',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, RelatorioColunasModal],
   templateUrl: './agendamentos-list.html',
 })
 export class AgendamentosList {
@@ -22,6 +23,9 @@ export class AgendamentosList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = AgendamentoService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -131,11 +135,19 @@ export class AgendamentosList {
     this.router.navigate(['/agendamentos', agendamento.id]);
   }
 
-  /** Exporta os agendamentos dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (filtros atuais da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, this.status(), this.auth.unidadeId()).subscribe({
+    this.service.exportar(formato, this.status(), this.auth.unidadeId(), colunas).subscribe({
       next: (blob) => {
         this.baixar(blob, `agendamentos.${formato}`);
         this.exportando.set(null);

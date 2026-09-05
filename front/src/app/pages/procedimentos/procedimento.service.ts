@@ -8,7 +8,7 @@ import { Pagina, Procedimento, ProcedimentoFiltro } from './procedimento.model';
 export class ProcedimentoService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = `${environment.apiUrl}/procedimento`;
+  readonly base = `${environment.apiUrl}/procedimento`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
@@ -23,11 +23,12 @@ export class ProcedimentoService {
     return this.http.get<Pagina<Procedimento>>(this.base, { params });
   }
 
-  /** Exporta os procedimentos dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ProcedimentoFiltro = {}): Observable<Blob> {
+  /** Exporta os procedimentos dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ProcedimentoFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

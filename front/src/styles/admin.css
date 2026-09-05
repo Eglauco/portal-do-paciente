@@ -723,6 +723,54 @@
   background: color-mix(in srgb, var(--brand) 14%, white);
 }
 
+/* Foto real do paciente dentro do círculo do avatar (herda tamanho/raio da classe do avatar). */
+.av-foto {
+  display: block;
+  object-fit: cover;
+}
+
+/* Modal de seleção de colunas do relatório. */
+.modal--colunas {
+  text-align: left;
+  width: min(32rem, 92vw);
+  max-width: 92vw;
+}
+.rel-colunas__todos {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  padding: 0.4rem 0;
+  margin: 0.25rem 0 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand) 18%, white);
+  cursor: pointer;
+}
+.rel-colunas__lista {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  max-height: 16rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.15rem;
+}
+.rel-colunas__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.25rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+.rel-colunas__item:hover {
+  background: color-mix(in srgb, var(--brand) 8%, white);
+}
+.rel-colunas__estado {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--muted, #6b7280);
+}
+
 .status {
   display: inline-flex;
   align-items: center;

@@ -80,24 +80,31 @@ public class ProcedimentoController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         List<Procedimento> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Procedimento::getId))
                 .toList();
-        List<ColunaExport<Procedimento>> colunas = colunasProcedimento();
+        List<ColunaExport<Procedimento>> cols = ExportacaoService.filtrar(colunasProcedimento(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Procedimentos", filtrosProcedimento(codigo, filtroNome), colunas, dados)
-                : exportacaoService.excel("Procedimentos", colunas, dados);
+                ? exportacaoService.pdf("Procedimentos", filtrosProcedimento(codigo, filtroNome), cols, dados)
+                : exportacaoService.excel("Procedimentos", cols, dados);
         String arquivoNome = "procedimentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + arquivoNome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasProcedimento().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -107,13 +114,16 @@ public class ProcedimentoController {
                 new FiltroAplicado("Nome", nome != null && !nome.isBlank() ? nome : "Todos"));
     }
 
+    /** Todas as colunas disponíveis do procedimento (o usuário escolhe quais exportar). */
     private static List<ColunaExport<Procedimento>> colunasProcedimento() {
         return List.of(
                 ColunaExport.de("Código", p -> p.getId() == null ? "" : String.valueOf(p.getId())),
-                ColunaExport.de("Nome", Procedimento::getNome),
-                ColunaExport.de("Preparo", Procedimento::getPreparo),
+                ColunaExport.de("Nome", p -> p.getNome() == null ? "" : p.getNome()),
+                ColunaExport.de("Preparo", p -> p.getPreparo() == null ? "" : p.getPreparo()),
                 ColunaExport.de("Horas para cancelamento",
-                        p -> p.getHorasCancelamento() == null ? "" : String.valueOf(p.getHorasCancelamento())));
+                        p -> p.getHorasCancelamento() == null ? "" : String.valueOf(p.getHorasCancelamento())),
+                ColunaExport.de("Horas para NPS",
+                        p -> p.getHorasNps() == null ? "" : String.valueOf(p.getHorasNps())));
     }
 
     @GetMapping("/{id}")

@@ -26,6 +26,8 @@ export interface Paciente {
   telefonesAdicionais?: string[];
   /** Liberado para acessar o app. */
   ativo?: boolean;
+  /** Foto (URL pré-assinada) para o avatar da lista; null se não tiver. */
+  fotoUrl?: string | null;
 }
 
 /** Campos aceitos ao criar/editar (ativo/código são geridos pelo backend). */

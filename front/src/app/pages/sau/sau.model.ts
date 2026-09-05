@@ -10,6 +10,8 @@ export interface Ref {
 export interface Manifestacao {
   id: number;
   paciente: Ref;
+  /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+  pacienteFotoUrl?: string | null;
   unidadeSaude: Ref;
   tipo: Ref;
   status: StatusManifestacao;
@@ -33,6 +35,8 @@ export interface MensagemSau {
 export interface ManifestacaoDetalhe {
   id: number;
   paciente: Ref;
+  /** Foto (pré-assinada) do paciente para o avatar das mensagens do paciente; null se não tiver. */
+  pacienteFotoUrl?: string | null;
   unidadeSaude: Ref;
   tipo: Ref;
   status: StatusManifestacao;

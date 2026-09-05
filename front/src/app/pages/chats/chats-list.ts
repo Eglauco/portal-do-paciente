@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -18,7 +19,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-chats-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal],
   templateUrl: './chats-list.html',
 })
 export class ChatsList {
@@ -33,6 +34,9 @@ export class ChatsList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = ChatService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
@@ -165,19 +169,31 @@ export class ChatsList {
       });
   }
 
-  /** Exporta as conversas dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (mesmos filtros da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, {
-        pacienteId: f.pacienteId,
-        unidadeId: this.auth.unidadeId(),
-        responsavelId: f.responsavelId,
-        status: f.status,
-        naoResolvidas: f.naoResolvidas,
-      })
+      .exportar(
+        formato,
+        {
+          pacienteId: f.pacienteId,
+          unidadeId: this.auth.unidadeId(),
+          responsavelId: f.responsavelId,
+          status: f.status,
+          naoResolvidas: f.naoResolvidas,
+        },
+        colunas,
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `chats.${formato}`);

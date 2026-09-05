@@ -7,7 +7,7 @@ import { Chat, ChatDetalhe, ChatFiltro, ChatLog, Pagina } from './chat.model';
 @Injectable({ providedIn: 'root' })
 export class ChatService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/chat`;
+  readonly base = `${environment.apiUrl}/chat`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -22,14 +22,15 @@ export class ChatService {
     return this.http.get<Pagina<Chat>>(this.base, { params });
   }
 
-  /** Exporta as conversas dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ChatFiltro = {}): Observable<Blob> {
+  /** Exporta as conversas dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: ChatFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.responsavelId) params = params.set('responsavelId', filtro.responsavelId);
     if (filtro.status) params = params.set('status', filtro.status);
     if (filtro.naoResolvidas) params = params.set('naoResolvidas', true);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

@@ -8,7 +8,7 @@ import { MotivoFalta, MotivoFaltaFiltro, Pagina } from './motivo-falta.model';
 export class MotivoFaltaService {
   private readonly http = inject(HttpClient);
 
-  private readonly base = `${environment.apiUrl}/motivo-falta`;
+  readonly base = `${environment.apiUrl}/motivo-falta`;
 
   /** Opções de registros por página (o backend limita a 100). */
   static readonly TAMANHOS = [10, 25, 50, 100];
@@ -27,11 +27,12 @@ export class MotivoFaltaService {
     return this.http.get<Pagina<MotivoFalta>>(this.base, { params });
   }
 
-  /** Exporta os motivos de falta dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: MotivoFaltaFiltro = {}): Observable<Blob> {
+  /** Exporta os motivos de falta dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: MotivoFaltaFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.motivo?.trim()) params = params.set('motivo', filtro.motivo.trim());
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

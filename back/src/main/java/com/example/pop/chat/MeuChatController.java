@@ -117,12 +117,12 @@ public class MeuChatController {
      * o app só precisa do NOME do responsável, não do identificador do admin.
      */
     private ChatDetalheResponse semResponsavelId(ChatDetalheResponse d) {
-        return new ChatDetalheResponse(d.id(), d.paciente(), d.unidadeSaude(), d.status(),
+        return new ChatDetalheResponse(d.id(), d.paciente(), d.pacienteFotoUrl(), d.unidadeSaude(), d.status(),
                 d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.mensagens());
     }
 
     private ChatResponse semResponsavelId(ChatResponse c) {
-        return new ChatResponse(c.id(), c.paciente(), c.unidadeSaude(), c.status(), c.statusDescricao(),
+        return new ChatResponse(c.id(), c.paciente(), c.pacienteFotoUrl(), c.unidadeSaude(), c.status(), c.statusDescricao(),
                 c.ultimaMensagem(), c.ultimaMensagemDe(), c.ultimaMensagemEm(), c.naoLidas(),
                 c.atualizadoEm(), null, c.responsavelNome());
     }

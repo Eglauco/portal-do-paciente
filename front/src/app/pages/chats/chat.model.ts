@@ -10,6 +10,8 @@ export interface Ref {
 export interface Chat {
   id: number;
   paciente: Ref;
+  /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+  pacienteFotoUrl?: string | null;
   unidadeSaude: Ref;
   status: StatusChat;
   statusDescricao: string;
@@ -47,6 +49,8 @@ export function novoClienteId(): string {
 export interface ChatDetalhe {
   id: number;
   paciente: Ref;
+  /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+  pacienteFotoUrl?: string | null;
   unidadeSaude: Ref;
   status: StatusChat;
   statusDescricao: string;

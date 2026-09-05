@@ -1,6 +1,7 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { TipoManifestacao } from './tipo-manifestacao.model';
 import { TipoManifestacaoBuscaStore } from './tipo-manifestacao-busca.store';
 import { TipoManifestacaoService } from './tipo-manifestacao.service';
@@ -9,7 +10,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-tipos-manifestacao-list',
-  imports: [RouterLink],
+  imports: [RouterLink, RelatorioColunasModal],
   templateUrl: './tipos-manifestacao-list.html',
 })
 export class TiposManifestacaoList {
@@ -19,6 +20,9 @@ export class TiposManifestacaoList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = TipoManifestacaoService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -128,12 +132,20 @@ export class TiposManifestacaoList {
     this.router.navigate(['/tipos-manifestacao', tipo.id]);
   }
 
-  /** Exporta os tipos dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (filtros atuais da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     const ativo = this.situacao() === '' ? null : this.situacao() === 'true';
     this.exportando.set(formato);
-    this.service.exportar(formato, { nome: this.nome(), ativo }).subscribe({
+    this.service.exportar(formato, { nome: this.nome(), ativo }, colunas).subscribe({
       next: (blob) => {
         this.baixar(blob, `tipos-manifestacao.${formato}`);
         this.exportando.set(null);

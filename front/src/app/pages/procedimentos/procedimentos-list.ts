@@ -1,6 +1,7 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { Procedimento } from './procedimento.model';
 import { ProcedimentoBuscaStore } from './procedimento-busca.store';
 import { ProcedimentoService } from './procedimento.service';
@@ -9,7 +10,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-procedimentos-list',
-  imports: [RouterLink],
+  imports: [RouterLink, RelatorioColunasModal],
   templateUrl: './procedimentos-list.html',
 })
 export class ProcedimentosList {
@@ -19,6 +20,9 @@ export class ProcedimentosList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = ProcedimentoService.TAMANHOS;
   protected readonly size = signal(this.store.size);
@@ -128,11 +132,19 @@ export class ProcedimentosList {
     this.router.navigate(['/procedimentos', procedimento.id]);
   }
 
-  /** Exporta os procedimentos dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta com as colunas escolhidas no modal (filtros atuais da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }).subscribe({
+    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas).subscribe({
       next: (blob) => {
         this.baixar(blob, `procedimentos.${formato}`);
         this.exportando.set(null);

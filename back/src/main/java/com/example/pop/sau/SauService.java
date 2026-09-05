@@ -16,6 +16,7 @@ import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.push.PushService;
+import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.Usuario;
@@ -36,10 +37,12 @@ public class SauService {
     private final UsuarioRepository usuarioRepository;
     private final PushService pushService;
     private final NotificacaoService notificacaoService;
+    private final StorageService storageService;
 
     public SauService(ManifestacaoRepository repository, ManifestacaoMensagemRepository mensagemRepository,
             UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
-            UsuarioRepository usuarioRepository, PushService pushService, NotificacaoService notificacaoService) {
+            UsuarioRepository usuarioRepository, PushService pushService, NotificacaoService notificacaoService,
+            StorageService storageService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.unidadeRepository = unidadeRepository;
@@ -47,6 +50,7 @@ public class SauService {
         this.usuarioRepository = usuarioRepository;
         this.pushService = pushService;
         this.notificacaoService = notificacaoService;
+        this.storageService = storageService;
     }
 
     /** Abre uma manifestação (cria + a 1ª mensagem do paciente). Status inicial: aguardando SAU. */
@@ -210,6 +214,7 @@ public class SauService {
         return new ManifestacaoResponse(
                 m.getId(),
                 new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
+                storageService.urlFotoPaciente(m.getPaciente().getFotoUrl()),
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
                 m.getStatus(), m.getStatus().getDescricao(),
@@ -231,6 +236,7 @@ public class SauService {
         return new ManifestacaoDetalheResponse(
                 m.getId(),
                 new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
+                storageService.urlFotoPaciente(m.getPaciente().getFotoUrl()),
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
                 m.getStatus(), m.getStatus().getDescricao(),

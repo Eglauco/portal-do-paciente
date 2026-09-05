@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AvatarFoto, AvatarPaciente } from '@/components/avatar-paciente';
 import { EdicaoComentario } from '@/components/comentario-edicao';
 import { Brand } from '@/constants/theme';
 import { useSessao } from '@/hooks/use-sessao';
@@ -254,9 +255,13 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
   const renderItem = ({ item }: { item: Comentario }) => (
     <View>
       <View style={styles.item}>
-        <View style={styles.itemAvatar}>
-          <Text style={styles.itemAvatarTxt}>{iniciais(item.autor)}</Text>
-        </View>
+        <AvatarFoto
+          fotoUrl={item.fotoUrl}
+          iniciais={iniciais(item.autor)}
+          tamanho={34}
+          estiloCirculo={styles.itemAvatar}
+          estiloTexto={styles.itemAvatarTxt}
+        />
         {renderCorpo(item, null)}
       </View>
 
@@ -264,9 +269,13 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
         <View style={styles.respostas}>
           {item.respostas.map((r) => (
             <View key={r.id} style={styles.itemResposta}>
-              <View style={styles.itemAvatarSm}>
-                <Text style={styles.itemAvatarTxtSm}>{iniciais(r.autor)}</Text>
-              </View>
+              <AvatarFoto
+                fotoUrl={r.fotoUrl}
+                iniciais={iniciais(r.autor)}
+                tamanho={28}
+                estiloCirculo={styles.itemAvatarSm}
+                estiloTexto={styles.itemAvatarTxtSm}
+              />
               {renderCorpo(r, item.id)}
             </View>
           ))}
@@ -333,9 +342,13 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
             </View>
           ) : null}
           <View style={[styles.input, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-            <View style={styles.inputAvatar}>
-              <Text style={styles.inputAvatarTxt}>{iniciais(AUTOR)}</Text>
-            </View>
+            <AvatarPaciente
+              iniciais={iniciais(AUTOR)}
+              tamanho={34}
+              estiloCirculo={styles.inputAvatar}
+              estiloTexto={styles.inputAvatarTxt}
+              estiloFoto={styles.inputAvatarFoto}
+            />
             <TextInput
               ref={campoRef}
               style={styles.campo}
@@ -447,6 +460,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   inputAvatarTxt: { color: Brand.onBrand, fontSize: 12, fontWeight: '800' },
+  inputAvatarFoto: { marginBottom: 4 },
   campo: {
     flex: 1,
     minHeight: 42,

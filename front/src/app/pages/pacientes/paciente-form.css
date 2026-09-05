@@ -16,6 +16,32 @@
   grid-column: 1 / -1;
 }
 
+/* Foto do paciente no topo do form (maior, p/ a unidade identificar o paciente). */
+.paciente-foto {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+.paciente-foto__img,
+.paciente-foto__ph {
+  width: 6rem;
+  height: 6rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.paciente-foto__img {
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--brand) 30%, white);
+}
+.paciente-foto__ph {
+  display: grid;
+  place-items: center;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 14%, white);
+}
+
 /* Lista de telefones adicionais. */
 .tel-lista {
   display: flex;

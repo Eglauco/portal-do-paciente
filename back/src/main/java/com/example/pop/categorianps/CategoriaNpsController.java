@@ -78,24 +78,31 @@ public class CategoriaNpsController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         List<CategoriaNps> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(CategoriaNps::getId))
                 .toList();
-        List<ColunaExport<CategoriaNps>> colunas = colunasCategoria();
+        List<ColunaExport<CategoriaNps>> cols = ExportacaoService.filtrar(colunasCategoria(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Categorias NPS", filtrosCategoria(codigo, filtroNome), colunas, dados)
-                : exportacaoService.excel("Categorias NPS", colunas, dados);
+                ? exportacaoService.pdf("Categorias NPS", filtrosCategoria(codigo, filtroNome), cols, dados)
+                : exportacaoService.excel("Categorias NPS", cols, dados);
         String arquivoNome = "categorias-nps-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + arquivoNome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasCategoria().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */

@@ -7,7 +7,7 @@ import { Nps, NpsDetalhe, NpsFiltro, Pagina } from './nps.model';
 @Injectable({ providedIn: 'root' })
 export class NpsService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/nps`;
+  readonly base = `${environment.apiUrl}/nps`;
 
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
@@ -20,12 +20,13 @@ export class NpsService {
     return this.http.get<Pagina<Nps>>(this.base, { params });
   }
 
-  /** Exporta as avaliações dos filtros atuais em Excel ou PDF (arquivo binário). */
-  exportar(formato: 'xlsx' | 'pdf', filtro: NpsFiltro = {}): Observable<Blob> {
+  /** Exporta as avaliações dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(formato: 'xlsx' | 'pdf', filtro: NpsFiltro = {}, colunas: string[] = []): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.status) params = params.set('status', filtro.status);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

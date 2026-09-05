@@ -105,7 +105,8 @@ public class ChatController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Long responsavelId,
             @RequestParam(required = false) StatusChat status,
-            @RequestParam(defaultValue = "false") boolean naoResolvidas) {
+            @RequestParam(defaultValue = "false") boolean naoResolvidas,
+            @RequestParam(required = false) List<String> colunas) {
         List<ChatResponse> dados = repository
                 .search(pacienteId, unidadeId, responsavelId, status, naoResolvidas, StatusChat.RESOLVIDO,
                         Pageable.unpaged())
@@ -113,19 +114,25 @@ public class ChatController {
                 .sorted(Comparator.comparing(Chat::getAtualizadoEm).reversed())
                 .map(chatService::toResponse)
                 .toList();
-        List<ColunaExport<ChatResponse>> colunas = colunasChat();
+        List<ColunaExport<ChatResponse>> cols = ExportacaoService.filtrar(colunasChat(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
                 ? exportacaoService.pdf("Chats",
-                        filtrosChat(pacienteId, unidadeId, responsavelId, status, naoResolvidas), colunas, dados)
-                : exportacaoService.excel("Chats", colunas, dados);
+                        filtrosChat(pacienteId, unidadeId, responsavelId, status, naoResolvidas), cols, dados)
+                : exportacaoService.excel("Chats", cols, dados);
         String nome = "chats-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasChat().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -147,17 +154,22 @@ public class ChatController {
 
     private static List<ColunaExport<ChatResponse>> colunasChat() {
         return List.of(
+                ColunaExport.de("Código", c -> String.valueOf(c.id())),
                 ColunaExport.de("Paciente", c -> c.paciente().nome()),
                 ColunaExport.de("Unidade", c -> c.unidadeSaude().nome()),
                 ColunaExport.de("Status", ChatResponse::statusDescricao),
                 ColunaExport.de("Responsável", c -> c.responsavelNome() != null ? c.responsavelNome() : "Sem responsável"),
                 ColunaExport.de("Não lidas", c -> String.valueOf(c.naoLidas())),
                 ColunaExport.de("Última mensagem de", c -> remetente(c.ultimaMensagemDe())),
-                ColunaExport.de("Última mensagem", ChatResponse::ultimaMensagem),
+                ColunaExport.de("Última mensagem", c -> texto(c.ultimaMensagem())),
                 ColunaExport.de("Última mensagem em",
                         c -> c.ultimaMensagemEm() == null ? "" : c.ultimaMensagemEm().format(DATA_HORA)),
                 ColunaExport.de("Atualizado em",
                         c -> c.atualizadoEm() == null ? "" : c.atualizadoEm().format(DATA_HORA)));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
     }
 
     private static String remetente(RemetenteMensagem de) {

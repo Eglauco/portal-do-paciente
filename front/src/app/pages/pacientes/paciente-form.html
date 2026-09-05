@@ -29,6 +29,18 @@
 
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     @if (editando()) {
+      <div class="paciente-foto">
+        @if (fotoUrl()) {
+          <img
+            class="paciente-foto__img"
+            [src]="fotoUrl()!"
+            (error)="fotoUrl.set(null)"
+            [alt]="'Foto de ' + (form.controls.nome.value || 'paciente')"
+          />
+        } @else {
+          <span class="paciente-foto__ph" aria-hidden="true">{{ iniciais(form.controls.nome.value) }}</span>
+        }
+      </div>
       <div class="form-field form-field--sm">
         <label class="label" for="codigo">Código</label>
         <input id="codigo" class="input input--readonly" [value]="codigo()" readonly tabindex="-1" />

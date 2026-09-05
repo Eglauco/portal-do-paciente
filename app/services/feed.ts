@@ -23,6 +23,8 @@ export interface Postagem {
 export interface Comentario {
   id: number;
   autor: string;
+  /** Foto (pré-assinada) do autor, ou null se não tiver / não for paciente. */
+  fotoUrl: string | null;
   texto: string;
   criadoEm: string;
   /** Foi editado depois de publicado (mostra o selo "editado"). */

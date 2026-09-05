@@ -78,24 +78,31 @@ public class ProfissionalSaudeController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
-            @RequestParam(required = false) String nome) {
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         List<ProfissionalSaude> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(ProfissionalSaude::getId))
                 .toList();
-        List<ColunaExport<ProfissionalSaude>> colunas = colunasProfissional();
+        List<ColunaExport<ProfissionalSaude>> cols = ExportacaoService.filtrar(colunasProfissional(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Profissionais", filtrosProfissional(codigo, filtroNome), colunas, dados)
-                : exportacaoService.excel("Profissionais", colunas, dados);
+                ? exportacaoService.pdf("Profissionais", filtrosProfissional(codigo, filtroNome), cols, dados)
+                : exportacaoService.excel("Profissionais", cols, dados);
         String nomeArquivo = "profissionais-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasProfissional().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */

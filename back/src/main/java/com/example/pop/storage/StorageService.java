@@ -157,6 +157,21 @@ public class StorageService {
         }
     }
 
+    /** URL de visualização (GET pré-assinada) da foto do paciente, válida por 6h; null se não houver. */
+    public String urlFotoPaciente(String fotoUrl) {
+        return urlVisualizacao(fotoUrl, Duration.ofHours(6));
+    }
+
+    /**
+     * true se a URL aponta para um objeto dentro da subpasta informada. Defesa
+     * para o app só salvar como foto uma URL realmente da pasta esperada
+     * (fecha o risco de gravar a URL de um objeto de outra pasta/paciente).
+     */
+    public boolean urlNaPasta(String url, String pasta) {
+        String chave = chaveDaUrl(url);
+        return chave != null && chave.startsWith(pastaSegura(pasta) + "/");
+    }
+
     /** Remove o objeto no S3 a partir da URL salva no documento. */
     public void excluirPorUrl(String url) {
         if (!StringUtils.hasText(url) || !configurado()) {

@@ -8,6 +8,8 @@ import com.example.pop.common.Ref;
 public record ChatDetalheResponse(
         Long id,
         Ref paciente,
+        /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
+        String pacienteFotoUrl,
         Ref unidadeSaude,
         StatusChat status,
         String statusDescricao,

@@ -119,23 +119,30 @@ public class AgendamentoController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) StatusAgendamento status,
             @RequestParam(required = false) Long pacienteId,
-            @RequestParam(required = false) Long unidadeId) {
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> colunas) {
         List<Agendamento> dados = repository.search(status, pacienteId, unidadeId, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Agendamento::getDataHora).reversed())
                 .toList();
-        List<ColunaExport<Agendamento>> colunas = colunasAgendamento();
+        List<ColunaExport<Agendamento>> cols = ExportacaoService.filtrar(colunasAgendamento(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Agendamentos", filtrosAgendamento(status, unidadeId), colunas, dados)
-                : exportacaoService.excel("Agendamentos", colunas, dados);
+                ? exportacaoService.pdf("Agendamentos", filtrosAgendamento(status, unidadeId), cols, dados)
+                : exportacaoService.excel("Agendamentos", cols, dados);
         String nome = "agendamentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
                 .body(arquivo);
+    }
+
+    /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
+    @GetMapping("/exportar/colunas")
+    public List<String> colunasDisponiveis() {
+        return colunasAgendamento().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -147,19 +154,53 @@ public class AgendamentoController {
                 new FiltroAplicado("Unidade", unidade));
     }
 
+    /** Todas as colunas disponíveis do agendamento (o usuário escolhe quais exportar). */
     private static List<ColunaExport<Agendamento>> colunasAgendamento() {
         return List.of(
+                ColunaExport.de("Código", a -> String.valueOf(a.getId())),
                 ColunaExport.de("Data/Hora", a -> a.getDataHora() == null ? "" : a.getDataHora().format(DATA_HORA)),
                 ColunaExport.de("Paciente", a -> a.getPaciente().getNome()),
+                ColunaExport.de("CPF do paciente", a -> formatarCpf(a.getPaciente().getCpf())),
+                ColunaExport.de("Telefone do paciente", a -> formatarTelefone(a.getPaciente().getTelefone())),
+                ColunaExport.de("Prontuário", a -> texto(a.getPaciente().getProntuario())),
                 ColunaExport.de("Unidade", a -> a.getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", a -> a.getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", a -> a.getProfissionalSaude().getNome()),
                 ColunaExport.de("Procedimento", a -> a.getProcedimento().getNome()),
                 ColunaExport.de("Status", a -> a.getStatusAgendamento().getDescricao()),
                 ColunaExport.de("Falta justificada", a -> a.getFaltaJustificadaEm() != null ? "Sim" : "Não"),
-                ColunaExport.de("Justificativa", Agendamento::getJustificativaFalta),
+                ColunaExport.de("Justificada em",
+                        a -> a.getFaltaJustificadaEm() == null ? "" : a.getFaltaJustificadaEm().format(DATA_HORA)),
+                ColunaExport.de("Justificativa", a -> texto(a.getJustificativaFalta())),
                 ColunaExport.de("Motivos da falta",
-                        a -> a.getMotivosFalta().stream().map(MotivoFalta::getMotivo).reduce((x, y) -> x + ", " + y).orElse("")));
+                        a -> a.getMotivosFalta().stream().map(MotivoFalta::getMotivo).reduce((x, y) -> x + "; " + y).orElse("")));
+    }
+
+    private static String texto(String v) {
+        return v == null ? "" : v;
+    }
+
+    /** Formata o CPF (só dígitos) como 000.000.000-00; devolve vazio se não tiver 11 dígitos. */
+    private static String formatarCpf(String cpf) {
+        if (cpf == null || cpf.length() != 11) {
+            return cpf == null ? "" : cpf;
+        }
+        return cpf.substring(0, 3) + "." + cpf.substring(3, 6) + "." + cpf.substring(6, 9) + "-" + cpf.substring(9);
+    }
+
+    /** Formata o telefone (só dígitos) no padrão brasileiro; devolve o valor original se não reconhecer. */
+    private static String formatarTelefone(String telefone) {
+        if (telefone == null || telefone.isBlank()) {
+            return "";
+        }
+        String digitos = telefone.replaceAll("\\D", "");
+        if (digitos.length() == 11) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 7) + "-" + digitos.substring(7);
+        }
+        if (digitos.length() == 10) {
+            return "(" + digitos.substring(0, 2) + ") " + digitos.substring(2, 6) + "-" + digitos.substring(6);
+        }
+        return telefone;
     }
 
     @GetMapping("/{id}")

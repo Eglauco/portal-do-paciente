@@ -5,13 +5,13 @@
       <p class="page-sub">Gerencie as contas de acesso da equipe administrativa.</p>
     </div>
     <div class="page-head__actions">
-      <button type="button" class="btn btn--ghost" (click)="exportar('xlsx')" [disabled]="exportando() !== null">
+      <button type="button" class="btn btn--ghost" (click)="abrirExportacao('xlsx')" [disabled]="exportando() !== null">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
         </svg>
         {{ exportando() === 'xlsx' ? 'Exportando…' : 'Excel' }}
       </button>
-      <button type="button" class="btn btn--ghost" (click)="exportar('pdf')" [disabled]="exportando() !== null">
+      <button type="button" class="btn btn--ghost" (click)="abrirExportacao('pdf')" [disabled]="exportando() !== null">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
         </svg>
@@ -206,3 +206,12 @@
     }
   </section>
 </section>
+
+@if (formatoModal(); as fmt) {
+  <app-relatorio-colunas-modal
+    [base]="base"
+    [formato]="fmt"
+    (exportar)="confirmarExportacao($event)"
+    (fechar)="formatoModal.set(null)"
+  />
+}

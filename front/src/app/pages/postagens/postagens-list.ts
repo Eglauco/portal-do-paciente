@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { AuthService } from '../../core/auth.service';
 import { Postagem } from './postagem.model';
 import { PostagemBuscaStore } from './postagem-busca.store';
@@ -23,7 +24,7 @@ const NOVO_COMENTARIO_OPCOES = [
 
 @Component({
   selector: 'app-postagens-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal],
   templateUrl: './postagens-list.html',
 })
 export class PostagensList {
@@ -34,6 +35,9 @@ export class PostagensList {
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
+  /** Formato escolhido enquanto o modal de colunas está aberto (null = fechado). */
+  protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
+  protected readonly base = this.service.base;
 
   protected readonly tamanhos = PostagemService.TAMANHOS;
   protected readonly comentariosOpcoes = COMENTARIOS_OPCOES;
@@ -157,18 +161,30 @@ export class PostagensList {
     this.router.navigate(['/postagens', p.id]);
   }
 
-  /** Exporta as postagens dos filtros atuais (mesmos da tela) em Excel ou PDF. */
-  protected exportar(formato: 'xlsx' | 'pdf'): void {
+  /** Abre o modal de seleção de colunas para o formato escolhido. */
+  protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
+    this.formatoModal.set(formato);
+  }
+
+  /** Exporta as postagens com as colunas escolhidas no modal (mesmos filtros da tela). */
+  protected confirmarExportacao(colunas: string[]): void {
+    const formato = this.formatoModal();
+    this.formatoModal.set(null);
+    if (!formato) return;
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, {
-        titulo: f.titulo,
-        unidadeId: this.auth.unidadeId(),
-        comentarios: f.comentarios,
-        novoComentario: f.novoComentario,
-      })
+      .exportar(
+        formato,
+        {
+          titulo: f.titulo,
+          unidadeId: this.auth.unidadeId(),
+          comentarios: f.comentarios,
+          novoComentario: f.novoComentario,
+        },
+        colunas,
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `postagens.${formato}`);

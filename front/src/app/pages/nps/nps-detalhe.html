@@ -108,7 +108,11 @@
         </div>
 
         <div class="nps-paciente">
-          <span class="nps-paciente__avatar">{{ iniciais(d.paciente.nome) }}</span>
+          @if (d.pacienteFotoUrl) {
+            <img class="nps-paciente__avatar av-foto" [src]="d.pacienteFotoUrl" (error)="d.pacienteFotoUrl = null" alt="" />
+          } @else {
+            <span class="nps-paciente__avatar">{{ iniciais(d.paciente.nome) }}</span>
+          }
           <div>
             <b class="nps-paciente__nome">{{ d.paciente.nome }}</b>
             <span class="nps-paciente__unidade">{{ d.unidadeSaude.nome }}</span>
