@@ -6,10 +6,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
+import { SemAcesso } from '@/components/sem-acesso';
 import { Brand } from '@/constants/theme';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
 import { carregarPerfil, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
+import { podeLancar, podeVer } from '@/services/sessao';
 
 const SEXO_LABEL: Record<SexoPaciente, string> = {
   MASCULINO: 'Masculino',
@@ -113,13 +115,15 @@ function montarSecoes(p: MeuPerfil) {
 
 export default function PerfilScreen() {
   const router = useRouter();
-  const { sessao, sair } = useSessao();
+  const { sessao } = useSessao();
   const { definirFoto } = usePerfilFoto();
+  // Travas do perfil dependente: ver os dados vs. alterar a foto ("lançamento").
+  const verPerfil = podeVer(sessao, 'MEU_PERFIL');
+  const podeTrocarFoto = podeLancar(sessao, 'MEU_PERFIL');
   const [perfil, setPerfil] = useState<MeuPerfil | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
-  const [saindo, setSaindo] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -136,8 +140,13 @@ export default function PerfilScreen() {
   }, [definirFoto]);
 
   useEffect(() => {
+    // Sem acesso ao perfil: não busca os dados (o backend responde 403); mostra o aviso.
+    if (!verPerfil) {
+      setCarregando(false);
+      return;
+    }
     carregar();
-  }, [carregar]);
+  }, [carregar, verPerfil]);
 
   async function trocarFotoFluxo(origem: 'camera' | 'galeria') {
     try {
@@ -204,13 +213,6 @@ export default function PerfilScreen() {
     ]);
   }
 
-  async function sairDaConta() {
-    if (saindo) return;
-    setSaindo(true);
-    await sair();
-    router.replace('/');
-  }
-
   const nome = perfil?.nome ?? sessao?.nome ?? 'Paciente';
   const secoes = perfil ? montarSecoes(perfil) : [];
 
@@ -221,10 +223,10 @@ export default function PerfilScreen() {
         {/* Cabeçalho do perfil */}
         <View style={styles.hero}>
           <Pressable
-            onPress={escolherOrigemFoto}
-            disabled={enviandoFoto}
-            accessibilityRole="button"
-            accessibilityLabel="Alterar foto do perfil"
+            onPress={podeTrocarFoto ? escolherOrigemFoto : undefined}
+            disabled={!podeTrocarFoto || enviandoFoto}
+            accessibilityRole={podeTrocarFoto ? 'button' : undefined}
+            accessibilityLabel={podeTrocarFoto ? 'Alterar foto do perfil' : undefined}
             accessibilityState={{ busy: enviandoFoto }}
             style={styles.avatarRing}>
             {perfil?.fotoUrl ? (
@@ -234,18 +236,22 @@ export default function PerfilScreen() {
                 <Ionicons name="person" size={44} color={Brand.muted} />
               </View>
             )}
-            <View style={styles.cameraBadge}>
-              {enviandoFoto ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Ionicons name="camera" size={15} color="#fff" />
-              )}
-            </View>
+            {podeTrocarFoto && (
+              <View style={styles.cameraBadge}>
+                {enviandoFoto ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="camera" size={15} color="#fff" />
+                )}
+              </View>
+            )}
           </Pressable>
           <Text style={styles.nome}>{nome}</Text>
-          <Pressable onPress={escolherOrigemFoto} disabled={enviandoFoto} accessibilityRole="button">
-            <Text style={styles.trocarFoto}>{enviandoFoto ? 'Enviando foto…' : 'Alterar foto'}</Text>
-          </Pressable>
+          {podeTrocarFoto && (
+            <Pressable onPress={escolherOrigemFoto} disabled={enviandoFoto} accessibilityRole="button">
+              <Text style={styles.trocarFoto}>{enviandoFoto ? 'Enviando foto…' : 'Alterar foto'}</Text>
+            </Pressable>
+          )}
           {perfil?.prontuario ? (
             <View style={styles.codigo}>
               <Ionicons name="finger-print-outline" size={13} color={Brand.brandDeep} />
@@ -254,7 +260,9 @@ export default function PerfilScreen() {
           ) : null}
         </View>
 
-        {carregando ? (
+        {!verPerfil ? (
+          <SemAcesso mensagem="O responsável não tem acesso aos dados deste perfil. Você ainda pode trocar de perfil abaixo." />
+        ) : carregando ? (
           <View style={styles.estado}>
             <ActivityIndicator color={Brand.brand} />
             <Text style={styles.estadoTxt}>Carregando seus dados…</Text>
@@ -301,11 +309,12 @@ export default function PerfilScreen() {
         )}
 
         <Pressable
-          style={({ pressed }) => [styles.sair, pressed && styles.sairPressed]}
-          onPress={sairDaConta}
-          disabled={saindo}>
-          <Ionicons name="log-out-outline" size={20} color="#B23B4E" />
-          <Text style={styles.sairTxt}>{saindo ? 'Saindo…' : 'Sair da conta'}</Text>
+          style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
+          onPress={() => router.push('/selecionar-perfil')}
+          accessibilityRole="button"
+          accessibilityLabel="Selecionar perfil">
+          <Ionicons name="people-outline" size={20} color={Brand.brandDeep} />
+          <Text style={styles.selecionarTxt}>Selecionar perfil</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -417,7 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  sair: {
+  selecionar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -425,10 +434,11 @@ const styles = StyleSheet.create({
     backgroundColor: Brand.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#F3D6DB',
+    borderColor: Brand.line,
     paddingVertical: 15,
     marginTop: 6,
+    marginBottom: 10,
   },
-  sairPressed: { backgroundColor: '#FDF2F3' },
-  sairTxt: { fontSize: 15, fontWeight: '700', color: '#B23B4E' },
+  selecionarPressed: { backgroundColor: '#F4FAF8' },
+  selecionarTxt: { fontSize: 15, fontWeight: '700', color: Brand.brandDeep },
 });

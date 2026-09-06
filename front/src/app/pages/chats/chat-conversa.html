@@ -45,6 +45,14 @@
               @if (m.remetente === 'UNIDADE' && m.atendenteNome) {
                 <span class="wa__atendente">{{ m.atendenteNome }}</span>
               }
+              @if (m.remetente === 'PACIENTE' && m.responsavelNome) {
+                <span class="wa__via-resp">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.66" />
+                  </svg>
+                  via <b>{{ m.responsavelNome }}</b> (responsável)
+                </span>
+              }
               <span class="wa__texto">{{ m.texto }}</span>
               <span class="wa__rodape">
                 {{ m.enviadaEm | date: 'HH:mm' }}

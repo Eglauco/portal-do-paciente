@@ -18,6 +18,7 @@ import com.example.pop.notificacao.Notificacao;
 import com.example.pop.notificacao.NotificacaoRepository;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.push.PushService;
 
 /**
@@ -77,8 +78,8 @@ public class LembreteService {
                 Long pacienteId = a.getPaciente().getId();
                 Long agendamentoId = a.getId();
                 String texto = l.getTexto();
-                pushes.add(() -> pushService.notificarPaciente(pacienteId, TITULO, texto,
-                        Map.of("tipo", "LEMBRETE", "agendamentoId", agendamentoId)));
+                pushes.add(() -> pushService.notificarPaciente(pacienteId, FuncionalidadeApp.AGENDAMENTOS, TITULO,
+                        texto, Map.of("tipo", "LEMBRETE", "agendamentoId", agendamentoId)));
             }
         }
         aposCommit(() -> pushes.forEach(Runnable::run));

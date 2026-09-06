@@ -1,12 +1,14 @@
 package com.example.pop.paciente;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
@@ -18,6 +20,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -106,6 +110,14 @@ public class Paciente {
     @Column(name = "numero", length = 20)
     private List<String> telefonesAdicionais = new ArrayList<>();
 
+    /**
+     * Responsáveis do paciente (cadastro paralelo: nome + telefone). Set (não List)
+     * para conviver com o bag EAGER de telefonesAdicionais sem MultipleBagFetchException.
+     */
+    @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("id")
+    private Set<Responsavel> responsaveis = new LinkedHashSet<>();
+
     /** Foto do paciente (URL do objeto no S3, pasta "foto-paciente"). Alterável pelo app. */
     @Column(name = "foto_url", length = 512)
     private String fotoUrl;
@@ -113,15 +125,6 @@ public class Paciente {
     /** Liberado (globalmente) para acessar o app. */
     @Column(nullable = false)
     private boolean ativo = false;
-
-    /** Hash BCrypt do código de ativação atual. Nunca serializado. */
-    @JsonIgnore
-    @Column(name = "codigo_ativacao_hash", length = 100)
-    private String codigoAtivacaoHash;
-
-    @JsonIgnore
-    @Column(name = "codigo_ativacao_expira_em")
-    private LocalDateTime codigoAtivacaoExpiraEm;
 
     /** Aparelho com a sessão ativa (uma por vez). Nunca serializado. */
     @JsonIgnore

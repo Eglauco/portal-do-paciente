@@ -47,6 +47,13 @@ public class Comentario {
     @Column(name = "usuario_id")
     private Long usuarioId;
 
+    /**
+     * Responsável (cadastro) que fez o comentário representando o paciente. Nulo
+     * quando o próprio paciente comentou (ou em comentários do admin/antigos).
+     */
+    @Column(name = "responsavel_id")
+    private Long responsavelId;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;
 

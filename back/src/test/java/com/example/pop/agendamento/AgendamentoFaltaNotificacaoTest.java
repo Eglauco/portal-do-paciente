@@ -27,16 +27,16 @@ class AgendamentoFaltaNotificacaoTest {
     @Test
     void marcarFaltaNotificaOPacienteUmaUnicaVez() {
         LocalDateTime dh = LocalDateTime.of(2026, 12, 1, 9, 0);
-        AgendamentoResponse criado = controller.criar(new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, null));
+        AgendamentoResponse criado = controller.criar(new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, null), null);
 
         // Transição AGUARDANDO_CONFIRMACAO -> FALTA_PACIENTE: notifica.
         controller.atualizar(criado.id(),
-                new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE));
+                new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE), null);
         verify(pushService, times(1)).notificarFaltaPaciente(any());
 
         // Salvar de novo já em FALTA (sem transição): não notifica outra vez.
         controller.atualizar(criado.id(),
-                new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE));
+                new AgendamentoRequest(dh, 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE), null);
         verify(pushService, times(1)).notificarFaltaPaciente(any());
 
         repository.deleteById(criado.id());

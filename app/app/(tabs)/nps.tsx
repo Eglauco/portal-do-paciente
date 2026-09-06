@@ -4,8 +4,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { NpsModal, NpsModalDados } from '@/components/nps-modal';
+import { SemAcesso } from '@/components/sem-acesso';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
 import {
   buscarNps,
   CategoriaNps,
@@ -15,6 +17,7 @@ import {
   NpsItem,
   responderNps,
 } from '@/services/nps';
+import { podeLancar, podeVer } from '@/services/sessao';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -24,6 +27,9 @@ function dataCurta(iso: string): string {
 }
 
 export default function NpsScreen() {
+  const { sessao } = useSessao();
+  const verNps = podeVer(sessao, 'NPS');
+  const podeAvaliar = podeLancar(sessao, 'NPS');
   const [lista, setLista] = useState<NpsItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -135,6 +141,10 @@ export default function NpsScreen() {
       }
     : null;
 
+  if (!verNps) {
+    return <SemAcesso />;
+  }
+
   return (
     <>
       <ScrollView
@@ -144,7 +154,15 @@ export default function NpsScreen() {
           <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
         }>
         <Text style={styles.title}>NPS</Text>
-        <Text style={styles.subtitle}>Avalie os seus atendimentos.</Text>
+        <Text style={styles.subtitle}>
+          {podeAvaliar ? 'Avalie os seus atendimentos.' : 'Acompanhe as avaliações dos atendimentos.'}
+        </Text>
+        {!podeAvaliar && (
+          <View style={styles.somenteLeitura}>
+            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Text style={styles.somenteLeituraTxt}>Você pode visualizar, mas não avaliar.</Text>
+          </View>
+        )}
 
         {carregando && (
           <View style={styles.estado}>
@@ -183,8 +201,8 @@ export default function NpsScreen() {
                 {pendentes.map((n) => (
                   <Pressable
                     key={n.id}
-                    onPress={() => abrirAvaliar(n)}
-                    style={({ pressed }) => [styles.pendente, pressed && styles.pendentePressed]}>
+                    onPress={podeAvaliar ? () => abrirAvaliar(n) : undefined}
+                    style={({ pressed }) => [styles.pendente, pressed && podeAvaliar && styles.pendentePressed]}>
                     <View style={styles.pendenteTopo}>
                       <View style={styles.pendenteTag}>
                         <Ionicons name="star-outline" size={12} color={Brand.brandPine} />
@@ -201,10 +219,12 @@ export default function NpsScreen() {
                       </Text>
                     </View>
 
-                    <View style={styles.pendenteCta}>
-                      <Text style={styles.pendenteCtaTxt}>Toque para avaliar</Text>
-                      <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
-                    </View>
+                    {podeAvaliar && (
+                      <View style={styles.pendenteCta}>
+                        <Text style={styles.pendenteCtaTxt}>Toque para avaliar</Text>
+                        <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
+                      </View>
+                    )}
                   </Pressable>
                 ))}
               </View>
@@ -283,6 +303,17 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
   title: { fontSize: 26, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 14, color: Brand.muted, marginTop: 4, marginBottom: 18 },
+  somenteLeitura: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#EEF3F1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 16,
+  },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
 
   // Estados
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },

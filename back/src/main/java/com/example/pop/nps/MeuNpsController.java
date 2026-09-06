@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
 
 import jakarta.validation.Valid;
@@ -50,6 +51,7 @@ public class MeuNpsController {
             @RequestParam(required = false) StatusNps status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.NPS);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
@@ -67,6 +69,7 @@ public class MeuNpsController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public NpsDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.NPS);
         return NpsDetalheResponse.from(meuNps(jwt, id));
     }
 
@@ -75,6 +78,7 @@ public class MeuNpsController {
     @Transactional
     public NpsDetalheResponse responder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody ResponderNpsRequest request) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.NPS);
         Nps nps = meuNps(jwt, id);
         return NpsDetalheResponse.from(npsService.responder(nps, request));
     }

@@ -6,9 +6,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HapticTab } from '@/components/haptic-tab';
 import { TopBar } from '@/components/top-bar';
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
+import { podeVer } from '@/services/sessao';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  // Perfil dependente sem acesso a uma funcionalidade → a aba some (href: null).
+  // Prontuário e NPS não são controlados: sempre visíveis.
+  const abaOculta = (func: Parameters<typeof podeVer>[1]) => (podeVer(sessao, func) ? undefined : null);
 
   return (
     <Tabs
@@ -30,6 +36,7 @@ export default function TabLayout() {
         name="novidades"
         options={{
           title: 'Novidades',
+          href: abaOculta('REDE_SOCIAL'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
           ),
@@ -39,6 +46,7 @@ export default function TabLayout() {
         name="agendamentos"
         options={{
           title: 'Agenda',
+          href: abaOculta('AGENDAMENTOS'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'calendar' : 'calendar-outline'} size={24} color={color} />
           ),
@@ -48,6 +56,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: 'Chat',
+          href: abaOculta('CHAT'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={24} color={color} />
           ),
@@ -57,6 +66,7 @@ export default function TabLayout() {
         name="sau"
         options={{
           title: 'SAU',
+          href: abaOculta('SAU'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'megaphone' : 'megaphone-outline'} size={24} color={color} />
           ),
@@ -66,6 +76,7 @@ export default function TabLayout() {
         name="prontuario"
         options={{
           title: 'Prontuário',
+          href: abaOculta('PRONTUARIO'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'document-text' : 'document-text-outline'} size={24} color={color} />
           ),
@@ -75,6 +86,7 @@ export default function TabLayout() {
         name="nps"
         options={{
           title: 'NPS',
+          href: abaOculta('NPS'),
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'star' : 'star-outline'} size={24} color={color} />
           ),

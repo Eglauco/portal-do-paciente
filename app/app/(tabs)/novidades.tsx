@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { Redirect, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,8 +15,10 @@ import {
 import { ComentariosSheet } from '@/components/comentarios-sheet';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
 import { curtir, listarFeed, Postagem } from '@/services/feed';
 import { obterDispositivoId } from '@/services/identidade';
+import { abaInicial, podeVer } from '@/services/sessao';
 
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/);
@@ -41,6 +43,10 @@ function haQuanto(iso: string): string {
 }
 
 export default function NovidadesScreen() {
+  const { sessao } = useSessao();
+  // Novidades = Rede Social. Sem acesso (perfil dependente): a aba some e, se cair
+  // aqui por ser a rota inicial, manda para o Prontuário (aba sempre disponível).
+  const verFeed = podeVer(sessao, 'REDE_SOCIAL');
   const [posts, setPosts] = useState<Postagem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -107,6 +113,10 @@ export default function NovidadesScreen() {
       lista.map((p) => (p.id === postagemId ? { ...p, totalComentarios: p.totalComentarios + 1 } : p)),
     );
   };
+
+  if (!verFeed) {
+    return <Redirect href={abaInicial(sessao)} />;
+  }
 
   const renderPost = ({ item: post }: { item: Postagem }) => (
     <View style={styles.card}>

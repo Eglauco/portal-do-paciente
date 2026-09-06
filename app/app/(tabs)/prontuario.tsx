@@ -17,9 +17,12 @@ import {
 } from 'react-native';
 
 import { DocumentoModal } from '@/components/documento-modal';
+import { SemAcesso } from '@/components/sem-acesso';
 import { Brand, DocTipo } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
 import { DocumentoApi, listarProntuarios, ProntuarioDetalhe } from '@/services/prontuario';
+import { podeVer } from '@/services/sessao';
 import { urlDownload } from '@/services/storage';
 
 /** Deriva um nome de arquivo limpo a partir da URL (remove query e o prefixo uuid). */
@@ -81,6 +84,8 @@ function inferirTipo(nome: string): TipoDoc {
 }
 
 export default function ProntuarioScreen() {
+  const { sessao } = useSessao();
+  const verProntuario = podeVer(sessao, 'PRONTUARIO');
   const [atendimentos, setAtendimentos] = useState<ProntuarioDetalhe[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -183,6 +188,10 @@ export default function ProntuarioScreen() {
     setMenu(null);
     if (atual) baixarECompartilhar(atual.doc, atual.link);
   };
+
+  if (!verProntuario) {
+    return <SemAcesso />;
+  }
 
   return (
     <>

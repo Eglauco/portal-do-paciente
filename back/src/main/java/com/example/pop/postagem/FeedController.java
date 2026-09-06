@@ -33,9 +33,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.paciente.Responsavel;
+import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -56,16 +59,19 @@ public class FeedController {
     private final StorageService storageService;
     private final PacienteAcessoService acessoService;
     private final PacienteRepository pacienteRepository;
+    private final ResponsavelRepository responsavelRepository;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, StorageService storageService,
-            PacienteAcessoService acessoService, PacienteRepository pacienteRepository) {
+            PacienteAcessoService acessoService, PacienteRepository pacienteRepository,
+            ResponsavelRepository responsavelRepository) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
         this.storageService = storageService;
         this.acessoService = acessoService;
         this.pacienteRepository = pacienteRepository;
+        this.responsavelRepository = responsavelRepository;
     }
 
     @GetMapping("/feed")
@@ -147,9 +153,10 @@ public class FeedController {
         boolean autenticado = pacienteAtual != null || adminAtual != null;
         Function<Long, String> fotoDoPaciente = autenticado ? resolverFotos(todos) : pid -> null;
 
+        Function<Long, String> nomeDoResponsavel = resolverNomesResponsavel(todos);
         List<ComentarioResponse> content = raizesList.stream()
                 .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()),
-                        pacienteAtual, adminAtual, fotoDoPaciente))
+                        pacienteAtual, adminAtual, fotoDoPaciente, nomeDoResponsavel))
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -158,6 +165,7 @@ public class FeedController {
     @PostMapping("/postagem/{id}/comentarios")
     public ComentarioResponse comentar(@PathVariable Long id, @Valid @RequestBody ComentarRequest request,
             @AuthenticationPrincipal Jwt jwt) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
         Postagem postagem = obter(id);
         if (!postagem.isHabilitarComentarios()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Comentários desativados para esta postagem");
@@ -165,15 +173,19 @@ public class FeedController {
         // Revalida a sessão (ativo + aparelho vinculado) e usa o nome do paciente
         // validado — autor confiável, nunca vindo do corpo.
         Paciente paciente = acessoService.pacienteDoToken(jwt);
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         Comentario comentario = new Comentario();
         comentario.setPostagem(postagem);
         comentario.setAutor(nomeExibicao(paciente.getNome()));
         comentario.setPacienteId(paciente.getId());
+        if (responsavel != null) {
+            comentario.setResponsavelId(responsavel.getId());
+        }
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
         Comentario salvo = comentarioRepository.save(comentario);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salvo, paciente.getId(), null, umaFoto(paciente));
+        return ComentarioResponse.from(salvo, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
     }
 
     /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
@@ -181,6 +193,7 @@ public class FeedController {
     @Transactional
     public ComentarioResponse responder(@PathVariable Long id, @PathVariable Long comentarioId,
             @Valid @RequestBody ComentarRequest request, @AuthenticationPrincipal Jwt jwt) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
         Postagem postagem = obter(id);
         if (!postagem.isHabilitarComentarios()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Comentários desativados para esta postagem");
@@ -191,6 +204,7 @@ public class FeedController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comentário não pertence à postagem");
         }
         Paciente paciente = acessoService.pacienteDoToken(jwt);
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         // Threading de 1 nível: a resposta se ancora sempre no comentário-raiz.
         Comentario raiz = pai.getComentarioPai() != null ? pai.getComentarioPai() : pai;
         Comentario resposta = new Comentario();
@@ -198,11 +212,14 @@ public class FeedController {
         resposta.setComentarioPai(raiz);
         resposta.setAutor(nomeExibicao(paciente.getNome()));
         resposta.setPacienteId(paciente.getId());
+        if (responsavel != null) {
+            resposta.setResponsavelId(responsavel.getId());
+        }
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
         Comentario salva = comentarioRepository.save(resposta);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salva, paciente.getId(), null, umaFoto(paciente));
+        return ComentarioResponse.from(salva, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
     }
 
     /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
@@ -210,6 +227,7 @@ public class FeedController {
     @Transactional
     public ComentarioResponse editar(@PathVariable Long id, @PathVariable Long comentarioId,
             @Valid @RequestBody EditarComentarioRequest request, @AuthenticationPrincipal Jwt jwt) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         Comentario c = comentarioDaPostagem(id, comentarioId);
         exigirDono(c, paciente);
@@ -219,7 +237,8 @@ public class FeedController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null, umaFoto(paciente));
+        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null, umaFoto(paciente),
+                resolverNomesResponsavel(List.of(c)));
     }
 
     /**
@@ -230,6 +249,7 @@ public class FeedController {
     @Transactional
     public ResponseEntity<Void> excluir(@PathVariable Long id, @PathVariable Long comentarioId,
             @AuthenticationPrincipal Jwt jwt) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         Comentario c = comentarioDaPostagem(id, comentarioId);
         exigirDono(c, paciente);
@@ -323,6 +343,28 @@ public class FeedController {
     private Function<Long, String> umaFoto(Paciente paciente) {
         String foto = storageService.urlVisualizacao(paciente.getFotoUrl(), VALIDADE_FOTO);
         return pid -> foto;
+    }
+
+    /**
+     * Resolve o nome do responsável de cada comentário pelo {@code responsavelId},
+     * buscando os responsáveis de uma vez. Nome COMPLETO (será configurável por tela
+     * futura). Sem responsável (comentário do próprio paciente) → null.
+     */
+    private Function<Long, String> resolverNomesResponsavel(List<Comentario> comentarios) {
+        Set<Long> ids = comentarios.stream().map(Comentario::getResponsavelId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return rid -> null;
+        }
+        Map<Long, String> nomes = responsavelRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Responsavel::getId, Responsavel::getNome));
+        return rid -> rid == null ? null : nomes.get(rid);
+    }
+
+    /** Resolver de nome de responsável para um único comentário/resposta recém-criado. */
+    private Function<Long, String> umNomeResponsavel(Responsavel responsavel) {
+        String nome = responsavel == null ? null : responsavel.getNome();
+        return rid -> nome;
     }
 
     private Postagem obter(Long id) {

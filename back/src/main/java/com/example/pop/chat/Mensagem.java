@@ -46,6 +46,14 @@ public class Mensagem {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
+    /**
+     * Responsável do paciente que enviou esta mensagem em nome dele (perfil
+     * dependente no app); nulo quando foi o próprio paciente. Não confundir com
+     * {@code chat.responsavel_id}, que é o atendente do back-office.
+     */
+    @Column(name = "responsavel_id")
+    private Long responsavelId;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;
 

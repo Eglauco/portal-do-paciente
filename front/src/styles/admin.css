@@ -1637,6 +1637,11 @@
 }
 .tl__hora { font-size: 0.74rem; color: var(--muted); }
 
+/* Autoria no histórico de status do agendamento: responsável em âmbar. */
+.ag-hist__autor { display: inline-flex; align-items: center; gap: 4px; font-size: 0.78rem; font-weight: 600; color: #40514c; }
+.ag-hist__autor svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.ag-hist__autor--resp { color: #8a5a00; font-weight: 700; }
+
 /* ---------- Responsivo (admin) ---------- */
 @media (max-width: 900px) {
   .filters__row {
@@ -1869,6 +1874,9 @@
 .convo__resp--vazio { font-weight: 500; font-style: italic; color: var(--muted); }
 .convo__meta > .status-pill { margin-left: auto; flex-shrink: 0; }
 .convo__linha { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.convo__via-resp { display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 600; color: #8a5a00; }
+.convo__via-resp svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.convo__via-resp b { font-weight: 700; }
 .convo__previa { font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .convo__voce { color: #40514c; font-weight: 600; }
 .convo__badge {
@@ -1946,6 +1954,10 @@
 
 /* Nome do atendente que enviou a mensagem (bolha da unidade). */
 .wa__atendente { display: block; font-size: 11px; font-weight: 700; color: var(--brand-deep); margin-bottom: 2px; }
+/* Marcador "via {responsável}": mensagem enviada pelo responsável em nome do paciente. */
+.wa__via-resp { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #8a5a00; margin-bottom: 2px; }
+.wa__via-resp svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.wa__via-resp b { font-weight: 700; }
 
 /* Faixa "assuma/transfira" no rodapé quando não sou o responsável. */
 .wa__assumir { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 16px; text-align: center; background: var(--surface); border-top: 1px solid var(--line); }
@@ -2270,6 +2282,17 @@
 .coment__body { flex: 1; min-width: 0; }
 .coment__texto { margin: 0; font-size: 0.9rem; color: var(--ink); line-height: 1.4; }
 .coment__texto b { font-weight: 700; }
+.coment__via-resp {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #8a5a00;
+}
+.coment__via-resp svg { width: 13px; height: 13px; flex: 0 0 auto; }
+.coment__via-resp b { font-weight: 700; }
 .coment__meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.3rem; }
 .coment__data { font-size: 0.75rem; color: var(--muted); }
 .coment__editado { font-style: italic; color: var(--muted); }
@@ -2524,6 +2547,7 @@
 .sau-msg__quem { display: flex; flex-direction: column; line-height: 1.25; }
 .sau-msg__nome { font-size: 0.92rem; color: var(--ink); }
 .sau-msg__papel { font-size: 0.75rem; color: var(--muted); }
+.sau-msg__via-resp { font-size: 0.75rem; font-weight: 700; color: #8a5a00; }
 .sau-msg__data { margin-left: auto; font-size: 0.78rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sau-msg__corpo { margin: 0; padding-left: 3rem; font-size: 0.95rem; color: var(--ink); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 

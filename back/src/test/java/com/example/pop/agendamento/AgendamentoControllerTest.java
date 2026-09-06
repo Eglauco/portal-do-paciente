@@ -40,13 +40,13 @@ class AgendamentoControllerTest {
     void confirmarECancelarAlteramOStatus() {
         AgendamentoRequest request = new AgendamentoRequest(
                 LocalDateTime.of(2026, 10, 2, 9, 0), 1L, 1L, 1L, 1L, 1L, null);
-        AgendamentoResponse criado = controller.criar(request);
+        AgendamentoResponse criado = controller.criar(request, null);
         assertEquals(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, criado.statusAgendamento());
 
-        AgendamentoResponse confirmado = controller.confirmar(criado.id()).getBody();
+        AgendamentoResponse confirmado = controller.confirmar(criado.id(), null).getBody();
         assertEquals(StatusAgendamento.PACIENTE_CONFIRMOU, confirmado.statusAgendamento());
 
-        AgendamentoResponse cancelado = controller.cancelar(criado.id()).getBody();
+        AgendamentoResponse cancelado = controller.cancelar(criado.id(), null).getBody();
         assertEquals(StatusAgendamento.CANCELADO_PELO_PACIENTE, cancelado.statusAgendamento());
 
         controller.excluir(criado.id());
@@ -55,11 +55,11 @@ class AgendamentoControllerTest {
     @Test
     void justificarFaltaRegistraMotivosETexto() {
         AgendamentoResponse criado = controller.criar(new AgendamentoRequest(
-                LocalDateTime.of(2026, 11, 3, 8, 0), 1L, 1L, 1L, 1L, 1L, null));
+                LocalDateTime.of(2026, 11, 3, 8, 0), 1L, 1L, 1L, 1L, 1L, null), null);
         Long id = criado.id();
         // Admin marca a falta do paciente.
         controller.atualizar(id, new AgendamentoRequest(
-                LocalDateTime.of(2026, 11, 3, 8, 0), 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE));
+                LocalDateTime.of(2026, 11, 3, 8, 0), 1L, 1L, 1L, 1L, 1L, StatusAgendamento.FALTA_PACIENTE), null);
 
         // Paciente justifica a falta (motivos semeados 1 e 2 + texto).
         AgendamentoResponse just = controller.justificarFalta(id,
@@ -75,7 +75,7 @@ class AgendamentoControllerTest {
     @Test
     void justificarFaltaExigeStatusFalta() {
         AgendamentoResponse criado = controller.criar(new AgendamentoRequest(
-                LocalDateTime.of(2026, 11, 4, 8, 0), 1L, 1L, 1L, 1L, 1L, null));
+                LocalDateTime.of(2026, 11, 4, 8, 0), 1L, 1L, 1L, 1L, 1L, null), null);
         Long id = criado.id();
         // Status AGUARDANDO -> justificar deve ser recusado.
         assertThrows(ResponseStatusException.class,
@@ -93,7 +93,7 @@ class AgendamentoControllerTest {
                 1L, // pacienteId
                 1L, // unidadeSaudeId
                 StatusAgendamento.PRESENCA_PACIENTE); // deve ser ignorado na criação
-        AgendamentoResponse criado = controller.criar(request);
+        AgendamentoResponse criado = controller.criar(request, null);
         assertEquals(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, criado.statusAgendamento());
         // Limpa o registro criado no teste.
         controller.excluir(criado.id());

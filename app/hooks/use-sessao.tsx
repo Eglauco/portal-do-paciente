@@ -5,8 +5,10 @@ import {
   ativar as ativarServico,
   carregarSessao,
   registrarInvalidacao,
+  registrarTrocaPerfil,
   sair as sairServico,
   solicitarCodigo as solicitarCodigoServico,
+  trocarPerfil as trocarPerfilServico,
   type SessaoPaciente,
 } from '@/services/sessao';
 
@@ -18,6 +20,8 @@ interface SessaoContexto {
   /** Pede o código de ativação por SMS para o telefone principal. */
   solicitarCodigo: (telefone: string) => Promise<void>;
   ativar: (telefone: string, codigo: string) => Promise<void>;
+  /** Escolhe o perfil ativo (tela "Selecionar Perfil"). Nunca refaz OTP. */
+  trocarPerfil: (pacienteId: number) => Promise<void>;
   sair: () => Promise<void>;
 }
 
@@ -36,10 +40,14 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     });
     // Se o backend recusar o token (401), a sessão local é encerrada e o app volta ao login.
     registrarInvalidacao(() => setSessao(null));
+    // Permite trocar de perfil de fora do React (ex.: toque em notificação de outro perfil).
+    registrarTrocaPerfil(trocarPerfil);
     return () => {
       vivo = false;
       registrarInvalidacao(null);
+      registrarTrocaPerfil(null);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Vincula o token de push a este paciente sempre que há sessão (login novo ou
@@ -56,13 +64,17 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     setSessao(await ativarServico(telefone, codigo));
   }
 
+  async function trocarPerfil(pacienteId: number) {
+    setSessao(await trocarPerfilServico(pacienteId));
+  }
+
   async function sair() {
     await sairServico();
     setSessao(null);
   }
 
   return (
-    <Contexto.Provider value={{ sessao, carregando, solicitarCodigo, ativar, sair }}>
+    <Contexto.Provider value={{ sessao, carregando, solicitarCodigo, ativar, trocarPerfil, sair }}>
       {children}
     </Contexto.Provider>
   );

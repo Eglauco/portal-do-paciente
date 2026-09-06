@@ -61,3 +61,23 @@ export const STATUS_OPTIONS: { value: StatusAgendamento; label: string }[] = [
 export function statusLabel(valor: StatusAgendamento): string {
   return STATUS_OPTIONS.find((o) => o.value === valor)?.label ?? valor;
 }
+
+/** Quem fez a troca de status registrada no log. */
+export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE';
+
+/** Item da linha do tempo de status do agendamento (espelha AgendamentoLogResponse no backend). */
+export interface AgendamentoLog {
+  id: number;
+  autor: AutorLog;
+  /** Nome do paciente (quando autor = PACIENTE). */
+  pacienteNome: string | null;
+  /** Nome do responsável (quando autor = RESPONSAVEL). */
+  responsavelNome: string | null;
+  /** Nome do atendente (quando autor = UNIDADE). */
+  usuarioNome: string | null;
+  statusAnterior: StatusAgendamento | null;
+  statusAnteriorDescricao: string | null;
+  statusNovo: StatusAgendamento;
+  statusNovoDescricao: string | null;
+  criadoEm: string;
+}

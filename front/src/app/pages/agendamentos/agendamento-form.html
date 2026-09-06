@@ -167,6 +167,51 @@
       }
     </section>
   }
+
+  @if (editando()) {
+    <section class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Histórico de status</h2>
+      </div>
+      <p class="section-label">Quem realizou cada mudança de status deste agendamento.</p>
+
+      @if (carregandoLogs()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando histórico…</p></div>
+      } @else if (erroLogs()) {
+        <div class="state">
+          <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+          <p>Não foi possível carregar o histórico.</p>
+        </div>
+      } @else if (logs().length === 0) {
+        <div class="state"><p>Nenhuma mudança de status registrada ainda.</p></div>
+      } @else {
+        <ul class="tl">
+          @for (log of logs(); track log.id) {
+            <li class="tl__item">
+              <span class="tl__dot" [class.tl__dot--amber]="autorResponsavel(log)" aria-hidden="true"></span>
+              <div class="tl__body">
+                <p class="tl__texto">
+                  {{ log.statusAnterior == null ? 'Agendamento criado' : log.statusNovoDescricao }}
+                </p>
+                @if (log.statusAnterior != null) {
+                  <span class="tl__status">{{ log.statusAnteriorDescricao }} → {{ log.statusNovoDescricao }}</span>
+                }
+                <span class="ag-hist__autor" [class.ag-hist__autor--resp]="autorResponsavel(log)">
+                  @if (autorResponsavel(log)) {
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.66" />
+                    </svg>
+                  }
+                  {{ descreverAutor(log) }}
+                </span>
+                <time class="tl__hora">{{ log.criadoEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
 </section>
 
 <!-- Diálogo de confirmação (Sim / Não) -->

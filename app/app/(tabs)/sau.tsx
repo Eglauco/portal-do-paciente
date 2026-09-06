@@ -12,9 +12,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SemAcesso } from '@/components/sem-acesso';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
 import { ManifestacaoItem, StatusManifestacao, listarManifestacoes } from '@/services/sau';
+import { podeLancar, podeVer } from '@/services/sessao';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -41,6 +44,9 @@ const CORES_STATUS: Record<StatusManifestacao, { fg: string; bg: string }> = {
 export default function SauScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  const verSau = podeVer(sessao, 'SAU');
+  const podeAbrirManifestacao = podeLancar(sessao, 'SAU');
   const [itens, setItens] = useState<ManifestacaoItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -80,6 +86,10 @@ export default function SauScreen() {
     router.push({ pathname: '/sau/[id]', params: { id: String(m.id) } });
   };
 
+  if (!verSau) {
+    return <SemAcesso />;
+  }
+
   return (
     <View style={styles.screen}>
       <ScrollView
@@ -115,12 +125,16 @@ export default function SauScreen() {
             </View>
             <Text style={styles.estadoTitulo}>Nenhuma manifestação</Text>
             <Text style={styles.estadoTxt}>
-              Envie um elogio, crítica ou sugestão para o Serviço de Atendimento ao Usuário.
+              {podeAbrirManifestacao
+                ? 'Envie um elogio, crítica ou sugestão para o Serviço de Atendimento ao Usuário.'
+                : 'Ainda não há manifestações para este perfil.'}
             </Text>
-            <Pressable style={styles.estadoBtn} onPress={() => router.push('/sau/nova')}>
-              <Ionicons name="add" size={18} color="#fff" />
-              <Text style={styles.estadoBtnTxt}>Nova manifestação</Text>
-            </Pressable>
+            {podeAbrirManifestacao && (
+              <Pressable style={styles.estadoBtn} onPress={() => router.push('/sau/nova')}>
+                <Ionicons name="add" size={18} color="#fff" />
+                <Text style={styles.estadoBtnTxt}>Nova manifestação</Text>
+              </Pressable>
+            )}
           </View>
         ) : (
           itens.map((m) => {
@@ -149,6 +163,12 @@ export default function SauScreen() {
                       <Text style={[styles.pillTxt, { color: status.fg }]}>{m.statusDescricao}</Text>
                     </View>
                   </View>
+                  {m.responsavelNome ? (
+                    <View style={styles.viaResp}>
+                      <Ionicons name="people-outline" size={11} color="#8A5A00" />
+                      <Text style={styles.viaRespTxt} numberOfLines={1}>Aberta por {m.responsavelNome} (responsável)</Text>
+                    </View>
+                  ) : null}
                   <Text style={[styles.previa, respostaSau && styles.previaForte]} numberOfLines={1}>
                     {prefixo}
                     {m.ultimaMensagem ?? ''}
@@ -160,14 +180,16 @@ export default function SauScreen() {
         )}
       </ScrollView>
 
-      {/* Botão flutuante: nova manifestação */}
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => router.push('/sau/nova')}
-        accessibilityRole="button"
-        accessibilityLabel="Nova manifestação">
-        <Ionicons name="add" size={26} color="#fff" />
-      </Pressable>
+      {/* Botão flutuante: nova manifestação (oculto no modo só-leitura) */}
+      {podeAbrirManifestacao && (
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={() => router.push('/sau/nova')}
+          accessibilityRole="button"
+          accessibilityLabel="Nova manifestação">
+          <Ionicons name="add" size={26} color="#fff" />
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -197,6 +219,8 @@ const styles = StyleSheet.create({
   pillTxt: { fontSize: 11, fontWeight: '700' },
   previa: { fontSize: 13.5, color: Brand.muted },
   previaForte: { color: '#40514C', fontWeight: '600' },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  viaRespTxt: { flex: 1, fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
 
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
   estadoIcone: {

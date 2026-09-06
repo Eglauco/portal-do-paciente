@@ -54,12 +54,12 @@ class NpsControllerTest {
         // Cria um agendamento (nasce AGUARDANDO) e o move para PRESENCA_PACIENTE.
         AgendamentoRequest novo = new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 5, 9, 0), 1L, 1L, 1L, 1L, 1L, null);
-        AgendamentoResponse criado = agendamentoController.criar(novo);
+        AgendamentoResponse criado = agendamentoController.criar(novo, null);
 
         AgendamentoRequest presenca = new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 5, 9, 0), 1L, 1L, 1L, 1L, 1L,
                 StatusAgendamento.PRESENCA_PACIENTE);
-        agendamentoController.atualizar(criado.id(), presenca);
+        agendamentoController.atualizar(criado.id(), presenca, null);
 
         Nps gerado = repository.findByAgendamentoId(criado.id()).orElseThrow();
         assertEquals(StatusNps.PENDENTE, gerado.getStatus());
@@ -91,10 +91,10 @@ class NpsControllerTest {
     void naoAceitaCategoriaRepetida() {
         AgendamentoRequest novo = new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 7, 9, 0), 1L, 1L, 1L, 1L, 1L, null);
-        AgendamentoResponse criado = agendamentoController.criar(novo);
+        AgendamentoResponse criado = agendamentoController.criar(novo, null);
         agendamentoController.atualizar(criado.id(), new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 7, 9, 0), 1L, 1L, 1L, 1L, 1L,
-                StatusAgendamento.PRESENCA_PACIENTE));
+                StatusAgendamento.PRESENCA_PACIENTE), null);
         Nps gerado = repository.findByAgendamentoId(criado.id()).orElseThrow();
 
         // Duas notas para a mesma categoria devem ser recusadas com 400 (e não estourar 500).
@@ -112,13 +112,13 @@ class NpsControllerTest {
         AgendamentoRequest novo = new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 6, 10, 0), 1L, 1L, 1L, 1L, 1L,
                 StatusAgendamento.PRESENCA_PACIENTE);
-        AgendamentoResponse criado = agendamentoController.criar(novo);
+        AgendamentoResponse criado = agendamentoController.criar(novo, null);
         // criar sempre nasce AGUARDANDO; move para presença duas vezes.
         AgendamentoRequest presenca = new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 6, 10, 0), 1L, 1L, 1L, 1L, 1L,
                 StatusAgendamento.PRESENCA_PACIENTE);
-        agendamentoController.atualizar(criado.id(), presenca);
-        agendamentoController.atualizar(criado.id(), presenca);
+        agendamentoController.atualizar(criado.id(), presenca, null);
+        agendamentoController.atualizar(criado.id(), presenca, null);
 
         long total = repository.findAll().stream()
                 .filter(n -> n.getAgendamento().getId().equals(criado.id()))

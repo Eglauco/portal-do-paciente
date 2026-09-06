@@ -16,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
+import { podeLancar } from '@/services/sessao';
 import {
   buscarConversa,
   ChatDetalhe,
@@ -62,6 +64,9 @@ export default function ConversaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  // Responsável só-leitura no Chat: lê a conversa, mas não envia.
+  const podeEnviar = podeLancar(sessao, 'CHAT');
 
   const [detalhe, setDetalhe] = useState<ChatDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -339,6 +344,12 @@ export default function ConversaScreen() {
                       {daUnidade && m.atendenteNome ? (
                         <Text style={styles.atendente}>{m.atendenteNome}</Text>
                       ) : null}
+                      {!daUnidade && m.responsavelNome ? (
+                        <View style={styles.viaResp}>
+                          <Ionicons name="people-outline" size={12} color="#8A5A00" />
+                          <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
+                        </View>
+                      ) : null}
                       <Text style={styles.texto}>{m.texto}</Text>
                       <View style={styles.rodape}>
                         <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
@@ -370,8 +381,8 @@ export default function ConversaScreen() {
           </ScrollView>
         )}
 
-        {/* Barra de digitação */}
-        {!carregando && !erro && (
+        {/* Barra de digitação (oculta no modo só-leitura do responsável) */}
+        {!carregando && !erro && podeEnviar && (
           <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
             <View style={styles.inputWrap}>
               <TextInput
@@ -390,6 +401,12 @@ export default function ConversaScreen() {
               accessibilityLabel="Enviar mensagem">
               <Ionicons name="send" size={19} color="#fff" />
             </Pressable>
+          </View>
+        )}
+        {!carregando && !erro && !podeEnviar && (
+          <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Text style={styles.somenteLeituraTxt}>Você pode ler esta conversa, mas não enviar mensagens.</Text>
           </View>
         )}
     </KeyboardAvoidingView>
@@ -458,6 +475,8 @@ const styles = StyleSheet.create({
   },
   bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
   atendente: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep, marginBottom: 2 },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+  viaRespTxt: { fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
   texto: { fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
   hora: { fontSize: 10.5, color: '#7C8C87' },
@@ -472,6 +491,15 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     backgroundColor: '#EEF3F1',
   },
+  somenteLeitura: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#EEF3F1',
+  },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
   inputWrap: {
     flex: 1,
     flexDirection: 'row',

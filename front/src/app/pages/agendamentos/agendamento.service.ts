@@ -2,7 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Agendamento, AgendamentoRequest, Pagina, StatusAgendamento } from './agendamento.model';
+import { Agendamento, AgendamentoLog, AgendamentoRequest, Pagina, StatusAgendamento } from './agendamento.model';
 
 @Injectable({ providedIn: 'root' })
 export class AgendamentoService {
@@ -52,5 +52,10 @@ export class AgendamentoService {
 
   excluir(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Linha do tempo das trocas de status do agendamento (quem fez cada mudança). */
+  logs(id: number): Observable<AgendamentoLog[]> {
+    return this.http.get<AgendamentoLog[]>(`${this.base}/${id}/logs`);
   }
 }

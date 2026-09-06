@@ -11,6 +11,8 @@ public record MensagemSauResponse(
         Long id,
         AutorManifestacao autor,
         String autorNome,
+        /** Nome do responsável que enviou esta mensagem pelo paciente; null se foi o próprio ou o SAU. */
+        String responsavelNome,
         String texto,
         LocalDateTime criadoEm) {
 }

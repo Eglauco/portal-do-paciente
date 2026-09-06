@@ -250,6 +250,89 @@
       </div>
     </fieldset>
 
+    <!-- Responsáveis (cadastro paralelo: nome + telefone) -->
+    <fieldset class="form-field">
+      <legend class="section-label">Responsáveis</legend>
+      <p class="field-hint">Pessoas responsáveis por este paciente. Cadastro à parte — não precisa ser um paciente.</p>
+
+      <div class="resp-lista" formArrayName="responsaveis">
+        @for (grupo of responsaveis.controls; track grupo) {
+          <div class="resp-lista__item" [formGroupName]="$index">
+            <span class="resp-lista__id" [class.resp-lista__id--novo]="!grupo.controls.id.value">
+              {{ grupo.controls.id.value ? '#' + grupo.controls.id.value : 'novo' }}
+            </span>
+            <div class="resp-lista__campos">
+              <div class="form-field">
+                <input
+                  class="input"
+                  formControlName="nome"
+                  placeholder="Nome do responsável"
+                  autocomplete="off"
+                  [attr.aria-label]="'Nome do responsável ' + ($index + 1)"
+                  [class.input--error]="responsavelNomeInvalido($index)"
+                  [attr.aria-invalid]="responsavelNomeInvalido($index)"
+                />
+                @if (responsavelNomeInvalido($index)) {
+                  <span class="field-error" role="alert">Informe o nome (mínimo 2 caracteres).</span>
+                }
+              </div>
+              <input
+                class="input"
+                formControlName="telefone"
+                appTelefoneBr
+                placeholder="(11) 99999-0000"
+                inputmode="tel"
+                maxlength="15"
+                autocomplete="off"
+                [attr.aria-label]="'Telefone do responsável ' + ($index + 1)"
+              />
+
+              <div class="resp-perms" formGroupName="permissoes">
+                <p class="resp-perms__titulo">Permissões no aplicativo</p>
+                <p class="resp-perms__hint">O que este responsável pode acessar ao entrar como este paciente.</p>
+                @for (f of funcionalidades; track f.value) {
+                  <div class="resp-perms__linha">
+                    <span class="resp-perms__func">{{ f.label }}</span>
+                    <span class="select resp-perms__select">
+                      <select
+                        [formControlName]="f.value"
+                        [attr.aria-label]="f.label + ' — acesso do responsável ' + ($index + 1)"
+                      >
+                        @for (n of niveisPara(f); track n.value) {
+                          <option [value]="n.value">{{ n.label }}</option>
+                        }
+                      </select>
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
+                  </div>
+                }
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn btn--ghost btn--sm resp-lista__rm"
+              (click)="removerResponsavel($index)"
+              [attr.aria-label]="'Remover responsável ' + ($index + 1)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+              </svg>
+              Remover
+            </button>
+          </div>
+        }
+      </div>
+
+      <button type="button" class="btn btn--ghost btn--sm resp-lista__add" (click)="adicionarResponsavel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Adicionar responsável
+      </button>
+    </fieldset>
+
     <!-- Endereço -->
     <fieldset class="form-field">
       <legend class="section-label">Endereço</legend>

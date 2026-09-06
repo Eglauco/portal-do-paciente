@@ -3,11 +3,15 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { AgendamentoHistoricoModal } from '@/components/agendamento-historico-modal';
 import { AgendamentoModal } from '@/components/agendamento-modal';
 import { FaltaModal } from '@/components/falta-modal';
+import { SemAcesso } from '@/components/sem-acesso';
 import { Agendamento, MotivoFalta } from '@/constants/agendamentos';
 import { Brand, Status } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
+import { podeLancar, podeVer } from '@/services/sessao';
 import {
   cancelarAgendamento,
   confirmarAgendamento,
@@ -52,7 +56,25 @@ function RelogioCancelamento({ a, agora, escuro }: { a: Agendamento; agora: numb
   );
 }
 
+/** Botão discreto que abre o histórico de status do agendamento (variante clara/escura). */
+function BotaoHistorico({ onPress, escuro }: { onPress: () => void; escuro?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [styles.histBtn, escuro && styles.histBtnEscuro, pressed && { opacity: 0.6 }]}
+      accessibilityRole="button"
+      accessibilityLabel="Ver histórico de status">
+      <Ionicons name="time-outline" size={16} color={escuro ? Brand.glow : Brand.brandDeep} />
+    </Pressable>
+  );
+}
+
 export default function AgendamentosScreen() {
+  const { sessao } = useSessao();
+  // Travas do perfil dependente: ver a agenda vs. lançar (confirmar/cancelar/justificar).
+  const verAgenda = podeVer(sessao, 'AGENDAMENTOS');
+  const podeLancarAgenda = podeLancar(sessao, 'AGENDAMENTOS');
   const [lista, setLista] = useState<Agendamento[]>([]);
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [selecionado, setSelecionado] = useState<Agendamento | null>(null);
@@ -61,6 +83,7 @@ export default function AgendamentosScreen() {
   const [erro, setErro] = useState(false);
   const [atualizando, setAtualizando] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [historicoId, setHistoricoId] = useState<string | null>(null);
   const [faltaSelecionada, setFaltaSelecionada] = useState<Agendamento | null>(null);
   const [motivosFalta, setMotivosFalta] = useState<MotivoFalta[]>([]);
   const [carregandoMotivos, setCarregandoMotivos] = useState(false);
@@ -77,8 +100,8 @@ export default function AgendamentosScreen() {
       const dados = await listarAgendamentos();
       setLista(dados);
       jaCarregou.current = true;
-      // Pop-up de entrada: abre o primeiro pendente na primeira carga bem-sucedida.
-      if (!entradaMostrada.current) {
+      // Pop-up de entrada: abre o primeiro pendente na 1ª carga (só se puder lançar).
+      if (!entradaMostrada.current && podeLancarAgenda) {
         entradaMostrada.current = true;
         const primeiroPendente = dados.find((a) => a.status === 'aguardando');
         if (primeiroPendente) {
@@ -207,6 +230,10 @@ export default function AgendamentosScreen() {
     }
   };
 
+  if (!verAgenda) {
+    return <SemAcesso />;
+  }
+
   return (
     <>
       <ScrollView
@@ -217,6 +244,12 @@ export default function AgendamentosScreen() {
         }>
         <Text style={styles.title}>Agendamentos</Text>
         <Text style={styles.subtitle}>Acompanhe suas consultas e exames.</Text>
+        {!podeLancarAgenda && (
+          <View style={styles.somenteLeitura}>
+            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Text style={styles.somenteLeituraTxt}>Você pode visualizar, mas não confirmar ou cancelar.</Text>
+          </View>
+        )}
 
         {/* Carregando (primeira carga) */}
         {carregando && (
@@ -266,20 +299,27 @@ export default function AgendamentosScreen() {
             {pendentes.map((a) => (
               <Pressable
                 key={a.id}
-                onPress={() => {
-                  setSelecionado(a);
-                  setModoModal('confirmar');
-                }}
-                style={({ pressed }) => [styles.pendente, pressed && styles.pendentePressed]}>
+                onPress={
+                  podeLancarAgenda
+                    ? () => {
+                        setSelecionado(a);
+                        setModoModal('confirmar');
+                      }
+                    : undefined
+                }
+                style={({ pressed }) => [styles.pendente, pressed && podeLancarAgenda && styles.pendentePressed]}>
                 <View style={styles.pendenteTopo}>
                   <View style={styles.pendenteTag}>
                     <Ionicons name="time" size={12} color={Brand.brandPine} />
                     <Text style={styles.pendenteTagTxt}>Aguardando confirmação</Text>
                   </View>
-                  <View style={styles.pendenteData}>
-                    <Text style={styles.pendenteDataTxt}>
-                      {a.dia} {a.mes}
-                    </Text>
+                  <View style={styles.pendenteTopoDir}>
+                    <View style={styles.pendenteData}>
+                      <Text style={styles.pendenteDataTxt}>
+                        {a.dia} {a.mes}
+                      </Text>
+                    </View>
+                    <BotaoHistorico onPress={() => setHistoricoId(a.id)} escuro />
                   </View>
                 </View>
 
@@ -295,10 +335,12 @@ export default function AgendamentosScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.pendenteCta}>
-                  <Text style={styles.pendenteCtaTxt}>Toque para confirmar</Text>
-                  <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
-                </View>
+                {podeLancarAgenda && (
+                  <View style={styles.pendenteCta}>
+                    <Text style={styles.pendenteCtaTxt}>Toque para confirmar</Text>
+                    <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
+                  </View>
+                )}
               </Pressable>
             ))}
           </View>
@@ -318,17 +360,20 @@ export default function AgendamentosScreen() {
             {faltasPendentes.map((a) => (
               <Pressable
                 key={a.id}
-                onPress={() => abrirFalta(a)}
-                style={({ pressed }) => [styles.faltaCard, pressed && styles.faltaCardPressed]}>
+                onPress={podeLancarAgenda ? () => abrirFalta(a) : undefined}
+                style={({ pressed }) => [styles.faltaCard, pressed && podeLancarAgenda && styles.faltaCardPressed]}>
                 <View style={styles.pendenteTopo}>
                   <View style={styles.faltaTag}>
                     <Ionicons name="close-circle" size={12} color="#fff" />
                     <Text style={styles.faltaTagTxt}>Falta registrada</Text>
                   </View>
-                  <View style={styles.pendenteData}>
-                    <Text style={styles.pendenteDataTxt}>
-                      {a.dia} {a.mes}
-                    </Text>
+                  <View style={styles.pendenteTopoDir}>
+                    <View style={styles.pendenteData}>
+                      <Text style={styles.pendenteDataTxt}>
+                        {a.dia} {a.mes}
+                      </Text>
+                    </View>
+                    <BotaoHistorico onPress={() => setHistoricoId(a.id)} escuro />
                   </View>
                 </View>
 
@@ -344,10 +389,12 @@ export default function AgendamentosScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.pendenteCta}>
-                  <Text style={styles.faltaCtaTxt}>Toque para informar o motivo</Text>
-                  <Ionicons name="arrow-forward" size={16} color="#fff" />
-                </View>
+                {podeLancarAgenda && (
+                  <View style={styles.pendenteCta}>
+                    <Text style={styles.faltaCtaTxt}>Toque para informar o motivo</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                  </View>
+                )}
               </Pressable>
             ))}
           </View>
@@ -374,8 +421,9 @@ export default function AgendamentosScreen() {
             ) : (
               filtrados.map((a) => {
                 const cor = Status[a.status];
-                // Só agendamentos CONFIRMADOS podem ser cancelados (toque abre o cancelamento).
-                const cancelavel = a.status === 'confirmado';
+                // Só agendamentos CONFIRMADOS podem ser cancelados (toque abre o cancelamento) —
+                // e apenas quando o perfil pode fazer lançamentos.
+                const cancelavel = a.status === 'confirmado' && podeLancarAgenda;
                 const conteudo = (
                   <>
                     <View style={styles.dateBox}>
@@ -394,6 +442,7 @@ export default function AgendamentosScreen() {
                             {a.statusLabel ?? capitalizar(a.status)}
                           </Text>
                         </View>
+                        <BotaoHistorico onPress={() => setHistoricoId(a.id)} />
                       </View>
                       <Text style={styles.profissional}>{a.profissional}</Text>
                       <View style={styles.metaRow}>
@@ -446,6 +495,12 @@ export default function AgendamentosScreen() {
         onJustificar={justificar}
         onFechar={() => setFaltaSelecionada(null)}
       />
+
+      <AgendamentoHistoricoModal
+        visivel={!!historicoId}
+        agendamentoId={historicoId}
+        onFechar={() => setHistoricoId(null)}
+      />
     </>
   );
 }
@@ -455,6 +510,17 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 32 },
   title: { fontSize: 26, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
   subtitle: { fontSize: 14, color: Brand.muted, marginTop: 4, marginBottom: 18 },
+  somenteLeitura: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#EEF3F1',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 16,
+  },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
 
   // Estados (carregando / erro / vazio)
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
@@ -504,6 +570,16 @@ const styles = StyleSheet.create({
   },
   pendentePressed: { backgroundColor: Brand.brandPine },
   pendenteTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  pendenteTopoDir: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  histBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E7F3EF',
+  },
+  histBtnEscuro: { backgroundColor: 'rgba(255,255,255,0.14)' },
   pendenteTag: {
     flexDirection: 'row',
     alignItems: 'center',

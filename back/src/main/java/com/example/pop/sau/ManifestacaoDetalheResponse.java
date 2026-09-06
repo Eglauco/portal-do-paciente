@@ -15,6 +15,8 @@ public record ManifestacaoDetalheResponse(
         Ref tipo,
         StatusManifestacao status,
         String statusDescricao,
+        /** Nome do responsável que abriu a manifestação pelo paciente; null se foi o próprio. */
+        String responsavelNome,
         /** Avaliação do atendimento (nulos até o paciente encerrar e avaliar). */
         Integer avaliacaoNota,
         String avaliacaoComentario,

@@ -3,6 +3,8 @@ package com.example.pop.push;
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +20,9 @@ import com.example.pop.chat.Chat;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.nps.Nps;
+import com.example.pop.paciente.FuncionalidadeApp;
+import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.PacienteAcessoService.DestinoPush;
 import com.example.pop.postagem.Postagem;
 
 /**
@@ -36,11 +41,14 @@ public class PushService {
 
     private final DispositivoRepository repository;
     private final NotificacaoService notificacaoService;
+    private final PacienteAcessoService acessoService;
     private RestClient restClient;
 
-    public PushService(DispositivoRepository repository, NotificacaoService notificacaoService) {
+    public PushService(DispositivoRepository repository, NotificacaoService notificacaoService,
+            PacienteAcessoService acessoService) {
         this.repository = repository;
         this.notificacaoService = notificacaoService;
+        this.acessoService = acessoService;
     }
 
     // Criado sob demanda (evita abrir conexão na inicialização/testes). Com timeouts:
@@ -62,7 +70,7 @@ public class PushService {
                 + ". Toque para confirmar ou cancelar.";
         Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId());
         notificacaoService.registrar(a.getPaciente().getId(), TipoNotificacao.AGENDAMENTO, "Novo agendamento", corpo, a.getId());
-        notificarPaciente(a.getPaciente().getId(), "Novo agendamento", corpo, data);
+        notificarPaciente(a.getPaciente().getId(), FuncionalidadeApp.AGENDAMENTOS, "Novo agendamento", corpo, data);
     }
 
     /** Falta registrada — pede ao paciente para justificar a ausência. */
@@ -71,14 +79,14 @@ public class PushService {
                 + " em " + a.getDataHora().format(DATA_FMT) + ". Toque para justificar.";
         Map<String, Object> data = Map.of("tipo", "FALTA", "agendamentoId", a.getId());
         notificacaoService.registrar(a.getPaciente().getId(), TipoNotificacao.FALTA, "Falta registrada", corpo, a.getId());
-        notificarPaciente(a.getPaciente().getId(), "Falta registrada", corpo, data);
+        notificarPaciente(a.getPaciente().getId(), FuncionalidadeApp.AGENDAMENTOS, "Falta registrada", corpo, data);
     }
 
     /** Nova mensagem da unidade no chat — só o paciente da conversa. */
     public void notificarNovaMensagem(Chat chat) {
         String corpo = "Você recebeu uma nova mensagem de " + chat.getUnidadeSaude().getNome() + ".";
         Map<String, Object> data = Map.of("tipo", "CHAT", "chatId", chat.getId());
-        notificarPaciente(chat.getPaciente().getId(), "Nova mensagem", corpo, data);
+        notificarPaciente(chat.getPaciente().getId(), FuncionalidadeApp.CHAT, "Nova mensagem", corpo, data);
     }
 
     /** Nova avaliação NPS pendente — só o paciente do atendimento. */
@@ -87,7 +95,7 @@ public class PushService {
         String corpo = "Como foi seu atendimento de " + especialidade + "? Toque para avaliar.";
         Long pacienteId = nps.getAgendamento().getPaciente().getId();
         notificacaoService.registrar(pacienteId, TipoNotificacao.NPS, "Avalie seu atendimento", corpo, null);
-        notificarPaciente(pacienteId, "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
+        notificarPaciente(pacienteId, FuncionalidadeApp.NPS, "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
     }
 
     /** Nova publicação (postagem) no feed das unidades — broadcast (todos os aparelhos). */
@@ -105,16 +113,46 @@ public class PushService {
                 ? "Seu atendimento foi registrado. Confira os documentos no prontuário."
                 : "Um novo documento foi adicionado ao seu prontuário.";
         notificacaoService.registrar(pacienteId, TipoNotificacao.PRONTUARIO, titulo, corpo, null);
-        notificarPaciente(pacienteId, titulo, corpo, Map.of("tipo", "PRONTUARIO"));
+        notificarPaciente(pacienteId, FuncionalidadeApp.PRONTUARIO, titulo, corpo, Map.of("tipo", "PRONTUARIO"));
     }
 
-    /** Envia uma notificação só para os aparelhos de um paciente (push direcionado). */
-    public void notificarPaciente(Long pacienteId, String titulo, String corpo, Map<String, Object> data) {
+    /**
+     * Push direcionado a um paciente: chega em TODAS as contas que o acessam (a
+     * própria + responsáveis), mesmo que a conta esteja logada em outro perfil. O
+     * título ganha o primeiro nome do perfil e o payload leva o pacienteId (o toque
+     * troca de perfil no app).
+     */
+    public void notificarPaciente(Long pacienteId, FuncionalidadeApp funcionalidade, String titulo, String corpo,
+            Map<String, Object> data) {
         if (pacienteId == null) {
             return;
         }
-        enviar(repository.findByPacienteId(pacienteId).stream().map(Dispositivo::getToken).toList(),
-                titulo, corpo, data);
+        // Fan-out respeitando a permissão: responsável sem acesso àquela funcionalidade não recebe.
+        DestinoPush destino = acessoService.destinoPush(pacienteId, funcionalidade);
+        Map<Long, Dispositivo> aparelhos = new LinkedHashMap<>();
+        if (!destino.contaIds().isEmpty()) {
+            repository.findByContaIdIn(destino.contaIds()).forEach(d -> aparelhos.put(d.getId(), d));
+        }
+        // Transição: aparelhos legados (sem conta) ainda registrados pelo paciente.
+        // Só conta_id nulo — um aparelho já migrado é resolvido pela conta (autorização atual),
+        // evitando vazar o push para uma conta que perdeu o acesso ao paciente.
+        repository.findByPacienteIdAndContaIdIsNull(pacienteId).forEach(d -> aparelhos.put(d.getId(), d));
+
+        List<String> tokens = aparelhos.values().stream().map(Dispositivo::getToken).distinct().toList();
+        enviar(tokens, comPrefixo(destino.nome(), titulo), corpo, comPacienteId(data, pacienteId));
+    }
+
+    /** Prefixa o título com o primeiro nome do perfil ("Mariana: Novo agendamento"). */
+    private static String comPrefixo(String nome, String titulo) {
+        String primeiro = nome == null ? "" : nome.trim().split("\\s+")[0];
+        return primeiro.isEmpty() ? titulo : primeiro + ": " + titulo;
+    }
+
+    /** Copia o data e adiciona o pacienteId alvo (para o toque trocar de perfil). */
+    private static Map<String, Object> comPacienteId(Map<String, Object> data, Long pacienteId) {
+        Map<String, Object> enriquecido = new HashMap<>(data);
+        enriquecido.put("pacienteId", pacienteId);
+        return enriquecido;
     }
 
     /** Envia uma notificação para todos os dispositivos registrados. */

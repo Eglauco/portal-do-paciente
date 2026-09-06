@@ -139,6 +139,32 @@ export async function listarMotivosFalta(): Promise<MotivoFalta[]> {
   return lista.map((m) => ({ id: m.id, motivo: m.motivo }));
 }
 
+/** Quem fez a troca de status registrada no log. */
+export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE';
+
+/** Item da linha do tempo de status do agendamento (espelha AgendamentoLogResponse no backend). */
+export interface AgendamentoLog {
+  id: number;
+  autor: AutorLog;
+  /** Nome do paciente (quando autor = PACIENTE). */
+  pacienteNome: string | null;
+  /** Nome do responsável (quando autor = RESPONSAVEL). */
+  responsavelNome: string | null;
+  /** Nome do atendente (quando autor = UNIDADE). */
+  usuarioNome: string | null;
+  statusAnterior: StatusBackend | null;
+  statusAnteriorDescricao: string | null;
+  statusNovo: StatusBackend;
+  statusNovoDescricao: string | null;
+  criadoEm: string;
+}
+
+/** Linha do tempo das trocas de status do agendamento do paciente logado (mais antigo primeiro). */
+export async function listarLogsAgendamento(id: string): Promise<AgendamentoLog[]> {
+  const resposta = await fetchMeu(`/meu/agendamentos/${id}/logs`);
+  return comoJson<AgendamentoLog[]>(resposta);
+}
+
 /** Registra a justificativa da falta (motivos selecionados + texto livre). */
 export async function justificarFalta(
   id: string,

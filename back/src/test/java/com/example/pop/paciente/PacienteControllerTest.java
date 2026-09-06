@@ -55,7 +55,7 @@ class PacienteControllerTest {
                 Sexo.FEMININO, LocalDate.of(1990, 5, 20), "12.345.678-9", CPF_A,
                 "Mãe Teste", "Pai Teste", "Rua A", "100", "Centro", "São Paulo", "sp",
                 "01001-000", "Apto 1", "Fulano@Email.com", CNS_OK,
-                List.of("(11) 90000-0002", "11900000002", "   ")));
+                List.of("(11) 90000-0002", "11900000002", "   "), List.of()));
         try {
             assertEquals("11988880001", p.getTelefone());
             assertEquals("52998224725", p.getCpf(), "CPF normalizado (só dígitos)");
@@ -73,6 +73,43 @@ class PacienteControllerTest {
         } finally {
             controller.excluir(p.getId());
         }
+    }
+
+    @Test
+    void responsaveisCriaAtualizaERemove() {
+        limparResiduos("11955550001", null);
+        // Cria com 2 responsáveis válidos + 1 linha em branco (deve ser ignorada).
+        Paciente criado = controller.criar(new PacienteRequest(
+                "Paciente Resp", "11955550001", null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
+                List.of(
+                        new PacienteRequest.ResponsavelRequest(null, "Maria Mãe", "(11) 98888-1111"),
+                        new PacienteRequest.ResponsavelRequest(null, "   ", "irrelevante"),
+                        new PacienteRequest.ResponsavelRequest(null, "João Pai", null))));
+        try {
+            assertEquals(2, criado.getResponsaveis().size(), "linha em branco é ignorada");
+            Responsavel maria = acharPorNome(criado, "Maria Mãe");
+            assertEquals("11988881111", maria.getTelefone(), "telefone normalizado (só dígitos)");
+            assertEquals(null, acharPorNome(criado, "João Pai").getTelefone(), "telefone opcional");
+
+            // Atualiza: renomeia Maria (mesmo id), remove João, adiciona Ana.
+            Paciente atualizado = controller.atualizar(criado.getId(), new PacienteRequest(
+                    "Paciente Resp", "11955550001", null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null, null,
+                    List.of(
+                            new PacienteRequest.ResponsavelRequest(maria.getId(), "Maria Silva", "11988881111"),
+                            new PacienteRequest.ResponsavelRequest(null, "Ana Avó", "11977772222")))).getBody();
+            List<String> nomes = atualizado.getResponsaveis().stream().map(Responsavel::getNome).sorted().toList();
+            assertEquals(List.of("Ana Avó", "Maria Silva"), nomes, "João removido, Maria renomeada, Ana criada");
+            // O id da Maria foi preservado (atualização, não recriação).
+            assertEquals(maria.getId(), acharPorNome(atualizado, "Maria Silva").getId());
+        } finally {
+            controller.excluir(criado.getId());
+        }
+    }
+
+    private static Responsavel acharPorNome(Paciente p, String nome) {
+        return p.getResponsaveis().stream().filter(r -> r.getNome().equals(nome)).findFirst().orElseThrow();
     }
 
     @Test
@@ -105,7 +142,7 @@ class PacienteControllerTest {
     /** Request com nome + (opcional) cpf/cns e nada mais. */
     private static PacienteRequest minimo(String nome, String cpf, String cns) {
         return new PacienteRequest(nome, null, null, null, null, null, null, cpf, null, null, null, null, null, null,
-                null, null, null, null, cns, null);
+                null, null, null, null, cns, null, null);
     }
 
     private void limparResiduos(String telefone, String cpf) {

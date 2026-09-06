@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
@@ -29,7 +28,6 @@ function mascararTelefone(valor: string): string {
 }
 
 export default function LoginScreen() {
-  const router = useRouter();
   const { solicitarCodigo, ativar } = useSessao();
 
   const [etapa, setEtapa] = useState<'telefone' | 'codigo'>('telefone');
@@ -63,7 +61,7 @@ export default function LoginScreen() {
     setEntrando(true);
     try {
       await ativar(telefone, codigo);
-      router.replace('/(tabs)/agendamentos');
+      // A navegação para "Selecionar Perfil" é feita pelo Navegacao (perfilSelecionado=false).
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
       setEntrando(false);

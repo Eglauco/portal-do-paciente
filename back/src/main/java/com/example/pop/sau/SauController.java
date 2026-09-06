@@ -67,7 +67,7 @@ public class SauController {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), TAMANHO_MAXIMO),
                 Sort.by(Sort.Direction.DESC, "atualizadoEm"));
         Page<Manifestacao> resultado = repository.search(unidadeId, tipoId, status, pageable);
-        List<ManifestacaoResponse> content = resultado.getContent().stream().map(sauService::toResponse).toList();
+        List<ManifestacaoResponse> content = sauService.toResponse(resultado.getContent());
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
@@ -85,9 +85,8 @@ public class SauController {
             @RequestParam(required = false) Long tipoId,
             @RequestParam(required = false) StatusManifestacao status,
             @RequestParam(required = false) List<String> colunas) {
-        List<ManifestacaoResponse> dados = repository.search(unidadeId, tipoId, status, Pageable.unpaged())
-                .getContent().stream()
-                .map(sauService::toResponse)
+        List<ManifestacaoResponse> dados = sauService.toResponse(
+                repository.search(unidadeId, tipoId, status, Pageable.unpaged()).getContent()).stream()
                 .sorted(Comparator.comparing(ManifestacaoResponse::atualizadoEm).reversed())
                 .toList();
         List<ColunaExport<ManifestacaoResponse>> cols = ExportacaoService.filtrar(colunasSau(), colunas);

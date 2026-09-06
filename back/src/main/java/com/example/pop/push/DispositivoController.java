@@ -1,7 +1,9 @@
 package com.example.pop.push;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,12 +37,17 @@ public class DispositivoController {
     public ResponseEntity<Void> registrar(@Valid @RequestBody RegistrarDispositivoRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         String token = request.token().trim();
-        Long pacienteId = pacienteIdDoToken(jwt);
+        Long contaId = claimLong(jwt, "cid");
+        Long pacienteId = claimLong(jwt, "pid");
 
         Dispositivo dispositivo = repository.findFirstByToken(token).orElseGet(Dispositivo::new);
         if (dispositivo.getId() == null) {
             dispositivo.setToken(token);
             dispositivo.setCriadoEm(LocalDateTime.now());
+        }
+        // O aparelho pertence à CONTA; paciente_id fica só como legado/transição.
+        if (contaId != null) {
+            dispositivo.setContaId(contaId);
         }
         if (pacienteId != null) {
             dispositivo.setPacienteId(pacienteId);
@@ -50,26 +57,35 @@ public class DispositivoController {
     }
 
     /**
-     * Desvincula os aparelhos do paciente logado (chamado no logout): para de
-     * receber push privado do paciente anterior num aparelho compartilhado.
+     * Desvincula os aparelhos da conta logada (chamado no logout): para de receber
+     * push privado da conta anterior num aparelho compartilhado.
      */
     @PostMapping("/desvincular")
     @Transactional
     public ResponseEntity<Void> desvincular(@AuthenticationPrincipal Jwt jwt) {
-        Long pacienteId = pacienteIdDoToken(jwt);
-        if (pacienteId != null) {
-            List<Dispositivo> dispositivos = repository.findByPacienteId(pacienteId);
-            dispositivos.forEach(d -> d.setPacienteId(null));
-            repository.saveAll(dispositivos);
+        Long contaId = claimLong(jwt, "cid");
+        Long pacienteId = claimLong(jwt, "pid");
+        Map<Long, Dispositivo> alvos = new LinkedHashMap<>();
+        if (contaId != null) {
+            repository.findByContaId(contaId).forEach(d -> alvos.put(d.getId(), d));
         }
+        if (pacienteId != null) {
+            // Só aparelhos legados (sem conta): evita zerar o aparelho de outra conta.
+            repository.findByPacienteIdAndContaIdIsNull(pacienteId).forEach(d -> alvos.put(d.getId(), d));
+        }
+        alvos.values().forEach(d -> {
+            d.setContaId(null);
+            d.setPacienteId(null);
+        });
+        repository.saveAll(alvos.values());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 
-    private Long pacienteIdDoToken(Jwt jwt) {
+    private static Long claimLong(Jwt jwt, String claim) {
         if (jwt == null) {
             return null;
         }
-        Object pid = jwt.getClaim("pid");
-        return pid instanceof Number numero ? numero.longValue() : null;
+        Object valor = jwt.getClaim(claim);
+        return valor instanceof Number numero ? numero.longValue() : null;
     }
 }

@@ -41,7 +41,11 @@
             }
             <div class="sau-msg__quem">
               <b class="sau-msg__nome">{{ msg.autorNome }}</b>
-              <span class="sau-msg__papel">{{ msg.autor === 'SAU' ? 'Atendimento SAU' : 'Paciente' }}</span>
+              @if (msg.responsavelNome) {
+                <span class="sau-msg__via-resp">via {{ msg.responsavelNome }} (responsável)</span>
+              } @else {
+                <span class="sau-msg__papel">{{ msg.autor === 'SAU' ? 'Atendimento SAU' : 'Paciente' }}</span>
+              }
             </div>
             <time class="sau-msg__data">{{ msg.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</time>
           </header>

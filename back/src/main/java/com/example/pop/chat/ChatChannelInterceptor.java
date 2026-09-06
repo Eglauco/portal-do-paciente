@@ -15,6 +15,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Component;
 
+import com.example.pop.paciente.FuncionalidadeApp;
+import com.example.pop.paciente.NivelAcessoResponsavel;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
 
@@ -70,14 +72,16 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         }
         String papel = jwt.getClaimAsString("role");
         if ("PACIENTE".equals(papel)) {
-            Paciente paciente = acessoService.pacienteDoToken(jwt); // valida sessão (ativo + aparelho vinculado)
+            Paciente paciente = acessoService.pacienteDoToken(jwt); // valida a conta (própria ou dependente) + aparelho
+            Object cid = jwt.getClaim("cid");
+            Long contaId = cid instanceof Number numero ? numero.longValue() : null;
             return new ChatPrincipal("PACIENTE:" + paciente.getId(), "PACIENTE", paciente.getId(),
-                    jwt.getClaimAsString("dev"));
+                    contaId, jwt.getClaimAsString("dev"));
         }
         if ("ADMIN".equals(papel)) {
             Object uid = jwt.getClaim("uid");
             Long id = uid instanceof Number numero ? numero.longValue() : null;
-            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id, null);
+            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id, null, null);
         }
         throw new MessagingException("Chat: papel inválido");
     }
@@ -97,20 +101,51 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         if (destino == null) {
             return;
         }
+        // Deny-by-default para CURINGAS. O cliente sempre assina/publica destinos
+        // concretos; um padrão STOMP (ex.: /topic/chat/**, /topic/chat/*) NÃO casa a
+        // regex numérica e cairia no `return` liberado abaixo — mas o broker
+        // (AntPathMatcher) o registraria como PADRÃO e entregaria TODA mensagem de
+        // /topic/chat/{id}, furando a checagem de posse (vazamento de conversas ao vivo).
+        if (ehPadrao(destino)) {
+            throw new MessagingException("Chat: destino com curinga não é permitido");
+        }
         Matcher m = DESTINO_CHAT.matcher(destino);
         if (!m.matches()) {
-            return; // /topic/chats e demais destinos: liberado para autenticados
+            // Deny-by-default no namespace por conversa: qualquer /topic/chat/... ou
+            // /app/chat/... fora do formato numérico estrito é rejeitado (não cai no
+            // `return` liberado). /topic/chats (sinal de lista) não casa esse prefixo.
+            if (destino.startsWith("/topic/chat/") || destino.startsWith("/app/chat/")) {
+                throw new MessagingException("Chat: destino inválido");
+            }
+            return; // /topic/chats e demais destinos concretos: liberado para autenticados
         }
         if ("ADMIN".equals(principal.role())) {
             return; // back-office enxerga todas as conversas
         }
         // Paciente: revalida a sessão a cada assinatura (respeita revogação/troca de aparelho)
-        // e confere a posse da conversa.
-        acessoService.validarSessao(principal.id(), principal.dev());
+        // e confere a posse da conversa. Perfil próprio ou dependente: a conta (cid) valida
+        // ambos; sem cid (token antigo), cai no modelo legado do próprio paciente.
+        acessoService.revalidarSessaoPaciente(principal.cid(), principal.id(), principal.dev());
         Long chatId = Long.valueOf(m.group(1));
         Long dono = chatRepository.findPacienteIdById(chatId).orElse(null);
         if (dono == null || !dono.equals(principal.id())) {
             throw new MessagingException("Chat: sem acesso a esta conversa");
         }
+        // Trava por funcionalidade: um responsável SEM_ACESSO ao Chat deste perfil não
+        // assina o tempo real (perfil próprio/legado passa: nível total).
+        if (acessoService.nivelPorContaEPerfil(principal.cid(), principal.id(), FuncionalidadeApp.CHAT)
+                == NivelAcessoResponsavel.SEM_ACESSO) {
+            throw new MessagingException("Chat: sem acesso a esta funcionalidade");
+        }
+    }
+
+    /**
+     * O destino é um PADRÃO STOMP (curinga) que o broker (AntPathMatcher) casaria
+     * contra vários destinos concretos. Espelha {@code AntPathMatcher.isPattern}:
+     * {@code *}, {@code ?} ou um template {@code {…}}. Assinaturas/publicações do
+     * chat são sempre para destinos concretos, então qualquer padrão é rejeitado.
+     */
+    private static boolean ehPadrao(String destino) {
+        return destino.indexOf('*') >= 0 || destino.indexOf('?') >= 0 || destino.indexOf('{') >= 0;
     }
 }

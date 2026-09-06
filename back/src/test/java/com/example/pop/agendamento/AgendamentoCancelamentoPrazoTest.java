@@ -84,7 +84,7 @@ class AgendamentoCancelamentoPrazoTest {
 
     private Long criarAgendamento(LocalDateTime dataHora) {
         return agendamentoController.criar(
-                new AgendamentoRequest(dataHora, 1L, 1L, procedimentoId, pacienteId, 1L, null)).id();
+                new AgendamentoRequest(dataHora, 1L, 1L, procedimentoId, pacienteId, 1L, null), null).id();
     }
 
     @Test

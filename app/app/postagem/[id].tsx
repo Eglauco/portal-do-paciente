@@ -270,6 +270,12 @@ export default function PostagemDetalheScreen() {
             <Text style={styles.itemAutor}>{item.autor} </Text>
             {item.texto}
           </Text>
+          {item.responsavelNome ? (
+            <View style={styles.viaResp}>
+              <Ionicons name="people-outline" size={11} color="#8A5A00" />
+              <Text style={styles.viaRespTxt}>Comentado por {item.responsavelNome} (responsável)</Text>
+            </View>
+          ) : null}
           <View style={styles.itemMeta}>
             <Text style={styles.itemTempo}>
               {haQuanto(item.criadoEm)}
@@ -500,6 +506,8 @@ const styles = StyleSheet.create({
   itemAvatarTxt: { color: Brand.brandDeep, fontSize: 12, fontWeight: '800' },
   itemTexto: { fontSize: 14, color: Brand.ink, lineHeight: 19 },
   itemAutor: { fontWeight: '700' },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  viaRespTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
   itemTempo: { fontSize: 11.5, color: Brand.muted },
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },

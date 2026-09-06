@@ -256,7 +256,7 @@ public class PostagemController {
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId, pid -> null));
+                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId, pid -> null, rid -> null));
     }
 
     /** Edita o próprio comentário do admin — permitido só até 15 min após criar. */
@@ -276,7 +276,7 @@ public class PostagemController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null);
+        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null, rid -> null);
     }
 
     /** Id do usuário admin a partir do claim "uid" do token; nulo se ausente. */

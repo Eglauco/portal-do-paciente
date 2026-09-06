@@ -18,6 +18,8 @@ export interface Manifestacao {
   statusDescricao: string;
   ultimaMensagem?: string | null;
   ultimaMensagemDe?: AutorManifestacao | null;
+  /** Nome do responsável que abriu a manifestação pelo paciente; null se foi o próprio. */
+  responsavelNome?: string | null;
   /** Nota do atendimento (1-5) quando o paciente já avaliou. */
   avaliacaoNota?: number | null;
   atualizadoEm: string;
@@ -28,6 +30,8 @@ export interface MensagemSau {
   id: number;
   autor: AutorManifestacao;
   autorNome: string;
+  /** Nome do responsável que enviou esta mensagem pelo paciente; null se foi o próprio ou o SAU. */
+  responsavelNome?: string | null;
   texto: string;
   criadoEm: string;
 }
@@ -41,6 +45,8 @@ export interface ManifestacaoDetalhe {
   tipo: Ref;
   status: StatusManifestacao;
   statusDescricao: string;
+  /** Nome do responsável que abriu a manifestação pelo paciente; null se foi o próprio. */
+  responsavelNome?: string | null;
   /** Avaliação do atendimento pelo paciente (null enquanto não avaliada). */
   avaliacaoNota?: number | null;
   avaliacaoComentario?: string | null;

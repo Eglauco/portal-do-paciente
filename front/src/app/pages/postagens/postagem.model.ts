@@ -38,6 +38,8 @@ export interface Comentario {
   autor: string;
   /** Foto (pré-assinada) do autor paciente, ou null se não tiver / não for paciente. */
   fotoUrl: string | null;
+  /** Nome (abreviado) do responsável que comentou pelo paciente, ou null se foi o próprio. */
+  responsavelNome: string | null;
   texto: string;
   criadoEm: string;
   /** Foi editado depois de publicado (mostra "editado"). */

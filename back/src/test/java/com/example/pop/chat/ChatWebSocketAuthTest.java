@@ -22,6 +22,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import com.example.pop.paciente.ContaAppRepository;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
@@ -48,10 +49,13 @@ class ChatWebSocketAuthTest {
     private PacienteRepository pacienteRepository;
     @Autowired
     private ChatRepository chatRepository;
+    @Autowired
+    private ContaAppRepository contaRepository;
     @MockitoBean
     private VerificacaoService verificacao;
 
     private Long pacienteId;
+    private Long contaId;
     private String token;
 
     @BeforeEach
@@ -60,6 +64,9 @@ class ChatWebSocketAuthTest {
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente WS", TEL)).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-ws")).token();
+        // Conta do app criada pela ativação (o token novo carrega o cid): usada para
+        // montar o principal como o interceptor faz, exercitando a revalidação por conta.
+        contaId = contaRepository.findByTelefone(TEL).orElseThrow().getId();
     }
 
     @AfterEach
@@ -105,7 +112,7 @@ class ChatWebSocketAuthTest {
     void pacienteNaoAssinaConversaDeOutro() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, "dev-ws");
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }
@@ -114,15 +121,24 @@ class ChatWebSocketAuthTest {
     void adminAssinaQualquerConversa() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L, null);
+        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L, null, null);
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, admin);
         assertDoesNotThrow(() -> interceptor.preSend(m, null));
     }
 
     @Test
+    void pacienteNaoAssinaComCuringa() {
+        // /topic/chat/** não casa a regex numérica, mas o broker (AntPathMatcher) o
+        // registraria como PADRÃO e casaria toda conversa: deve ser rejeitado (deny-by-default).
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
+        Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/**", null, paciente);
+        assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
+    }
+
+    @Test
     void pacienteNaoPublicaEmDestinoDeBroker() {
         // SEND direto a /topic/** é proibido (impede forjar mensagem/impersonar a unidade).
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, "dev-ws");
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
         Message<byte[]> m = frame(StompCommand.SEND, "/topic/chat/" + pacienteId, null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }

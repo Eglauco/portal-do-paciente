@@ -12,10 +12,13 @@ import {
   View,
 } from 'react-native';
 
+import { SemAcesso } from '@/components/sem-acesso';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
 import { ChatItem, listarChats } from '@/services/chat';
 import { observarLista } from '@/services/chat-realtime';
+import { podeLancar, podeVer } from '@/services/sessao';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -43,6 +46,9 @@ function iniciais(nome: string): string {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const { sessao } = useSessao();
+  const verChat = podeVer(sessao, 'CHAT');
+  const podeIniciarConversa = podeLancar(sessao, 'CHAT');
   const [chats, setChats] = useState<ChatItem[]>([]);
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
@@ -98,6 +104,10 @@ export default function ChatScreen() {
   const abrir = (chat: ChatItem) => {
     router.push({ pathname: '/conversa/[id]', params: { id: String(chat.id) } });
   };
+
+  if (!verChat) {
+    return <SemAcesso />;
+  }
 
   return (
     <View style={styles.screen}>
@@ -189,14 +199,16 @@ export default function ChatScreen() {
         )}
       </ScrollView>
 
-      {/* Botão flutuante: iniciar uma nova conversa */}
-      <Pressable
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => router.push('/conversa/nova')}
-        accessibilityRole="button"
-        accessibilityLabel="Nova conversa">
-        <Ionicons name="add" size={26} color="#fff" />
-      </Pressable>
+      {/* Botão flutuante: iniciar uma nova conversa (oculto no modo só-leitura) */}
+      {podeIniciarConversa && (
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={() => router.push('/conversa/nova')}
+          accessibilityRole="button"
+          accessibilityLabel="Nova conversa">
+          <Ionicons name="add" size={26} color="#fff" />
+        </Pressable>
+      )}
     </View>
   );
 }

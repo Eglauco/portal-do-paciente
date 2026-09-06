@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -15,7 +16,7 @@ import { ProfissionalSaude } from '../profissionais/profissional.model';
 import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
-import { AgendamentoRequest, Ref, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
+import { AgendamentoLog, AgendamentoRequest, Ref, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
 import { AgendamentoService } from './agendamento.service';
 
 type Campo =
@@ -28,7 +29,7 @@ type Campo =
 
 @Component({
   selector: 'app-agendamento-form',
-  imports: [ReactiveFormsModule, NgSelectModule],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
   templateUrl: './agendamento-form.html',
 })
 export class AgendamentoForm implements PodeSair {
@@ -74,6 +75,11 @@ export class AgendamentoForm implements PodeSair {
   protected readonly justificativaFalta = signal<string | null>(null);
   protected readonly motivosFalta = signal<Ref[]>([]);
 
+  // Histórico de status: quem fez cada troca (paciente, responsável ou unidade).
+  protected readonly logs = signal<AgendamentoLog[]>([]);
+  protected readonly carregandoLogs = signal(false);
+  protected readonly erroLogs = signal(false);
+
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
@@ -89,7 +95,10 @@ export class AgendamentoForm implements PodeSair {
       // Unidade travada na unidade logada (não editável).
       this.form.controls.unidadeSaudeId.setValue(this.auth.unidadeId());
       this.form.controls.unidadeSaudeId.disable();
-      if (this.editando()) this.carregarAgendamento();
+      if (this.editando()) {
+        this.carregarAgendamento();
+        this.carregarLogs();
+      }
     });
   }
 
@@ -196,6 +205,41 @@ export class AgendamentoForm implements PodeSair {
       },
       error: () => this.erroCarregar.set(true),
     });
+  }
+
+  /** Carrega a linha do tempo de trocas de status deste agendamento (edição). */
+  private carregarLogs(): void {
+    if (this.codigo() == null) return;
+    this.carregandoLogs.set(true);
+    this.erroLogs.set(false);
+    this.service.logs(this.codigo()!).subscribe({
+      next: (logs) => {
+        this.logs.set(logs);
+        this.carregandoLogs.set(false);
+      },
+      error: () => {
+        this.erroLogs.set(true);
+        this.carregandoLogs.set(false);
+      },
+    });
+  }
+
+  protected autorResponsavel(log: AgendamentoLog): boolean {
+    return log.autor === 'RESPONSAVEL';
+  }
+
+  /** Texto de quem fez a troca de status (paciente, responsável ou unidade/atendente). */
+  protected descreverAutor(log: AgendamentoLog): string {
+    // Decide o texto pelo AUTOR (não pela presença do nome): um responsável removido
+    // do cadastro zera o responsavel_id (FK SET NULL), mas a ação continua sendo dele —
+    // cai num rótulo genérico, coerente com o marcador âmbar de autorResponsavel().
+    if (log.autor === 'RESPONSAVEL') {
+      return log.responsavelNome ? `${log.responsavelNome} (responsável)` : 'Responsável';
+    }
+    if (log.autor === 'PACIENTE') {
+      return log.pacienteNome ?? 'Paciente';
+    }
+    return log.usuarioNome ? `Unidade · ${log.usuarioNome}` : 'Unidade';
   }
 
   private confirmar(mensagem: string): Promise<boolean> {

@@ -64,3 +64,101 @@
   margin-top: 0.5rem;
   align-self: flex-start;
 }
+
+/* Lista de responsáveis (id · nome · telefone). */
+.resp-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.resp-lista__item {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.resp-lista__id {
+  flex: 0 0 auto;
+  min-width: 3rem;
+  margin-top: 0.65rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  text-align: right;
+}
+
+.resp-lista__id--novo {
+  font-weight: 500;
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.resp-lista__campos {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 0.6rem;
+}
+
+.resp-lista__campos .form-field {
+  min-width: 0;
+}
+
+.resp-lista__rm {
+  margin-top: 0.15rem;
+  flex: 0 0 auto;
+}
+
+/* Matriz de permissões do responsável (nível por funcionalidade do app). */
+.resp-perms {
+  grid-column: 1 / -1;
+  margin-top: 0.35rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed var(--line);
+}
+
+.resp-perms__titulo {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.resp-perms__hint {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.resp-perms__linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.resp-perms__func {
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.resp-perms__select {
+  flex: 0 0 auto;
+  min-width: 11.5rem;
+}
+
+@media (max-width: 640px) {
+  .resp-lista__campos {
+    grid-template-columns: 1fr;
+  }
+
+  .resp-perms__select {
+    min-width: 9.5rem;
+  }
+}

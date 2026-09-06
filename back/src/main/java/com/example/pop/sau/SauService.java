@@ -1,8 +1,12 @@
 package com.example.pop.sau;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -14,7 +18,10 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.common.Ref;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.Responsavel;
+import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.push.PushService;
 import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
@@ -35,42 +42,50 @@ public class SauService {
     private final UnidadeRepository unidadeRepository;
     private final TipoManifestacaoRepository tipoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ResponsavelRepository responsavelRepository;
     private final PushService pushService;
     private final NotificacaoService notificacaoService;
     private final StorageService storageService;
 
     public SauService(ManifestacaoRepository repository, ManifestacaoMensagemRepository mensagemRepository,
             UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
-            UsuarioRepository usuarioRepository, PushService pushService, NotificacaoService notificacaoService,
-            StorageService storageService) {
+            UsuarioRepository usuarioRepository, ResponsavelRepository responsavelRepository,
+            PushService pushService, NotificacaoService notificacaoService, StorageService storageService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.unidadeRepository = unidadeRepository;
         this.tipoRepository = tipoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.responsavelRepository = responsavelRepository;
         this.pushService = pushService;
         this.notificacaoService = notificacaoService;
         this.storageService = storageService;
     }
 
-    /** Abre uma manifestação (cria + a 1ª mensagem do paciente). Status inicial: aguardando SAU. */
-    public Manifestacao abrir(Paciente paciente, Long unidadeId, Long tipoId, String texto) {
+    /**
+     * Abre uma manifestação (cria + a 1ª mensagem do paciente). Status inicial:
+     * aguardando SAU. {@code responsavel} não-nulo quando um responsável abriu pelo
+     * dependente — registrado na manifestação e na 1ª mensagem.
+     */
+    public Manifestacao abrir(Paciente paciente, Long unidadeId, Long tipoId, String texto, Responsavel responsavel) {
         Unidade unidade = unidadeRepository.findById(unidadeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não encontrada"));
         TipoManifestacao tipo = tipoRepository.findById(tipoId)
                 .filter(TipoManifestacao::isAtivo)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Tipo de manifestação inválido ou desativado"));
+        Long responsavelId = responsavel != null ? responsavel.getId() : null;
         LocalDateTime agora = LocalDateTime.now();
         Manifestacao m = new Manifestacao();
         m.setPaciente(paciente);
         m.setUnidadeSaude(unidade);
         m.setTipo(tipo);
         m.setStatus(StatusManifestacao.AGUARDANDO_SAU);
+        m.setResponsavelId(responsavelId);
         m.setCriadoEm(agora);
         m.setAtualizadoEm(agora);
         repository.save(m);
-        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto);
+        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto, responsavelId);
         return m;
     }
 
@@ -79,7 +94,7 @@ public class SauService {
      * "aguardando paciente" ou "fechada" (respondendo, reabre). Se estiver
      * "aguardando SAU", o paciente já enviou e precisa esperar — 409.
      */
-    public Manifestacao responderComoPaciente(Manifestacao m, String texto) {
+    public Manifestacao responderComoPaciente(Manifestacao m, String texto, Responsavel responsavel) {
         if (m.getAvaliadoEm() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Esta conversa foi encerrada e avaliada; não é possível reabri-la.");
@@ -88,7 +103,7 @@ public class SauService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Aguarde a resposta do SAU antes de enviar outra mensagem.");
         }
-        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto);
+        criarMensagem(m, AutorManifestacao.PACIENTE, null, texto, responsavel != null ? responsavel.getId() : null);
         m.setStatus(StatusManifestacao.AGUARDANDO_SAU);
         m.setAtualizadoEm(LocalDateTime.now());
         return salvarComVersao(m);
@@ -108,7 +123,7 @@ public class SauService {
         }
         Usuario usuario = usuarioRepository.findById(usuarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Usuário não encontrado"));
-        criarMensagem(m, AutorManifestacao.SAU, usuario, texto);
+        criarMensagem(m, AutorManifestacao.SAU, usuario, texto, null);
         m.setStatus(StatusManifestacao.AGUARDANDO_PACIENTE);
         m.setAtualizadoEm(LocalDateTime.now());
         // Grava (checando a versão) ANTES do push: se perder a corrida, dá 409 e
@@ -123,7 +138,7 @@ public class SauService {
         Long manifestacaoId = m.getId();
         aposCommit(() -> {
             notificacaoService.registrar(pacienteId, TipoNotificacao.SAU, "Resposta do SAU", corpoSau, manifestacaoId);
-            pushService.notificarPaciente(pacienteId, "Resposta do SAU", corpoSau,
+            pushService.notificarPaciente(pacienteId, FuncionalidadeApp.SAU, "Resposta do SAU", corpoSau,
                     Map.of("tipo", "SAU", "manifestacaoId", manifestacaoId));
         });
         return m;
@@ -147,7 +162,7 @@ public class SauService {
         Long manifestacaoId = m.getId();
         aposCommit(() -> {
             notificacaoService.registrar(pacienteId, TipoNotificacao.SAU, "Manifestação encerrada", corpo, manifestacaoId);
-            pushService.notificarPaciente(pacienteId, "Manifestação encerrada", corpo,
+            pushService.notificarPaciente(pacienteId, FuncionalidadeApp.SAU, "Manifestação encerrada", corpo,
                     Map.of("tipo", "SAU", "manifestacaoId", manifestacaoId));
         });
         return salva;
@@ -199,17 +214,27 @@ public class SauService {
         }
     }
 
-    private void criarMensagem(Manifestacao m, AutorManifestacao autor, Usuario usuario, String texto) {
+    private void criarMensagem(Manifestacao m, AutorManifestacao autor, Usuario usuario, String texto,
+            Long responsavelId) {
         ManifestacaoMensagem msg = new ManifestacaoMensagem();
         msg.setManifestacao(m);
         msg.setAutor(autor);
         msg.setUsuario(usuario);
+        msg.setResponsavelId(responsavelId);
         msg.setTexto(texto.trim());
         msg.setCriadoEm(LocalDateTime.now());
         mensagemRepository.save(msg);
     }
 
-    public ManifestacaoResponse toResponse(Manifestacao m) {
+    /** Mapeia uma lista de manifestações resolvendo os nomes dos responsáveis num só lote. */
+    public List<ManifestacaoResponse> toResponse(List<Manifestacao> manifestacoes) {
+        Set<Long> ids = manifestacoes.stream().map(Manifestacao::getResponsavelId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> nomes = nomesDosResponsaveis(ids);
+        return manifestacoes.stream().map(m -> toResponse(m, nomes)).toList();
+    }
+
+    private ManifestacaoResponse toResponse(Manifestacao m, Map<Long, String> nomes) {
         ManifestacaoMensagem ultima = mensagemRepository.findFirstByManifestacaoIdOrderByCriadoEmDesc(m.getId());
         return new ManifestacaoResponse(
                 m.getId(),
@@ -220,8 +245,16 @@ public class SauService {
                 m.getStatus(), m.getStatus().getDescricao(),
                 ultima != null ? ultima.getTexto() : null,
                 ultima != null ? ultima.getAutor() : null,
+                m.getResponsavelId() == null ? null : nomes.get(m.getResponsavelId()),
                 m.getAvaliacaoNota(),
                 m.getAtualizadoEm(), m.getCriadoEm());
+    }
+
+    /** Nomes (completos) dos responsáveis pelos ids, resolvidos num só findAllById. */
+    private Map<Long, String> nomesDosResponsaveis(Set<Long> ids) {
+        return ids.isEmpty() ? Map.of()
+                : responsavelRepository.findAllById(ids).stream()
+                        .collect(Collectors.toMap(Responsavel::getId, Responsavel::getNome));
     }
 
     /**
@@ -231,8 +264,19 @@ public class SauService {
      * raro), cai para "Atendimento SAU".
      */
     public ManifestacaoDetalheResponse toDetalhe(Manifestacao m) {
-        List<MensagemSauResponse> mensagens = mensagemRepository.findByManifestacaoIdOrderByCriadoEmAsc(m.getId())
-                .stream().map(msg -> toMensagem(m, msg)).toList();
+        List<ManifestacaoMensagem> msgs = mensagemRepository.findByManifestacaoIdOrderByCriadoEmAsc(m.getId());
+        // Resolve de uma vez os nomes dos responsáveis (manifestação + mensagens).
+        Set<Long> ids = new HashSet<>();
+        if (m.getResponsavelId() != null) {
+            ids.add(m.getResponsavelId());
+        }
+        msgs.forEach(msg -> {
+            if (msg.getResponsavelId() != null) {
+                ids.add(msg.getResponsavelId());
+            }
+        });
+        Map<Long, String> nomes = nomesDosResponsaveis(ids);
+        List<MensagemSauResponse> mensagens = msgs.stream().map(msg -> toMensagem(m, msg, nomes)).toList();
         return new ManifestacaoDetalheResponse(
                 m.getId(),
                 new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
@@ -240,17 +284,20 @@ public class SauService {
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
                 m.getStatus(), m.getStatus().getDescricao(),
+                m.getResponsavelId() == null ? null : nomes.get(m.getResponsavelId()),
                 m.getAvaliacaoNota(), m.getAvaliacaoComentario(), m.getAvaliadoEm(),
                 mensagens);
     }
 
-    private MensagemSauResponse toMensagem(Manifestacao m, ManifestacaoMensagem msg) {
+    private MensagemSauResponse toMensagem(Manifestacao m, ManifestacaoMensagem msg, Map<Long, String> nomes) {
         String autorNome;
         if (msg.getAutor() == AutorManifestacao.SAU) {
             autorNome = msg.getUsuario() != null ? msg.getUsuario().getNome() : "Atendimento SAU";
         } else {
             autorNome = m.getPaciente().getNome();
         }
-        return new MensagemSauResponse(msg.getId(), msg.getAutor(), autorNome, msg.getTexto(), msg.getCriadoEm());
+        String responsavelNome = msg.getResponsavelId() == null ? null : nomes.get(msg.getResponsavelId());
+        return new MensagemSauResponse(msg.getId(), msg.getAutor(), autorNome, responsavelNome, msg.getTexto(),
+                msg.getCriadoEm());
     }
 }

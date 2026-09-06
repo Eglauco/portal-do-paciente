@@ -18,6 +18,8 @@ import { AvaliacaoSauModal } from '@/components/avaliacao-sau-modal';
 import { AvatarPaciente } from '@/components/avatar-paciente';
 import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { useSessao } from '@/hooks/use-sessao';
+import { podeLancar } from '@/services/sessao';
 import {
   ManifestacaoDetalhe,
   MensagemSau,
@@ -54,6 +56,9 @@ export default function ManifestacaoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { sessao } = useSessao();
+  // Responsável só-leitura no SAU: lê a manifestação, mas não responde/encerra.
+  const podeLancarSau = podeLancar(sessao, 'SAU');
 
   const [detalhe, setDetalhe] = useState<ManifestacaoDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -168,10 +173,12 @@ export default function ManifestacaoScreen() {
   const fechada = detalhe?.status === 'FECHADA';
   const aguardandoPaciente = detalhe?.status === 'AGUARDANDO_PACIENTE';
   // Onde estamos no fluxo (avaliada = definitiva; fechada s/ nota = avaliar ou reabrir).
-  const mostrarResponder = !avaliada && (aguardandoPaciente || (fechada && reabrindo));
-  const mostrarAvaliarReabrir = fechada && !avaliada && !reabrindo;
+  // Os controles de LANÇAMENTO (responder/avaliar/reabrir/encerrar) só aparecem para
+  // quem pode lançar; o responsável só-leitura apenas acompanha a thread.
+  const mostrarResponder = podeLancarSau && !avaliada && (aguardandoPaciente || (fechada && reabrindo));
+  const mostrarAvaliarReabrir = podeLancarSau && fechada && !avaliada && !reabrindo;
   const mostrarAguardando = !avaliada && !fechada && !aguardandoPaciente; // aguardando SAU
-  const mostrarEncerrar = !avaliada && !fechada; // conversa aberta: pode encerrar a qualquer momento
+  const mostrarEncerrar = podeLancarSau && !avaliada && !fechada; // conversa aberta: pode encerrar a qualquer momento
 
   return (
     <View style={styles.screen}>
@@ -245,7 +252,11 @@ export default function ManifestacaoScreen() {
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.autorNome} numberOfLines={1}>{m.autorNome}</Text>
-                    {mostrarPapel && <Text style={styles.autorPapel}>{papel}</Text>}
+                    {m.responsavelNome ? (
+                      <Text style={styles.viaResp} numberOfLines={1}>via {m.responsavelNome} (responsável)</Text>
+                    ) : (
+                      mostrarPapel && <Text style={styles.autorPapel}>{papel}</Text>
+                    )}
                   </View>
                 </View>
                 <Text style={styles.cardData}>{dataHora(m.criadoEm)}</Text>
@@ -355,6 +366,14 @@ export default function ManifestacaoScreen() {
               <Text style={styles.btnGhostTxt}>Encerrar conversa</Text>
             </Pressable>
           )}
+
+          {/* Responsável só-leitura: acompanha, mas não interage */}
+          {!podeLancarSau && !avaliada && (
+            <View style={[styles.aguardando, { marginTop: 14 }]}>
+              <Ionicons name="eye-outline" size={18} color={Brand.muted} />
+              <Text style={styles.aguardandoTxt}>Você pode acompanhar esta manifestação, mas não responder.</Text>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -430,6 +449,7 @@ const styles = StyleSheet.create({
   avatarTxt: { color: '#40514C', fontSize: 14, fontWeight: '800' },
   avatarTxtSau: { color: '#fff' },
   autorNome: { fontSize: 14.5, fontWeight: '700', color: Brand.ink },
+  viaResp: { fontSize: 12, fontWeight: '700', color: '#8A5A00', marginTop: 1 },
   autorPapel: { fontSize: 12, color: Brand.muted },
   cardData: { fontSize: 11.5, color: Brand.muted, marginTop: 8 },
   cardCorpo: { fontSize: 14.5, color: Brand.ink, lineHeight: 21, marginTop: 6 },

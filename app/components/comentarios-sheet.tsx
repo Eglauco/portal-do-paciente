@@ -27,6 +27,7 @@ import {
   listarComentarios,
   responder,
 } from '@/services/feed';
+import { podeLancar } from '@/services/sessao';
 
 const TAMANHO = 20;
 
@@ -57,6 +58,8 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
   const insets = useSafeAreaInsets();
   const { sessao } = useSessao();
   const AUTOR = sessao?.nome ?? 'Paciente';
+  // Responsável só-leitura na Rede Social: lê os comentários, mas não comenta/responde.
+  const podeComentar = podeLancar(sessao, 'REDE_SOCIAL');
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [carregandoMais, setCarregandoMais] = useState(false);
@@ -224,20 +227,28 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
             <Text style={styles.itemAutor}>{item.autor} </Text>
             {item.texto}
           </Text>
+          {item.responsavelNome ? (
+            <View style={styles.viaResp}>
+              <Ionicons name="people-outline" size={11} color="#8A5A00" />
+              <Text style={styles.viaRespTxt}>Comentado por {item.responsavelNome} (responsável)</Text>
+            </View>
+          ) : null}
           <View style={styles.itemMeta}>
             <Text style={styles.itemTempo}>
               {haQuanto(item.criadoEm)}
               {item.editado ? ' · editado' : ''}
             </Text>
-            <Pressable onPress={() => iniciarResposta(raizId ?? item.id, item.autor)} hitSlop={6}>
-              <Text style={styles.responder}>Responder</Text>
-            </Pressable>
-            {item.meu && item.podeEditar && (
+            {podeComentar && (
+              <Pressable onPress={() => iniciarResposta(raizId ?? item.id, item.autor)} hitSlop={6}>
+                <Text style={styles.responder}>Responder</Text>
+              </Pressable>
+            )}
+            {podeComentar && item.meu && item.podeEditar && (
               <Pressable onPress={() => iniciarEdicao(item)} hitSlop={6}>
                 <Text style={styles.acaoLink}>Editar</Text>
               </Pressable>
             )}
-            {item.meu && (
+            {podeComentar && item.meu && (
               <Pressable
                 style={styles.lixeira}
                 onPress={() => confirmarExclusao(item, raizId)}
@@ -331,7 +342,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
             />
           )}
 
-          {respondendo ? (
+          {podeComentar && respondendo ? (
             <View style={styles.faixa}>
               <Text style={styles.faixaTxt} numberOfLines={1}>
                 Respondendo a <Text style={styles.faixaNome}>{respondendo.autor}</Text>
@@ -341,35 +352,42 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
               </Pressable>
             </View>
           ) : null}
-          <View style={[styles.input, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-            <AvatarPaciente
-              iniciais={iniciais(AUTOR)}
-              tamanho={34}
-              estiloCirculo={styles.inputAvatar}
-              estiloTexto={styles.inputAvatarTxt}
-              estiloFoto={styles.inputAvatarFoto}
-            />
-            <TextInput
-              ref={campoRef}
-              style={styles.campo}
-              value={texto}
-              onChangeText={setTexto}
-              placeholder={respondendo ? 'Escreva uma resposta…' : 'Deixe um comentário…'}
-              placeholderTextColor="#9AAAA5"
-              multiline
-            />
-            <Pressable
-              style={[styles.enviar, !podeEnviar && styles.enviarDesativado]}
-              onPress={enviar}
-              disabled={!podeEnviar}
-              accessibilityLabel="Enviar comentário">
-              {enviando ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <Ionicons name="send" size={18} color="#fff" />
-              )}
-            </Pressable>
-          </View>
+          {podeComentar ? (
+            <View style={[styles.input, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+              <AvatarPaciente
+                iniciais={iniciais(AUTOR)}
+                tamanho={34}
+                estiloCirculo={styles.inputAvatar}
+                estiloTexto={styles.inputAvatarTxt}
+                estiloFoto={styles.inputAvatarFoto}
+              />
+              <TextInput
+                ref={campoRef}
+                style={styles.campo}
+                value={texto}
+                onChangeText={setTexto}
+                placeholder={respondendo ? 'Escreva uma resposta…' : 'Deixe um comentário…'}
+                placeholderTextColor="#9AAAA5"
+                multiline
+              />
+              <Pressable
+                style={[styles.enviar, !podeEnviar && styles.enviarDesativado]}
+                onPress={enviar}
+                disabled={!podeEnviar}
+                accessibilityLabel="Enviar comentário">
+                {enviando ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="send" size={18} color="#fff" />
+                )}
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+              <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+              <Text style={styles.somenteLeituraTxt}>Você pode ler os comentários, mas não comentar.</Text>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -412,6 +430,8 @@ const styles = StyleSheet.create({
   itemAvatarTxt: { color: Brand.brandDeep, fontSize: 12, fontWeight: '800' },
   itemTexto: { fontSize: 14, color: Brand.ink, lineHeight: 19 },
   itemAutor: { fontWeight: '700' },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  viaRespTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
   itemTempo: { fontSize: 11.5, color: Brand.muted },
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
@@ -450,6 +470,17 @@ const styles = StyleSheet.create({
     borderTopColor: Brand.line,
     backgroundColor: Brand.surface,
   },
+  somenteLeitura: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Brand.line,
+    backgroundColor: Brand.surface,
+  },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
   inputAvatar: {
     width: 34,
     height: 34,

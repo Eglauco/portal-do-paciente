@@ -59,7 +59,7 @@ class LembreteFlowTest {
         // Agendamento CONFIRMADO daqui a 2h nesse procedimento (paciente/unidade/etc. do seed = id 1).
         LocalDateTime dh = LocalDateTime.now(FUSO).plusHours(2).withNano(0);
         AgendamentoResponse ag = agendamentoController.criar(
-                new AgendamentoRequest(dh, 1L, 1L, proc.getId(), 1L, 1L, null));
+                new AgendamentoRequest(dh, 1L, 1L, proc.getId(), 1L, 1L, null), null);
         Long pacienteId = ag.paciente().id();
         // criar() sempre nasce AGUARDANDO; confirmamos para o pop-up poder cancelar.
         var entidade = agendamentoRepository.findById(ag.id()).orElseThrow();

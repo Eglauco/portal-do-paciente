@@ -8,6 +8,8 @@ public record ComentarioResponse(
         Long id,
         String autor,
         String fotoUrl,
+        /** Nome (abreviado) do responsável que comentou pelo paciente, ou null se foi o próprio. */
+        String responsavelNome,
         String texto,
         LocalDateTime criadoEm,
         boolean editado,
@@ -21,16 +23,18 @@ public record ComentarioResponse(
     /**
      * Comentário/resposta sem filhos aninhados. {@code fotoDoPaciente} resolve a foto
      * (URL pré-assinada) pelo {@code pacienteId} do autor — null quando não é do paciente
-     * ou não tem foto. O "dono" é conferido contra o paciente logado ({@code pacienteAtual})
-     * OU o admin logado ({@code adminAtual}); qualquer um pode ser nulo conforme quem lê.
+     * ou não tem foto. {@code nomeDoResponsavel} resolve o nome (abreviado) pelo
+     * {@code responsavelId} — null quando foi o próprio paciente. O "dono" é conferido
+     * contra o paciente logado ({@code pacienteAtual}) OU o admin logado ({@code adminAtual}).
      */
     public static ComentarioResponse from(Comentario c, Long pacienteAtual, Long adminAtual,
-            Function<Long, String> fotoDoPaciente) {
+            Function<Long, String> fotoDoPaciente, Function<Long, String> nomeDoResponsavel) {
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
                 fotoDoPaciente.apply(c.getPacienteId()),
+                nomeDoResponsavel.apply(c.getResponsavelId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,
@@ -41,14 +45,15 @@ public record ComentarioResponse(
 
     /** Comentário-raiz com suas respostas (as respostas não aninham mais níveis). */
     public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual,
-            Long adminAtual, Function<Long, String> fotoDoPaciente) {
+            Long adminAtual, Function<Long, String> fotoDoPaciente, Function<Long, String> nomeDoResponsavel) {
         List<ComentarioResponse> filhos = respostas.stream()
-                .map(r -> from(r, pacienteAtual, adminAtual, fotoDoPaciente)).toList();
+                .map(r -> from(r, pacienteAtual, adminAtual, fotoDoPaciente, nomeDoResponsavel)).toList();
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
                 c.getAutor(),
                 fotoDoPaciente.apply(c.getPacienteId()),
+                nomeDoResponsavel.apply(c.getResponsavelId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,

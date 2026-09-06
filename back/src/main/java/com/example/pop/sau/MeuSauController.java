@@ -21,8 +21,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.Responsavel;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
@@ -68,10 +70,11 @@ public class MeuSauController {
     @GetMapping
     public Pagina<ManifestacaoResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.SAU);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), TAMANHO_MAXIMO));
         Page<Manifestacao> resultado = repository.findByPacienteIdOrderByAtualizadoEmDesc(pacienteId, pageable);
-        List<ManifestacaoResponse> content = resultado.getContent().stream().map(sauService::toResponse).toList();
+        List<ManifestacaoResponse> content = sauService.toResponse(resultado.getContent());
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
@@ -81,14 +84,17 @@ public class MeuSauController {
     @Transactional
     public ManifestacaoDetalheResponse abrir(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody AbrirManifestacaoRequest request) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.SAU);
         Paciente paciente = acessoService.pacienteDoToken(jwt);
-        Manifestacao m = sauService.abrir(paciente, request.unidadeId(), request.tipoId(), request.texto());
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        Manifestacao m = sauService.abrir(paciente, request.unidadeId(), request.tipoId(), request.texto(), responsavel);
         return sauService.toDetalhe(m);
     }
 
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ManifestacaoDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.SAU);
         return sauService.toDetalhe(minha(jwt, id));
     }
 
@@ -97,7 +103,9 @@ public class MeuSauController {
     @Transactional
     public ManifestacaoDetalheResponse responder(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody MensagemSauRequest request) {
-        Manifestacao m = sauService.responderComoPaciente(minha(jwt, id), request.texto());
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.SAU);
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        Manifestacao m = sauService.responderComoPaciente(minha(jwt, id), request.texto(), responsavel);
         return sauService.toDetalhe(m);
     }
 
@@ -106,6 +114,7 @@ public class MeuSauController {
     @Transactional
     public ManifestacaoDetalheResponse encerrar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody EncerrarSauRequest request) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.SAU);
         Manifestacao m = sauService.encerrarPeloPaciente(minha(jwt, id), request.nota(), request.comentario());
         return sauService.toDetalhe(m);
     }

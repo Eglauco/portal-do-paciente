@@ -27,7 +27,11 @@ public class Dispositivo {
     @Column(nullable = false, unique = true, length = 255)
     private String token;
 
-    /** Paciente dono do aparelho (para push direcionado). Null antes do login. */
+    /** Conta (telefone) dona do aparelho — base do push por conta. Null antes do login. */
+    @Column(name = "conta_id")
+    private Long contaId;
+
+    /** Perfil ativo no registro. Legado: o push direcionado agora resolve pela conta. */
     @Column(name = "paciente_id")
     private Long pacienteId;
 

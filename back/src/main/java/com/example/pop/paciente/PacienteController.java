@@ -4,8 +4,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -90,7 +94,6 @@ public class PacienteController {
                 resultado.isLast());
     }
 
-    private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     /**
@@ -168,9 +171,7 @@ public class PacienteController {
                 ColunaExport.de("CEP", p -> formatarCep(p.getCep())),
                 ColunaExport.de("Complemento", p -> texto(p.getComplemento())),
                 ColunaExport.de("Liberado (app)", p -> p.isAtivo() ? "Sim" : "Não"),
-                ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"),
-                ColunaExport.de("Código expira em",
-                        p -> p.getCodigoAtivacaoExpiraEm() == null ? "" : p.getCodigoAtivacaoExpiraEm().format(DATA_HORA)));
+                ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"));
     }
 
     private static String texto(String v) {
@@ -280,6 +281,7 @@ public class PacienteController {
         p.setEmail(limparEmail(r.email()));
         p.setCns(Documentos.somenteDigitos(r.cns()));
         p.setTelefonesAdicionais(normalizarTelefones(r.telefonesAdicionais()));
+        aplicarResponsaveis(p, r.responsaveis());
 
         if (p.getCpf() != null && !Documentos.cpfValido(p.getCpf())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF inválido");
@@ -326,6 +328,65 @@ public class PacienteController {
     private static String limparEmail(String email) {
         String t = limpar(email);
         return t == null ? null : t.toLowerCase();
+    }
+
+    /**
+     * Reconcilia os responsáveis (cadastro paralelo) na coleção do paciente: atualiza os
+     * existentes por id, cria os novos (id nulo) e remove os que saíram (orphanRemoval).
+     * Muta a coleção no lugar — nunca substitui a instância (exigência do orphanRemoval).
+     */
+    private static void aplicarResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> reqs) {
+        List<PacienteRequest.ResponsavelRequest> entradas = reqs == null ? List.of() : reqs;
+
+        Map<Long, Responsavel> existentes = new HashMap<>();
+        for (Responsavel r : p.getResponsaveis()) {
+            if (r.getId() != null) {
+                existentes.put(r.getId(), r);
+            }
+        }
+        Set<Long> mantidos = new HashSet<>();
+
+        for (PacienteRequest.ResponsavelRequest entrada : entradas) {
+            String nome = limpar(entrada.nome());
+            if (nome == null) {
+                continue; // ignora linhas em branco
+            }
+            String telefone = Documentos.somenteDigitos(entrada.telefone());
+            Responsavel alvo = entrada.id() == null ? null : existentes.get(entrada.id());
+            if (alvo != null) {
+                alvo.setNome(nome);
+                alvo.setTelefone(telefone);
+                aplicarPermissoes(alvo, entrada.permissoes());
+                mantidos.add(alvo.getId());
+            } else {
+                Responsavel novo = new Responsavel();
+                novo.setNome(nome);
+                novo.setTelefone(telefone);
+                novo.setPaciente(p);
+                aplicarPermissoes(novo, entrada.permissoes());
+                p.getResponsaveis().add(novo);
+            }
+        }
+        // Remove os existentes que não vieram no request (orphanRemoval apaga no banco).
+        p.getResponsaveis().removeIf(r -> r.getId() != null && !mantidos.contains(r.getId()));
+    }
+
+    /**
+     * Substitui as permissões do responsável pelas do request. Só grava as concessões
+     * (nível diferente de SEM_ACESSO); as demais funcionalidades ficam ausentes = sem
+     * acesso. Muta o mapa no lugar (não troca a instância — exigência do @ElementCollection).
+     */
+    private static void aplicarPermissoes(Responsavel alvo,
+            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes) {
+        Map<FuncionalidadeApp, NivelAcessoResponsavel> destino = alvo.getPermissoes();
+        destino.clear();
+        if (permissoes != null) {
+            permissoes.forEach((func, nivel) -> {
+                if (func != null && nivel != null && nivel != NivelAcessoResponsavel.SEM_ACESSO) {
+                    destino.put(func, nivel);
+                }
+            });
+        }
     }
 
     /** Telefones adicionais: só dígitos, sem vazios nem repetidos. */

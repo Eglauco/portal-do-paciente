@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.storage.DownloadUrlResponse;
 import com.example.pop.storage.StorageService;
@@ -50,6 +51,7 @@ public class MeusProntuariosController {
     public Pagina<ProntuarioResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
@@ -65,6 +67,7 @@ public class MeusProntuariosController {
     /** Detalhe (com documentos) de um prontuário do paciente logado. */
     @GetMapping("/{id}")
     public ProntuarioDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         return repository.findByIdAndAgendamento_Paciente_Id(id, pacienteId)
                 .map(ProntuarioDetalheResponse::from)
@@ -78,6 +81,7 @@ public class MeusProntuariosController {
      */
     @GetMapping("/documento/download-url")
     public DownloadUrlResponse downloadDocumento(@AuthenticationPrincipal Jwt jwt, @RequestParam String url) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         if (!documentoRepository.existsByUrlAndProntuario_Agendamento_Paciente_Id(url, pacienteId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento não encontrado");

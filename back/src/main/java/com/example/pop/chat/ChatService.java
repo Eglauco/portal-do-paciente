@@ -2,7 +2,11 @@ package com.example.pop.chat;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -14,7 +18,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Ref;
 import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.paciente.Responsavel;
+import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.push.PushService;
 import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
@@ -34,6 +41,8 @@ public class ChatService {
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ResponsavelRepository responsavelRepository;
+    private final PacienteAcessoService acessoService;
     private final ChatLogService chatLogService;
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
@@ -41,13 +50,16 @@ public class ChatService {
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
-            UsuarioRepository usuarioRepository, ChatLogService chatLogService,
+            UsuarioRepository usuarioRepository, ResponsavelRepository responsavelRepository,
+            PacienteAcessoService acessoService, ChatLogService chatLogService,
             SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.usuarioRepository = usuarioRepository;
+        this.responsavelRepository = responsavelRepository;
+        this.acessoService = acessoService;
         this.chatLogService = chatLogService;
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
@@ -104,28 +116,35 @@ public class ChatService {
     }
 
     /**
-     * true quando o paciente tem uma sessão do app amarrada a um aparelho — ou
-     * seja, está de fato usando o app. {@code ativo} sozinho não basta: fica
-     * true assim que o admin gera o código de ativação, antes de o paciente
-     * ativar no celular. Sem uma sessão, ele não recebe as mensagens.
+     * true quando o paciente é ALCANÇÁVEL no app: a própria sessão está amarrada a
+     * um aparelho OU algum responsável dele tem uma conta com aparelho ativo (o
+     * responsável responde por ele). Enquanto alcançável, o admin pode abrir/enviar
+     * e o app do responsável recebe as mensagens. Delega ao serviço de acesso, que
+     * conhece a modelagem de conta/responsável.
      */
     public boolean pacienteUsandoApp(Paciente paciente) {
-        return paciente != null && paciente.isAtivo() && paciente.getDispositivoAtivo() != null;
+        return acessoService.pacienteAlcancavel(paciente);
     }
 
-    /** Registra uma mensagem do paciente na conversa e publica em tempo real. */
-    public Chat enviarComoPaciente(Chat chat, String texto, String clienteId) {
+    /**
+     * Registra uma mensagem do paciente na conversa e publica em tempo real. Quando
+     * quem envia é um responsável agindo pelo perfil dependente, {@code responsavel}
+     * é o cadastro dele — gravado na mensagem e mostrado como marcador; nulo quando é
+     * o próprio paciente.
+     */
+    public Chat enviarComoPaciente(Chat chat, String texto, String clienteId, Responsavel responsavel) {
         if (jaEnviada(chat.getId(), clienteId)) {
             return chat; // idempotente: reenvio da mesma mensagem não duplica
         }
-        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null);
+        Long responsavelId = responsavel != null ? responsavel.getId() : null;
+        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null, responsavelId);
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
 
-        publicar(chat.getId(), salva);
+        publicar(chat.getId(), salva, responsavel != null ? responsavel.getNome() : null);
         return chat;
     }
 
@@ -153,8 +172,8 @@ public class ChatService {
                     "O paciente não está mais utilizando o aplicativo no celular.");
         }
         marcarMensagensDoPacienteComoLidas(chat.getId());
-        // O remetente é o próprio responsável (garantido pelo guard acima).
-        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel);
+        // O remetente é o próprio atendente (garantido pelo guard acima); sem responsável do paciente.
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel, null);
 
         StatusChat statusAntes = chat.getStatus();
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
@@ -168,7 +187,7 @@ public class ChatService {
                     statusAntes, StatusChat.EM_ATENDIMENTO);
         }
 
-        publicar(chat.getId(), salva);
+        publicar(chat.getId(), salva, null);
         // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
         pushService.notificarNovaMensagem(chat);
         return chat;
@@ -201,11 +220,12 @@ public class ChatService {
     }
 
     private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida,
-            Usuario usuario) {
+            Usuario usuario, Long responsavelId) {
         Mensagem mensagem = new Mensagem();
         mensagem.setChat(chat);
         mensagem.setRemetente(remetente);
         mensagem.setUsuario(usuario);
+        mensagem.setResponsavelId(responsavelId);
         mensagem.setTexto(texto.trim());
         mensagem.setEnviadaEm(LocalDateTime.now());
         mensagem.setLida(lida);
@@ -218,8 +238,8 @@ public class ChatService {
      * commit: assim um eco nunca sai de um envio que sofreu rollback (evita bolha
      * fantasma no back-office) e um eco recebido implica mensagem já persistida.
      */
-    public void publicar(Long chatId, Mensagem mensagem) {
-        MensagemResponse payload = MensagemResponse.from(mensagem);
+    public void publicar(Long chatId, Mensagem mensagem, String responsavelNome) {
+        MensagemResponse payload = MensagemResponse.from(mensagem, responsavelNome);
         aposCommit(() -> {
             messagingTemplate.convertAndSend("/topic/chat/" + chatId, payload);
             messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
@@ -294,9 +314,12 @@ public class ChatService {
     }
 
     public ChatDetalheResponse toDetalhe(Chat chat) {
-        List<MensagemResponse> mensagens = mensagemRepository
-                .findByChatIdOrderByEnviadaEmAsc(chat.getId())
-                .stream().map(MensagemResponse::from).toList();
+        List<Mensagem> lista = mensagemRepository.findByChatIdOrderByEnviadaEmAsc(chat.getId());
+        Map<Long, String> nomes = nomesDosResponsaveis(lista);
+        List<MensagemResponse> mensagens = lista.stream()
+                .map(m -> MensagemResponse.from(m,
+                        m.getResponsavelId() == null ? null : nomes.get(m.getResponsavelId())))
+                .toList();
         return new ChatDetalheResponse(
                 chat.getId(),
                 new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
@@ -308,6 +331,23 @@ public class ChatService {
                 chat.getResponsavel() != null ? chat.getResponsavel().getId() : null,
                 chat.getResponsavel() != null ? chat.getResponsavel().getNome() : null,
                 mensagens);
+    }
+
+    /**
+     * Nome de cada responsável referenciado pelas mensagens, resolvido em uma única
+     * consulta (evita N+1 ao montar o detalhe). Vazio quando nenhuma mensagem foi
+     * enviada via responsável.
+     */
+    private Map<Long, String> nomesDosResponsaveis(List<Mensagem> mensagens) {
+        Set<Long> ids = mensagens.stream()
+                .map(Mensagem::getResponsavelId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return responsavelRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(Responsavel::getId, Responsavel::getNome));
     }
 
     /** Sinal leve para as telas de lista recarregarem. */

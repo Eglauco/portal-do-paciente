@@ -21,7 +21,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.Responsavel;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
@@ -65,6 +67,7 @@ public class MeuChatController {
     @PostMapping
     public ChatDetalheResponse abrir(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody AbrirMinhaConversaRequest request) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.CHAT);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         ChatService.AberturaConversa abertura = chatService.abrirOuCriar(pacienteId, request.unidadeId());
         return semResponsavelId(chatService.toDetalhe(abertura.chat()));
@@ -75,6 +78,7 @@ public class MeuChatController {
     public Pagina<ChatResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.CHAT);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
@@ -92,15 +96,22 @@ public class MeuChatController {
     @GetMapping("/{id}")
     @Transactional(readOnly = true)
     public ChatDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.CHAT);
         return semResponsavelId(chatService.toDetalhe(minhaConversa(jwt, id)));
     }
 
-    /** Envia uma mensagem do paciente logado na conversa dele. */
+    /**
+     * Envia uma mensagem do paciente logado na conversa dele. Se a sessão está agindo
+     * por um perfil dependente, registra o responsável que a enviou (marcador).
+     */
     @PostMapping("/{id}/mensagem")
     @Transactional
     public ChatDetalheResponse enviar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
-        Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId());
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.CHAT);
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId(),
+                responsavel);
         return semResponsavelId(chatService.toDetalhe(chat));
     }
 
@@ -108,6 +119,7 @@ public class MeuChatController {
     @PostMapping("/{id}/entregue")
     @Transactional
     public void confirmarEntrega(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.CHAT);
         Chat chat = minhaConversa(jwt, id);
         chatService.marcarEntregue(chat.getId());
     }

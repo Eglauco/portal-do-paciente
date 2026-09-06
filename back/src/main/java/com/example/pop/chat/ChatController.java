@@ -260,7 +260,7 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviarComoPaciente(@PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
-        Chat chat = chatService.enviarComoPaciente(obter(id), request.texto(), request.clienteId());
+        Chat chat = chatService.enviarComoPaciente(obter(id), request.texto(), request.clienteId(), null);
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 

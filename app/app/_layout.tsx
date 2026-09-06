@@ -17,6 +17,7 @@ import { notificarAtualizacao } from '@/services/atualizacao';
 import { ehChatAtivo } from '@/services/chat-ativo';
 import { registrarParaPush } from '@/services/notificacoes';
 import { navegarNotificacao } from '@/services/rota-notificacao';
+import { abaInicial, trocarPerfilSeNecessario } from '@/services/sessao';
 
 // Mantém a splash nativa até sabermos se o paciente já está logado (sem piscar o login).
 SplashScreen.preventAutoHideAsync();
@@ -32,6 +33,8 @@ interface DadosNotificacao {
   postagemId?: number;
   manifestacaoId?: number;
   agendamentoId?: number;
+  /** Perfil a que a notificação se refere (para trocar de perfil ao tocar). */
+  pacienteId?: number;
 }
 
 // Como exibir a notificação quando o app está em primeiro plano.
@@ -56,12 +59,28 @@ Notifications.setNotificationHandler({
   },
 });
 
-/** Ao tocar na notificação push, leva o paciente para a tela certa. */
-function tratarToque(resposta: Notifications.NotificationResponse) {
+/**
+ * Ao tocar na notificação push: se ela é de outro perfil, troca automaticamente
+ * para o perfil dela antes de navegar; depois leva à tela certa.
+ */
+async function tratarToque(resposta: Notifications.NotificationResponse) {
   const dados = resposta.notification.request.content.data as DadosNotificacao;
+  let trocou = false;
+  if (typeof dados?.pacienteId === 'number') {
+    try {
+      trocou = await trocarPerfilSeNecessario(dados.pacienteId);
+    } catch {
+      // Se a troca falhar, segue no perfil atual (a navegação ainda acontece).
+    }
+  }
   // Cada push traz só o id relevante do seu tipo; a rota é compartilhada com a lista.
   const id = dados?.chatId ?? dados?.manifestacaoId ?? dados?.postagemId ?? dados?.agendamentoId ?? null;
   navegarNotificacao(dados?.tipo, id);
+  // Trocou de perfil: recarrega a tela em foco com o novo perfil (as demais recarregam
+  // ao ganhar foco). Garante que o app reflita o perfil da notificação, sem "puxar p/ atualizar".
+  if (trocou) {
+    notificarAtualizacao();
+  }
 }
 
 /**
@@ -76,12 +95,20 @@ function Navegacao() {
   useEffect(() => {
     if (carregando) return;
     SplashScreen.hideAsync();
-    const naTelaDeLogin = (segments as string[]).length === 0; // rota "/" (index)
-    if (!sessao && !naTelaDeLogin) {
-      roteador.replace('/');
-    } else if (sessao && naTelaDeLogin) {
-      roteador.replace('/(tabs)/agendamentos');
+    const rota = (segments as string[])[0] ?? '';
+    const naRaiz = rota === ''; // rota "/" (index / login)
+    if (!sessao) {
+      if (!naRaiz) roteador.replace('/');
+      return;
     }
+    // Autenticou mas ainda não escolheu o perfil → tela "Selecionar Perfil".
+    if (!sessao.perfilSelecionado) {
+      if (rota !== 'selecionar-perfil') roteador.replace('/selecionar-perfil');
+      return;
+    }
+    // Perfil escolhido: se ainda está no login, entra no app na primeira aba acessível
+    // do perfil ativo (evita cair numa aba escondida por permissão).
+    if (naRaiz) roteador.replace(abaInicial(sessao));
   }, [sessao, carregando, segments, roteador]);
 
   return (
@@ -89,6 +116,7 @@ function Navegacao() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="selecionar-perfil" options={{ headerShown: false }} />
         <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
@@ -98,8 +126,8 @@ function Navegacao() {
         <Stack.Screen name="sau/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
-      {/* Pop-up fixo de lembrete: só com sessão (usa endpoints do paciente). */}
-      {sessao && <LembretePopup />}
+      {/* Pop-up fixo de lembrete: só com um perfil escolhido (usa endpoints do paciente). */}
+      {sessao && sessao.perfilSelecionado && <LembretePopup />}
     </>
   );
 }

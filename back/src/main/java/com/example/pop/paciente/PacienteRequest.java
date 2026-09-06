@@ -2,6 +2,7 @@ package com.example.pop.paciente;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -33,12 +34,31 @@ public record PacienteRequest(
         @Size(max = 160) String complemento,
         @Email @Size(max = 160) String email,
         @Size(max = 18) String cns,
-        List<String> telefonesAdicionais) {
+        List<String> telefonesAdicionais,
+        List<ResponsavelRequest> responsaveis) {
 
     /** Atalho (nome + telefone) usado em testes e cadastros mínimos. */
     public PacienteRequest(String nome, String telefone) {
         this(nome, telefone, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null);
+                null, null, null, null);
+    }
+
+    /**
+     * Responsável do paciente (cadastro paralelo). {@code id} nulo = novo; preenchido
+     * = já existente (mantém o mesmo registro na edição). Só o nome é obrigatório.
+     * {@code permissoes} define o nível de acesso por funcionalidade do app; ausente
+     * ou SEM_ACESSO = sem acesso àquela funcionalidade (padrão).
+     */
+    public record ResponsavelRequest(
+            Long id,
+            @NotBlank @Size(min = 2, max = 120) String nome,
+            @Size(max = 20) String telefone,
+            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes) {
+
+        /** Compat (testes/cadastros mínimos): sem permissões explícitas → tudo SEM_ACESSO. */
+        public ResponsavelRequest(Long id, String nome, String telefone) {
+            this(id, nome, telefone, null);
+        }
     }
 }
 

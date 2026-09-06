@@ -1,6 +1,7 @@
 package com.example.pop.notificacao;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -86,10 +87,23 @@ public class NotificacaoService {
 
     @Transactional(readOnly = true)
     public Pagina<NotificacaoResponse> listar(Long pacienteId, int page, int size) {
+        return listar(pacienteId, List.of(), page, size);
+    }
+
+    /**
+     * Lista as notificações do paciente, EXCLUINDO os tipos bloqueados por permissão
+     * (funcionalidade sem acesso para o responsável). Filtra no banco para a paginação
+     * e o contador ficarem consistentes com a lista. Vazio = sem exclusão.
+     */
+    @Transactional(readOnly = true)
+    public Pagina<NotificacaoResponse> listar(Long pacienteId, Collection<TipoNotificacao> tiposExcluidos,
+            int page, int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pagina, tamanho);
-        Page<Notificacao> resultado = repository.findByPacienteIdOrderByCriadoEmDesc(pacienteId, pageable);
+        Page<Notificacao> resultado = tiposExcluidos.isEmpty()
+                ? repository.findByPacienteIdOrderByCriadoEmDesc(pacienteId, pageable)
+                : repository.findByPacienteIdAndTipoNotInOrderByCriadoEmDesc(pacienteId, tiposExcluidos, pageable);
         List<NotificacaoResponse> content = resultado.getContent().stream().map(NotificacaoResponse::from).toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -97,7 +111,15 @@ public class NotificacaoService {
 
     @Transactional(readOnly = true)
     public long contarNaoLidas(Long pacienteId) {
-        return repository.countByPacienteIdAndLidaFalse(pacienteId);
+        return contarNaoLidas(pacienteId, List.of());
+    }
+
+    /** Não lidas do sino, excluindo os tipos bloqueados por permissão. Vazio = sem exclusão. */
+    @Transactional(readOnly = true)
+    public long contarNaoLidas(Long pacienteId, Collection<TipoNotificacao> tiposExcluidos) {
+        return tiposExcluidos.isEmpty()
+                ? repository.countByPacienteIdAndLidaFalse(pacienteId)
+                : repository.countByPacienteIdAndLidaFalseAndTipoNotIn(pacienteId, tiposExcluidos);
     }
 
     /** Marca como lida ao tocar (idempotente); ignora se não for do paciente. */

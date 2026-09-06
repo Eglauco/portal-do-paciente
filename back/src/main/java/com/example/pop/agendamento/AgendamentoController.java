@@ -14,6 +14,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -60,12 +62,13 @@ public class AgendamentoController {
     private final NpsService npsService;
     private final PushService pushService;
     private final ExportacaoService exportacaoService;
+    private final AgendamentoLogService logService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
-            ExportacaoService exportacaoService) {
+            ExportacaoService exportacaoService, AgendamentoLogService logService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
@@ -76,6 +79,7 @@ public class AgendamentoController {
         this.npsService = npsService;
         this.pushService = pushService;
         this.exportacaoService = exportacaoService;
+        this.logService = logService;
     }
 
     /**
@@ -212,12 +216,15 @@ public class AgendamentoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public AgendamentoResponse criar(@Valid @RequestBody AgendamentoRequest request) {
+    public AgendamentoResponse criar(@Valid @RequestBody AgendamentoRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
         Agendamento agendamento = new Agendamento();
         aplicar(agendamento, request);
         // Regra de negócio: todo novo agendamento nasce aguardando confirmação do paciente.
         agendamento.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
         Agendamento salvo = repository.save(agendamento);
+        // Primeira linha do histórico: a unidade criou o agendamento (status inicial).
+        logService.registrarDaUnidade(salvo, null, StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, uidDoToken(jwt));
         // Notifica o paciente (push) para confirmar/cancelar o novo agendamento.
         pushService.notificarNovoAgendamento(salvo);
         return AgendamentoResponse.from(salvo);
@@ -225,7 +232,7 @@ public class AgendamentoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<AgendamentoResponse> atualizar(@PathVariable Long id,
-            @Valid @RequestBody AgendamentoRequest request) {
+            @Valid @RequestBody AgendamentoRequest request, @AuthenticationPrincipal Jwt jwt) {
         return repository.findById(id)
                 .map(agendamento -> {
                     StatusAgendamento anterior = agendamento.getStatusAgendamento();
@@ -234,6 +241,8 @@ public class AgendamentoController {
                         agendamento.setStatusAgendamento(request.statusAgendamento());
                     }
                     Agendamento salvo = repository.save(agendamento);
+                    // Registra a troca de status feita pela unidade (só grava se de fato mudou).
+                    logService.registrarDaUnidade(salvo, anterior, salvo.getStatusAgendamento(), uidDoToken(jwt));
                     // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
                     npsService.gerarSeNecessario(salvo);
                     // Ao MARCAR falta (transição), notifica o paciente para justificar a ausência.
@@ -248,14 +257,27 @@ public class AgendamentoController {
 
     /** Confirmação do paciente (app): move o status para PACIENTE_CONFIRMOU. */
     @PostMapping("/{id}/confirmar")
-    public ResponseEntity<AgendamentoResponse> confirmar(@PathVariable Long id) {
-        return alterarStatus(id, StatusAgendamento.PACIENTE_CONFIRMOU);
+    public ResponseEntity<AgendamentoResponse> confirmar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        return alterarStatus(id, StatusAgendamento.PACIENTE_CONFIRMOU, uidDoToken(jwt));
     }
 
     /** Cancelamento pelo paciente (app): move o status para CANCELADO_PELO_PACIENTE. */
     @PostMapping("/{id}/cancelar")
-    public ResponseEntity<AgendamentoResponse> cancelar(@PathVariable Long id) {
-        return alterarStatus(id, StatusAgendamento.CANCELADO_PELO_PACIENTE);
+    public ResponseEntity<AgendamentoResponse> cancelar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        return alterarStatus(id, StatusAgendamento.CANCELADO_PELO_PACIENTE, uidDoToken(jwt));
+    }
+
+    /**
+     * Linha do tempo das trocas de status do agendamento (auditoria): quem fez cada
+     * mudança (paciente, responsável ou unidade). Espelha o histórico do chat.
+     */
+    @GetMapping("/{id}/logs")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<AgendamentoLogResponse>> logs(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(logService.listar(id));
     }
 
     /**
@@ -282,13 +304,22 @@ public class AgendamentoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    private ResponseEntity<AgendamentoResponse> alterarStatus(Long id, StatusAgendamento status) {
+    private ResponseEntity<AgendamentoResponse> alterarStatus(Long id, StatusAgendamento status, Long usuarioId) {
         return repository.findById(id)
                 .map(agendamento -> {
+                    StatusAgendamento antes = agendamento.getStatusAgendamento();
                     agendamento.setStatusAgendamento(status);
-                    return ResponseEntity.ok(AgendamentoResponse.from(repository.save(agendamento)));
+                    Agendamento salvo = repository.save(agendamento);
+                    // Feita pela unidade (back-office); grava só se o status mudou de fato.
+                    logService.registrarDaUnidade(salvo, antes, status, usuarioId);
+                    return ResponseEntity.ok(AgendamentoResponse.from(salvo));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** uid do atendente logado (nulo se não houver token — ex.: chamadas diretas em teste). */
+    private Long uidDoToken(Jwt jwt) {
+        return jwt != null && jwt.getClaim("uid") instanceof Number numero ? numero.longValue() : null;
     }
 
     @DeleteMapping("/{id}")

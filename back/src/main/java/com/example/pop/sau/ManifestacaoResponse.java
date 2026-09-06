@@ -16,6 +16,8 @@ public record ManifestacaoResponse(
         String statusDescricao,
         String ultimaMensagem,
         AutorManifestacao ultimaMensagemDe,
+        /** Nome do responsável que abriu a manifestação pelo paciente; null se foi o próprio. */
+        String responsavelNome,
         /** Nota do atendimento (1-5) quando o paciente já avaliou; senão nulo. */
         Integer avaliacaoNota,
         LocalDateTime atualizadoEm,

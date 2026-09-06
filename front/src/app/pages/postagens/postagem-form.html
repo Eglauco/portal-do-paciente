@@ -160,6 +160,14 @@
                     </div>
                   } @else {
                     <p class="coment__texto"><b>{{ c.autor }}</b> {{ c.texto }}</p>
+                    @if (c.responsavelNome) {
+                      <p class="coment__via-resp">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.66" />
+                        </svg>
+                        Comentado por <b>{{ c.responsavelNome }}</b> (responsável)
+                      </p>
+                    }
                     <div class="coment__meta">
                       <span class="coment__data">
                         {{ c.criadoEm | date: 'dd/MM/yyyy HH:mm' }}@if (c.editado) {<span class="coment__editado"> · editado</span>}
@@ -215,6 +223,14 @@
                             </div>
                           } @else {
                             <p class="coment__texto"><b>{{ r.autor }}</b> {{ r.texto }}</p>
+                            @if (r.responsavelNome) {
+                              <p class="coment__via-resp">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                  <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.66" />
+                                </svg>
+                                Comentado por <b>{{ r.responsavelNome }}</b> (responsável)
+                              </p>
+                            }
                             <div class="coment__meta">
                               <span class="coment__data">
                                 {{ r.criadoEm | date: 'dd/MM/yyyy HH:mm' }}@if (r.editado) {<span class="coment__editado"> · editado</span>}

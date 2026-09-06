@@ -48,9 +48,9 @@ class NpsAgendamentoDisparoTest {
     /** Cria um agendamento (seed id 1 para especialidade/profissional/paciente/unidade) e marca presença. */
     private AgendamentoResponse presenca(Long procId) {
         LocalDateTime dh = LocalDateTime.now(FUSO).plusDays(1).withNano(0);
-        AgendamentoResponse ag = agendamentoController.criar(new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, null));
+        AgendamentoResponse ag = agendamentoController.criar(new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, null), null);
         agendamentoController.atualizar(ag.id(),
-                new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, StatusAgendamento.PRESENCA_PACIENTE));
+                new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, StatusAgendamento.PRESENCA_PACIENTE), null);
         return ag;
     }
 
@@ -107,7 +107,7 @@ class NpsAgendamentoDisparoTest {
             // Sai de presença (ex.: correção para falta).
             LocalDateTime dh = LocalDateTime.now(FUSO).plusDays(1).withNano(0);
             agendamentoController.atualizar(ag.id(),
-                    new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, StatusAgendamento.FALTA_PACIENTE));
+                    new AgendamentoRequest(dh, 1L, 1L, procId, 1L, 1L, StatusAgendamento.FALTA_PACIENTE), null);
 
             nps.setDispararEm(LocalDateTime.now(FUSO).minusMinutes(1));
             npsRepository.save(nps);

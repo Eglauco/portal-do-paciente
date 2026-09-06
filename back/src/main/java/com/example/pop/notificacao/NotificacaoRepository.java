@@ -1,6 +1,7 @@
 package com.example.pop.notificacao;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -15,8 +16,15 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
     /** Notificações do paciente, mais recentes primeiro. */
     Page<Notificacao> findByPacienteIdOrderByCriadoEmDesc(Long pacienteId, Pageable pageable);
 
+    /** Idem, excluindo tipos bloqueados por permissão do responsável (funcionalidade sem acesso). */
+    Page<Notificacao> findByPacienteIdAndTipoNotInOrderByCriadoEmDesc(
+            Long pacienteId, Collection<TipoNotificacao> tipos, Pageable pageable);
+
     /** Quantas ainda não foram lidas (para o contador do sino). */
     long countByPacienteIdAndLidaFalse(Long pacienteId);
+
+    /** Idem, excluindo tipos bloqueados por permissão do responsável. */
+    long countByPacienteIdAndLidaFalseAndTipoNotIn(Long pacienteId, Collection<TipoNotificacao> tipos);
 
     /** Marca TODAS as não lidas do paciente como lidas de uma vez (botão "marcar todas"). */
     @Modifying

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
 
 /** Lembretes do lado do paciente (app): pop-ups pendentes e reconhecimento. */
@@ -28,6 +29,8 @@ public class MeuLembreteController {
     /** Pop-ups de lembrete a mostrar ao abrir o app (reaparecem até reconhecer). */
     @GetMapping("/popups")
     public List<LembretePopupResponse> popups(@AuthenticationPrincipal Jwt jwt) {
+        // Lembrete é conteúdo de AGENDAMENTOS: um responsável sem acesso não recebe os pop-ups.
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         return lembreteService.popupsPendentes(pacienteId);
     }
@@ -35,6 +38,7 @@ public class MeuLembreteController {
     /** Reconhece o pop-up (não reaparece mais). */
     @PostMapping("/{notificacaoId}/reconhecer")
     public void reconhecer(@AuthenticationPrincipal Jwt jwt, @PathVariable Long notificacaoId) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         lembreteService.reconhecer(notificacaoId, pacienteId);
     }

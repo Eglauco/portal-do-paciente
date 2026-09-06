@@ -3,9 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 import { cancelarAgendamento } from '@/services/agendamentos';
 import { assinarAtualizacao } from '@/services/atualizacao';
 import { LembretePopup as Lembrete, listarPopupsPendentes, reconhecerLembrete } from '@/services/lembretes';
+import { podeLancar } from '@/services/sessao';
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -21,6 +23,9 @@ function dataHoraFmt(iso: string): string {
  * ainda está no prazo, oferece cancelar direto no pop-up.
  */
 export function LembretePopup() {
+  const { sessao } = useSessao();
+  // Cancelar é lançamento em AGENDAMENTOS: responsável só-leitura vê o lembrete, mas sem o botão.
+  const podeCancelarAgendamento = podeLancar(sessao, 'AGENDAMENTOS');
   const [fila, setFila] = useState<Lembrete[]>([]);
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -132,7 +137,7 @@ export function LembretePopup() {
             </View>
           )}
 
-          {atual.podeCancelar && (
+          {atual.podeCancelar && podeCancelarAgendamento && (
             <Pressable style={[styles.btnCancelar, processando && styles.desativado]} onPress={cancelar} disabled={processando}>
               {processando ? (
                 <ActivityIndicator color="#B23B4E" />

@@ -31,6 +31,8 @@ export interface Mensagem {
   entregue: boolean;
   /** Nome do atendente que enviou (só nas mensagens da unidade). */
   atendenteNome?: string | null;
+  /** Nome do responsável que enviou em nome do paciente (perfil dependente); nulo se foi o próprio. */
+  responsavelNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
   pendente?: boolean;
   /** Só no cliente: o envio falhou depois das retentativas (mostra "reenviar"). */

@@ -20,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
-import com.example.pop.pacienteauth.PacienteSessaoResponse;
 import com.example.pop.pacienteauth.SolicitarCodigoRequest;
 import com.example.pop.verificacao.CanalVerificacao;
 import com.example.pop.verificacao.VerificacaoService;
@@ -97,7 +96,7 @@ class PacienteAcessoTest {
     void fluxoAtivarEmiteTokenAmarradoAoAparelho() {
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
 
-        PacienteSessaoResponse sessao = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-A"));
+        var sessao = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-A"));
         assertNotNull(sessao.token());
         assertEquals(pacienteId, sessao.pacienteId());
 
@@ -105,6 +104,8 @@ class PacienteAcessoTest {
         assertEquals("PACIENTE", jwt.getClaimAsString("role"));
         assertEquals("dev-A", jwt.getClaimAsString("dev"));
         assertEquals(pacienteId, ((Number) jwt.getClaim("pid")).longValue());
+        // Novo modelo: o token também carrega a conta (cid).
+        assertNotNull(jwt.getClaim("cid"));
 
         assertDoesNotThrow(() -> acessoService.validarSessao(pacienteId, "dev-A"));
     }
@@ -138,8 +139,11 @@ class PacienteAcessoTest {
     @Test
     void revogarInvalidaSessao() {
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-A"));
+        var sessao = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-A"));
         acessoService.revogar(repository.findById(pacienteId).orElseThrow());
+        // A sessão legada (validarSessao) E a nova (token com cid) devem cair.
         assertThrows(ResponseStatusException.class, () -> acessoService.validarSessao(pacienteId, "dev-A"));
+        Jwt jwt = jwtDecoder.decode(sessao.token());
+        assertThrows(ResponseStatusException.class, () -> acessoService.pacienteDoToken(jwt));
     }
 }

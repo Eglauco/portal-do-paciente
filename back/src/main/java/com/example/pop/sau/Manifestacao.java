@@ -66,6 +66,10 @@ public class Manifestacao {
     @Column(name = "avaliacao_comentario", length = 500)
     private String avaliacaoComentario;
 
+    /** Responsável (cadastro) que ABRIU a manifestação pelo paciente. Nulo quando foi o próprio. */
+    @Column(name = "responsavel_id")
+    private Long responsavelId;
+
     /** Quando foi avaliada. Não-nulo = encerrada e avaliada (definitiva, não reabre). */
     @Column(name = "avaliado_em")
     private LocalDateTime avaliadoEm;

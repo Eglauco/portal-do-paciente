@@ -16,8 +16,28 @@ import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { CepService } from '../../shared/cep.service';
 import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
-import { PacienteEntrada } from './paciente.model';
+import {
+  FUNCIONALIDADES_APP,
+  FuncionalidadeApp,
+  NIVEIS_ACESSO,
+  NIVEIS_SEM_LANCAMENTO,
+  NivelAcesso,
+  PacienteEntrada,
+  PermissoesResponsavel,
+  Responsavel,
+} from './paciente.model';
 import { PacienteService } from './paciente.service';
+
+/** Sub-grupo com o nível de acesso do responsável por funcionalidade do app. */
+type PermissoesForm = FormGroup<Record<FuncionalidadeApp, FormControl<NivelAcesso>>>;
+
+/** Grupo do formulário para um responsável (cadastro paralelo). */
+type ResponsavelForm = FormGroup<{
+  id: FormControl<number | null>;
+  nome: FormControl<string>;
+  telefone: FormControl<string>;
+  permissoes: PermissoesForm;
+}>;
 
 const SEXOS = [
   { value: 'MASCULINO', label: 'Masculino' },
@@ -79,6 +99,7 @@ export class PacienteForm implements PodeSair {
     email: new FormControl('', { nonNullable: true, validators: [Validators.email] }),
     telefone: new FormControl('', { nonNullable: true }),
     telefonesAdicionais: new FormArray<FormControl<string>>([]),
+    responsaveis: new FormArray<ResponsavelForm>([]),
     cep: new FormControl('', { nonNullable: true }),
     rua: new FormControl('', { nonNullable: true }),
     numero: new FormControl('', { nonNullable: true }),
@@ -144,6 +165,72 @@ export class PacienteForm implements PodeSair {
     numeros.forEach((n) => this.telefonesAdicionais.push(new FormControl(n, { nonNullable: true })));
   }
 
+  protected get responsaveis(): FormArray<ResponsavelForm> {
+    return this.form.controls.responsaveis;
+  }
+
+  /** Funcionalidades e níveis para a matriz de permissões (template). */
+  protected readonly funcionalidades = FUNCIONALIDADES_APP;
+  protected readonly niveis = NIVEIS_ACESSO;
+
+  /** Níveis oferecidos para uma funcionalidade (Prontuário não tem "Visualizar e lançar"). */
+  protected niveisPara(funcionalidade: { semLancamento?: boolean }): { value: NivelAcesso; label: string }[] {
+    return funcionalidade.semLancamento ? NIVEIS_SEM_LANCAMENTO : NIVEIS_ACESSO;
+  }
+
+  /** Cria o grupo de um responsável (novo = sem id). */
+  private grupoResponsavel(r: Responsavel = { nome: '' }): ResponsavelForm {
+    const controlesPermissoes = {} as Record<FuncionalidadeApp, FormControl<NivelAcesso>>;
+    for (const f of FUNCIONALIDADES_APP) {
+      controlesPermissoes[f.value] = new FormControl<NivelAcesso>(
+        r.permissoes?.[f.value] ?? 'SEM_ACESSO',
+        { nonNullable: true },
+      );
+    }
+    return new FormGroup({
+      id: new FormControl<number | null>(r.id ?? null),
+      nome: new FormControl(r.nome ?? '', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.minLength(2)],
+      }),
+      telefone: new FormControl(r.telefone ?? '', { nonNullable: true }),
+      permissoes: new FormGroup(controlesPermissoes),
+    });
+  }
+
+  /** Extrai as concessões do sub-grupo (só níveis diferentes de SEM_ACESSO). */
+  private permissoesDoGrupo(grupo: PermissoesForm): PermissoesResponsavel {
+    const perms: PermissoesResponsavel = {};
+    for (const f of FUNCIONALIDADES_APP) {
+      const nivel = grupo.controls[f.value].value;
+      if (nivel !== 'SEM_ACESSO') {
+        perms[f.value] = nivel;
+      }
+    }
+    return perms;
+  }
+
+  protected adicionarResponsavel(): void {
+    this.responsaveis.push(this.grupoResponsavel());
+    this.form.markAsDirty();
+  }
+
+  protected removerResponsavel(indice: number): void {
+    this.responsaveis.removeAt(indice);
+    this.form.markAsDirty();
+  }
+
+  private setResponsaveis(itens: Responsavel[]): void {
+    this.responsaveis.clear();
+    itens.forEach((r) => this.responsaveis.push(this.grupoResponsavel(r)));
+  }
+
+  /** Erro de "nome obrigatório" de uma linha de responsável (após toque/edição). */
+  protected responsavelNomeInvalido(indice: number): boolean {
+    const c = this.responsaveis.at(indice).controls.nome;
+    return c.invalid && (c.touched || c.dirty);
+  }
+
   private carregar(id: number): void {
     this.service.buscarPorId(id).subscribe({
       next: (p) => {
@@ -170,6 +257,7 @@ export class PacienteForm implements PodeSair {
           complemento: p.complemento ?? '',
         });
         this.setTelefonesAdicionais(p.telefonesAdicionais ?? []);
+        this.setResponsaveis(p.responsaveis ?? []);
         this.preenchendo = false;
         this.ativo.set(!!p.ativo);
         this.fotoUrl.set(p.fotoUrl ?? null);
@@ -248,6 +336,14 @@ export class PacienteForm implements PodeSair {
       telefonesAdicionais: this.telefonesAdicionais.controls
         .map((c) => (c.value ?? '').trim())
         .filter((v) => v.length > 0),
+      responsaveis: this.responsaveis.controls
+        .map((g) => ({
+          id: g.controls.id.value ?? null,
+          nome: (g.controls.nome.value ?? '').trim(),
+          telefone: (g.controls.telefone.value ?? '').trim() || null,
+          permissoes: this.permissoesDoGrupo(g.controls.permissoes),
+        }))
+        .filter((r) => r.nome.length > 0),
     };
   }
 

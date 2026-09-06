@@ -24,7 +24,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.common.Pagina;
 import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.motivofalta.MotivoFaltaRepository;
+import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.Responsavel;
 
 import jakarta.validation.Valid;
 
@@ -46,12 +48,15 @@ public class MeusAgendamentosController {
     private final AgendamentoRepository repository;
     private final MotivoFaltaRepository motivoFaltaRepository;
     private final PacienteAcessoService acessoService;
+    private final AgendamentoLogService logService;
 
     public MeusAgendamentosController(AgendamentoRepository repository,
-            MotivoFaltaRepository motivoFaltaRepository, PacienteAcessoService acessoService) {
+            MotivoFaltaRepository motivoFaltaRepository, PacienteAcessoService acessoService,
+            AgendamentoLogService logService) {
         this.repository = repository;
         this.motivoFaltaRepository = motivoFaltaRepository;
         this.acessoService = acessoService;
+        this.logService = logService;
     }
 
     /** Lista os agendamentos do paciente logado (mais recentes primeiro). */
@@ -59,6 +64,7 @@ public class MeusAgendamentosController {
     public Pagina<AgendamentoResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
@@ -85,14 +91,21 @@ public class MeusAgendamentosController {
      * agendamento já cancelado/realizado só para depois cancelá-lo.
      */
     @PostMapping("/{id}/confirmar")
+    @Transactional
     public AgendamentoResponse confirmar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Agendamento agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Só é possível confirmar um agendamento que aguarda confirmação.");
         }
+        StatusAgendamento antes = agendamento.getStatusAgendamento();
         agendamento.setStatusAgendamento(StatusAgendamento.PACIENTE_CONFIRMOU);
-        return AgendamentoResponse.from(repository.save(agendamento));
+        Agendamento salvo = repository.save(agendamento);
+        // Registra quem confirmou: responsável (se a sessão age por um dependente) ou o próprio paciente.
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        logService.registrarDoApp(salvo, antes, StatusAgendamento.PACIENTE_CONFIRMOU, responsavel);
+        return AgendamentoResponse.from(salvo);
     }
 
     /**
@@ -101,7 +114,9 @@ public class MeusAgendamentosController {
      * de cancelamento do procedimento — fora disso, 409.
      */
     @PostMapping("/{id}/cancelar")
+    @Transactional
     public AgendamentoResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Agendamento agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -115,8 +130,13 @@ public class MeusAgendamentosController {
                         "O prazo para cancelar este agendamento já passou.");
             }
         }
+        StatusAgendamento antes = agendamento.getStatusAgendamento();
         agendamento.setStatusAgendamento(StatusAgendamento.CANCELADO_PELO_PACIENTE);
-        return AgendamentoResponse.from(repository.save(agendamento));
+        Agendamento salvo = repository.save(agendamento);
+        // Registra quem cancelou: responsável (se a sessão age por um dependente) ou o próprio paciente.
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        logService.registrarDoApp(salvo, antes, StatusAgendamento.CANCELADO_PELO_PACIENTE, responsavel);
+        return AgendamentoResponse.from(salvo);
     }
 
     /**
@@ -127,6 +147,7 @@ public class MeusAgendamentosController {
     @Transactional
     public AgendamentoResponse justificarFalta(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody JustificarFaltaRequest request) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Agendamento agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.FALTA_PACIENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -138,6 +159,19 @@ public class MeusAgendamentosController {
         agendamento.setJustificativaFalta(texto == null || texto.isBlank() ? null : texto);
         agendamento.setFaltaJustificadaEm(LocalDateTime.now());
         return AgendamentoResponse.from(repository.save(agendamento));
+    }
+
+    /**
+     * Linha do tempo das trocas de status do agendamento do paciente logado — quem
+     * fez cada mudança (o próprio paciente, um responsável ou a unidade). Visível a
+     * todos os perfis com acesso a este agendamento.
+     */
+    @GetMapping("/{id}/logs")
+    @Transactional(readOnly = true)
+    public List<AgendamentoLogResponse> logs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
+        Agendamento agendamento = meuAgendamento(jwt, id); // 404 se não é do paciente logado
+        return logService.listar(agendamento.getId());
     }
 
     /** Carrega o agendamento garantindo que é do paciente logado (404 caso contrário). */

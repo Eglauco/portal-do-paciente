@@ -49,6 +49,10 @@ public class ManifestacaoMensagem {
     @JoinColumn(name = "usuario_id")
     private Usuario usuario;
 
+    /** Responsável (cadastro) que ENVIOU esta mensagem pelo paciente. Nulo quando foi o próprio ou o SAU. */
+    @Column(name = "responsavel_id")
+    private Long responsavelId;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String texto;
 
