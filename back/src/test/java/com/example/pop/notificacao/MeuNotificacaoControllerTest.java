@@ -57,7 +57,7 @@ class MeuNotificacaoControllerTest {
                             org.springframework.data.domain.PageRequest.of(0, 100)).getContent());
             pacienteRepository.deleteById(p.getId());
         });
-        pacienteId = pacienteController.criar(new PacienteRequest("Notif Paciente", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Notif Paciente", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-notif")).token());
     }
@@ -111,7 +111,7 @@ class MeuNotificacaoControllerTest {
     @Test
     void naoEnxergaNemMarcaNotificacaoDeOutroPaciente() {
         // Notificação de OUTRO paciente não deve aparecer nem ser marcável por este.
-        Long outroId = pacienteController.criar(new PacienteRequest("Outro Notif", "11955557777")).getId();
+        Long outroId = pacienteController.criar(new PacienteRequest("Outro Notif", "11955557777"), null).getId();
         try {
             notificacaoService.registrar(outroId, TipoNotificacao.FALTA, "Falta registrada", "corpo", 30L);
             Long idOutro = notificacaoRepository.findByPacienteIdOrderByCriadoEmDesc(outroId,

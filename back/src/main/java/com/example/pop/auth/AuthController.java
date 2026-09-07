@@ -105,6 +105,26 @@ public class AuthController {
         return UsuarioLogadoResponse.from(usuarioRepository.save(usuario));
     }
 
+    /**
+     * Troca a própria senha (admin logado): confere a atual, aplica a nova e marca
+     * {@code credenciaisAlteradasEm} — o que INVALIDA todas as sessões (tokens emitidos
+     * antes deixam de valer). O front desloga em seguida e o usuário entra com a nova.
+     */
+    @PutMapping("/senha")
+    public void trocarSenha(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TrocarSenhaRequest request) {
+        Usuario usuario = usuarioLogado(jwt);
+        if (usuario.getSenhaHash() == null
+                || !passwordEncoder.matches(request.senhaAtual(), usuario.getSenhaHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha atual incorreta");
+        }
+        if (passwordEncoder.matches(request.novaSenha(), usuario.getSenhaHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A nova senha não pode ser igual à atual");
+        }
+        usuario.setSenhaHash(passwordEncoder.encode(request.novaSenha()));
+        usuario.setCredenciaisAlteradasEm(Instant.now());
+        usuarioRepository.save(usuario);
+    }
+
     private Usuario usuarioLogado(Jwt jwt) {
         return usuarioRepository.findByEmailIgnoreCase(jwt.getSubject())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida"));

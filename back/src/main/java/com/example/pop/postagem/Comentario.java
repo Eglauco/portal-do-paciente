@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -63,4 +65,16 @@ public class Comentario {
     /** Quando foi editado pela última vez (nulo se nunca editado). */
     @Column(name = "editado_em")
     private LocalDateTime editadoEm;
+
+    /**
+     * Estado de moderação por IA. PUBLICADO por padrão (postagem sem validação, ou aprovado).
+     * PENDENTE = potencialmente ofensivo/não validado (oculto do público até o admin decidir).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_moderacao", nullable = false, length = 20)
+    private StatusModeracao statusModeracao = StatusModeracao.PUBLICADO;
+
+    /** Motivo da IA quando ficou pendente (auditoria; exibido ao admin). */
+    @Column(name = "motivo_moderacao", columnDefinition = "TEXT")
+    private String motivoModeracao;
 }

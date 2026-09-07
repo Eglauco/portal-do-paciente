@@ -1,10 +1,10 @@
 import { DatePipe } from '@angular/common';
-import { afterNextRender, Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { StorageService } from '../prontuarios/storage.service';
@@ -68,6 +68,7 @@ export class PostagemForm implements PodeSair {
     descricao: new FormControl('', { nonNullable: true }),
     mostrarTotalCurtidas: new FormControl(true, { nonNullable: true }),
     habilitarComentarios: new FormControl(true, { nonNullable: true }),
+    validarComentariosIa: new FormControl(false, { nonNullable: true }),
     unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
   });
 
@@ -89,7 +90,27 @@ export class PostagemForm implements PodeSair {
   protected readonly comentarios = signal<Comentario[]>([]);
   protected readonly carregandoComentarios = signal(false);
   protected readonly temMaisComentarios = signal(false);
+  /** Referência de "visto" (ISO) devolvida ao abrir: comentários posteriores são novos. */
+  protected readonly comentariosVistosEm = signal<string | null>(null);
+  /** Índice do próximo comentário novo para o atalho "ir para o próximo". */
+  private readonly indiceProximoNovo = signal(0);
+
+  /** Ids (na ordem de exibição) dos comentários novos — para destacar e navegar. */
+  protected readonly idsNovos = computed<string[]>(() => {
+    const ref = this.comentariosVistosEm();
+    const ids: string[] = [];
+    for (const c of this.comentarios()) {
+      if (this.ehNovo(c, ref)) ids.push('coment-' + c.id);
+      for (const r of c.respostas ?? []) {
+        if (this.ehNovo(r, ref)) ids.push('coment-' + r.id);
+      }
+    }
+    return ids;
+  });
+  protected readonly totalNovos = computed(() => this.idsNovos().length);
   protected readonly excluindoComentario = signal<number | null>(null);
+  /** Comentário cuja decisão de moderação (aprovar/rejeitar) está em andamento. */
+  protected readonly moderandoId = signal<number | null>(null);
   private pageComentarios = 0;
 
   // Responder comentários (administração)
@@ -192,6 +213,7 @@ export class PostagemForm implements PodeSair {
         descricao: v.descricao.trim() || null,
         mostrarTotalCurtidas: v.mostrarTotalCurtidas,
         habilitarComentarios: v.habilitarComentarios,
+        validarComentariosIa: v.validarComentariosIa,
         unidadeSaudeId: v.unidadeSaudeId!,
         url: url!,
       };
@@ -242,11 +264,13 @@ export class PostagemForm implements PodeSair {
           descricao: p.descricao ?? '',
           mostrarTotalCurtidas: p.mostrarTotalCurtidas,
           habilitarComentarios: p.habilitarComentarios,
+          validarComentariosIa: p.validarComentariosIa,
         });
         this.urlAtual = p.url;
         this.previewUrl.set(p.url);
         this.totalCurtidas.set(p.totalCurtidas);
         this.totalComentarios.set(p.totalComentarios);
+        this.comentariosVistosEm.set(p.comentariosVistosEm ?? null);
         this.form.markAsPristine();
         this.carregarComentarios(0);
       },
@@ -271,6 +295,38 @@ export class PostagemForm implements PodeSair {
   protected carregarMaisComentarios(): void {
     if (this.carregandoComentarios() || !this.temMaisComentarios()) return;
     this.carregarComentarios(this.pageComentarios + 1);
+  }
+
+  /** Comentário novo = de outra pessoa (não meu) criado depois da última vez que abri a postagem. */
+  private ehNovo(c: Comentario, ref: string | null): boolean {
+    if (c.meu) {
+      return false;
+    }
+    if (!ref) {
+      return true; // nunca abri antes: todos são novos
+    }
+    return new Date(c.criadoEm).getTime() > new Date(ref).getTime();
+  }
+
+  /** Usado no template para destacar o comentário/resposta. */
+  protected comentarioNovo(c: Comentario): boolean {
+    return this.ehNovo(c, this.comentariosVistosEm());
+  }
+
+  /** Rola até o próximo comentário novo (cicla), com um flash para localizar. */
+  protected irParaProximoNovo(): void {
+    const ids = this.idsNovos();
+    if (ids.length === 0) {
+      return;
+    }
+    const idx = this.indiceProximoNovo() % ids.length;
+    const el = document.getElementById(ids[idx]);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('coment--flash');
+      setTimeout(() => el.classList.remove('coment--flash'), 1200);
+    }
+    this.indiceProximoNovo.set(idx + 1);
   }
 
   protected async excluirComentario(comentario: Comentario): Promise<void> {
@@ -310,6 +366,46 @@ export class PostagemForm implements PodeSair {
       error: () => {
         this.excluindoComentario.set(null);
         this.toastr.error('Não foi possível excluir a resposta.');
+      },
+    });
+  }
+
+  /** Aprova um comentário em análise: passa a publicado (visível a todos no feed). */
+  protected aprovarComentario(c: Comentario): void {
+    this.decidirModeracao(c, this.service.aprovarComentario(c.id), 'Comentário aprovado e publicado');
+  }
+
+  /** Rejeita um comentário em análise: nunca é publicado (fica marcado como rejeitado). */
+  protected rejeitarComentario(c: Comentario): void {
+    this.decidirModeracao(c, this.service.rejeitarComentario(c.id), 'Comentário rejeitado');
+  }
+
+  /** Executa a decisão do admin e atualiza o comentário (raiz ou resposta) na lista. */
+  private decidirModeracao(c: Comentario, requisicao: Observable<Comentario>, ok: string): void {
+    if (this.moderandoId() != null) return;
+    this.moderandoId.set(c.id);
+    requisicao.subscribe({
+      next: (atualizado) => {
+        this.comentarios.update((lista) =>
+          lista.map((raiz) =>
+            raiz.id === c.id
+              ? { ...raiz, statusModeracao: atualizado.statusModeracao, motivoModeracao: atualizado.motivoModeracao }
+              : {
+                  ...raiz,
+                  respostas: raiz.respostas.map((r) =>
+                    r.id === c.id
+                      ? { ...r, statusModeracao: atualizado.statusModeracao, motivoModeracao: atualizado.motivoModeracao }
+                      : r,
+                  ),
+                },
+          ),
+        );
+        this.moderandoId.set(null);
+        this.toastr.success(ok);
+      },
+      error: () => {
+        this.moderandoId.set(null);
+        this.toastr.error('Não foi possível concluir a moderação.');
       },
     });
   }

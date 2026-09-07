@@ -236,6 +236,30 @@ public class PostagemController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Aprova um comentário em análise: passa a PUBLICADO (visível a todos no feed). */
+    @PostMapping("/comentario/{comentarioId}/aprovar")
+    @Transactional
+    public ComentarioResponse aprovarComentario(@PathVariable Long comentarioId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return moderar(comentarioId, StatusModeracao.PUBLICADO, uidDoToken(jwt));
+    }
+
+    /** Rejeita um comentário em análise: passa a REJEITADO (nunca publicado; some do feed). */
+    @PostMapping("/comentario/{comentarioId}/rejeitar")
+    @Transactional
+    public ComentarioResponse rejeitarComentario(@PathVariable Long comentarioId,
+            @AuthenticationPrincipal Jwt jwt) {
+        return moderar(comentarioId, StatusModeracao.REJEITADO, uidDoToken(jwt));
+    }
+
+    /** Aplica a decisão do admin sobre um comentário e devolve o comentário atualizado. */
+    private ComentarioResponse moderar(Long comentarioId, StatusModeracao decisao, Long adminId) {
+        Comentario c = comentarioRepository.findById(comentarioId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado"));
+        c.setStatusModeracao(decisao);
+        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null, rid -> null);
+    }
+
     /** Responde a um comentário (administração respondendo dúvidas dos pacientes). */
     @PostMapping("/comentario/{comentarioId}/responder")
     @Transactional
@@ -294,6 +318,7 @@ public class PostagemController {
         postagem.setDescricao(request.descricao());
         postagem.setMostrarTotalCurtidas(request.mostrarTotalCurtidas());
         postagem.setHabilitarComentarios(request.habilitarComentarios());
+        postagem.setValidarComentariosIa(request.validarComentariosIa());
         postagem.setUnidadeSaude(unidade);
         // Guarda a URL do objeto sem query (o front pode reenviar uma URL assinada na edição).
         postagem.setUrl(request.url().split("\\?")[0]);
@@ -321,10 +346,14 @@ public class PostagemController {
                 p.getDescricao(),
                 p.isMostrarTotalCurtidas(),
                 p.isHabilitarComentarios(),
+                p.isValidarComentariosIa(),
                 new Ref(p.getUnidadeSaude().getId(), p.getUnidadeSaude().getNome()),
                 storageService.urlVisualizacao(p.getUrl(), VALIDADE_IMAGEM),
                 p.getCriadoEm(),
                 curtidaRepository.countByPostagemId(p.getId()),
-                comentarioRepository.countByPostagemId(p.getId()));
+                comentarioRepository.countByPostagemId(p.getId()),
+                // Valor ANTIGO: o UPDATE de "vistos" no buscar() é via JPQL e não atualiza o
+                // objeto em memória, então aqui ainda é a referência de antes de abrir.
+                p.getComentariosVistosEm());
     }
 }

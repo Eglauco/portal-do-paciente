@@ -160,20 +160,28 @@ export default function PostagemDetalheScreen() {
     async (conteudo: string): Promise<boolean> => {
       if (!id) return false;
       try {
+        let criado: Comentario;
         if (respondendo) {
-          const resposta = await responder(id, respondendo.raizId, AUTOR, conteudo);
+          criado = await responder(id, respondendo.raizId, AUTOR, conteudo);
           setComentarios((lista) =>
             lista.map((c) =>
-              c.id === respondendo.raizId ? { ...c, respostas: [...(c.respostas ?? []), resposta] } : c,
+              c.id === respondendo.raizId ? { ...c, respostas: [...(c.respostas ?? []), criado] } : c,
             ),
           );
           setPost((p) => (p ? { ...p, totalComentarios: p.totalComentarios + 1 } : p));
           setRespondendo(null);
-          return true;
+        } else {
+          criado = await comentar(id, AUTOR, conteudo);
+          setComentarios((lista) => [criado, ...lista]);
+          setPost((p) => (p ? { ...p, totalComentarios: p.totalComentarios + 1 } : p));
         }
-        const novo = await comentar(id, AUTOR, conteudo);
-        setComentarios((lista) => [novo, ...lista]);
-        setPost((p) => (p ? { ...p, totalComentarios: p.totalComentarios + 1 } : p));
+        // Moderação por IA: se caiu em análise, avisa que só ele o vê por enquanto.
+        if (criado.statusModeracao === 'PENDENTE') {
+          Alert.alert(
+            'Comentário em análise',
+            'Para manter um ambiente seguro, seu comentário passará por uma análise rápida antes de aparecer para todos. Por enquanto, só você o vê aqui.',
+          );
+        }
         return true;
       } catch {
         return false;
@@ -199,17 +207,30 @@ export default function PostagemDetalheScreen() {
       }
       setSalvandoEdicao(true);
       try {
-        await editarComentario(id, c.id, novo);
+        const atualizado = await editarComentario(id, c.id, novo);
+        // A edição pode reprovar na IA (status vira PENDENTE) — reflete o novo status.
+        const aplicar = (x: Comentario) => ({
+          ...x,
+          texto: novo,
+          editado: true,
+          statusModeracao: atualizado.statusModeracao,
+        });
         setComentarios((lista) =>
           raizId == null
-            ? lista.map((x) => (x.id === c.id ? { ...x, texto: novo, editado: true } : x))
+            ? lista.map((x) => (x.id === c.id ? aplicar(x) : x))
             : lista.map((x) =>
                 x.id === raizId
-                  ? { ...x, respostas: x.respostas.map((r) => (r.id === c.id ? { ...r, texto: novo, editado: true } : r)) }
+                  ? { ...x, respostas: x.respostas.map((r) => (r.id === c.id ? aplicar(r) : r)) }
                   : x,
               ),
         );
         setEditando(null);
+        if (atualizado.statusModeracao === 'PENDENTE') {
+          Alert.alert(
+            'Comentário em análise',
+            'Seu comentário editado passará por uma análise rápida antes de aparecer para todos. Por enquanto, só você o vê aqui.',
+          );
+        }
       } catch {
         Alert.alert('Não foi possível editar', 'Talvez o prazo de 15 minutos tenha expirado. Tente novamente.');
       } finally {
@@ -301,6 +322,12 @@ export default function PostagemDetalheScreen() {
               </Pressable>
             )}
           </View>
+          {item.statusModeracao === 'PENDENTE' && (
+            <View style={styles.analise}>
+              <Ionicons name="time-outline" size={12} color="#8A5A00" />
+              <Text style={styles.analiseTxt}>Em análise — visível só para você até ser aprovado.</Text>
+            </View>
+          )}
         </>
       )}
     </View>
@@ -513,6 +540,18 @@ const styles = StyleSheet.create({
   responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
   acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
   lixeira: { marginLeft: 'auto', padding: 2 },
+  analise: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FBEFD6',
+    alignSelf: 'flex-start',
+  },
+  analiseTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   respostas: { paddingLeft: 44 },
   itemResposta: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 12 },
   itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },

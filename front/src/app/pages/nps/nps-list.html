@@ -111,7 +111,17 @@
                 (keydown.enter)="abrir(n)"
               >
                 <td class="cell-data">{{ n.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td><b>{{ n.paciente.nome }}</b></td>
+                <td>
+                  <b>{{ n.paciente.nome }}</b>
+                  @if (n.responsavelNome) {
+                    <span class="cell-via-resp">
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="9" cy="8" r="3" /><path d="M3 20a6 6 0 0 1 12 0" /><path d="M16 5.2a3 3 0 0 1 0 5.6M21 20a6 6 0 0 0-4-5.66" />
+                      </svg>
+                      Respondido por <b>{{ n.responsavelNome }}</b> (responsável)
+                    </span>
+                  }
+                </td>
                 <td class="muted-cell">{{ n.especialidade.nome }}</td>
                 <td class="muted-cell">{{ n.unidadeSaude.nome }}</td>
                 <td>

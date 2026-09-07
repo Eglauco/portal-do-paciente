@@ -2051,6 +2051,46 @@
 .nps-obs__vazio { margin: 0.35rem 0 0; color: var(--muted); font-style: italic; }
 .nps-quando { margin: 1rem 0 0; font-size: 0.82rem; color: var(--muted); }
 
+/* Marcador "respondido por (responsável)" — âmbar, mesmo padrão do chat/SAU/comentários */
+.nps-via-resp {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #8a5a00;
+}
+.nps-via-resp svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.nps-via-resp b { font-weight: 700; }
+
+/* Mesmo marcador, compacto, dentro da célula da datatable (abaixo do nome do paciente) */
+.cell-via-resp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #8a5a00;
+}
+.cell-via-resp svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.cell-via-resp b { font-weight: 700; }
+
+/* Selo de cadastro inativo (soft-delete) na listagem de pacientes. */
+.badge-inativo {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #7a1b13;
+  background: color-mix(in srgb, #b42318 12%, white);
+  border: 1px solid color-mix(in srgb, #b42318 28%, white);
+}
+
 /* Bloco do paciente no detalhe */
 .nps-paciente { display: flex; align-items: center; gap: 0.85rem; padding-bottom: 1rem; margin-bottom: 0.25rem; border-bottom: 1px solid var(--line); }
 .nps-paciente__avatar {
@@ -2347,11 +2387,83 @@
 .coment--resposta .coment__avatar { width: 1.75rem; height: 1.75rem; font-size: 0.65rem; }
 .coment--resposta .coment__texto { font-size: 0.86rem; }
 
+/* Comentário novo (não visto desde a última abertura): realce para o admin localizar. */
+.coment--novo {
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+  border-left: 3px solid var(--brand);
+  padding-left: 0.7rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+.coment--flash { animation: coment-flash 1.2s ease; }
+@keyframes coment-flash {
+  0%, 100% { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+  30% { background: color-mix(in srgb, var(--brand) 24%, transparent); }
+}
+
+/* Atalho "N comentários novos — ir para o próximo". */
+.coment-novos {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line));
+  border-radius: 2rem;
+  background: color-mix(in srgb, var(--brand) 8%, white);
+  color: var(--brand-deep);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.coment-novos:hover { background: color-mix(in srgb, var(--brand) 15%, white); }
+.coment-novos svg { width: 1rem; height: 1rem; stroke: currentColor; }
+.coment-novos__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 1rem;
+  background: var(--brand);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
 /* Caixa de resposta da administração */
 .coment-resposta-box { margin: 0.5rem 0 0.2rem 2.85rem; }
 .coment-resposta-campo { min-height: 3.4rem; }
 .coment-resposta-acoes { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.5rem; }
 .coment-resposta-acoes .btn { height: 2.2rem; padding: 0 0.9rem; font-size: 0.82rem; }
+
+/* Painel de moderação por IA (comentário em análise/rejeitado) — só o admin vê. */
+.coment-mod {
+  margin-top: 0.55rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid color-mix(in srgb, #f0a824 45%, var(--line));
+  border-left: 3px solid #f0a824;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, #f0a824 8%, white);
+}
+.coment-mod--rejeitado {
+  border-color: color-mix(in srgb, #c0364c 40%, var(--line));
+  border-left-color: #c0364c;
+  background: color-mix(in srgb, #c0364c 7%, white);
+}
+.coment-mod__cab {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--ink);
+}
+.coment-mod__cab svg { width: 1rem; height: 1rem; flex: 0 0 auto; stroke: #b9791a; margin-top: 0.05rem; }
+.coment-mod--rejeitado .coment-mod__cab svg { stroke: #c0364c; }
+.coment-mod__motivo { margin: 0.35rem 0 0; font-size: 0.82rem; color: var(--muted); }
+.coment-mod__acoes { display: flex; gap: 0.5rem; margin-top: 0.55rem; }
 
 /* Situação (ativo/inativo) na listagem de motivos de falta */
 .col-sit { width: 8rem; }
@@ -2479,6 +2591,73 @@
 .unit-menu__item:disabled { opacity: 0.6; cursor: default; }
 .unit-menu__item.is-active { color: var(--brand-deep); font-weight: 600; }
 .unit-menu__item svg { width: 1.05rem; height: 1.05rem; stroke: var(--brand); flex-shrink: 0; }
+
+/* Menu do usuário (abre ao clicar no nome do administrador) — abriga o "Sair". */
+.user-switch { position: relative; }
+.user.is-open { background: #f2f7f5; }
+.user.is-open .user__caret { transform: rotate(180deg); }
+.user__caret { transition: transform 0.15s ease; }
+.user-menu {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 15rem;
+  padding: 0.4rem;
+  border-radius: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 18px 40px -18px rgba(7, 46, 43, 0.35);
+}
+.user-menu__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.7rem 0.6rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--line);
+}
+.user-menu__nome { font-size: 0.9rem; font-weight: 700; color: var(--ink); }
+.user-menu__email { font-size: 0.78rem; color: var(--muted); word-break: break-all; }
+.user-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.user-menu__item:hover { background: #f2f7f5; }
+.user-menu__item svg { width: 1.05rem; height: 1.05rem; stroke: var(--brand); flex-shrink: 0; }
+
+/* Modal de troca de senha */
+.modal--senha { max-width: 26rem; width: 100%; text-align: left; }
+.modal--senha form { display: flex; flex-direction: column; gap: 0.9rem; margin-top: 0.6rem; }
+.senha-mostrar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.senha-erro {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, #b42318 8%, white);
+  border: 1px solid color-mix(in srgb, #b42318 25%, white);
+  color: #7a1b13;
+  font-size: 0.85rem;
+}
 
 /* Acesso ao app (liberar / gerar código do paciente) */
 .acesso-app { margin-top: 1.25rem; }

@@ -8,6 +8,8 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import com.example.pop.unidade.Unidade;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -20,6 +22,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
@@ -118,6 +122,18 @@ public class Paciente {
     @OrderBy("id")
     private Set<Responsavel> responsaveis = new LinkedHashSet<>();
 
+    /**
+     * Unidades de saúde que o paciente pode ver e com as quais pode interagir (feed,
+     * notificações de feed, abrir chat/SAU). Sem nenhuma = sem acesso a essas telas.
+     * Set (não bag) para conviver com o bag EAGER de telefonesAdicionais.
+     */
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "paciente_unidade",
+            joinColumns = @JoinColumn(name = "paciente_id"),
+            inverseJoinColumns = @JoinColumn(name = "unidade_id"))
+    @OrderBy("nome")
+    private Set<Unidade> unidades = new LinkedHashSet<>();
+
     /** Foto do paciente (URL do objeto no S3, pasta "foto-paciente"). Alterável pelo app. */
     @Column(name = "foto_url", length = 512)
     private String fotoUrl;
@@ -125,6 +141,15 @@ public class Paciente {
     /** Liberado (globalmente) para acessar o app. */
     @Column(nullable = false)
     private boolean ativo = false;
+
+    /**
+     * Situação do cadastro (soft-delete): ATIVO ou INATIVO. Paciente nunca é excluído —
+     * é inativado (some dos seletores/pesquisas e fica somente-leitura) e pode ser reativado.
+     * Separado de {@link #ativo} (acesso ao app).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SituacaoCadastro situacao = SituacaoCadastro.ATIVO;
 
     /** Aparelho com a sessão ativa (uma por vez). Nunca serializado. */
     @JsonIgnore

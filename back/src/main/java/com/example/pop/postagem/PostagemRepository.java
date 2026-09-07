@@ -1,6 +1,7 @@
 package com.example.pop.postagem;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -11,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface PostagemRepository extends JpaRepository<Postagem, Long> {
+
+    /** Feed do paciente: postagens das unidades a que ele tem acesso (mais recentes primeiro). */
+    Page<Postagem> findByUnidadeSaude_IdInOrderByCriadoEmDesc(Collection<Long> unidadeIds, Pageable pageable);
 
     /**
      * Marca os comentários como vistos com um UPDATE pontual (só a coluna), evitando

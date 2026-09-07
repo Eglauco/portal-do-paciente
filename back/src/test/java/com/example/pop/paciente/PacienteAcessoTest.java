@@ -49,7 +49,7 @@ class PacienteAcessoTest {
     @BeforeEach
     void criar() {
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Teste", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Teste", TEL), null).getId();
     }
 
     @AfterEach
@@ -73,7 +73,7 @@ class PacienteAcessoTest {
     void solicitarCodigoRespeitaCooldown() {
         String tel2 = "11955554444";
         repository.findByTelefone(tel2).ifPresent(p -> repository.deleteById(p.getId()));
-        Long id2 = pacienteController.criar(new PacienteRequest("Cooldown Teste", tel2)).getId();
+        Long id2 = pacienteController.criar(new PacienteRequest("Cooldown Teste", tel2), null).getId();
         try {
             authController.solicitarCodigo(new SolicitarCodigoRequest(tel2));
             // Segundo pedido imediato para o mesmo telefone → 429 (evita SMS bombing / abuso de custo).

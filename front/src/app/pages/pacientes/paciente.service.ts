@@ -2,7 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { Pagina, Paciente, PacienteEntrada, PacienteFiltro } from './paciente.model';
+import { Pagina, Paciente, PacienteEntrada, PacienteFiltro, PacienteLog } from './paciente.model';
 
 @Injectable({ providedIn: 'root' })
 export class PacienteService {
@@ -22,6 +22,7 @@ export class PacienteService {
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
     if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
+    if (filtro.situacao) params = params.set('situacao', filtro.situacao);
     return this.http.get<Pagina<Paciente>>(this.base, { params });
   }
 
@@ -32,6 +33,7 @@ export class PacienteService {
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
     if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
+    if (filtro.situacao) params = params.set('situacao', filtro.situacao);
     for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
@@ -55,5 +57,20 @@ export class PacienteService {
   /** Revoga o acesso do paciente ao app. */
   revogarAcesso(id: number): Observable<void> {
     return this.http.post<void>(`${this.base}/${id}/revogar-acesso`, {});
+  }
+
+  /** Inativa o cadastro (soft-delete): some dos seletores e vira somente-leitura; revoga o app. */
+  inativar(id: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/${id}/inativar`, {});
+  }
+
+  /** Reativa o cadastro. */
+  reativar(id: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/${id}/reativar`, {});
+  }
+
+  /** Linha do tempo de auditoria (LGPD) do cadastro. */
+  logs(id: number): Observable<PacienteLog[]> {
+    return this.http.get<PacienteLog[]>(`${this.base}/${id}/logs`);
   }
 }

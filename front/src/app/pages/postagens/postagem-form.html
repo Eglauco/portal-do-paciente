@@ -95,7 +95,19 @@
             </span>
             Habilitar comentários
           </label>
+          <label class="check">
+            <input type="checkbox" formControlName="validarComentariosIa" />
+            <span class="check__box" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+            </span>
+            Validar comentários ofensivos por IA
+          </label>
         </div>
+        <p class="field-hint">
+          Com a validação ligada, todo comentário novo é analisado por IA antes de aparecer no feed. Se for
+          considerado potencialmente ofensivo, fica em análise (oculto dos pacientes) até você aprovar ou rejeitar.
+          Comentários já existentes não são afetados.
+        </p>
       </div>
     </div>
 
@@ -127,12 +139,24 @@
         </div>
       </div>
 
+      @if (totalNovos() > 0) {
+        <button type="button" class="coment-novos" (click)="irParaProximoNovo()">
+          <span class="coment-novos__badge">{{ totalNovos() }}</span>
+          <span class="coment-novos__txt">
+            {{ totalNovos() === 1 ? 'comentário novo' : 'comentários novos' }} — ir para o próximo
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M6 13l6 6 6-6" />
+          </svg>
+        </button>
+      }
+
       @if (comentarios().length === 0 && !carregandoComentarios()) {
         <p class="coment-vazio">Esta postagem ainda não tem comentários.</p>
       } @else {
         <ul class="coment-list">
           @for (c of comentarios(); track c.id) {
-            <li class="coment">
+            <li class="coment" [id]="'coment-' + c.id" [class.coment--novo]="comentarioNovo(c)">
               <div class="coment__row">
                 @if (c.fotoUrl) {
                   <img class="coment__avatar av-foto" [src]="c.fotoUrl" (error)="c.fotoUrl = null" alt="" />
@@ -177,6 +201,32 @@
                         <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(c)">Editar</button>
                       }
                     </div>
+                    @if (c.statusModeracao !== 'PUBLICADO') {
+                      <div class="coment-mod" [class.coment-mod--rejeitado]="c.statusModeracao === 'REJEITADO'">
+                        <p class="coment-mod__cab">
+                          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 9v4M12 17h.01" />
+                            <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                          </svg>
+                          @if (c.statusModeracao === 'PENDENTE') {
+                            <span><b>Em análise</b> — oculto dos pacientes até sua decisão.</span>
+                          } @else {
+                            <span><b>Rejeitado</b> — não está publicado no feed.</span>
+                          }
+                        </p>
+                        @if (c.motivoModeracao) {
+                          <p class="coment-mod__motivo">Motivo da IA: {{ c.motivoModeracao }}</p>
+                        }
+                        <div class="coment-mod__acoes">
+                          @if (c.statusModeracao === 'PENDENTE') {
+                            <button type="button" class="btn btn--solid btn--sm" (click)="aprovarComentario(c)" [disabled]="moderandoId() !== null">Aprovar</button>
+                            <button type="button" class="btn btn--ghost btn--sm" (click)="rejeitarComentario(c)" [disabled]="moderandoId() !== null">Rejeitar</button>
+                          } @else {
+                            <button type="button" class="btn btn--ghost btn--sm" (click)="aprovarComentario(c)" [disabled]="moderandoId() !== null">Publicar mesmo assim</button>
+                          }
+                        </div>
+                      </div>
+                    }
                   }
                 </div>
                 <button
@@ -195,7 +245,7 @@
               @if (c.respostas.length) {
                 <ul class="coment-respostas">
                   @for (r of c.respostas; track r.id) {
-                    <li class="coment coment--resposta">
+                    <li class="coment coment--resposta" [id]="'coment-' + r.id" [class.coment--novo]="comentarioNovo(r)">
                       <div class="coment__row">
                         @if (r.fotoUrl) {
                           <img class="coment__avatar av-foto" [src]="r.fotoUrl" (error)="r.fotoUrl = null" alt="" />
@@ -240,6 +290,32 @@
                                 <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(r)">Editar</button>
                               }
                             </div>
+                            @if (r.statusModeracao !== 'PUBLICADO') {
+                              <div class="coment-mod" [class.coment-mod--rejeitado]="r.statusModeracao === 'REJEITADO'">
+                                <p class="coment-mod__cab">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M12 9v4M12 17h.01" />
+                                    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                                  </svg>
+                                  @if (r.statusModeracao === 'PENDENTE') {
+                                    <span><b>Em análise</b> — oculto dos pacientes até sua decisão.</span>
+                                  } @else {
+                                    <span><b>Rejeitado</b> — não está publicado no feed.</span>
+                                  }
+                                </p>
+                                @if (r.motivoModeracao) {
+                                  <p class="coment-mod__motivo">Motivo da IA: {{ r.motivoModeracao }}</p>
+                                }
+                                <div class="coment-mod__acoes">
+                                  @if (r.statusModeracao === 'PENDENTE') {
+                                    <button type="button" class="btn btn--solid btn--sm" (click)="aprovarComentario(r)" [disabled]="moderandoId() !== null">Aprovar</button>
+                                    <button type="button" class="btn btn--ghost btn--sm" (click)="rejeitarComentario(r)" [disabled]="moderandoId() !== null">Rejeitar</button>
+                                  } @else {
+                                    <button type="button" class="btn btn--ghost btn--sm" (click)="aprovarComentario(r)" [disabled]="moderandoId() !== null">Publicar mesmo assim</button>
+                                  }
+                                </div>
+                              </div>
+                            }
                           }
                         </div>
                         <button

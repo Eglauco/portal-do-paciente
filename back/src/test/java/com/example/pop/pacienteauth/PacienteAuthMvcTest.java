@@ -69,7 +69,7 @@ class PacienteAuthMvcTest {
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         // Admin de teste (para as chamadas /paciente/** que agora exigem role ADMIN).
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();

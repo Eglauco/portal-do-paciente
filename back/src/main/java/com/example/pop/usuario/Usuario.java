@@ -46,6 +46,15 @@ public class Usuario {
     @Column(name = "senha_hash", length = 100)
     private String senhaHash;
 
+    /**
+     * Momento (UTC) da última troca de senha. Tokens ADMIN emitidos ANTES disto são
+     * rejeitados — trocar a senha derruba todas as sessões. Instant (não LocalDateTime)
+     * para comparar direto com o "iat" do JWT, que é UTC.
+     */
+    @JsonIgnore
+    @Column(name = "credenciais_alteradas_em")
+    private java.time.Instant credenciaisAlteradasEm;
+
     /** Unidade de saúde ativa ("logada") do usuário. */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "unidade_id")

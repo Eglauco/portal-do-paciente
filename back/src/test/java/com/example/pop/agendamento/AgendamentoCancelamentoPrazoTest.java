@@ -62,7 +62,7 @@ class AgendamentoCancelamentoPrazoTest {
             apagarAgendamentos(p.getId());
             pacienteRepository.deleteById(p.getId());
         });
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Prazo", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Prazo", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-prazo")).token());
         // Procedimento com prazo de 24h de antecedência.

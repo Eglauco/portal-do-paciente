@@ -41,6 +41,13 @@ public class Postagem {
     @Column(name = "habilitar_comentarios", nullable = false)
     private boolean habilitarComentarios = true;
 
+    /**
+     * Se ligado, os comentários NOVOS passam por uma validação de IA (Claude) antes de
+     * publicar: se potencialmente ofensivos, ficam ocultos até o admin aprovar/rejeitar.
+     */
+    @Column(name = "validar_comentarios_ia", nullable = false)
+    private boolean validarComentariosIa = false;
+
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "unidade_id", nullable = false)
     private Unidade unidadeSaude;

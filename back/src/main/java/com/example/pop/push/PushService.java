@@ -21,8 +21,10 @@ import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.nps.Nps;
 import com.example.pop.paciente.FuncionalidadeApp;
+import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.PacienteAcessoService.DestinoPush;
+import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.postagem.Postagem;
 
 /**
@@ -42,13 +44,15 @@ public class PushService {
     private final DispositivoRepository repository;
     private final NotificacaoService notificacaoService;
     private final PacienteAcessoService acessoService;
+    private final PacienteRepository pacienteRepository;
     private RestClient restClient;
 
     public PushService(DispositivoRepository repository, NotificacaoService notificacaoService,
-            PacienteAcessoService acessoService) {
+            PacienteAcessoService acessoService, PacienteRepository pacienteRepository) {
         this.repository = repository;
         this.notificacaoService = notificacaoService;
         this.acessoService = acessoService;
+        this.pacienteRepository = pacienteRepository;
     }
 
     // Criado sob demanda (evita abrir conexão na inicialização/testes). Com timeouts:
@@ -98,12 +102,16 @@ public class PushService {
         notificarPaciente(pacienteId, FuncionalidadeApp.NPS, "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
     }
 
-    /** Nova publicação (postagem) no feed das unidades — broadcast (todos os aparelhos). */
+    /** Nova publicação (postagem) — só os pacientes vinculados à unidade da postagem (inbox + push). */
     public void notificarNovaPostagem(Postagem p) {
         String corpo = p.getUnidadeSaude().getNome() + " publicou: " + p.getTitulo();
         Map<String, Object> data = Map.of("tipo", "POSTAGEM", "postagemId", p.getId());
-        notificacaoService.registrarParaTodos(TipoNotificacao.POSTAGEM, "Nova publicação", corpo, p.getId());
-        notificarTodos("Nova publicação", corpo, data);
+        // Só os pacientes vinculados à unidade da postagem recebem (inbox + push). O push
+        // por paciente já respeita a permissão REDE_SOCIAL e ignora responsável sem acesso.
+        for (Paciente paciente : pacienteRepository.findByUnidades_Id(p.getUnidadeSaude().getId())) {
+            notificacaoService.registrar(paciente.getId(), TipoNotificacao.POSTAGEM, "Nova publicação", corpo, p.getId());
+            notificarPaciente(paciente.getId(), FuncionalidadeApp.REDE_SOCIAL, "Nova publicação", corpo, data);
+        }
     }
 
     /** Novo prontuário (novo=true) ou novo documento (novo=false) — só o paciente dono. */

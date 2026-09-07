@@ -22,15 +22,24 @@ public record NpsDetalheResponse(
         Double media,
         List<CategoriaNotaResponse> notas,
         String observacao,
+        /** Nome do responsável que respondeu pelo paciente; null quando foi o próprio. */
+        String responsavelNome,
         LocalDateTime criadoEm,
         LocalDateTime respondidoEm) {
 
     public static NpsDetalheResponse from(Nps nps) {
-        return from(nps, null);
+        return from(nps, null, null);
     }
 
-    /** {@code pacienteFotoUrl}: foto pré-assinada do paciente (avatar), ou null. */
     public static NpsDetalheResponse from(Nps nps, String pacienteFotoUrl) {
+        return from(nps, pacienteFotoUrl, null);
+    }
+
+    /**
+     * {@code pacienteFotoUrl}: foto pré-assinada do paciente (avatar), ou null.
+     * {@code responsavelNome}: responsável que respondeu pelo dependente, ou null.
+     */
+    public static NpsDetalheResponse from(Nps nps, String pacienteFotoUrl, String responsavelNome) {
         Agendamento a = nps.getAgendamento();
         List<CategoriaNotaResponse> notas = nps.getNotasCategorias().stream()
                 .sorted((x, y) -> x.getCategoria().getNome().compareToIgnoreCase(y.getCategoria().getNome()))
@@ -50,6 +59,7 @@ public record NpsDetalheResponse(
                 nps.getMedia(),
                 notas,
                 nps.getObservacao(),
+                responsavelNome,
                 nps.getCriadoEm(),
                 nps.getRespondidoEm());
     }

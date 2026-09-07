@@ -15,6 +15,10 @@ public record ComentarioResponse(
         boolean editado,
         boolean meu,
         boolean podeEditar,
+        /** Estado de moderação (PUBLICADO/PENDENTE/REJEITADO). PENDENTE = "em análise". */
+        StatusModeracao statusModeracao,
+        /** Motivo da IA quando pendente — só preenchido para o admin. */
+        String motivoModeracao,
         List<ComentarioResponse> respostas) {
 
     /** Janela em que o autor ainda pode editar o próprio comentário (fonte única). */
@@ -40,6 +44,8 @@ public record ComentarioResponse(
                 c.getEditadoEm() != null,
                 dono,
                 dono && dentroDaJanela(c),
+                c.getStatusModeracao(),
+                adminAtual != null ? c.getMotivoModeracao() : null,
                 List.of());
     }
 
@@ -59,6 +65,8 @@ public record ComentarioResponse(
                 c.getEditadoEm() != null,
                 dono,
                 dono && dentroDaJanela(c),
+                c.getStatusModeracao(),
+                adminAtual != null ? c.getMotivoModeracao() : null,
                 filhos);
     }
 

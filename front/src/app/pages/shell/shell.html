@@ -202,14 +202,6 @@
       }
     </nav>
 
-    <div class="sidebar__foot">
-      <button type="button" class="logout" (click)="logout()">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" />
-        </svg>
-        Sair
-      </button>
-    </div>
   </aside>
 
   <!-- ================= Área principal ================= -->
@@ -284,16 +276,49 @@
 
         <span class="topbar__divider" aria-hidden="true"></span>
 
-        <button type="button" class="user">
-          <span class="user__avatar" aria-hidden="true">{{ usuario() ? iniciais(usuario()!.nome) : 'US' }}</span>
-          <span class="user__meta">
-            <span class="user__name">{{ usuario()?.nome ?? 'Usuário' }}</span>
-            <span class="user__role">Administrador</span>
-          </span>
-          <svg class="user__caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
+        <div class="user-switch">
+          <button
+            type="button"
+            class="user"
+            [class.is-open]="menuUsuarioAberto()"
+            (click)="abrirMenuUsuario()"
+            [attr.aria-expanded]="menuUsuarioAberto()"
+            aria-haspopup="menu"
+          >
+            <span class="user__avatar" aria-hidden="true">{{ usuario() ? iniciais(usuario()!.nome) : 'US' }}</span>
+            <span class="user__meta">
+              <span class="user__name">{{ usuario()?.nome ?? 'Usuário' }}</span>
+              <span class="user__role">Administrador</span>
+            </span>
+            <svg class="user__caret" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          @if (menuUsuarioAberto()) {
+            <button type="button" class="unit-backdrop" aria-label="Fechar" (click)="fecharMenuUsuario()"></button>
+            <div class="user-menu" role="menu">
+              <div class="user-menu__head">
+                <span class="user-menu__nome">{{ usuario()?.nome ?? 'Usuário' }}</span>
+                @if (usuario()?.email) {
+                  <span class="user-menu__email">{{ usuario()!.email }}</span>
+                }
+              </div>
+              <button type="button" class="user-menu__item" role="menuitem" (click)="abrirTrocarSenha()">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /><path d="M12 14v3" />
+                </svg>
+                Trocar a senha
+              </button>
+              <button type="button" class="user-menu__item" role="menuitem" (click)="logout()">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 17l-5-5 5-5" /><path d="M5 12h11" />
+                </svg>
+                Sair
+              </button>
+            </div>
+          }
+        </div>
         }
       </div>
     </header>
@@ -303,3 +328,7 @@
     </main>
   </div>
 </div>
+
+@if (modalSenhaAberto()) {
+  <app-trocar-senha-modal (fechar)="fecharTrocarSenha()" />
+}

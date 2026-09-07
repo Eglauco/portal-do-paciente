@@ -1,4 +1,4 @@
-import { Component, afterNextRender, inject, signal } from '@angular/core';
+import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
@@ -16,6 +16,8 @@ import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { CepService } from '../../shared/cep.service';
 import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
+import { Unidade } from '../unidades/unidade.model';
+import { UnidadeService } from '../unidades/unidade.service';
 import {
   FUNCIONALIDADES_APP,
   FuncionalidadeApp,
@@ -25,7 +27,9 @@ import {
   PacienteEntrada,
   PermissoesResponsavel,
   Responsavel,
+  SituacaoCadastro,
 } from './paciente.model';
+import { PacienteLogModal } from './paciente-log-modal';
 import { PacienteService } from './paciente.service';
 
 /** Sub-grupo com o nível de acesso do responsável por funcionalidade do app. */
@@ -37,6 +41,10 @@ type ResponsavelForm = FormGroup<{
   nome: FormControl<string>;
   telefone: FormControl<string>;
   permissoes: PermissoesForm;
+  /** Situação (soft-delete): inativo perde acesso ao perfil no app. */
+  ativo: FormControl<boolean>;
+  /** Metadado (não editável): tem lançamentos → não pode remover, só inativar. */
+  temLancamentos: FormControl<boolean>;
 }>;
 
 const SEXOS = [
@@ -68,13 +76,14 @@ function dataNascimentoValidator(control: AbstractControl): ValidationErrors | n
 
 @Component({
   selector: 'app-paciente-form',
-  imports: [ReactiveFormsModule, NgxMaskDirective, NgSelectModule, TelefoneBrDirective],
+  imports: [ReactiveFormsModule, NgxMaskDirective, NgSelectModule, TelefoneBrDirective, PacienteLogModal],
   templateUrl: './paciente-form.html',
   styleUrl: './paciente-form.css',
 })
 export class PacienteForm implements PodeSair {
   private readonly service = inject(PacienteService);
   private readonly cepService = inject(CepService);
+  private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
@@ -107,12 +116,15 @@ export class PacienteForm implements PodeSair {
     municipio: new FormControl('', { nonNullable: true }),
     uf: new FormControl<string | null>(null),
     complemento: new FormControl('', { nonNullable: true }),
+    unidadeIds: new FormControl<number[]>([], { nonNullable: true }),
   });
+
+  /** Unidades de saúde disponíveis para vincular ao paciente. */
+  protected readonly unidadesDisponiveis = signal<Unidade[]>([]);
 
   protected readonly editando = signal(false);
   protected readonly codigo = signal<number | null>(null);
   protected readonly salvando = signal(false);
-  protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
   protected readonly buscandoCep = signal(false);
   /** Foto (pré-assinada) do paciente para o avatar do form; null se não tiver. */
@@ -121,6 +133,15 @@ export class PacienteForm implements PodeSair {
   // Acesso ao app (o paciente ativa sozinho por OTP; aqui o admin só revoga).
   protected readonly ativo = signal(false);
   protected readonly revogando = signal(false);
+
+  // Situação do cadastro (soft-delete). Inativo = somente leitura (form desabilitado).
+  protected readonly situacao = signal<SituacaoCadastro>('ATIVO');
+  protected readonly inativo = computed(() => this.situacao() === 'INATIVO');
+  protected readonly alterandoSituacao = signal(false);
+  /** Nome do paciente carregado (título do histórico e mensagens). */
+  protected readonly nomePaciente = signal('');
+  /** Modal de histórico (auditoria LGPD) aberto? */
+  protected readonly historicoAberto = signal(false);
 
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
@@ -142,7 +163,15 @@ export class PacienteForm implements PodeSair {
     }
     // Só carrega no navegador (evita chamada sem token no SSR/prerender).
     afterNextRender(() => {
+      this.carregarUnidades();
       if (this.editando() && this.codigo() != null) this.carregar(this.codigo()!);
+    });
+  }
+
+  private carregarUnidades(): void {
+    this.unidadeService.listar({}, 0, 100).subscribe({
+      next: (pagina) => this.unidadesDisponiveis.set(pagina.content),
+      error: () => {},
     });
   }
 
@@ -195,6 +224,8 @@ export class PacienteForm implements PodeSair {
       }),
       telefone: new FormControl(r.telefone ?? '', { nonNullable: true }),
       permissoes: new FormGroup(controlesPermissoes),
+      ativo: new FormControl(r.ativo ?? true, { nonNullable: true }),
+      temLancamentos: new FormControl(r.temLancamentos ?? false, { nonNullable: true }),
     });
   }
 
@@ -216,7 +247,30 @@ export class PacienteForm implements PodeSair {
   }
 
   protected removerResponsavel(indice: number): void {
+    // Responsável com lançamentos não pode ser removido (só inativado) — o backend também
+    // barra (409), mas evitamos a tentativa aqui.
+    if (this.responsaveis.at(indice).controls.temLancamentos.value) {
+      this.toastr.info('Este responsável tem lançamentos. Inative-o em vez de remover.');
+      return;
+    }
     this.responsaveis.removeAt(indice);
+    this.form.markAsDirty();
+  }
+
+  /** Marca se um responsável tem lançamentos (não pode remover, só inativar). */
+  protected temLancamentos(indice: number): boolean {
+    return this.responsaveis.at(indice).controls.temLancamentos.value;
+  }
+
+  /** Situação atual do responsável no form (ativo/inativo). */
+  protected responsavelAtivo(indice: number): boolean {
+    return this.responsaveis.at(indice).controls.ativo.value;
+  }
+
+  /** Alterna ativo/inativo do responsável (salvo com o paciente). */
+  protected alternarAtivoResponsavel(indice: number): void {
+    const controle = this.responsaveis.at(indice).controls.ativo;
+    controle.setValue(!controle.value);
     this.form.markAsDirty();
   }
 
@@ -258,12 +312,25 @@ export class PacienteForm implements PodeSair {
         });
         this.setTelefonesAdicionais(p.telefonesAdicionais ?? []);
         this.setResponsaveis(p.responsaveis ?? []);
+        this.form.controls.unidadeIds.setValue((p.unidades ?? []).map((u) => u.id));
         this.preenchendo = false;
         this.ativo.set(!!p.ativo);
+        this.nomePaciente.set(p.nome ?? '');
+        this.aplicarSituacao(p.situacao ?? 'ATIVO');
         this.fotoUrl.set(p.fotoUrl ?? null);
       },
       error: () => this.erroCarregar.set(true),
     });
+  }
+
+  /** Aplica a situação: inativo desabilita o formulário inteiro (somente leitura). */
+  private aplicarSituacao(situacao: SituacaoCadastro): void {
+    this.situacao.set(situacao);
+    if (situacao === 'INATIVO') {
+      this.form.disable({ emitEvent: false });
+    } else {
+      this.form.enable({ emitEvent: false });
+    }
   }
 
   private buscarCep(): void {
@@ -342,8 +409,10 @@ export class PacienteForm implements PodeSair {
           nome: (g.controls.nome.value ?? '').trim(),
           telefone: (g.controls.telefone.value ?? '').trim() || null,
           permissoes: this.permissoesDoGrupo(g.controls.permissoes),
+          ativo: g.controls.ativo.value,
         }))
         .filter((r) => r.nome.length > 0),
+      unidadeIds: f.unidadeIds,
     };
   }
 
@@ -396,22 +465,53 @@ export class PacienteForm implements PodeSair {
     });
   }
 
-  protected async excluir(): Promise<void> {
+  protected async inativar(): Promise<void> {
     if (!this.editando() || this.codigo() == null) return;
-    const confirmado = await this.confirmar('Deseja excluir o paciente?');
+    const confirmado = await this.confirmar(
+      'Inativar este cadastro? Ele fica somente leitura, sai das buscas e o acesso ao app é revogado. Você pode reativar depois.',
+    );
     if (!confirmado) return;
-    this.excluindo.set(true);
-    this.service.excluir(this.codigo()!).subscribe({
+    this.alterandoSituacao.set(true);
+    this.service.inativar(this.codigo()!).subscribe({
       next: () => {
-        this.saidaAutorizada = true;
-        this.toastr.success('Paciente excluído');
-        this.router.navigate(['/pacientes']);
+        this.alterandoSituacao.set(false);
+        this.ativo.set(false);
+        this.aplicarSituacao('INATIVO');
+        this.toastr.success('Cadastro inativado');
       },
       error: () => {
-        this.excluindo.set(false);
-        this.toastr.error('Não foi possível excluir o paciente.');
+        this.alterandoSituacao.set(false);
+        this.toastr.error('Não foi possível inativar o cadastro.');
       },
     });
+  }
+
+  protected async reativar(): Promise<void> {
+    if (!this.editando() || this.codigo() == null) return;
+    const confirmado = await this.confirmar(
+      'Reativar este cadastro? Ele volta a ser editável e aparece nas buscas. O acesso ao app não é religado (gere um novo código se precisar).',
+    );
+    if (!confirmado) return;
+    this.alterandoSituacao.set(true);
+    this.service.reativar(this.codigo()!).subscribe({
+      next: () => {
+        this.alterandoSituacao.set(false);
+        this.aplicarSituacao('ATIVO');
+        this.toastr.success('Cadastro reativado');
+      },
+      error: () => {
+        this.alterandoSituacao.set(false);
+        this.toastr.error('Não foi possível reativar o cadastro.');
+      },
+    });
+  }
+
+  protected abrirHistorico(): void {
+    this.historicoAberto.set(true);
+  }
+
+  protected fecharHistorico(): void {
+    this.historicoAberto.set(false);
   }
 
   protected cancelar(): void {

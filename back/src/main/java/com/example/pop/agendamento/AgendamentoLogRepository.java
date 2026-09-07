@@ -18,4 +18,7 @@ public interface AgendamentoLogRepository extends JpaRepository<AgendamentoLog, 
             order by l.criadoEm asc, l.id asc
             """)
     List<AgendamentoLog> findByAgendamentoIdOrderByCriadoEmAsc(@Param("agendamentoId") Long agendamentoId);
+
+    /** O responsável fez alguma troca de status (lançamento no log)? Trava a remoção do responsável. */
+    boolean existsByResponsavel_Id(Long responsavelId);
 }

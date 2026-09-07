@@ -46,7 +46,7 @@
         </div>
 
         @for (p of posts(); track p.id) {
-          <article class="rs-card">
+          <a class="rs-card" [routerLink]="['/postagens', p.id]" [attr.aria-label]="'Abrir postagem: ' + p.titulo">
             <div class="rs-card__head">
               <span class="rs-card__avatar" aria-hidden="true">{{ iniciais(p.unidadeSaude.nome) }}</span>
               <span class="rs-card__unidade">{{ p.unidadeSaude.nome }}</span>
@@ -85,7 +85,7 @@
             @if (p.descricao) {
               <p class="rs-card__descricao">{{ p.descricao }}</p>
             }
-          </article>
+          </a>
         }
       </div>
     }

@@ -1,10 +1,11 @@
 import { Component, afterNextRender, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService, UnidadeRef } from '../../core/auth.service';
+import { TrocarSenhaModal } from './trocar-senha-modal';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal],
   templateUrl: './shell.html',
 })
 export class Shell {
@@ -28,6 +29,11 @@ export class Shell {
 
   protected readonly menuUnidadeAberto = signal(false);
   protected readonly trocandoUnidade = signal(false);
+
+  /** Menu do usuário (nome no topo) — abriga "Trocar a senha" e "Sair". */
+  protected readonly menuUsuarioAberto = signal(false);
+  /** Modal de troca de senha. */
+  protected readonly modalSenhaAberto = signal(false);
 
   constructor() {
     afterNextRender(() => {
@@ -72,7 +78,25 @@ export class Shell {
     });
   }
 
+  protected abrirMenuUsuario(): void {
+    this.menuUsuarioAberto.set(!this.menuUsuarioAberto());
+  }
+
+  protected fecharMenuUsuario(): void {
+    this.menuUsuarioAberto.set(false);
+  }
+
+  protected abrirTrocarSenha(): void {
+    this.fecharMenuUsuario();
+    this.modalSenhaAberto.set(true);
+  }
+
+  protected fecharTrocarSenha(): void {
+    this.modalSenhaAberto.set(false);
+  }
+
   protected logout(): void {
+    this.fecharMenuUsuario();
     this.auth.logout();
   }
 }

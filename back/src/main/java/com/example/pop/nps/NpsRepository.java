@@ -14,6 +14,9 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
 
     boolean existsByAgendamentoId(Long agendamentoId);
 
+    /** O responsável respondeu algum NPS (lançamento)? Trava a remoção do responsável. */
+    boolean existsByResponsavelId(Long responsavelId);
+
     Optional<Nps> findByAgendamentoId(Long agendamentoId);
 
     /** Carrega o NPS garantindo que é do paciente (via agendamento.paciente). Escopo do app. */

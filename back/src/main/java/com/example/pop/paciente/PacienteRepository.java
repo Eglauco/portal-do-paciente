@@ -28,6 +28,7 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
     @Query(value = """
             select p from Paciente p
             where (:id is null or p.id = :id)
+              and (:situacao is null or p.situacao = :situacao)
               and lower(p.nome) like lower(concat('%', :nome, '%'))
               and (:cpf = '' or p.cpf like concat('%', :cpf, '%'))
               and (:prontuario = '' or lower(p.prontuario) like lower(concat('%', :prontuario, '%')))
@@ -35,12 +36,17 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
             countQuery = """
             select count(p) from Paciente p
             where (:id is null or p.id = :id)
+              and (:situacao is null or p.situacao = :situacao)
               and lower(p.nome) like lower(concat('%', :nome, '%'))
               and (:cpf = '' or p.cpf like concat('%', :cpf, '%'))
               and (:prontuario = '' or lower(p.prontuario) like lower(concat('%', :prontuario, '%')))
             """)
-    Page<Paciente> search(@Param("id") Long id, @Param("nome") String nome, @Param("cpf") String cpf,
+    Page<Paciente> search(@Param("id") Long id, @Param("situacao") SituacaoCadastro situacao,
+            @Param("nome") String nome, @Param("cpf") String cpf,
             @Param("prontuario") String prontuario, Pageable pageable);
+
+    /** Pacientes vinculados a uma unidade (fan-out da notificação de nova postagem). */
+    java.util.List<Paciente> findByUnidades_Id(Long unidadeId);
 
     /** Pacientes liberados a usar o app (dashboard). */
     long countByAtivoTrue();

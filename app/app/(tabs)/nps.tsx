@@ -271,6 +271,14 @@ export default function NpsScreen() {
                     <Text style={styles.meta}>
                       {dataCurta(n.dataHora)} · {n.unidadeSaude.nome}
                     </Text>
+                    {!!n.responsavelNome && (
+                      <View style={styles.viaResp}>
+                        <Ionicons name="people-outline" size={12} color="#8A5A00" />
+                        <Text style={styles.viaRespTxt} numberOfLines={1}>
+                          Respondido por {n.responsavelNome} (responsável)
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={Brand.muted} />
                 </Pressable>
@@ -289,6 +297,7 @@ export default function NpsScreen() {
         mediaAtual={detalhe?.media ?? selecionado?.media}
         notasRespondidas={detalhe?.notas}
         observacaoAtual={detalhe?.observacao}
+        responsavelNome={detalhe?.responsavelNome ?? selecionado?.responsavelNome}
         respondidoEm={detalhe?.respondidoEm}
         processando={processando}
         onEnviar={enviar}
@@ -438,4 +447,6 @@ const styles = StyleSheet.create({
   notaNum: { fontSize: 18, fontWeight: '800', color: '#fff' },
   especialidade: { fontSize: 15, fontWeight: '700', color: Brand.ink },
   meta: { fontSize: 12.5, color: Brand.muted, marginTop: 3 },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  viaRespTxt: { flex: 1, fontSize: 11.5, fontWeight: '600', color: '#8A5A00' },
 });

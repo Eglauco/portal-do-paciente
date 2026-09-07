@@ -2,9 +2,13 @@ package com.example.pop.nps;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -17,6 +21,8 @@ import com.example.pop.agendamento.Agendamento;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.categorianps.CategoriaNps;
 import com.example.pop.categorianps.CategoriaNpsRepository;
+import com.example.pop.paciente.Responsavel;
+import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.push.PushService;
 
 @Service
@@ -27,16 +33,19 @@ public class NpsService {
     private final NpsRepository repository;
     private final CategoriaNpsRepository categoriaRepository;
     private final PushService pushService;
+    private final ResponsavelRepository responsavelRepository;
 
     /** Proxy do próprio bean, para chamar dispararUm() com transação por item (evita self-invocation). */
     @Autowired
     @Lazy
     private NpsService self;
 
-    public NpsService(NpsRepository repository, CategoriaNpsRepository categoriaRepository, PushService pushService) {
+    public NpsService(NpsRepository repository, CategoriaNpsRepository categoriaRepository, PushService pushService,
+            ResponsavelRepository responsavelRepository) {
         this.repository = repository;
         this.categoriaRepository = categoriaRepository;
         this.pushService = pushService;
+        this.responsavelRepository = responsavelRepository;
     }
 
     /**
@@ -115,8 +124,11 @@ public class NpsService {
      * Regras: bloqueia reavaliação (409), rejeita categoria repetida (400),
      * recalcula a média e marca como RESPONDIDO. Reutilizado pelo admin e pelo app.
      * Deve rodar dentro de uma transação (a coleção de notas é LAZY).
+     *
+     * @param responsavelId responsável (cadastro) que respondeu pelo dependente; nulo
+     *                      quando foi o próprio paciente ou o admin (back-office).
      */
-    public Nps responder(Nps nps, ResponderNpsRequest request) {
+    public Nps responder(Nps nps, ResponderNpsRequest request, Long responsavelId) {
         // Regra: uma vez respondido, a avaliação não pode ser alterada.
         if (nps.getStatus() == StatusNps.RESPONDIDO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Esta avaliação já foi respondida");
@@ -143,8 +155,28 @@ public class NpsService {
         }
         nps.setMedia(soma / request.notas().size());
         nps.setObservacao(request.observacao());
+        nps.setResponsavelId(responsavelId);
         nps.setStatus(StatusNps.RESPONDIDO);
         nps.setRespondidoEm(LocalDateTime.now());
         return repository.save(nps);
+    }
+
+    /** Nome (completo) do responsável, ou null (id nulo, ou responsável já removido). */
+    public String nomeDoResponsavel(Long responsavelId) {
+        if (responsavelId == null) {
+            return null;
+        }
+        return responsavelRepository.findById(responsavelId).map(Responsavel::getNome).orElse(null);
+    }
+
+    /** Nomes dos responsáveis de uma lista de NPS, resolvidos num só findAllById (para as listagens). */
+    public Map<Long, String> nomesDosResponsaveis(Collection<Nps> lista) {
+        Set<Long> ids = lista.stream()
+                .map(Nps::getResponsavelId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? Map.of()
+                : responsavelRepository.findAllById(ids).stream()
+                        .collect(Collectors.toMap(Responsavel::getId, Responsavel::getNome));
     }
 }

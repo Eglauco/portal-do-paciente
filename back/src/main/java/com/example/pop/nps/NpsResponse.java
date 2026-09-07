@@ -15,9 +15,15 @@ public record NpsResponse(
         StatusNps status,
         String statusDescricao,
         Double media,
+        /** Nome do responsável que respondeu pelo paciente; null quando foi o próprio. */
+        String responsavelNome,
         LocalDateTime criadoEm) {
 
     public static NpsResponse from(Nps nps) {
+        return from(nps, null);
+    }
+
+    public static NpsResponse from(Nps nps, String responsavelNome) {
         Agendamento a = nps.getAgendamento();
         return new NpsResponse(
                 nps.getId(),
@@ -28,6 +34,7 @@ public record NpsResponse(
                 nps.getStatus(),
                 nps.getStatus().getDescricao(),
                 nps.getMedia(),
+                responsavelNome,
                 nps.getCriadoEm());
     }
 }

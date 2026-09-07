@@ -17,6 +17,9 @@ public interface ManifestacaoMensagemRepository extends JpaRepository<Manifestac
     /** Última mensagem (para o resumo na listagem). */
     ManifestacaoMensagem findFirstByManifestacaoIdOrderByCriadoEmDesc(Long manifestacaoId);
 
+    /** O responsável enviou alguma mensagem no SAU (lançamento)? Trava a remoção do responsável. */
+    boolean existsByResponsavelId(Long responsavelId);
+
     // ===================== Dashboard (agregações) =====================
 
     /** Mensagens da thread no período agrupadas por autor (PACIENTE/SAU). */

@@ -60,11 +60,12 @@ public class FeedController {
     private final PacienteAcessoService acessoService;
     private final PacienteRepository pacienteRepository;
     private final ResponsavelRepository responsavelRepository;
+    private final ModeracaoService moderacaoService;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, StorageService storageService,
             PacienteAcessoService acessoService, PacienteRepository pacienteRepository,
-            ResponsavelRepository responsavelRepository) {
+            ResponsavelRepository responsavelRepository, ModeracaoService moderacaoService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
@@ -72,20 +73,30 @@ public class FeedController {
         this.acessoService = acessoService;
         this.pacienteRepository = pacienteRepository;
         this.responsavelRepository = responsavelRepository;
+        this.moderacaoService = moderacaoService;
     }
 
     @GetMapping("/feed")
     public Pagina<FeedResponse> feed(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String dispositivoId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        // Feed do paciente logado: só as postagens das unidades a que ele tem acesso.
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.REDE_SOCIAL);
+        Set<Long> unidades = acessoService.unidadeIdsDoPaciente(paciente);
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         String disp = dispositivoId == null ? "" : dispositivoId.trim();
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
-        Page<Postagem> resultado = repository.findAll(pageable);
-        List<FeedResponse> content = resultado.getContent().stream().map(p -> toFeed(p, disp)).toList();
+        // Sem unidade vinculada = feed vazio (regra estrita).
+        Page<Postagem> resultado = unidades.isEmpty()
+                ? Page.empty(pageable)
+                : repository.findByUnidadeSaude_IdInOrderByCriadoEmDesc(unidades, pageable);
+        List<FeedResponse> content = resultado.getContent().stream()
+                .map(p -> toFeed(p, disp, paciente.getId())).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -93,8 +104,14 @@ public class FeedController {
 
     /** Detalhe de uma postagem no formato do feed (para a tela de detalhe do app). */
     @GetMapping("/feed/{id}")
-    public FeedResponse postagem(@PathVariable Long id, @RequestParam(required = false) String dispositivoId) {
-        return toFeed(obter(id), dispositivoId == null ? "" : dispositivoId.trim());
+    public FeedResponse postagem(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @RequestParam(required = false) String dispositivoId) {
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.REDE_SOCIAL);
+        Postagem postagem = obter(id);
+        // Não deixa abrir por id uma postagem de unidade fora do acesso do paciente.
+        acessoService.exigirUnidade(paciente, postagem.getUnidadeSaude().getId());
+        return toFeed(postagem, dispositivoId == null ? "" : dispositivoId.trim(), paciente.getId());
     }
 
     /** Curte ou descurte (toggle) a postagem para um aparelho. */
@@ -134,8 +151,12 @@ public class FeedController {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         Pageable pageable = PageRequest.of(pagina, tamanho);
-        Page<Comentario> resultado = comentarioRepository
-                .findByPostagemIdAndComentarioPaiIsNullOrderByCriadoEmDesc(id, pageable);
+        // Admin vê todos os comentários (inclusive pendentes/rejeitados para moderar); o público
+        // e o paciente veem só os publicados + os próprios pendentes ("em análise"). Filtrar no
+        // banco mantém a paginação correta (não conta/expõe comentários ocultos).
+        Page<Comentario> resultado = adminAtual != null
+                ? comentarioRepository.findByPostagemIdAndComentarioPaiIsNullOrderByCriadoEmDesc(id, pageable)
+                : comentarioRepository.findRaizesVisiveis(id, pacienteAtual, pageable);
 
         // Carrega as respostas dos comentários-raiz desta página em uma única consulta.
         List<Comentario> raizesList = resultado.getContent();
@@ -154,9 +175,16 @@ public class FeedController {
         Function<Long, String> fotoDoPaciente = autenticado ? resolverFotos(todos) : pid -> null;
 
         Function<Long, String> nomeDoResponsavel = resolverNomesResponsavel(todos);
+        // As raízes já vêm filtradas do banco; aqui filtram-se as RESPOSTAS ocultas (ex.: resposta
+        // pendente de outro paciente sob um comentário publicado).
         List<ComentarioResponse> content = raizesList.stream()
-                .map(c -> ComentarioResponse.from(c, porPai.getOrDefault(c.getId(), List.of()),
-                        pacienteAtual, adminAtual, fotoDoPaciente, nomeDoResponsavel))
+                .map(c -> {
+                    List<Comentario> respostas = porPai.getOrDefault(c.getId(), List.of()).stream()
+                            .filter(r -> visivel(r, pacienteAtual, adminAtual))
+                            .toList();
+                    return ComentarioResponse.from(c, respostas, pacienteAtual, adminAtual,
+                            fotoDoPaciente, nomeDoResponsavel);
+                })
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -173,6 +201,7 @@ public class FeedController {
         // Revalida a sessão (ativo + aparelho vinculado) e usa o nome do paciente
         // validado — autor confiável, nunca vindo do corpo.
         Paciente paciente = acessoService.pacienteDoToken(jwt);
+        acessoService.exigirUnidade(paciente, postagem.getUnidadeSaude().getId());
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         Comentario comentario = new Comentario();
         comentario.setPostagem(postagem);
@@ -183,14 +212,19 @@ public class FeedController {
         }
         comentario.setTexto(request.texto().trim());
         comentario.setCriadoEm(LocalDateTime.now());
+        moderarSeNecessario(postagem, comentario);
         Comentario salvo = comentarioRepository.save(comentario);
         marcarComentarioNovo(postagem);
         return ComentarioResponse.from(salvo, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
     }
 
-    /** Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). */
+    /**
+     * Responde a um comentário (outro paciente pode ajudar a tirar a dúvida). Sem
+     * {@code @Transactional} de propósito: a moderação por IA faz uma chamada HTTP (até o
+     * timeout) e não pode segurar uma conexão do pool aberta. O pai vem com o comentário-raiz
+     * já inicializado ({@code findByIdComPai}) para navegar até a raiz fora de transação.
+     */
     @PostMapping("/postagem/{id}/comentarios/{comentarioId}/responder")
-    @Transactional
     public ComentarioResponse responder(@PathVariable Long id, @PathVariable Long comentarioId,
             @Valid @RequestBody ComentarRequest request, @AuthenticationPrincipal Jwt jwt) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
@@ -198,12 +232,13 @@ public class FeedController {
         if (!postagem.isHabilitarComentarios()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Comentários desativados para esta postagem");
         }
-        Comentario pai = comentarioRepository.findById(comentarioId)
+        Comentario pai = comentarioRepository.findByIdComPai(comentarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado"));
         if (!pai.getPostagem().getId().equals(id)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Comentário não pertence à postagem");
         }
         Paciente paciente = acessoService.pacienteDoToken(jwt);
+        acessoService.exigirUnidade(paciente, postagem.getUnidadeSaude().getId());
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         // Threading de 1 nível: a resposta se ancora sempre no comentário-raiz.
         Comentario raiz = pai.getComentarioPai() != null ? pai.getComentarioPai() : pai;
@@ -217,14 +252,17 @@ public class FeedController {
         }
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
+        moderarSeNecessario(postagem, resposta);
         Comentario salva = comentarioRepository.save(resposta);
         marcarComentarioNovo(postagem);
         return ComentarioResponse.from(salva, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
     }
 
-    /** Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar. */
+    /**
+     * Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar.
+     * Sem {@code @Transactional} (a moderação faz chamada HTTP; não segura conexão do pool).
+     */
     @PutMapping("/postagem/{id}/comentarios/{comentarioId}")
-    @Transactional
     public ComentarioResponse editar(@PathVariable Long id, @PathVariable Long comentarioId,
             @Valid @RequestBody EditarComentarioRequest request, @AuthenticationPrincipal Jwt jwt) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.REDE_SOCIAL);
@@ -237,6 +275,9 @@ public class FeedController {
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
+        // Segurança: um comentário já publicado pode ser reescrito para conteúdo ofensivo dentro
+        // da janela de edição. Se a postagem exige validação por IA, revalida o texto editado.
+        remoderarAoEditar(c);
         return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null, umaFoto(paciente),
                 resolverNomesResponsavel(List.of(c)));
     }
@@ -269,6 +310,55 @@ public class FeedController {
     private void marcarComentarioNovo(Postagem postagem) {
         postagem.setUltimoComentarioPacienteEm(LocalDateTime.now());
         repository.save(postagem);
+    }
+
+    /**
+     * Se a postagem exige validação por IA, modera o comentário antes de publicar. Ofensivo
+     * (ou indeterminado, por falha da IA) → PENDENTE (oculto do público até o admin decidir).
+     */
+    private void moderarSeNecessario(Postagem postagem, Comentario comentario) {
+        if (!postagem.isValidarComentariosIa()) {
+            return;
+        }
+        ModeracaoService.Moderacao m = moderacaoService.avaliar(comentario.getTexto());
+        if (!m.liberado()) {
+            comentario.setStatusModeracao(StatusModeracao.PENDENTE);
+            comentario.setMotivoModeracao(m.motivo());
+        }
+    }
+
+    /**
+     * Revalida por IA um comentário que foi EDITADO, quando a postagem exige validação. Nunca
+     * republica sozinho um comentário que o admin já havia REJEITADO (vai para nova análise);
+     * nos demais casos, texto liberado → PUBLICADO, ofensivo/indeterminado → PENDENTE.
+     */
+    private void remoderarAoEditar(Comentario c) {
+        if (!c.getPostagem().isValidarComentariosIa()) {
+            return;
+        }
+        boolean eraRejeitado = c.getStatusModeracao() == StatusModeracao.REJEITADO;
+        ModeracaoService.Moderacao m = moderacaoService.avaliar(c.getTexto());
+        if (m.liberado() && !eraRejeitado) {
+            c.setStatusModeracao(StatusModeracao.PUBLICADO);
+            c.setMotivoModeracao(null);
+        } else {
+            c.setStatusModeracao(StatusModeracao.PENDENTE);
+            c.setMotivoModeracao(m.liberado()
+                    ? "Comentário reprovado foi editado; aguardando nova revisão."
+                    : m.motivo());
+        }
+    }
+
+    /** Visível ao leitor: admin vê tudo; público só PUBLICADO; o autor vê o próprio PENDENTE. */
+    private boolean visivel(Comentario c, Long pacienteAtual, Long adminAtual) {
+        if (adminAtual != null) {
+            return true;
+        }
+        if (c.getStatusModeracao() == StatusModeracao.PUBLICADO) {
+            return true;
+        }
+        return c.getStatusModeracao() == StatusModeracao.PENDENTE
+                && pacienteAtual != null && pacienteAtual.equals(c.getPacienteId());
     }
 
     /** Id do paciente a partir do claim do token (sem validar sessão); nulo se não autenticado. */
@@ -372,7 +462,7 @@ public class FeedController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Postagem não encontrada"));
     }
 
-    private FeedResponse toFeed(Postagem p, String dispositivoId) {
+    private FeedResponse toFeed(Postagem p, String dispositivoId, Long pacienteId) {
         boolean curtidoPorMim = StringUtils.hasText(dispositivoId)
                 && curtidaRepository.existsByPostagemIdAndDispositivoId(p.getId(), dispositivoId);
         return new FeedResponse(
@@ -384,7 +474,8 @@ public class FeedController {
                 p.isMostrarTotalCurtidas(),
                 curtidaRepository.countByPostagemId(p.getId()),
                 p.isHabilitarComentarios(),
-                comentarioRepository.countByPostagemId(p.getId()),
+                // Conta só o que o paciente pode ver (não vaza pendentes de outros / rejeitados).
+                comentarioRepository.countVisiveis(p.getId(), pacienteId),
                 curtidoPorMim,
                 p.getCriadoEm());
     }

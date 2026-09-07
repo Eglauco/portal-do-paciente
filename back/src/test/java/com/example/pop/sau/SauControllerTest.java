@@ -85,7 +85,9 @@ class SauControllerTest {
     void setup() {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> apagarManifestacoes(p.getId()));
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Ana Manifestante", TEL)).getId();
+        pacienteId = pacienteController.criar(
+                new PacienteRequest("Ana Manifestante", TEL, List.of(unidadeRepository.findAll().get(0).getId())), null)
+                .getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-sau")).token());
         unidadeId = unidadeRepository.findAll().get(0).getId();
@@ -107,7 +109,7 @@ class SauControllerTest {
 
     @Test
     void unidadesEtiposDisponiveisParaOPaciente() {
-        List<Ref> unidades = meuController.unidades();
+        List<Ref> unidades = meuController.unidades(jwt);
         assertFalse(unidades.isEmpty());
         assertTrue(unidades.stream().anyMatch(u -> u.id().equals(unidadeId)));
 
@@ -196,8 +198,10 @@ class SauControllerTest {
     }
 
     @Test
-    void unidadeInvalidaAoAbrirRetorna400() {
-        assertEquals(400, assertThrows(ResponseStatusException.class,
+    void unidadeSemAcessoAoAbrirRetorna403() {
+        // Unidade fora das que o paciente tem acesso (aqui inexistente) é barrada com 403
+        // por exigirUnidade, antes mesmo de checar a existência.
+        assertEquals(403, assertThrows(ResponseStatusException.class,
                 () -> meuController.abrir(jwt, new AbrirManifestacaoRequest(tipoId, 999999L, "texto")))
                 .getStatusCode().value());
     }
@@ -216,7 +220,7 @@ class SauControllerTest {
 
         String tel2 = "11955550002";
         pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        Long outroId = pacienteController.criar(new PacienteRequest("Outro Paciente", tel2)).getId();
+        Long outroId = pacienteController.criar(new PacienteRequest("Outro Paciente", tel2), null).getId();
         Jwt jwtOutro = jwtDecoder.decode(
                 authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro-sau")).token());
 

@@ -35,12 +35,20 @@ public record PacienteRequest(
         @Email @Size(max = 160) String email,
         @Size(max = 18) String cns,
         List<String> telefonesAdicionais,
-        List<ResponsavelRequest> responsaveis) {
+        List<ResponsavelRequest> responsaveis,
+        /** Ids das unidades de saúde que o paciente pode acessar (feed/chat/SAU). */
+        List<Long> unidadeIds) {
 
     /** Atalho (nome + telefone) usado em testes e cadastros mínimos. */
     public PacienteRequest(String nome, String telefone) {
         this(nome, telefone, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
+    }
+
+    /** Atalho (nome + telefone + unidades de acesso) usado em testes. */
+    public PacienteRequest(String nome, String telefone, List<Long> unidadeIds) {
+        this(nome, telefone, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, unidadeIds);
     }
 
     /**
@@ -53,11 +61,18 @@ public record PacienteRequest(
             Long id,
             @NotBlank @Size(min = 2, max = 120) String nome,
             @Size(max = 20) String telefone,
-            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes) {
+            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes,
+            /** Situação do responsável: ausente (null) = ativo. Inativo perde acesso ao app. */
+            Boolean ativo) {
 
-        /** Compat (testes/cadastros mínimos): sem permissões explícitas → tudo SEM_ACESSO. */
+        /** Compat (testes/cadastros mínimos): sem permissões nem situação explícitas → SEM_ACESSO e ativo. */
         public ResponsavelRequest(Long id, String nome, String telefone) {
-            this(id, nome, telefone, null);
+            this(id, nome, telefone, null, null);
+        }
+
+        /** Situação efetiva: ausente (null) = ativo (true). */
+        public boolean ativoOuPadrao() {
+            return ativo == null || ativo;
         }
     }
 }

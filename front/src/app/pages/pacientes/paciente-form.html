@@ -9,14 +9,40 @@
       </p>
     </div>
     @if (editando()) {
-      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
-        </svg>
-        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
-      </button>
+      <div class="page-head__actions">
+        <button type="button" class="btn btn--ghost" (click)="abrirHistorico()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 8v4l3 2" />
+          </svg>
+          Histórico
+        </button>
+        @if (inativo()) {
+          <button type="button" class="btn btn--solid" (click)="reativar()" [disabled]="alterandoSituacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+            </svg>
+            {{ alterandoSituacao() ? 'Reativando…' : 'Reativar cadastro' }}
+          </button>
+        } @else {
+          <button type="button" class="btn btn--danger" (click)="inativar()" [disabled]="alterandoSituacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
+            </svg>
+            {{ alterandoSituacao() ? 'Inativando…' : 'Inativar' }}
+          </button>
+        }
+      </div>
     }
   </header>
+
+  @if (editando() && inativo()) {
+    <div class="aviso-inativo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
+      </svg>
+      <span>Cadastro <b>inativo</b> — somente leitura. Reative o cadastro para poder editar.</span>
+    </div>
+  }
 
   @if (erroCarregar()) {
     <div class="state">
@@ -257,10 +283,17 @@
 
       <div class="resp-lista" formArrayName="responsaveis">
         @for (grupo of responsaveis.controls; track grupo) {
-          <div class="resp-lista__item" [formGroupName]="$index">
+          <div
+            class="resp-lista__item"
+            [formGroupName]="$index"
+            [class.resp-lista__item--inativo]="!!grupo.controls.id.value && !responsavelAtivo($index)"
+          >
             <span class="resp-lista__id" [class.resp-lista__id--novo]="!grupo.controls.id.value">
               {{ grupo.controls.id.value ? '#' + grupo.controls.id.value : 'novo' }}
             </span>
+            @if (!!grupo.controls.id.value && !responsavelAtivo($index)) {
+              <span class="badge-inativo resp-lista__badge">Inativo</span>
+            }
             <div class="resp-lista__campos">
               <div class="form-field">
                 <input
@@ -310,17 +343,48 @@
                 }
               </div>
             </div>
-            <button
-              type="button"
-              class="btn btn--ghost btn--sm resp-lista__rm"
-              (click)="removerResponsavel($index)"
-              [attr.aria-label]="'Remover responsável ' + ($index + 1)"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M5 12h14" />
-              </svg>
-              Remover
-            </button>
+            <div class="resp-lista__acoes">
+              @if (grupo.controls.id.value) {
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm"
+                  (click)="alternarAtivoResponsavel($index)"
+                  [attr.aria-label]="(responsavelAtivo($index) ? 'Inativar' : 'Reativar') + ' responsável ' + ($index + 1)"
+                >
+                  @if (responsavelAtivo($index)) {
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
+                    </svg>
+                    Inativar
+                  } @else {
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+                    </svg>
+                    Reativar
+                  }
+                </button>
+              }
+              @if (temLancamentos($index)) {
+                <span class="resp-lista__trava" title="Tem lançamentos no sistema — inative em vez de remover">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                  </svg>
+                  Tem lançamentos
+                </span>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm resp-lista__rm"
+                  (click)="removerResponsavel($index)"
+                  [attr.aria-label]="'Remover responsável ' + ($index + 1)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14" />
+                  </svg>
+                  Remover
+                </button>
+              }
+            </div>
           </div>
         }
       </div>
@@ -331,6 +395,27 @@
         </svg>
         Adicionar responsável
       </button>
+    </fieldset>
+
+    <!-- Unidades de acesso -->
+    <fieldset class="form-field">
+      <legend class="section-label">Unidades de acesso</legend>
+      <p class="field-hint">
+        Unidades de saúde que o paciente pode ver e com as quais pode interagir (feed, chat, SAU).
+        Sem nenhuma unidade, ele não terá acesso a essas telas.
+      </p>
+      <label class="sr-only" for="unidadeIds">Unidades de acesso</label>
+      <ng-select
+        labelForId="unidadeIds"
+        formControlName="unidadeIds"
+        [items]="unidadesDisponiveis()"
+        bindLabel="nome"
+        bindValue="id"
+        [multiple]="true"
+        [closeOnSelect]="false"
+        placeholder="Selecione as unidades"
+        notFoundText="Nenhuma unidade"
+      ></ng-select>
     </fieldset>
 
     <!-- Endereço -->
@@ -387,10 +472,12 @@
     </fieldset>
 
     <div class="form-actions">
-      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
-      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
-        {{ salvando() ? 'Salvando…' : 'Salvar' }}
-      </button>
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">{{ inativo() ? 'Voltar' : 'Cancelar' }}</button>
+      @if (!inativo()) {
+        <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando…' : 'Salvar' }}
+        </button>
+      }
     </div>
   </form>
 
@@ -441,4 +528,13 @@
       </div>
     </div>
   </div>
+}
+
+<!-- Histórico de auditoria (LGPD) do cadastro -->
+@if (historicoAberto() && codigo() != null) {
+  <app-paciente-log-modal
+    [pacienteId]="codigo()!"
+    [pacienteNome]="nomePaciente()"
+    (fechar)="fecharHistorico()"
+  />
 }

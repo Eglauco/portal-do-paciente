@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -72,7 +73,13 @@ public class NpsController {
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
         Page<Nps> resultado = repository.search(status, pacienteId, unidadeId, pageable);
-        List<NpsResponse> content = resultado.getContent().stream().map(NpsResponse::from).toList();
+        Map<Long, String> nomes = npsService.nomesDosResponsaveis(resultado.getContent());
+        // Guarda o id nulo: quando ninguém da página tem responsável, `nomes` é o Map.of()
+        // imutável do JDK, e Map.of().get(null) lança NPE (coleções imutáveis são null-hostile).
+        List<NpsResponse> content = resultado.getContent().stream()
+                .map(n -> NpsResponse.from(n,
+                        n.getResponsavelId() == null ? null : nomes.get(n.getResponsavelId())))
+                .toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -93,7 +100,8 @@ public class NpsController {
                 .getContent().stream()
                 .sorted(Comparator.comparing(Nps::getCriadoEm).reversed())
                 .toList();
-        List<ColunaExport<Nps>> cols = ExportacaoService.filtrar(colunasNps(), colunas);
+        Map<Long, String> nomesResp = npsService.nomesDosResponsaveis(dados);
+        List<ColunaExport<Nps>> cols = ExportacaoService.filtrar(colunasNps(nomesResp), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
@@ -110,7 +118,7 @@ public class NpsController {
     /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
     @GetMapping("/exportar/colunas")
     public List<String> colunasDisponiveis() {
-        return colunasNps().stream().map(ColunaExport::titulo).toList();
+        return colunasNps(Map.of()).stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
@@ -126,7 +134,7 @@ public class NpsController {
     }
 
     /** Todas as colunas disponíveis do NPS (o usuário escolhe quais exportar). */
-    private static List<ColunaExport<Nps>> colunasNps() {
+    private static List<ColunaExport<Nps>> colunasNps(Map<Long, String> nomesResp) {
         return List.of(
                 ColunaExport.de("Código", n -> String.valueOf(n.getId())),
                 ColunaExport.de("Atendimento",
@@ -144,6 +152,8 @@ public class NpsController {
                 ColunaExport.de("Disparo agendado", n -> n.getDispararEm() == null ? "" : n.getDispararEm().format(DATA_HORA)),
                 ColunaExport.de("Disparado em", n -> n.getDisparadoEm() == null ? "" : n.getDisparadoEm().format(DATA_HORA)),
                 ColunaExport.de("Respondido em", n -> n.getRespondidoEm() == null ? "" : n.getRespondidoEm().format(DATA_HORA)),
+                ColunaExport.de("Respondido por (responsável)",
+                        n -> n.getResponsavelId() == null ? "" : nomesResp.getOrDefault(n.getResponsavelId(), "")),
                 ColunaExport.de("Observação", n -> texto(n.getObservacao())));
     }
 
@@ -155,7 +165,8 @@ public class NpsController {
     @Transactional(readOnly = true)
     public ResponseEntity<NpsDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(nps -> ResponseEntity.ok(NpsDetalheResponse.from(nps, fotoDoNps(nps))))
+                .map(nps -> ResponseEntity.ok(
+                        NpsDetalheResponse.from(nps, fotoDoNps(nps), npsService.nomeDoResponsavel(nps.getResponsavelId()))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -165,8 +176,10 @@ public class NpsController {
     public ResponseEntity<NpsDetalheResponse> responder(@PathVariable Long id,
             @Valid @RequestBody ResponderNpsRequest request) {
         Nps nps = obter(id);
-        Nps respondido = npsService.responder(nps, request);
-        return ResponseEntity.ok(NpsDetalheResponse.from(respondido, fotoDoNps(respondido)));
+        // Resposta pelo back-office: sem responsável (é o admin, não um responsável do paciente).
+        Nps respondido = npsService.responder(nps, request, null);
+        return ResponseEntity.ok(NpsDetalheResponse.from(respondido, fotoDoNps(respondido),
+                npsService.nomeDoResponsavel(respondido.getResponsavelId())));
     }
 
     @PostMapping("/{id}/expirar")
@@ -175,7 +188,8 @@ public class NpsController {
         Nps nps = obter(id);
         nps.setStatus(StatusNps.EXPIRADO);
         Nps salvo = repository.save(nps);
-        return ResponseEntity.ok(NpsDetalheResponse.from(salvo, fotoDoNps(salvo)));
+        return ResponseEntity.ok(NpsDetalheResponse.from(salvo, fotoDoNps(salvo),
+                npsService.nomeDoResponsavel(salvo.getResponsavelId())));
     }
 
     private Nps obter(Long id) {

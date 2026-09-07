@@ -67,7 +67,8 @@ class PostagemControllerTest {
     @BeforeEach
     void setup() {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL)).getId();
+        // Vincula o paciente à unidade 1 (as postagens dos testes usam unidadeSaudeId=1).
+        pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL, java.util.List.of(1L)), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         String token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-post")).token();
         jwt = jwtDecoder.decode(token);
@@ -87,11 +88,11 @@ class PostagemControllerTest {
         assertEquals("Campanha de vacinação", criada.titulo());
 
         // Aparece no feed
-        Pagina<FeedResponse> feed = feedController.feed("dev-teste-1", 0, 50);
+        Pagina<FeedResponse> feed = feedController.feed(jwt, "dev-teste-1", 0, 50);
         assertTrue(feed.content().stream().anyMatch(f -> f.id().equals(id)));
 
         // Detalhe da postagem (tela de detalhe do app)
-        FeedResponse detalhe = feedController.postagem(id, "dev-teste-1");
+        FeedResponse detalhe = feedController.postagem(jwt, id, "dev-teste-1");
         assertEquals("Campanha de vacinação", detalhe.titulo());
         assertFalse(detalhe.curtidoPorMim());
 
@@ -105,7 +106,7 @@ class PostagemControllerTest {
 
         // curtidoPorMim reflete o aparelho
         feedController.curtir(id, new CurtirRequest("dev-teste-2"));
-        FeedResponse meu = feedController.feed("dev-teste-2", 0, 50).content().stream()
+        FeedResponse meu = feedController.feed(jwt, "dev-teste-2", 0, 50).content().stream()
                 .filter(f -> f.id().equals(id)).findFirst().orElseThrow();
         assertTrue(meu.curtidoPorMim());
         assertEquals(1, meu.totalCurtidas());
@@ -153,7 +154,7 @@ class PostagemControllerTest {
         assertEquals(3, pagina.content().get(0).respostas().size());
 
         // Total de comentários (raiz + respostas)
-        FeedResponse detalhe = feedController.postagem(id, "dev-x");
+        FeedResponse detalhe = feedController.postagem(jwt, id, "dev-x");
         assertEquals(4, detalhe.totalComentarios());
 
         controller.excluir(id);
@@ -210,12 +211,12 @@ class PostagemControllerTest {
         ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "que horas?"), jwt);
         feedController.responder(id, raiz.id(), new ComentarRequest("João", "eu também"), jwt);
         controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "às 9h"), adminJwt()); // resposta de outro
-        assertEquals(3, feedController.postagem(id, "dev-x").totalComentarios());
+        assertEquals(3, feedController.postagem(jwt, id, "dev-x").totalComentarios());
 
         // O dono exclui o raiz → apaga o raiz e TODAS as respostas (inclusive a do admin).
         feedController.excluir(id, raiz.id(), jwt);
         assertEquals(0, feedController.comentarios(id, 0, 20, jwt).totalElements());
-        assertEquals(0, feedController.postagem(id, "dev-x").totalComentarios());
+        assertEquals(0, feedController.postagem(jwt, id, "dev-x").totalComentarios());
 
         controller.excluir(id);
     }
@@ -224,7 +225,7 @@ class PostagemControllerTest {
     void soODonoPodeEditarOuExcluir() {
         String tel2 = "11933332222";
         pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        Long outroId = pacienteController.criar(new PacienteRequest("Maria Outra", tel2)).getId();
+        Long outroId = pacienteController.criar(new PacienteRequest("Maria Outra", tel2), null).getId();
         Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro")).token());
 
         Long id = controller.criar(new PostagemRequest("Regras", "teste", true, true, 1L, IMG)).id();

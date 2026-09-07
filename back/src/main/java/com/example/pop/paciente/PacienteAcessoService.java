@@ -104,6 +104,11 @@ public class PacienteAcessoService {
             telefones.add(proprio); // o próprio paciente sempre recebe
         }
         for (Responsavel r : responsavelRepository.findByPaciente_Id(pacienteId)) {
+            // Responsável inativo perdeu o acesso ao perfil: não recebe o push (senão a
+            // prévia da notificação — atividade do paciente — vazaria para quem já não acessa).
+            if (!r.isAtivo()) {
+                continue;
+            }
             String d = normalizarTelefone(r.getTelefone());
             if (d == null || d.isEmpty()) {
                 continue;
@@ -244,8 +249,14 @@ public class PacienteAcessoService {
         String tel = normalizarTelefone(telefone);
         Map<Long, Perfil> porId = new LinkedHashMap<>();
         if (tel != null && !tel.isEmpty()) {
-            repository.findByTelefone(tel).ifPresent(p -> porId.put(p.getId(), new Perfil(p, true, Map.of())));
+            // Cadastros inativos (soft-delete) não aparecem no seletor de perfis.
+            repository.findByTelefone(tel)
+                    .filter(p -> p.getSituacao() != SituacaoCadastro.INATIVO)
+                    .ifPresent(p -> porId.put(p.getId(), new Perfil(p, true, Map.of())));
             for (Paciente dep : responsavelRepository.pacientesPorTelefoneDoResponsavel(tel)) {
+                if (dep.getSituacao() == SituacaoCadastro.INATIVO) {
+                    continue;
+                }
                 porId.computeIfAbsent(dep.getId(), k -> new Perfil(dep, false, permissoesDoResponsavel(dep.getId(), tel)));
             }
         }
@@ -345,6 +356,24 @@ public class PacienteAcessoService {
         }
     }
 
+    /** Ids das unidades de saúde que o paciente pode acessar (feed/chat/SAU). Vazio = sem acesso. */
+    public Set<Long> unidadeIdsDoPaciente(Paciente paciente) {
+        if (paciente == null || paciente.getUnidades() == null) {
+            return Set.of();
+        }
+        return paciente.getUnidades().stream()
+                .map(com.example.pop.unidade.Unidade::getId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    /** 403 quando a unidade não está entre as que o paciente pode acessar. */
+    public void exigirUnidade(Paciente paciente, Long unidadeId) {
+        if (unidadeId == null || !unidadeIdsDoPaciente(paciente).contains(unidadeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Você não tem acesso a esta unidade de saúde.");
+        }
+    }
+
     /**
      * Nível da (conta, perfil) numa funcionalidade — para uso fora do fluxo de token,
      * como o WebSocket, cujo principal só carrega cid+pid. Sem conta (token legado) ou
@@ -408,11 +437,18 @@ public class PacienteAcessoService {
         if (telConta == null || telConta.isEmpty()) {
             return false;
         }
+        // Cadastro inativo (soft-delete): fora do app para QUALQUER acesso — próprio ou via
+        // responsável. Sem isto, um responsável com sessão ativa seguiria vendo/agindo no
+        // perfil inativado (revogar só encerra a sessão do telefone do próprio paciente).
+        if (paciente.getSituacao() == SituacaoCadastro.INATIVO) {
+            return false;
+        }
         if (telConta.equals(normalizarTelefone(paciente.getTelefone()))) {
             // Perfil próprio: respeita a revogação administrativa (ativo=false → sem acesso).
             return paciente.isAtivo();
         }
-        return responsavelRepository.existsByTelefoneAndPaciente_Id(telConta, paciente.getId());
+        // Dependente: só um responsável ATIVO dá acesso (inativo perde acesso ao perfil).
+        return responsavelRepository.existsByTelefoneAndPaciente_IdAndAtivoTrue(telConta, paciente.getId());
     }
 
     /**

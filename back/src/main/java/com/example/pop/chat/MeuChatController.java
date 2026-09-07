@@ -52,10 +52,10 @@ public class MeuChatController {
         this.unidadeRepository = unidadeRepository;
     }
 
-    /** Unidades disponíveis para o paciente iniciar uma conversa. */
+    /** Unidades disponíveis para o paciente iniciar uma conversa (só as vinculadas a ele). */
     @GetMapping("/unidades")
-    public List<Ref> unidades() {
-        return unidadeRepository.findAll(Sort.by("nome")).stream()
+    public List<Ref> unidades(@AuthenticationPrincipal Jwt jwt) {
+        return acessoService.pacienteDoToken(jwt).getUnidades().stream()
                 .map(u -> new Ref(u.getId(), u.getNome())).toList();
     }
 
@@ -68,8 +68,10 @@ public class MeuChatController {
     public ChatDetalheResponse abrir(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody AbrirMinhaConversaRequest request) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.CHAT);
-        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        ChatService.AberturaConversa abertura = chatService.abrirOuCriar(pacienteId, request.unidadeId());
+        var paciente = acessoService.pacienteDoToken(jwt);
+        // Só pode abrir conversa com uma unidade a que tem acesso.
+        acessoService.exigirUnidade(paciente, request.unidadeId());
+        ChatService.AberturaConversa abertura = chatService.abrirOuCriar(paciente.getId(), request.unidadeId());
         return semResponsavelId(chatService.toDetalhe(abertura.chat()));
     }
 

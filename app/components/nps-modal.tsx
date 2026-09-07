@@ -34,6 +34,8 @@ interface Props {
   mediaAtual?: number | null;
   notasRespondidas?: CategoriaNota[];
   observacaoAtual?: string | null;
+  /** Responsável que respondeu pelo dependente; ausente quando foi o próprio paciente. */
+  responsavelNome?: string | null;
   respondidoEm?: string | null;
   processando?: boolean;
   onEnviar: (notas: { categoriaId: number; nota: number }[], observacao: string) => void;
@@ -61,6 +63,7 @@ export function NpsModal({
   mediaAtual,
   notasRespondidas,
   observacaoAtual,
+  responsavelNome,
   respondidoEm,
   processando = false,
   onEnviar,
@@ -229,6 +232,14 @@ export function NpsModal({
                 </Text>
 
                 {!!respondidoEm && <Text style={styles.verQuando}>Enviada em {dataHoraFmt(respondidoEm)}</Text>}
+                {!!responsavelNome && (
+                  <View style={styles.viaResp}>
+                    <Ionicons name="people-outline" size={14} color="#8A5A00" />
+                    <Text style={styles.viaRespTxt}>
+                      Respondido por <Text style={styles.viaRespNome}>{responsavelNome}</Text> (responsável)
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </ScrollView>
@@ -379,4 +390,7 @@ const styles = StyleSheet.create({
   verObs: { alignSelf: 'flex-start', fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
   verObsVazio: { alignSelf: 'flex-start', fontSize: 14, color: Brand.muted, fontStyle: 'italic' },
   verQuando: { alignSelf: 'flex-start', fontSize: 12, color: Brand.muted, marginTop: 12 },
+  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 6 },
+  viaRespTxt: { fontSize: 12.5, fontWeight: '600', color: '#8A5A00' },
+  viaRespNome: { fontWeight: '800', color: '#8A5A00' },
 });

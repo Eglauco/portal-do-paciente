@@ -1,0 +1,150 @@
+.modal--log {
+  max-width: 640px;
+  width: 100%;
+  /* O .modal base é text-align:center; a timeline precisa alinhar à esquerda. */
+  text-align: left;
+}
+
+.plog__estado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 1.6rem 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.plog {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.plog__evento {
+  position: relative;
+  display: flex;
+  gap: 0.85rem;
+  padding-bottom: 1.15rem;
+}
+/* Linha vertical conectando os marcos da linha do tempo. */
+.plog__evento::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
+}
+.plog__evento:last-child::before {
+  display: none;
+}
+
+.plog__marco {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand);
+  z-index: 1;
+}
+.plog__evento[data-tipo='CRIACAO'] .plog__marco {
+  background: #1e874b;
+}
+.plog__evento[data-tipo='ALTERACAO'] .plog__marco {
+  background: var(--brand);
+}
+.plog__evento[data-tipo='INATIVACAO'] .plog__marco {
+  background: #b42318;
+}
+.plog__evento[data-tipo='REATIVACAO'] .plog__marco {
+  background: #0e7490;
+}
+
+.plog__corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.plog__cab {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.plog__tipo {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+.plog__quando {
+  font-size: 0.78rem;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.plog__autor {
+  margin: 0.1rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.plog__autor b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.plog__campos {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.plog__campo {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+}
+.plog__campo-nome {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.plog__diff {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  flex-wrap: wrap;
+}
+.plog__antes {
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.plog__seta {
+  color: var(--brand);
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.plog__depois {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

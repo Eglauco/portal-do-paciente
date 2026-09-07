@@ -11,6 +11,8 @@ export class PacienteBuscaStore {
   nome = '';
   cpf = '';
   prontuario = '';
+  /** Situação do cadastro: Ativos (padrão), Inativos ou Todos. */
+  situacao: 'ATIVO' | 'INATIVO' | 'TODOS' = 'ATIVO';
   page = 0;
   size = PacienteService.TAMANHO_PADRAO;
 
@@ -19,6 +21,7 @@ export class PacienteBuscaStore {
     this.nome = '';
     this.cpf = '';
     this.prontuario = '';
+    this.situacao = 'ATIVO';
     this.page = 0;
     this.size = PacienteService.TAMANHO_PADRAO;
   }

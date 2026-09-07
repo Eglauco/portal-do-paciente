@@ -52,10 +52,10 @@ public class MeuSauController {
         this.tipoRepository = tipoRepository;
     }
 
-    /** Unidades disponíveis para o paciente escolher ao abrir a manifestação. */
+    /** Unidades disponíveis para o paciente abrir a manifestação (só as vinculadas a ele). */
     @GetMapping("/unidades")
-    public List<Ref> unidades() {
-        return unidadeRepository.findAll(Sort.by("nome")).stream()
+    public List<Ref> unidades(@AuthenticationPrincipal Jwt jwt) {
+        return acessoService.pacienteDoToken(jwt).getUnidades().stream()
                 .map(u -> new Ref(u.getId(), u.getNome())).toList();
     }
 
@@ -86,6 +86,8 @@ public class MeuSauController {
             @Valid @RequestBody AbrirManifestacaoRequest request) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.SAU);
         Paciente paciente = acessoService.pacienteDoToken(jwt);
+        // Só pode abrir manifestação em uma unidade a que tem acesso.
+        acessoService.exigirUnidade(paciente, request.unidadeId());
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         Manifestacao m = sauService.abrir(paciente, request.unidadeId(), request.tipoId(), request.texto(), responsavel);
         return sauService.toDetalhe(m);

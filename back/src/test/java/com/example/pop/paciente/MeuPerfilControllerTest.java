@@ -48,7 +48,7 @@ class MeuPerfilControllerTest {
     @BeforeEach
     void setup() {
         repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Perfil", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Perfil", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-perfil")).token());
     }

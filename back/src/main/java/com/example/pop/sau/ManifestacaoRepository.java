@@ -21,6 +21,9 @@ public interface ManifestacaoRepository extends JpaRepository<Manifestacao, Long
     /** Existe alguma manifestação usando este tipo? (trava a exclusão do tipo). */
     boolean existsByTipoId(Long tipoId);
 
+    /** O responsável abriu alguma manifestação (lançamento no SAU)? Trava a remoção do responsável. */
+    boolean existsByResponsavelId(Long responsavelId);
+
     /** Busca do back-office (SAU): por unidade, tipo e status (todos opcionais). */
     @Query("""
             select m from Manifestacao m

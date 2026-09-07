@@ -15,6 +15,8 @@ export interface Nps {
   status: StatusNps;
   statusDescricao: string;
   media?: number | null;
+  /** Nome do responsável que respondeu pelo paciente; ausente quando foi o próprio. */
+  responsavelNome?: string | null;
   criadoEm: string;
 }
 
@@ -41,6 +43,8 @@ export interface NpsDetalhe {
   media?: number | null;
   notas: CategoriaNota[];
   observacao?: string | null;
+  /** Nome do responsável que respondeu pelo paciente; ausente quando foi o próprio. */
+  responsavelNome?: string | null;
   criadoEm: string;
   respondidoEm?: string | null;
 }

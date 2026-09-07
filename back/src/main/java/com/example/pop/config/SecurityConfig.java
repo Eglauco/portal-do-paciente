@@ -19,14 +19,24 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.example.pop.usuario.Usuario;
+import com.example.pop.usuario.UsuarioRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+
+import java.time.Instant;
 
 /**
  * Segurança da API: autenticação stateless via JWT (Bearer no header).
@@ -53,8 +63,10 @@ public class SecurityConfig {
                         // Públicos (sem token).
                         .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
-                        .requestMatchers("/feed/**", "/dispositivo").permitAll()
+                        .requestMatchers("/dispositivo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
+                        // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
+                        .requestMatchers("/feed", "/feed/**").hasRole("PACIENTE")
                         .requestMatchers(HttpMethod.POST, "/postagem/*/curtir").permitAll()
                         // App do paciente logado.
                         .requestMatchers(HttpMethod.POST, "/postagem/*/comentarios", "/postagem/*/comentarios/*/responder")
@@ -93,8 +105,36 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder() {
-        return NimbusJwtDecoder.withSecretKey(chaveJwt).build();
+    JwtDecoder jwtDecoder(UsuarioRepository usuarioRepository) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(chaveJwt).build();
+        // Além da validação padrão (expiração), rejeita tokens ADMIN emitidos ANTES da
+        // última troca de senha do usuário — trocar a senha derruba todas as sessões.
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(),
+                tokenNaoRevogado(usuarioRepository)));
+        return decoder;
+    }
+
+    /** Invalida tokens ADMIN cujo "iat" é anterior ao credenciaisAlteradasEm do usuário. */
+    private static OAuth2TokenValidator<Jwt> tokenNaoRevogado(UsuarioRepository usuarioRepository) {
+        return jwt -> {
+            if (!"ADMIN".equals(jwt.getClaimAsString("role"))) {
+                return OAuth2TokenValidatorResult.success(); // só o admin tem versionamento de senha
+            }
+            Object uid = jwt.getClaim("uid");
+            Instant emitidoEm = jwt.getIssuedAt();
+            if (!(uid instanceof Number numero) || emitidoEm == null) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            Instant alteradaEm = usuarioRepository.findById(numero.longValue())
+                    .map(Usuario::getCredenciaisAlteradasEm)
+                    .orElse(null);
+            if (alteradaEm != null && emitidoEm.isBefore(alteradaEm)) {
+                return OAuth2TokenValidatorResult.failure(
+                        new OAuth2Error("invalid_token", "Sessão encerrada por troca de senha", null));
+            }
+            return OAuth2TokenValidatorResult.success();
+        };
     }
 
     @Bean

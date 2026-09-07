@@ -20,6 +20,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -51,13 +54,21 @@ public class PacienteController {
     private final PacienteAcessoService acessoService;
     private final ExportacaoService exportacaoService;
     private final StorageService storageService;
+    private final PacienteLogService logService;
+    private final ResponsavelLancamentoService lancamentoService;
+    private final com.example.pop.unidade.UnidadeRepository unidadeRepository;
 
     public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService,
-            ExportacaoService exportacaoService, StorageService storageService) {
+            ExportacaoService exportacaoService, StorageService storageService, PacienteLogService logService,
+            ResponsavelLancamentoService lancamentoService,
+            com.example.pop.unidade.UnidadeRepository unidadeRepository) {
         this.repository = repository;
         this.acessoService = acessoService;
         this.exportacaoService = exportacaoService;
         this.storageService = storageService;
+        this.logService = logService;
+        this.lancamentoService = lancamentoService;
+        this.unidadeRepository = unidadeRepository;
     }
 
     /**
@@ -70,6 +81,7 @@ public class PacienteController {
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String cpf,
             @RequestParam(required = false) String prontuario,
+            @RequestParam(required = false) String situacao,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
@@ -79,7 +91,7 @@ public class PacienteController {
         String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
-        Page<Paciente> resultado = repository.search(codigo, filtroNome, filtroCpf, filtroProntuario, pageable);
+        Page<Paciente> resultado = repository.search(codigo, situacaoFiltro(situacao), filtroNome, filtroCpf, filtroProntuario, pageable);
         // Avatar da lista: troca a URL crua da foto pela GET pré-assinada (só p/ exibição;
         // as entidades já estão destacadas fora de transação, então não persiste nada).
         resultado.getContent().forEach(p -> p.setFotoUrl(storageService.urlFotoPaciente(p.getFotoUrl())));
@@ -107,11 +119,12 @@ public class PacienteController {
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String cpf,
             @RequestParam(required = false) String prontuario,
+            @RequestParam(required = false) String situacao,
             @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroCpf = digitos(cpf);
         String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
-        List<Paciente> dados = repository.search(codigo, filtroNome, filtroCpf, filtroProntuario, Pageable.unpaged())
+        List<Paciente> dados = repository.search(codigo, situacaoFiltro(situacao), filtroNome, filtroCpf, filtroProntuario, Pageable.unpaged())
                 .getContent().stream()
                 .sorted(Comparator.comparing(Paciente::getId))
                 .toList();
@@ -171,7 +184,9 @@ public class PacienteController {
                 ColunaExport.de("CEP", p -> formatarCep(p.getCep())),
                 ColunaExport.de("Complemento", p -> texto(p.getComplemento())),
                 ColunaExport.de("Liberado (app)", p -> p.isAtivo() ? "Sim" : "Não"),
-                ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"));
+                ColunaExport.de("Usando o app", p -> p.getDispositivoAtivo() != null ? "Sim" : "Não"),
+                ColunaExport.de("Situação do cadastro",
+                        p -> p.getSituacao() == SituacaoCadastro.INATIVO ? "Inativo" : "Ativo"));
     }
 
     private static String texto(String v) {
@@ -210,6 +225,21 @@ public class PacienteController {
         return d == null ? "" : d;
     }
 
+    /**
+     * Filtro de situação da busca: ausente/"ATIVO" → só ativos (padrão, também herdado
+     * por todos os seletores de paciente do sistema); "INATIVO" → só inativos; qualquer
+     * outro valor (ex.: "TODOS") → sem filtro.
+     */
+    private static SituacaoCadastro situacaoFiltro(String valor) {
+        if (valor == null || valor.isBlank() || "ATIVO".equalsIgnoreCase(valor)) {
+            return SituacaoCadastro.ATIVO;
+        }
+        if ("INATIVO".equalsIgnoreCase(valor)) {
+            return SituacaoCadastro.INATIVO;
+        }
+        return null; // TODOS
+    }
+
     /** Formata o telefone (só dígitos) no padrão brasileiro; devolve o valor original se não reconhecer. */
     private static String formatarTelefone(String telefone) {
         if (telefone == null || telefone.isBlank()) {
@@ -232,29 +262,55 @@ public class PacienteController {
                     // Foto só p/ exibição no form (avatar): URL crua → GET pré-assinada.
                     // aplicar()/PacienteRequest não tocam fotoUrl, então salvar não persiste a assinada.
                     p.setFotoUrl(storageService.urlFotoPaciente(p.getFotoUrl()));
+                    // Marca quais responsáveis têm lançamentos (o front bloqueia a remoção deles).
+                    p.getResponsaveis().forEach(r -> r.setTemLancamentos(lancamentoService.temLancamentos(r.getId())));
                     return ResponseEntity.ok(p);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** Linha do tempo de auditoria (LGPD) do cadastro: quem criou/alterou/inativou e o quê. */
+    @GetMapping("/{id}/logs")
+    public ResponseEntity<List<PacienteLogResponse>> logs(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(logService.listar(id));
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Paciente criar(@Valid @RequestBody PacienteRequest dados) {
+    @Transactional
+    public Paciente criar(@Valid @RequestBody PacienteRequest dados, @AuthenticationPrincipal Jwt jwt) {
         Paciente paciente = new Paciente();
         aplicar(paciente, dados);
         paciente.setAtivo(false); // a liberação é feita depois, via "gerar código"
         validarUnicidade(paciente, null);
-        return salvarUnico(paciente);
+        Paciente salvo = salvarUnico(paciente);
+        // Auditoria (LGPD): quem cadastrou e quais campos preencheu. Na mesma transação:
+        // se o log falhar, o cadastro inteiro é desfeito (não há alteração sem trilha).
+        logService.registrarCriacao(salvo, uidDoToken(jwt));
+        return salvo;
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @Valid @RequestBody PacienteRequest dados) {
+    @Transactional
+    public ResponseEntity<Paciente> atualizar(@PathVariable Long id, @Valid @RequestBody PacienteRequest dados,
+            @AuthenticationPrincipal Jwt jwt) {
         return repository.findById(id)
                 .map(existente -> {
+                    if (existente.getSituacao() == SituacaoCadastro.INATIVO) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                "Paciente inativo é somente leitura. Reative o cadastro para editar.");
+                    }
+                    // Fotografa o estado ANTES de aplicar as mudanças (para o diff granular).
+                    PacienteLogService.SnapshotPaciente antes = logService.snapshot(existente);
                     aplicar(existente, dados);
                     // ativo/código/aparelho são geridos por gerar-codigo/revogar, não pelo corpo.
                     validarUnicidade(existente, id);
-                    return ResponseEntity.ok(salvarUnico(existente));
+                    Paciente salvo = salvarUnico(existente);
+                    logService.registrarAlteracao(antes, salvo, uidDoToken(jwt));
+                    return ResponseEntity.ok(salvo);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -282,6 +338,7 @@ public class PacienteController {
         p.setCns(Documentos.somenteDigitos(r.cns()));
         p.setTelefonesAdicionais(normalizarTelefones(r.telefonesAdicionais()));
         aplicarResponsaveis(p, r.responsaveis());
+        aplicarUnidades(p, r.unidadeIds());
 
         if (p.getCpf() != null && !Documentos.cpfValido(p.getCpf())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF inválido");
@@ -335,7 +392,7 @@ public class PacienteController {
      * existentes por id, cria os novos (id nulo) e remove os que saíram (orphanRemoval).
      * Muta a coleção no lugar — nunca substitui a instância (exigência do orphanRemoval).
      */
-    private static void aplicarResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> reqs) {
+    private void aplicarResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> reqs) {
         List<PacienteRequest.ResponsavelRequest> entradas = reqs == null ? List.of() : reqs;
 
         Map<Long, Responsavel> existentes = new HashMap<>();
@@ -356,18 +413,29 @@ public class PacienteController {
             if (alvo != null) {
                 alvo.setNome(nome);
                 alvo.setTelefone(telefone);
+                alvo.setAtivo(entrada.ativoOuPadrao());
                 aplicarPermissoes(alvo, entrada.permissoes());
                 mantidos.add(alvo.getId());
             } else {
                 Responsavel novo = new Responsavel();
                 novo.setNome(nome);
                 novo.setTelefone(telefone);
+                novo.setAtivo(entrada.ativoOuPadrao());
                 novo.setPaciente(p);
                 aplicarPermissoes(novo, entrada.permissoes());
                 p.getResponsaveis().add(novo);
             }
         }
-        // Remove os existentes que não vieram no request (orphanRemoval apaga no banco).
+        // Bloqueia a remoção de responsável com lançamentos (preserva a autoria): só resta
+        // inativar. Checa ANTES do removeIf; se disparar, a transação inteira é desfeita.
+        for (Responsavel r : p.getResponsaveis()) {
+            if (r.getId() != null && !mantidos.contains(r.getId()) && lancamentoService.temLancamentos(r.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Não é possível remover o responsável \"" + r.getNome()
+                                + "\": há lançamentos dele no sistema. Inative-o para preservar o histórico.");
+            }
+        }
+        // Remove os existentes (sem lançamentos) que não vieram no request (orphanRemoval apaga).
         p.getResponsaveis().removeIf(r -> r.getId() != null && !mantidos.contains(r.getId()));
     }
 
@@ -386,6 +454,16 @@ public class PacienteController {
                     destino.put(func, nivel);
                 }
             });
+        }
+    }
+
+    /** Reconcilia as unidades de acesso do paciente pelos ids do request (muta a coleção no lugar). */
+    private void aplicarUnidades(Paciente p, List<Long> unidadeIds) {
+        Set<Long> ids = unidadeIds == null ? Set.of()
+                : unidadeIds.stream().filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        p.getUnidades().clear();
+        if (!ids.isEmpty()) {
+            p.getUnidades().addAll(unidadeRepository.findAllById(ids));
         }
     }
 
@@ -421,9 +499,56 @@ public class PacienteController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Inativa o cadastro (soft-delete): fica somente-leitura e some dos seletores/pesquisas.
+     * Também revoga o acesso ao app (desliga o "liberado" e desloga o aparelho). Idempotente.
+     */
+    @PostMapping("/{id}/inativar")
+    @Transactional
+    public ResponseEntity<Void> inativar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        Paciente paciente = repository.findById(id).orElse(null);
+        if (paciente == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (paciente.getSituacao() == SituacaoCadastro.INATIVO) {
+            return ResponseEntity.noContent().build();
+        }
+        paciente.setSituacao(SituacaoCadastro.INATIVO);
+        acessoService.revogar(paciente); // desliga app + desloga; também persiste o paciente
+        logService.registrarInativacao(paciente, uidDoToken(jwt));
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Reativa o cadastro (volta ATIVO). Não relibera o acesso ao app sozinho — isso é
+     * feito de novo por "gerar código". Idempotente.
+     */
+    @PostMapping("/{id}/reativar")
+    @Transactional
+    public ResponseEntity<Void> reativar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
+        Paciente paciente = repository.findById(id).orElse(null);
+        if (paciente == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (paciente.getSituacao() == SituacaoCadastro.ATIVO) {
+            return ResponseEntity.noContent().build();
+        }
+        paciente.setSituacao(SituacaoCadastro.ATIVO);
+        repository.save(paciente);
+        logService.registrarReativacao(paciente, uidDoToken(jwt));
+        return ResponseEntity.noContent().build();
+    }
+
+    /** uid do atendente logado (nulo se não houver token — ex.: chamadas diretas em teste). */
+    private static Long uidDoToken(Jwt jwt) {
+        return jwt != null && jwt.getClaim("uid") instanceof Number numero ? numero.longValue() : null;
+    }
+
     private Paciente salvarUnico(Paciente paciente) {
         try {
-            return repository.save(paciente);
+            // saveAndFlush: dentro da transação de criar/atualizar, força a checagem de
+            // unicidade a aflorar AQUI (e virar 409) em vez de só no commit (viraria 500).
+            return repository.saveAndFlush(paciente);
         } catch (DataIntegrityViolationException e) {
             // Rede de segurança para corridas: os campos únicos já são checados antes.
             throw new ResponseStatusException(HttpStatus.CONFLICT,

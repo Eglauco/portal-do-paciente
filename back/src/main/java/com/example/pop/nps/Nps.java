@@ -60,6 +60,14 @@ public class Nps {
     @Column(columnDefinition = "TEXT")
     private String observacao;
 
+    /**
+     * Responsável (cadastro) que respondeu a avaliação pelo paciente dependente.
+     * Nulo quando foi o próprio paciente (perfil próprio) ou o admin (back-office).
+     * FK com ON DELETE SET NULL (ver V58): remover o responsável não apaga o NPS.
+     */
+    @Column(name = "responsavel_id")
+    private Long responsavelId;
+
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 

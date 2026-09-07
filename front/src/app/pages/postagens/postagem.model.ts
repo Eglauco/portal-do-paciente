@@ -26,12 +26,19 @@ export interface PostagemDetalhe {
   descricao: string | null;
   mostrarTotalCurtidas: boolean;
   habilitarComentarios: boolean;
+  /** Validação de comentários novos por IA (Claude) ligada nesta postagem. */
+  validarComentariosIa: boolean;
   unidadeSaude: Ref;
   url: string;
   criadoEm: string;
   totalCurtidas: number;
   totalComentarios: number;
+  /** Até quando o admin já vira os comentários antes de abrir (marca "novo"); null = nunca abriu. */
+  comentariosVistosEm: string | null;
 }
+
+/** Estado de moderação por IA (espelha o enum StatusModeracao no back). */
+export type StatusModeracao = 'PUBLICADO' | 'PENDENTE' | 'REJEITADO';
 
 export interface Comentario {
   id: number;
@@ -48,6 +55,10 @@ export interface Comentario {
   meu: boolean;
   /** Ainda dentro da janela de edição de 15 min (calculado no servidor). */
   podeEditar: boolean;
+  /** Moderação por IA: PENDENTE = em análise (oculto do público); REJEITADO = reprovado. */
+  statusModeracao: StatusModeracao;
+  /** Motivo da IA quando pendente/rejeitado (só o admin recebe). */
+  motivoModeracao: string | null;
   respostas: Comentario[];
 }
 
@@ -62,6 +73,8 @@ export interface PostagemRequest {
   descricao: string | null;
   mostrarTotalCurtidas: boolean;
   habilitarComentarios: boolean;
+  /** Liga a validação de comentários novos por IA (Claude) antes de publicar. */
+  validarComentariosIa: boolean;
   unidadeSaudeId: number;
   url: string;
 }

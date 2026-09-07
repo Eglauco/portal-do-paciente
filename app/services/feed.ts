@@ -20,6 +20,9 @@ export interface Postagem {
   criadoEm: string;
 }
 
+/** Estado de moderação por IA. O paciente só recebe PUBLICADO (feed) ou PENDENTE (o próprio). */
+export type StatusModeracao = 'PUBLICADO' | 'PENDENTE' | 'REJEITADO';
+
 export interface Comentario {
   id: number;
   autor: string;
@@ -35,6 +38,8 @@ export interface Comentario {
   meu: boolean;
   /** Ainda dentro da janela de edição (calculado no servidor; controla o botão "Editar"). */
   podeEditar: boolean;
+  /** PENDENTE = em análise por IA (só o autor vê o próprio); PUBLICADO = visível a todos. */
+  statusModeracao: StatusModeracao;
   respostas: Comentario[];
 }
 
@@ -60,10 +65,11 @@ async function comoJson<T>(resposta: Response): Promise<T> {
   return resposta.json() as Promise<T>;
 }
 
-/** Feed com todas as postagens (mais recentes primeiro). */
+/** Feed do paciente logado (só as postagens das unidades a que ele tem acesso). */
 export async function listarFeed(dispositivoId: string): Promise<Postagem[]> {
   const params = new URLSearchParams({ dispositivoId, page: '0', size: '50' });
-  const resposta = await fetch(`${API_URL}/feed?${params.toString()}`);
+  // Autenticado: o backend filtra pelas unidades do paciente (o token vai no fetchMeu).
+  const resposta = await fetchMeu(`/feed?${params.toString()}`);
   const pagina = await comoJson<Pagina<Postagem>>(resposta);
   return pagina.content;
 }
@@ -71,7 +77,7 @@ export async function listarFeed(dispositivoId: string): Promise<Postagem[]> {
 /** Detalhe de uma postagem específica (formato do feed). */
 export async function buscarPostagem(id: number | string, dispositivoId: string): Promise<Postagem> {
   const params = new URLSearchParams({ dispositivoId });
-  const resposta = await fetch(`${API_URL}/feed/${id}?${params.toString()}`);
+  const resposta = await fetchMeu(`/feed/${id}?${params.toString()}`);
   return comoJson<Postagem>(resposta);
 }
 

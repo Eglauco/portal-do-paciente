@@ -71,7 +71,7 @@ class MeusEndpointsMvcTest {
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Meu", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente Meu", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-meu")).token();
     }

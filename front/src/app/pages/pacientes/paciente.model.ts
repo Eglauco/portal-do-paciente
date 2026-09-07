@@ -1,6 +1,9 @@
 /** Sexo do paciente (chave do enum no backend). */
 export type Sexo = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 
+/** Situação do cadastro (soft-delete). Não confundir com `ativo` (acesso ao app). */
+export type SituacaoCadastro = 'ATIVO' | 'INATIVO';
+
 /** Funcionalidade do app sujeita à permissão do responsável. */
 export type FuncionalidadeApp =
   | 'AGENDAMENTOS'
@@ -50,6 +53,10 @@ export interface Responsavel {
   nome: string;
   telefone?: string | null;
   permissoes?: PermissoesResponsavel;
+  /** Ativo (soft-delete/acesso). Inativo perde acesso ao perfil no app. */
+  ativo?: boolean;
+  /** Tem lançamentos no sistema? Quando true, não pode ser removido (só inativado). */
+  temLancamentos?: boolean;
 }
 
 /** Responsável no envio: id preenchido = existente; ausente = novo. */
@@ -58,6 +65,7 @@ export interface ResponsavelEntrada {
   nome: string;
   telefone?: string | null;
   permissoes: PermissoesResponsavel;
+  ativo: boolean;
 }
 
 export interface Paciente {
@@ -86,6 +94,10 @@ export interface Paciente {
   responsaveis?: Responsavel[];
   /** Liberado para acessar o app. */
   ativo?: boolean;
+  /** Situação do cadastro (soft-delete): ATIVO ou INATIVO. */
+  situacao?: SituacaoCadastro;
+  /** Unidades de saúde que o paciente pode acessar (feed/chat/SAU). */
+  unidades?: { id: number; nome: string }[];
   /** Foto (URL pré-assinada) para o avatar da lista; null se não tiver. */
   fotoUrl?: string | null;
 }
@@ -114,6 +126,8 @@ export interface PacienteEntrada {
   cns?: string | null;
   telefonesAdicionais: string[];
   responsaveis: ResponsavelEntrada[];
+  /** Ids das unidades de saúde que o paciente pode acessar. */
+  unidadeIds: number[];
 }
 
 export interface PacienteFiltro {
@@ -121,6 +135,34 @@ export interface PacienteFiltro {
   nome?: string;
   cpf?: string;
   prontuario?: string;
+  /** ATIVO (padrão no backend), INATIVO ou TODOS. */
+  situacao?: 'ATIVO' | 'INATIVO' | 'TODOS';
+}
+
+/** Tipo de evento na auditoria do cadastro. */
+export type TipoEventoPaciente = 'CRIACAO' | 'ALTERACAO' | 'INATIVACAO' | 'REATIVACAO';
+
+/** Quem realizou o evento de auditoria. */
+export type AutorLogPaciente = 'UNIDADE' | 'PACIENTE' | 'RESPONSAVEL' | 'SISTEMA';
+
+/** Alteração de um campo (antes/depois) dentro de um evento de auditoria. */
+export interface PacienteLogAlteracao {
+  campo: string;
+  campoDescricao: string;
+  valorAntes?: string | null;
+  valorDepois?: string | null;
+}
+
+/** Item da linha do tempo de auditoria do cadastro. */
+export interface PacienteLog {
+  id: number;
+  tipo: TipoEventoPaciente;
+  tipoDescricao: string;
+  autor: AutorLogPaciente;
+  /** Nome de quem fez a ação; null = sem ator identificado (exibir "Sistema"). */
+  autorNome?: string | null;
+  criadoEm: string;
+  alteracoes: PacienteLogAlteracao[];
 }
 
 export interface Pagina<T> {

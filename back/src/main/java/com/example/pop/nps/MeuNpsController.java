@@ -1,6 +1,7 @@
 package com.example.pop.nps;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.common.Pagina;
 import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.paciente.Responsavel;
 
 import jakarta.validation.Valid;
 
@@ -59,7 +61,13 @@ public class MeuNpsController {
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
         // Só NPS já disparados: os agendados (aguardando as horas) ficam ocultos.
         Page<Nps> resultado = repository.searchDisparadosDoPaciente(status, pacienteId, pageable);
-        List<NpsResponse> content = resultado.getContent().stream().map(NpsResponse::from).toList();
+        Map<Long, String> nomes = npsService.nomesDosResponsaveis(resultado.getContent());
+        // Guarda o id nulo: quando ninguém da página tem responsável, `nomes` é o Map.of()
+        // imutável do JDK, e Map.of().get(null) lança NPE (coleções imutáveis são null-hostile).
+        List<NpsResponse> content = resultado.getContent().stream()
+                .map(n -> NpsResponse.from(n,
+                        n.getResponsavelId() == null ? null : nomes.get(n.getResponsavelId())))
+                .toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -70,7 +78,8 @@ public class MeuNpsController {
     @Transactional(readOnly = true)
     public NpsDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.NPS);
-        return NpsDetalheResponse.from(meuNps(jwt, id));
+        Nps nps = meuNps(jwt, id);
+        return NpsDetalheResponse.from(nps, null, npsService.nomeDoResponsavel(nps.getResponsavelId()));
     }
 
     /** Resposta do paciente logado (uma nota em estrelas 1 a 5 por categoria + observação). */
@@ -80,7 +89,11 @@ public class MeuNpsController {
             @Valid @RequestBody ResponderNpsRequest request) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.NPS);
         Nps nps = meuNps(jwt, id);
-        return NpsDetalheResponse.from(npsService.responder(nps, request));
+        // Quando a sessão age por um dependente, registra o responsável que respondeu.
+        Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        Nps respondido = npsService.responder(nps, request, responsavel != null ? responsavel.getId() : null);
+        String responsavelNome = responsavel != null ? responsavel.getNome() : null;
+        return NpsDetalheResponse.from(respondido, null, responsavelNome);
     }
 
     /** Carrega o NPS garantindo que é do paciente logado (404 caso contrário). */

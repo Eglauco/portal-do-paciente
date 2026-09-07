@@ -1,0 +1,59 @@
+<div class="modal-backdrop" (click)="fechar.emit()">
+  <div
+    class="modal modal--log"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="paciente-log-titulo"
+    (click)="$event.stopPropagation()"
+  >
+    <h2 id="paciente-log-titulo" class="modal__titulo">Histórico do cadastro</h2>
+    <p class="modal__sub">
+      Auditoria (LGPD) de {{ pacienteNome() || 'paciente' }}: quem criou, alterou, inativou ou reativou — e o quê.
+    </p>
+
+    @if (carregando()) {
+      <div class="plog__estado"><span class="spinner" aria-hidden="true"></span> Carregando histórico…</div>
+    } @else if (erro()) {
+      <div class="plog__estado">
+        Não foi possível carregar o histórico.
+        <button type="button" class="btn btn--ghost btn--sm" (click)="carregar()">Tentar novamente</button>
+      </div>
+    } @else if (logs().length === 0) {
+      <div class="plog__estado">Nenhum registro de auditoria para este cadastro ainda.</div>
+    } @else {
+      <ol class="plog">
+        @for (log of logs(); track log.id) {
+          <li class="plog__evento" [attr.data-tipo]="log.tipo">
+            <span class="plog__marco" aria-hidden="true">{{ icone(log.tipo) }}</span>
+            <div class="plog__corpo">
+              <div class="plog__cab">
+                <span class="plog__tipo">{{ log.tipoDescricao }}</span>
+                <span class="plog__quando">{{ log.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <p class="plog__autor">por <b>{{ log.autorNome || 'Sistema' }}</b></p>
+
+              @if (log.alteracoes.length) {
+                <ul class="plog__campos">
+                  @for (a of log.alteracoes; track $index) {
+                    <li class="plog__campo">
+                      <span class="plog__campo-nome">{{ a.campoDescricao }}</span>
+                      <span class="plog__diff">
+                        <span class="plog__antes">{{ a.valorAntes || '—' }}</span>
+                        <span class="plog__seta" aria-hidden="true">→</span>
+                        <span class="plog__depois">{{ a.valorDepois || '—' }}</span>
+                      </span>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+    }
+
+    <div class="modal__actions">
+      <button type="button" class="btn btn--solid" (click)="fechar.emit()">Fechar</button>
+    </div>
+  </div>
+</div>

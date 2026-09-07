@@ -62,7 +62,19 @@
       />
     </div>
     <div class="filters__chat-acoes">
-      <span></span>
+      <label class="page-size">
+        Situação
+        <span class="select">
+          <select (change)="updateSituacao($event)" aria-label="Situação do cadastro">
+            <option value="ATIVO" [selected]="situacao() === 'ATIVO'">Ativos</option>
+            <option value="INATIVO" [selected]="situacao() === 'INATIVO'">Inativos</option>
+            <option value="TODOS" [selected]="situacao() === 'TODOS'">Todos</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </label>
       <div class="filters__actions">
         <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
         <button type="submit" class="btn btn--solid">
@@ -137,6 +149,9 @@
                       <span class="avatar" aria-hidden="true">{{ iniciais(p.nome) }}</span>
                     }
                     <b>{{ p.nome }}</b>
+                    @if (p.situacao === 'INATIVO') {
+                      <span class="badge-inativo">Inativo</span>
+                    }
                   </span>
                 </td>
                 <td class="mono muted-cell">{{ formatarCpf(p.cpf) || '—' }}</td>

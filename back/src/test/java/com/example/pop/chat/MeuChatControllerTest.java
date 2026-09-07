@@ -60,7 +60,7 @@ class MeuChatControllerTest {
                     .ifPresent(c -> chatRepository.deleteById(c.getId()));
             pacienteRepository.deleteById(p.getId());
         });
-        pacienteId = pacienteController.criar(new PacienteRequest("Chat Paciente", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Chat Paciente", TEL, List.of(unidadeAtual())), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-meuchat")).token());
         unidadeId = unidadeAtual();
@@ -79,7 +79,7 @@ class MeuChatControllerTest {
 
     @Test
     void unidadesDisponiveis() {
-        List<Ref> unidades = meuController.unidades();
+        List<Ref> unidades = meuController.unidades(jwt);
         assertFalse(unidades.isEmpty());
         assertTrue(unidades.stream().anyMatch(u -> u.id().equals(unidadeId)));
     }

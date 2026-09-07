@@ -127,6 +127,14 @@ export class AuthService {
   }
 
   /**
+   * Troca a própria senha (confere a atual no backend). Ao ter sucesso, todas as
+   * sessões são invalidadas no servidor — o front desloga em seguida.
+   */
+  trocarSenha(senhaAtual: string, novaSenha: string): Observable<void> {
+    return this.http.put<void>(`${this.base}/senha`, { senhaAtual, novaSenha });
+  }
+
+  /**
    * Recarrega o usuário do backend (/auth/me) para refletir telas/unidades atuais
    * (ex.: perfil alterado por outro admin, ou sessão antiga sem esses campos).
    */

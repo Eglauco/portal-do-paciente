@@ -20,6 +20,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.MapKeyEnumerated;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -51,6 +52,22 @@ public class Responsavel {
     /** Telefone (somente dígitos). Opcional. */
     @Column(length = 20)
     private String telefone;
+
+    /**
+     * Ativo (soft-delete/acesso). Inativo = sem acesso ao perfil do paciente no app
+     * (some do seletor e a próxima ação é negada), mas preservado para não perder a
+     * autoria dos lançamentos já feitos. Reativável.
+     */
+    @Column(nullable = false)
+    private boolean ativo = true;
+
+    /**
+     * Só para a tela (não persistido): indica se o responsável tem algum lançamento no
+     * sistema. Quando true, a remoção é bloqueada — só resta inativar. Preenchido no
+     * GET do paciente.
+     */
+    @Transient
+    private boolean temLancamentos;
 
     /**
      * Nível de acesso do responsável por funcionalidade do app. Só guarda o que foi

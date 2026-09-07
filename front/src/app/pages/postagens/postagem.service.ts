@@ -85,4 +85,14 @@ export class PostagemService {
   editarComentario(comentarioId: number, texto: string): Observable<Comentario> {
     return this.http.put<Comentario>(`${this.base}/comentario/${comentarioId}`, { texto });
   }
+
+  /** Aprova um comentário em análise (IA) — passa a publicado (visível no feed). */
+  aprovarComentario(comentarioId: number): Observable<Comentario> {
+    return this.http.post<Comentario>(`${this.base}/comentario/${comentarioId}/aprovar`, {});
+  }
+
+  /** Rejeita um comentário em análise (IA) — nunca é publicado. */
+  rejeitarComentario(comentarioId: number): Observable<Comentario> {
+    return this.http.post<Comentario>(`${this.base}/comentario/${comentarioId}/rejeitar`, {});
+  }
 }

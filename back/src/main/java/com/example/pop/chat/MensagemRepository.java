@@ -19,6 +19,9 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
 
     Mensagem findFirstByChatIdOrderByEnviadaEmDesc(Long chatId);
 
+    /** O responsável enviou alguma mensagem no chat (lançamento)? Trava a remoção do responsável. */
+    boolean existsByResponsavelId(Long responsavelId);
+
     long countByChatIdAndRemetenteAndLidaFalse(Long chatId, RemetenteMensagem remetente);
 
     List<Mensagem> findByChatIdAndRemetenteAndLidaFalse(Long chatId, RemetenteMensagem remetente);

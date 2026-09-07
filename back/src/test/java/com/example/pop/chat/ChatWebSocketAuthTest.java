@@ -61,7 +61,7 @@ class ChatWebSocketAuthTest {
     @BeforeEach
     void setup() {
         pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
-        pacienteId = pacienteController.criar(new PacienteRequest("Paciente WS", TEL)).getId();
+        pacienteId = pacienteController.criar(new PacienteRequest("Paciente WS", TEL), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-ws")).token();
         // Conta do app criada pela ativação (o token novo carrega o cid): usada para

@@ -1,0 +1,76 @@
+<div class="modal-backdrop">
+  <div
+    class="modal modal--senha"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="trocar-senha-titulo"
+  >
+    <h2 id="trocar-senha-titulo" class="modal__titulo">Trocar a senha</h2>
+    <p class="modal__sub">Ao salvar, você será deslogado para entrar novamente com a nova senha.</p>
+
+    <form [formGroup]="form" (submit)="salvar($event)">
+      <div class="form-field">
+        <label class="label" for="senha-atual">Senha atual</label>
+        <input
+          id="senha-atual"
+          class="input"
+          [type]="mostrar() ? 'text' : 'password'"
+          formControlName="senhaAtual"
+          autocomplete="current-password"
+          [class.input--error]="invalido('senhaAtual')"
+        />
+        @if (invalido('senhaAtual')) {
+          <span class="field-error" role="alert">Informe a senha atual.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="nova-senha">Nova senha</label>
+        <input
+          id="nova-senha"
+          class="input"
+          [type]="mostrar() ? 'text' : 'password'"
+          formControlName="novaSenha"
+          autocomplete="new-password"
+          [class.input--error]="invalido('novaSenha') || igualAtual"
+        />
+        @if (invalido('novaSenha')) {
+          <span class="field-error" role="alert">A nova senha deve ter ao menos 6 caracteres.</span>
+        } @else if (igualAtual) {
+          <span class="field-error" role="alert">A nova senha não pode ser igual à atual.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="repetir-senha">Repetir a nova senha</label>
+        <input
+          id="repetir-senha"
+          class="input"
+          [type]="mostrar() ? 'text' : 'password'"
+          formControlName="repetir"
+          autocomplete="new-password"
+          [class.input--error]="naoConfere"
+        />
+        @if (naoConfere) {
+          <span class="field-error" role="alert">As senhas não conferem.</span>
+        }
+      </div>
+
+      <label class="senha-mostrar">
+        <input type="checkbox" [checked]="mostrar()" (change)="alternarMostrar()" />
+        <span>Mostrar senhas</span>
+      </label>
+
+      @if (erroServidor(); as erro) {
+        <p class="senha-erro" role="alert">{{ erro }}</p>
+      }
+
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="fechar.emit()" [disabled]="salvando()">Cancelar</button>
+        <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando…' : 'Salvar nova senha' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

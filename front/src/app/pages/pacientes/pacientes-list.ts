@@ -31,6 +31,7 @@ export class PacientesList {
   protected readonly nome = signal(this.store.nome);
   protected readonly cpf = signal(this.store.cpf);
   protected readonly prontuario = signal(this.store.prontuario);
+  protected readonly situacao = signal<'ATIVO' | 'INATIVO' | 'TODOS'>(this.store.situacao);
 
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly loading = signal(false);
@@ -80,6 +81,13 @@ export class PacientesList {
     this.nome.set('');
     this.cpf.set('');
     this.prontuario.set('');
+    this.situacao.set('ATIVO');
+    this.page.set(0);
+    this.carregar();
+  }
+
+  protected updateSituacao(event: Event): void {
+    this.situacao.set((event.target as HTMLSelectElement).value as 'ATIVO' | 'INATIVO' | 'TODOS');
     this.page.set(0);
     this.carregar();
   }
@@ -109,6 +117,7 @@ export class PacientesList {
     this.store.nome = this.nome();
     this.store.cpf = this.cpf();
     this.store.prontuario = this.prontuario();
+    this.store.situacao = this.situacao();
     this.store.size = this.size();
     this.store.page = this.page();
 
@@ -116,7 +125,13 @@ export class PacientesList {
     this.error.set(false);
     this.service
       .listar(
-        { codigo: this.codigo(), nome: this.nome(), cpf: this.cpf(), prontuario: this.prontuario() },
+        {
+          codigo: this.codigo(),
+          nome: this.nome(),
+          cpf: this.cpf(),
+          prontuario: this.prontuario(),
+          situacao: this.situacao(),
+        },
         this.page(),
         this.size(),
       )
@@ -159,7 +174,13 @@ export class PacientesList {
     this.service
       .exportar(
         formato,
-        { codigo: this.codigo(), nome: this.nome(), cpf: this.cpf(), prontuario: this.prontuario() },
+        {
+          codigo: this.codigo(),
+          nome: this.nome(),
+          cpf: this.cpf(),
+          prontuario: this.prontuario(),
+          situacao: this.situacao(),
+        },
         colunas,
       )
       .subscribe({
