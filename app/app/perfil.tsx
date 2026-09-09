@@ -2,12 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import type { ImagePickerOptions } from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { SemAcesso } from '@/components/sem-acesso';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
 import { carregarPerfil, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
@@ -114,6 +114,8 @@ function montarSecoes(p: MeuPerfil) {
 }
 
 export default function PerfilScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const { sessao } = useSessao();
   const { definirFoto } = usePerfilFoto();
@@ -233,7 +235,7 @@ export default function PerfilScreen() {
               <Image source={perfil.fotoUrl} style={styles.avatar} contentFit="cover" transition={200} />
             ) : (
               <View style={[styles.avatar, styles.avatarVazio]}>
-                <Ionicons name="person" size={44} color={Brand.muted} />
+                <Ionicons name="person" size={44} color={t.muted} />
               </View>
             )}
             {podeTrocarFoto && (
@@ -254,7 +256,7 @@ export default function PerfilScreen() {
           )}
           {perfil?.prontuario ? (
             <View style={styles.codigo}>
-              <Ionicons name="finger-print-outline" size={13} color={Brand.brandDeep} />
+              <Ionicons name="finger-print-outline" size={13} color={t.brandDeep} />
               <Text style={styles.codigoTxt}>Prontuário nº {perfil.prontuario}</Text>
             </View>
           ) : null}
@@ -264,13 +266,13 @@ export default function PerfilScreen() {
           <SemAcesso mensagem="O responsável não tem acesso aos dados deste perfil. Você ainda pode trocar de perfil abaixo." />
         ) : carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando seus dados…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -282,7 +284,7 @@ export default function PerfilScreen() {
         ) : (
           <>
             <View style={styles.aviso}>
-              <Ionicons name="lock-closed-outline" size={14} color={Brand.muted} />
+              <Ionicons name="lock-closed-outline" size={14} color={t.muted} />
               <Text style={styles.avisoTxt}>
                 Seus dados são somente para consulta. Para corrigir algo, procure a sua unidade de saúde.
               </Text>
@@ -294,7 +296,7 @@ export default function PerfilScreen() {
                   {secao.campos.map((c, i) => (
                     <View key={`${secao.titulo}-${i}`} style={[styles.linha, i > 0 && styles.linhaBorda]}>
                       <View style={styles.linhaIcon}>
-                        <Ionicons name={c.icon as never} size={18} color={Brand.brandDeep} />
+                        <Ionicons name={c.icon as never} size={18} color={t.brandDeep} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.rotulo}>{c.rotulo}</Text>
@@ -313,7 +315,7 @@ export default function PerfilScreen() {
           onPress={() => router.push('/selecionar-perfil')}
           accessibilityRole="button"
           accessibilityLabel="Selecionar perfil">
-          <Ionicons name="people-outline" size={20} color={Brand.brandDeep} />
+          <Ionicons name="people-outline" size={20} color={t.brandDeep} />
           <Text style={styles.selecionarTxt}>Selecionar perfil</Text>
         </Pressable>
       </ScrollView>
@@ -321,124 +323,125 @@ export default function PerfilScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
-  content: { padding: 20, paddingBottom: 40 },
-  hero: { alignItems: 'center', marginBottom: 22 },
-  avatarRing: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    padding: 3,
-    borderWidth: 2,
-    borderColor: Brand.glow,
-    marginBottom: 10,
-  },
-  avatar: { width: '100%', height: '100%', borderRadius: 44, backgroundColor: Brand.line },
-  avatarVazio: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
-  cameraBadge: {
-    position: 'absolute',
-    right: -2,
-    bottom: -2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: Brand.brand,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: Brand.bg,
-  },
-  nome: { fontSize: 22, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
-  trocarFoto: { fontSize: 13.5, fontWeight: '700', color: Brand.brandDeep, marginTop: 4 },
-  codigo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#E7F3EF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 12,
-  },
-  codigoTxt: { fontSize: 12.5, fontWeight: '700', color: Brand.brandDeep },
-  aviso: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#EEF3F1',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 18,
-  },
-  avisoTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
-  secao: { marginBottom: 18 },
-  secaoTitulo: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Brand.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  card: {
-    backgroundColor: Brand.surface,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    paddingHorizontal: 14,
-  },
-  linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
-  linhaBorda: { borderTopWidth: 1, borderTopColor: '#EEF3F1' },
-  linhaIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E7F3EF',
-  },
-  rotulo: { fontSize: 12, color: Brand.muted },
-  valor: { fontSize: 14.5, fontWeight: '600', color: Brand.ink, marginTop: 1 },
-  estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
-  estadoIcone: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
-    backgroundColor: Brand.bg,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
-  estadoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 6,
-    height: 44,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    backgroundColor: Brand.brand,
-  },
-  estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  selecionar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: Brand.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    paddingVertical: 15,
-    marginTop: 6,
-    marginBottom: 10,
-  },
-  selecionarPressed: { backgroundColor: '#F4FAF8' },
-  selecionarTxt: { fontSize: 15, fontWeight: '700', color: Brand.brandDeep },
-});
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.bg },
+    content: { padding: 20, paddingBottom: 40 },
+    hero: { alignItems: 'center', marginBottom: 22 },
+    avatarRing: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      padding: 3,
+      borderWidth: 2,
+      borderColor: t.glow,
+      marginBottom: 10,
+    },
+    avatar: { width: '100%', height: '100%', borderRadius: 44, backgroundColor: t.line },
+    avatarVazio: { alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandTint },
+    cameraBadge: {
+      position: 'absolute',
+      right: -2,
+      bottom: -2,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: t.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: t.bg,
+    },
+    nome: { fontSize: 22, fontWeight: '800', color: t.ink, letterSpacing: -0.4 },
+    trocarFoto: { fontSize: 13.5, fontWeight: '700', color: t.brandDeep, marginTop: 4 },
+    codigo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: t.brandTint,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      marginTop: 12,
+    },
+    codigoTxt: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep },
+    aviso: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: t.brandTint,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 18,
+    },
+    avisoTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
+    secao: { marginBottom: 18 },
+    secaoTitulo: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: t.muted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: 10,
+      marginLeft: 4,
+    },
+    card: {
+      backgroundColor: t.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: t.line,
+      paddingHorizontal: 14,
+    },
+    linha: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
+    linhaBorda: { borderTopWidth: 1, borderTopColor: t.brandTint },
+    linhaIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.brandTint,
+    },
+    rotulo: { fontSize: 12, color: t.muted },
+    valor: { fontSize: 14.5, fontWeight: '600', color: t.ink, marginTop: 1 },
+    estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 10 },
+    estadoIcone: {
+      width: 56,
+      height: 56,
+      borderRadius: 18,
+      backgroundColor: t.bg,
+      borderWidth: 1,
+      borderColor: t.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+    estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+    estadoBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      marginTop: 6,
+      height: 44,
+      paddingHorizontal: 18,
+      borderRadius: 14,
+      backgroundColor: t.brand,
+    },
+    estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    selecionar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: t.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: t.line,
+      paddingVertical: 15,
+      marginTop: 6,
+      marginBottom: 10,
+    },
+    selecionarPressed: { backgroundColor: t.brandTint },
+    selecionarTxt: { fontSize: 15, fontWeight: '700', color: t.brandDeep },
+  });

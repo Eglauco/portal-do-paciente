@@ -60,9 +60,25 @@ interface Pagina<T> {
 
 async function comoJson<T>(resposta: Response): Promise<T> {
   if (!resposta.ok) {
-    throw new Error(`Falha na requisição (${resposta.status})`);
+    throw new Error(await mensagemErro(resposta));
   }
   return resposta.json() as Promise<T>;
+}
+
+/**
+ * Mensagem amigável do corpo de erro do backend (campo "message" — exposto via
+ * server.error.include-message), para mostrar ao paciente o motivo (ex.: idade mínima para
+ * comentar). Sem mensagem utilizável, cai num texto genérico com o status.
+ */
+async function mensagemErro(resposta: Response): Promise<string> {
+  try {
+    const corpo = await resposta.json();
+    const msg = corpo?.message;
+    if (typeof msg === 'string' && msg.trim()) return msg.trim();
+  } catch {
+    // corpo não-JSON/vazio: usa o genérico abaixo
+  }
+  return `Falha na requisição (${resposta.status})`;
 }
 
 /** Feed do paciente logado (só as postagens das unidades a que ele tem acesso). */
@@ -137,12 +153,12 @@ export async function excluirComentario(postagemId: number | string, comentarioI
   }
 }
 
-export async function comentar(postagemId: number | string, autor: string, texto: string): Promise<Comentario> {
-  // Autenticado: o backend define o autor pelo token (o nome enviado é ignorado).
+export async function comentar(postagemId: number | string, texto: string): Promise<Comentario> {
+  // O autor exibido é resolvido no servidor pelo token do paciente; não vai no corpo.
   const resposta = await fetchMeu(`/postagem/${postagemId}/comentarios`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ autor, texto }),
+    body: JSON.stringify({ texto }),
   });
   return comoJson<Comentario>(resposta);
 }
@@ -151,7 +167,6 @@ export async function comentar(postagemId: number | string, autor: string, texto
 export async function responder(
   postagemId: number | string,
   comentarioId: number,
-  autor: string,
   texto: string,
 ): Promise<Comentario> {
   const resposta = await fetchMeu(
@@ -159,7 +174,7 @@ export async function responder(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ autor, texto }),
+      body: JSON.stringify({ texto }),
     },
   );
   return comoJson<Comentario>(resposta);

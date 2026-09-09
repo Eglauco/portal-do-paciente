@@ -66,4 +66,12 @@ public class Chat {
 
     @Column(name = "atualizado_em", nullable = false)
     private LocalDateTime atualizadoEm;
+
+    /**
+     * Até quando o PACIENTE já leu a conversa (high-water-mark). Uma mensagem da
+     * unidade com {@code enviadaEm} depois disto ainda está "não lida" pelo paciente
+     * (indicador no app) e "não lida" no recibo mostrado ao atendente. Null = nunca abriu.
+     */
+    @Column(name = "paciente_leu_em")
+    private LocalDateTime pacienteLeuEm;
 }

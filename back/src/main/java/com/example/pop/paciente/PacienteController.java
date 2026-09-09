@@ -413,6 +413,7 @@ public class PacienteController {
             if (alvo != null) {
                 alvo.setNome(nome);
                 alvo.setTelefone(telefone);
+                alvo.setDataNascimento(entrada.dataNascimento());
                 alvo.setAtivo(entrada.ativoOuPadrao());
                 aplicarPermissoes(alvo, entrada.permissoes());
                 mantidos.add(alvo.getId());
@@ -420,6 +421,7 @@ public class PacienteController {
                 Responsavel novo = new Responsavel();
                 novo.setNome(nome);
                 novo.setTelefone(telefone);
+                novo.setDataNascimento(entrada.dataNascimento());
                 novo.setAtivo(entrada.ativoOuPadrao());
                 novo.setPaciente(p);
                 aplicarPermissoes(novo, entrada.permissoes());

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -13,8 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SemAcesso } from '@/components/sem-acesso';
-import { Brand } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { ManifestacaoItem, StatusManifestacao, listarManifestacoes } from '@/services/sau';
 import { podeLancar, podeVer } from '@/services/sessao';
@@ -32,8 +32,8 @@ function horaLista(iso: string | null): string {
   return `${doisDigitos(d.getDate())}/${doisDigitos(d.getMonth() + 1)}`;
 }
 
-// Cor neutra da marca para o tipo (o nome é livre, vem do cadastro).
-const COR_TIPO = { fg: Brand.brandDeep, bg: '#E3F1EC', icone: 'chatbox-ellipses-outline' as const };
+// Ícone fixo do "tipo" (o nome é livre, vem do cadastro); fundo e texto seguem a marca no render.
+const COR_TIPO = { icone: 'chatbox-ellipses-outline' as const };
 
 const CORES_STATUS: Record<StatusManifestacao, { fg: string; bg: string }> = {
   AGUARDANDO_SAU: { fg: '#A5741A', bg: '#FBF0D6' },
@@ -42,6 +42,8 @@ const CORES_STATUS: Record<StatusManifestacao, { fg: string; bg: string }> = {
 };
 
 export default function SauScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { sessao } = useSessao();
@@ -99,17 +101,17 @@ export default function SauScreen() {
           itens.length === 0 && styles.listaVaziaContent,
         ]}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>
         {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando manifestações…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -121,7 +123,7 @@ export default function SauScreen() {
         ) : itens.length === 0 ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="chatbox-ellipses-outline" size={26} color={Brand.muted} />
+              <Ionicons name="chatbox-ellipses-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Nenhuma manifestação</Text>
             <Text style={styles.estadoTxt}>
@@ -147,8 +149,8 @@ export default function SauScreen() {
                 key={m.id}
                 onPress={() => abrir(m)}
                 style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
-                <View style={[styles.avatar, { backgroundColor: tipo.bg }]}>
-                  <Ionicons name={tipo.icone as never} size={22} color={tipo.fg} />
+                <View style={[styles.avatar, { backgroundColor: t.brandTint }]}>
+                  <Ionicons name={tipo.icone as never} size={22} color={t.brandDeep} />
                 </View>
                 <View style={styles.rowBody}>
                   <View style={styles.rowTop}>
@@ -156,8 +158,8 @@ export default function SauScreen() {
                     <Text style={styles.hora}>{horaLista(m.atualizadoEm)}</Text>
                   </View>
                   <View style={styles.pills}>
-                    <View style={[styles.pill, { backgroundColor: tipo.bg }]}>
-                      <Text style={[styles.pillTxt, { color: tipo.fg }]}>{m.tipo.nome}</Text>
+                    <View style={[styles.pill, { backgroundColor: t.brandTint }]}>
+                      <Text style={[styles.pillTxt, { color: t.brandDeep }]}>{m.tipo.nome}</Text>
                     </View>
                     <View style={[styles.pill, { backgroundColor: status.bg }]}>
                       <Text style={[styles.pillTxt, { color: status.fg }]}>{m.statusDescricao}</Text>
@@ -194,8 +196,9 @@ export default function SauScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.surface },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.surface },
   lista: { flex: 1 },
   listaVaziaContent: { flexGrow: 1 },
 
@@ -206,32 +209,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F4F2',
+    borderBottomColor: t.brandTint,
   },
-  rowPressed: { backgroundColor: '#EEF3F1' },
+  rowPressed: { backgroundColor: t.brandTint },
   avatar: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   rowBody: { flex: 1, justifyContent: 'center', gap: 5 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  nome: { flex: 1, fontSize: 15.5, fontWeight: '700', color: Brand.ink },
-  hora: { fontSize: 12, color: Brand.muted },
+  nome: { flex: 1, fontSize: 15.5, fontWeight: '700', color: t.ink },
+  hora: { fontSize: 12, color: t.muted },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   pillTxt: { fontSize: 11, fontWeight: '700' },
-  previa: { fontSize: 13.5, color: Brand.muted },
+  previa: { fontSize: 13.5, color: t.muted },
   previaForte: { color: '#40514C', fontWeight: '600' },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
   viaRespTxt: { flex: 1, fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
 
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
   estadoIcone: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: Brand.bg,
-    borderWidth: 1, borderColor: Brand.line, alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: 18, backgroundColor: t.bg,
+    borderWidth: 1, borderColor: t.line, alignItems: 'center', justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6, height: 44,
-    paddingHorizontal: 18, borderRadius: 14, backgroundColor: Brand.brand,
+    paddingHorizontal: 18, borderRadius: 14, backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
@@ -242,7 +245,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

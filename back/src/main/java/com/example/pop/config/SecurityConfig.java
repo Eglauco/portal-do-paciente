@@ -63,6 +63,8 @@ public class SecurityConfig {
                         // Públicos (sem token).
                         .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
+                        // Tema (cor da plataforma): leitura pública p/ o front e o app aplicarem no boot.
+                        .requestMatchers(HttpMethod.GET, "/tema").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
@@ -81,7 +83,7 @@ public class SecurityConfig {
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/procedimento/**", "/profissional/**", "/motivo-falta/**", "/categoria-nps/**",
                                 "/postagem/**", "/sau/**", "/tipo-manifestacao/**", "/dashboard/**",
-                                "/perfil/**")
+                                "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())

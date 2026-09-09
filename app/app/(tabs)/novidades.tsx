@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { ComentariosSheet } from '@/components/comentarios-sheet';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { curtir, listarFeed, Postagem } from '@/services/feed';
@@ -43,6 +43,8 @@ function haQuanto(iso: string): string {
 }
 
 export default function NovidadesScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   // Novidades = Rede Social. Sem acesso (perfil dependente): a aba some e, se cair
   // aqui por ser a rota inicial, manda para o Prontuário (aba sempre disponível).
@@ -137,12 +139,12 @@ export default function NovidadesScreen() {
           <Ionicons
             name={post.curtidoPorMim ? 'heart' : 'heart-outline'}
             size={27}
-            color={post.curtidoPorMim ? '#E0245E' : Brand.ink}
+            color={post.curtidoPorMim ? '#E0245E' : t.ink}
           />
         </Pressable>
         {post.habilitarComentarios && (
           <Pressable style={styles.acaoComentar} onPress={() => abrirComentarios(post)} hitSlop={8} accessibilityLabel="Comentar">
-            <Ionicons name="chatbubble-outline" size={24} color={Brand.ink} />
+            <Ionicons name="chatbubble-outline" size={24} color={t.ink} />
             {post.totalComentarios > 0 && <Text style={styles.acaoContagem}>{post.totalComentarios}</Text>}
           </Pressable>
         )}
@@ -165,7 +167,7 @@ export default function NovidadesScreen() {
   if (carregando) {
     return (
       <View style={styles.estado}>
-        <ActivityIndicator color={Brand.brand} />
+        <ActivityIndicator color={t.brand} />
         <Text style={styles.estadoTxt}>Carregando novidades…</Text>
       </View>
     );
@@ -175,7 +177,7 @@ export default function NovidadesScreen() {
     return (
       <View style={styles.estado}>
         <View style={styles.estadoIcone}>
-          <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+          <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
         </View>
         <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
         <Text style={styles.estadoTxt}>Verifique sua conexão e tente novamente.</Text>
@@ -195,7 +197,7 @@ export default function NovidadesScreen() {
         keyExtractor={(p) => String(p.id)}
         renderItem={renderPost}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }
         ListHeaderComponent={
           <View style={styles.topo}>
@@ -206,7 +208,7 @@ export default function NovidadesScreen() {
         ListEmptyComponent={
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="images-outline" size={26} color={Brand.muted} />
+              <Ionicons name="images-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Nenhuma novidade ainda</Text>
             <Text style={styles.estadoTxt}>As postagens das unidades aparecerão aqui.</Text>
@@ -225,19 +227,20 @@ export default function NovidadesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   conteudo: { paddingBottom: 24 },
   topo: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6 },
-  titulo: { fontSize: 24, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
-  subtitulo: { fontSize: 13.5, color: Brand.muted, marginTop: 2 },
+  titulo: { fontSize: 24, fontWeight: '800', color: t.ink, letterSpacing: -0.4 },
+  subtitulo: { fontSize: 13.5, color: t.muted, marginTop: 2 },
 
   card: {
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     marginTop: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
   avatar: {
@@ -246,36 +249,36 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brandDeep,
+    backgroundColor: t.brandDeep,
   },
-  avatarTxt: { color: Brand.onBrand, fontSize: 13, fontWeight: '800' },
-  unidade: { flex: 1, fontSize: 14.5, fontWeight: '700', color: Brand.ink },
-  tempoTopo: { fontSize: 12, color: Brand.muted },
+  avatarTxt: { color: t.onBrand, fontSize: 13, fontWeight: '800' },
+  unidade: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.ink },
+  tempoTopo: { fontSize: 12, color: t.muted },
 
-  imagem: { width: '100%', aspectRatio: 4 / 5, backgroundColor: '#E7EDEA' },
+  imagem: { width: '100%', aspectRatio: 4 / 5, backgroundColor: t.brandTint },
 
   acoes: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
   acaoComentar: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  acaoContagem: { fontSize: 14, fontWeight: '600', color: Brand.ink },
-  curtidas: { paddingHorizontal: 14, fontSize: 13.5, fontWeight: '700', color: Brand.ink, marginTop: 2 },
-  legenda: { paddingHorizontal: 14, marginTop: 4, fontSize: 14, color: Brand.ink, lineHeight: 20 },
+  acaoContagem: { fontSize: 14, fontWeight: '600', color: t.ink },
+  curtidas: { paddingHorizontal: 14, fontSize: 13.5, fontWeight: '700', color: t.ink, marginTop: 2 },
+  legenda: { paddingHorizontal: 14, marginTop: 4, fontSize: 14, color: t.ink, lineHeight: 20 },
   legendaUnidade: { fontWeight: '700' },
   legendaTitulo: { fontWeight: '400' },
   descricao: { paddingHorizontal: 14, marginTop: 3, fontSize: 13.5, color: '#40514C', lineHeight: 19 },
 
-  estado: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 10, backgroundColor: Brand.bg },
+  estado: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 64, gap: 10, backgroundColor: t.bg },
   estadoIcone: {
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -284,7 +287,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvaliacaoSauModal } from '@/components/avaliacao-sau-modal';
 import { AvatarPaciente } from '@/components/avatar-paciente';
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { podeLancar } from '@/services/sessao';
@@ -56,6 +56,8 @@ export default function ManifestacaoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   // Responsável só-leitura no SAU: lê a manifestação, mas não responde/encerra.
   const podeLancarSau = podeLancar(sessao, 'SAU');
@@ -115,8 +117,8 @@ export default function ManifestacaoScreen() {
 
   useEffect(() => {
     if (alturaTeclado > 0) {
-      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      return () => clearTimeout(timer);
     }
   }, [alturaTeclado]);
 
@@ -189,7 +191,7 @@ export default function ManifestacaoScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={Brand.ink} />
+          <Ionicons name="chevron-back" size={26} color={t.ink} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitulo} numberOfLines={1}>
@@ -205,12 +207,12 @@ export default function ManifestacaoScreen() {
 
       {carregando ? (
         <View style={styles.estado}>
-          <ActivityIndicator color={Brand.brand} />
+          <ActivityIndicator color={t.brand} />
           <Text style={styles.estadoTxt}>Carregando…</Text>
         </View>
       ) : erro ? (
         <View style={styles.estado}>
-          <Ionicons name="cloud-offline-outline" size={28} color={Brand.muted} />
+          <Ionicons name="cloud-offline-outline" size={28} color={t.muted} />
           <Text style={styles.estadoTitulo}>Não foi possível abrir</Text>
           <Pressable style={styles.estadoBtn} onPress={carregar}>
             <Ionicons name="refresh" size={16} color="#fff" />
@@ -269,7 +271,7 @@ export default function ManifestacaoScreen() {
           {avaliada && (
             <View style={styles.avaliacaoCard}>
               <View style={styles.avaliacaoTopo}>
-                <Ionicons name="checkmark-circle" size={18} color={Brand.brand} />
+                <Ionicons name="checkmark-circle" size={18} color={t.brand} />
                 <Text style={styles.avaliacaoTitulo}>Atendimento encerrado e avaliado</Text>
               </View>
               <View style={styles.estrelasVer} accessibilityLabel={`Nota ${detalhe?.avaliacaoNota} de 5 estrelas`}>
@@ -292,7 +294,7 @@ export default function ManifestacaoScreen() {
           {mostrarAvaliarReabrir && (
             <View style={styles.encerradaBox}>
               <View style={styles.encerradaTopo}>
-                <Ionicons name="lock-closed-outline" size={18} color={Brand.muted} />
+                <Ionicons name="lock-closed-outline" size={18} color={t.muted} />
                 <Text style={styles.encerradaTxt}>
                   Esta conversa foi encerrada. Avalie o atendimento ou reabra para continuar.
                 </Text>
@@ -302,7 +304,7 @@ export default function ManifestacaoScreen() {
                 <Text style={styles.enviarTxt}>Avaliar atendimento</Text>
               </Pressable>
               <Pressable style={styles.btnGhost} onPress={() => setReabrindo(true)}>
-                <Ionicons name="refresh" size={16} color={Brand.brandDeep} />
+                <Ionicons name="refresh" size={16} color={t.brandDeep} />
                 <Text style={styles.btnGhostTxt}>Reabrir e continuar</Text>
               </Pressable>
             </View>
@@ -317,8 +319,8 @@ export default function ManifestacaoScreen() {
               <TextInput
                 style={styles.textarea}
                 value={texto}
-                onChangeText={(t) => {
-                  setTexto(t);
+                onChangeText={(txt) => {
+                  setTexto(txt);
                   if (erroEnvio) setErroEnvio(null);
                 }}
                 placeholder="Escreva sua resposta ao SAU"
@@ -352,7 +354,7 @@ export default function ManifestacaoScreen() {
           {/* Aguardando o SAU */}
           {mostrarAguardando && (
             <View style={styles.aguardando}>
-              <Ionicons name="time-outline" size={20} color={Brand.muted} />
+              <Ionicons name="time-outline" size={20} color={t.muted} />
               <Text style={styles.aguardandoTxt}>
                 Aguardando a resposta do SAU. Você poderá responder novamente quando o atendimento retornar.
               </Text>
@@ -362,7 +364,7 @@ export default function ManifestacaoScreen() {
           {/* Encerrar a qualquer momento (conversa aberta) */}
           {mostrarEncerrar && (
             <Pressable style={[styles.btnGhost, { marginTop: 14 }]} onPress={abrirAvaliar}>
-              <Ionicons name="close-circle-outline" size={16} color={Brand.brandDeep} />
+              <Ionicons name="close-circle-outline" size={16} color={t.brandDeep} />
               <Text style={styles.btnGhostTxt}>Encerrar conversa</Text>
             </Pressable>
           )}
@@ -370,7 +372,7 @@ export default function ManifestacaoScreen() {
           {/* Responsável só-leitura: acompanha, mas não interage */}
           {!podeLancarSau && !avaliada && (
             <View style={[styles.aguardando, { marginTop: 14 }]}>
-              <Ionicons name="eye-outline" size={18} color={Brand.muted} />
+              <Ionicons name="eye-outline" size={18} color={t.muted} />
               <Text style={styles.aguardandoTxt}>Você pode acompanhar esta manifestação, mas não responder.</Text>
             </View>
           )}
@@ -413,21 +415,22 @@ export default function ManifestacaoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 8,
     paddingBottom: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: '#EAF2EF' },
-  headerTitulo: { fontSize: 15.5, fontWeight: '700', color: Brand.ink },
+  backPressed: { backgroundColor: t.brandTint },
+  headerTitulo: { fontSize: 15.5, fontWeight: '700', color: t.ink },
   pill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   pillTxt: { fontSize: 11, fontWeight: '700' },
 
@@ -435,37 +438,37 @@ const styles = StyleSheet.create({
 
   // Cartão de mensagem (estilo e-mail)
   card: {
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 14,
     marginBottom: 12,
   },
-  cardSau: { backgroundColor: '#F1FAF7', borderColor: '#CDEAE1' },
+  cardSau: { backgroundColor: t.brandTint, borderColor: t.brandTintStrong },
   cardCab: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2EAE6' },
-  avatarSau: { backgroundColor: Brand.brand },
+  avatarSau: { backgroundColor: t.brand },
   avatarTxt: { color: '#40514C', fontSize: 14, fontWeight: '800' },
   avatarTxtSau: { color: '#fff' },
-  autorNome: { fontSize: 14.5, fontWeight: '700', color: Brand.ink },
+  autorNome: { fontSize: 14.5, fontWeight: '700', color: t.ink },
   viaResp: { fontSize: 12, fontWeight: '700', color: '#8A5A00', marginTop: 1 },
-  autorPapel: { fontSize: 12, color: Brand.muted },
-  cardData: { fontSize: 11.5, color: Brand.muted, marginTop: 8 },
-  cardCorpo: { fontSize: 14.5, color: Brand.ink, lineHeight: 21, marginTop: 6 },
+  autorPapel: { fontSize: 12, color: t.muted },
+  cardData: { fontSize: 11.5, color: t.muted, marginTop: 8 },
+  cardCorpo: { fontSize: 14.5, color: t.ink, lineHeight: 21, marginTop: 6 },
 
   // Responder
   responder: { marginTop: 4 },
-  responderLabel: { fontSize: 13, fontWeight: '700', color: Brand.muted, marginBottom: 8 },
+  responderLabel: { fontSize: 13, fontWeight: '700', color: t.muted, marginBottom: 8 },
   textarea: {
     minHeight: 130,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
     borderRadius: 14,
     padding: 14,
     fontSize: 15,
-    color: Brand.ink,
+    color: t.ink,
     lineHeight: 21,
   },
   enviar: {
@@ -476,7 +479,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     height: 52,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   enviarDesativado: { opacity: 0.5 },
   enviarTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
@@ -492,10 +495,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
   },
-  aguardandoTxt: { flex: 1, fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+  aguardandoTxt: { flex: 1, fontSize: 13.5, color: t.muted, lineHeight: 19 },
 
   // Botão secundário (reabrir / encerrar / aguardar)
   btnGhost: {
@@ -507,10 +510,10 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
   },
-  btnGhostTxt: { color: Brand.brandDeep, fontSize: 14.5, fontWeight: '800' },
+  btnGhostTxt: { color: t.brandDeep, fontSize: 14.5, fontWeight: '800' },
 
   // Encerrada pelo SAU (avaliar ou reabrir)
   encerradaBox: {
@@ -518,11 +521,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
   },
   encerradaTopo: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
-  encerradaTxt: { flex: 1, fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+  encerradaTxt: { flex: 1, fontSize: 13.5, color: t.muted, lineHeight: 19 },
 
   // Avaliação final (definitiva)
   avaliacaoCard: {
@@ -530,34 +533,34 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CDEAE1',
-    backgroundColor: '#F1FAF7',
+    borderColor: t.brandTintStrong,
+    backgroundColor: t.brandTint,
     alignItems: 'center',
     gap: 8,
   },
   avaliacaoTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avaliacaoTitulo: { fontSize: 14.5, fontWeight: '800', color: Brand.brandDeep },
+  avaliacaoTitulo: { fontSize: 14.5, fontWeight: '800', color: t.brandDeep },
   estrelasVer: { flexDirection: 'row', gap: 4 },
   avaliacaoComentario: { fontSize: 14, color: '#40514C', lineHeight: 20, textAlign: 'center', marginTop: 2 },
 
   // Pergunta pós-envio (encerrar ou aguardar)
   promptBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
+    backgroundColor: alpha(t.brandPine, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
-  promptCard: { width: '100%', maxWidth: 400, backgroundColor: Brand.surface, borderRadius: 24, padding: 22 },
-  promptTitulo: { fontSize: 18, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
-  promptTexto: { fontSize: 14, color: Brand.muted, lineHeight: 20, marginTop: 6, marginBottom: 6 },
+  promptCard: { width: '100%', maxWidth: 400, backgroundColor: t.surface, borderRadius: 24, padding: 22 },
+  promptTitulo: { fontSize: 18, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
+  promptTexto: { fontSize: 14, color: t.muted, lineHeight: 20, marginTop: 6, marginBottom: 6 },
 
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center' },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
   estadoBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4, height: 44,
-    paddingHorizontal: 18, borderRadius: 14, backgroundColor: Brand.brand,
+    paddingHorizontal: 18, borderRadius: 14, backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

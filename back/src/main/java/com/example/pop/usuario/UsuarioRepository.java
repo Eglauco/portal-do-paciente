@@ -1,5 +1,6 @@
 package com.example.pop.usuario;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -16,6 +17,24 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     /** Quantos usuários têm o perfil informado (usado para bloquear a exclusão de um perfil em uso). */
     long countByPerfis_Id(Long perfilId);
+
+    /**
+     * Ids dos admins ELEGÍVEIS a uma notificação: cujos perfis (união) liberam a TELA
+     * informada E dão acesso à UNIDADE do evento. Nativa para casar direto com as tabelas
+     * de junção do RBAC (usuario_perfil / perfil_tela / perfil_unidade).
+     */
+    @Query(value = """
+            select u.id from usuario u
+            where exists (
+                select 1 from usuario_perfil up
+                join perfil_tela pt on pt.perfil_id = up.perfil_id
+                where up.usuario_id = u.id and pt.tela = :tela)
+              and exists (
+                select 1 from usuario_perfil up2
+                join perfil_unidade pu on pu.perfil_id = up2.perfil_id
+                where up2.usuario_id = u.id and pu.unidade_id = :unidadeId)
+            """, nativeQuery = true)
+    List<Long> idsComAcesso(@Param("tela") String tela, @Param("unidadeId") Long unidadeId);
 
     @Query(value = """
             select u from Usuario u

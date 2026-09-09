@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { cancelarAgendamento } from '@/services/agendamentos';
 import { assinarAtualizacao } from '@/services/atualizacao';
@@ -24,6 +24,8 @@ function dataHoraFmt(iso: string): string {
  */
 export function LembretePopup() {
   const { sessao } = useSessao();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   // Cancelar é lançamento em AGENDAMENTOS: responsável só-leitura vê o lembrete, mas sem o botão.
   const podeCancelarAgendamento = podeLancar(sessao, 'AGENDAMENTOS');
   const [fila, setFila] = useState<Lembrete[]>([]);
@@ -108,7 +110,7 @@ export function LembretePopup() {
       <View style={styles.backdrop}>
         <View style={styles.card} accessibilityViewIsModal accessibilityRole="alert">
           <View style={styles.icone}>
-            <Ionicons name="alarm" size={26} color={Brand.brandDeep} />
+            <Ionicons name="alarm" size={26} color={t.brandDeep} />
           </View>
           <Text style={styles.titulo}>{atual.titulo}</Text>
           <Text style={styles.mensagem}>{atual.mensagem}</Text>
@@ -117,13 +119,13 @@ export function LembretePopup() {
             <View style={styles.detalhe}>
               {!!atual.especialidade && (
                 <View style={styles.detLinha}>
-                  <Ionicons name="medkit-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="medkit-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>{atual.especialidade}</Text>
                 </View>
               )}
               {!!atual.dataHora && (
                 <View style={styles.detLinha}>
-                  <Ionicons name="calendar-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="calendar-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>{dataHoraFmt(atual.dataHora)}</Text>
                 </View>
               )}
@@ -159,17 +161,18 @@ export function LembretePopup() {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(7,46,43,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 400, backgroundColor: Brand.surface, borderRadius: 24, padding: 22, alignItems: 'center' },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: alpha(t.brandPine, 0.55), alignItems: 'center', justifyContent: 'center', padding: 24 },
+  card: { width: '100%', maxWidth: 400, backgroundColor: t.surface, borderRadius: 24, padding: 22, alignItems: 'center' },
   icone: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: '#E7F3EF',
+    width: 56, height: 56, borderRadius: 18, backgroundColor: t.brandTint,
     alignItems: 'center', justifyContent: 'center', marginBottom: 12,
   },
-  titulo: { fontSize: 18, fontWeight: '800', color: Brand.ink, textAlign: 'center', letterSpacing: -0.3 },
+  titulo: { fontSize: 18, fontWeight: '800', color: t.ink, textAlign: 'center', letterSpacing: -0.3 },
   mensagem: { fontSize: 14.5, color: '#40514C', textAlign: 'center', lineHeight: 21, marginTop: 8 },
   detalhe: {
-    width: '100%', backgroundColor: Brand.bg, borderRadius: 14, borderWidth: 1, borderColor: Brand.line,
+    width: '100%', backgroundColor: t.bg, borderRadius: 14, borderWidth: 1, borderColor: t.line,
     padding: 12, marginTop: 14, gap: 6,
   },
   detLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -183,7 +186,7 @@ const styles = StyleSheet.create({
   btnCancelarTxt: { color: '#B23B4E', fontSize: 14.5, fontWeight: '800' },
   btnOk: {
     width: '100%', alignItems: 'center', justifyContent: 'center',
-    height: 50, borderRadius: 14, marginTop: 10, backgroundColor: Brand.brand,
+    height: 50, borderRadius: 14, marginTop: 10, backgroundColor: t.brand,
   },
   btnOkTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
   desativado: { opacity: 0.6 },

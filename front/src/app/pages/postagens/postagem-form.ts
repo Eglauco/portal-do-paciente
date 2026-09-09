@@ -113,8 +113,7 @@ export class PostagemForm implements PodeSair {
   protected readonly moderandoId = signal<number | null>(null);
   private pageComentarios = 0;
 
-  // Responder comentários (administração)
-  private readonly AUTOR_ADMIN = 'Administração';
+  // Responder comentários (administração) — o autor exibido ("Administração") é resolvido no servidor.
   protected readonly respondendoId = signal<number | null>(null);
   protected readonly textoResposta = signal('');
   protected readonly enviandoResposta = signal(false);
@@ -128,12 +127,16 @@ export class PostagemForm implements PodeSair {
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
 
+  /** Fragmento da URL (ex.: "coment-42") — rola até o comentário ao abrir (vindo de notificação). */
+  private fragmentoAlvo: string | null = null;
+
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       this.editando.set(true);
       this.codigo.set(Number(idParam));
     }
+    this.fragmentoAlvo = this.route.snapshot.fragment;
     afterNextRender(() => {
       this.carregarOpcoes();
       // Unidade travada na unidade logada (não editável).
@@ -287,9 +290,25 @@ export class PostagemForm implements PodeSair {
         this.temMaisComentarios.set(!pagina.last);
         this.pageComentarios = page;
         this.carregandoComentarios.set(false);
+        // Deep-link da notificação de moderação (/postagens/:id#coment-<id>): rola até o comentário.
+        if (page === 0 && this.fragmentoAlvo) {
+          const alvo = this.fragmentoAlvo;
+          this.fragmentoAlvo = null;
+          setTimeout(() => this.focarComentario(alvo), 150);
+        }
       },
       error: () => this.carregandoComentarios.set(false),
     });
+  }
+
+  /** Rola até um comentário específico (id do elemento, ex.: "coment-42") e dá um flash. */
+  private focarComentario(id: string): void {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('coment--flash');
+      setTimeout(() => el.classList.remove('coment--flash'), 1200);
+    }
   }
 
   protected carregarMaisComentarios(): void {
@@ -450,7 +469,7 @@ export class PostagemForm implements PodeSair {
       },
       error: () => {
         this.salvandoEdicao.set(false);
-        this.toastr.error('Não foi possível editar (o prazo de 15 min pode ter expirado).');
+        this.toastr.error('Não foi possível editar (o prazo de edição pode ter expirado).');
       },
     });
   }
@@ -474,7 +493,7 @@ export class PostagemForm implements PodeSair {
     const texto = this.textoResposta().trim();
     if (!texto || this.enviandoResposta()) return;
     this.enviandoResposta.set(true);
-    this.service.responderComentario(raiz.id, this.AUTOR_ADMIN, texto).subscribe({
+    this.service.responderComentario(raiz.id, texto).subscribe({
       next: (resposta) => {
         this.comentarios.update((lista) =>
           lista.map((c) => (c.id === raiz.id ? { ...c, respostas: [...c.respostas, resposta] } : c)),

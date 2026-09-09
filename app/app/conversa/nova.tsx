@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { UnidadeRef, abrirConversa, listarUnidadesChat } from '@/services/chat';
 
 export default function NovaConversaScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
 
   const [unidades, setUnidades] = useState<UnidadeRef[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -56,7 +58,7 @@ export default function NovaConversaScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={Brand.ink} />
+          <Ionicons name="chevron-back" size={26} color={t.ink} />
         </Pressable>
         <Text style={styles.headerTitulo}>Nova conversa</Text>
       </View>
@@ -68,12 +70,12 @@ export default function NovaConversaScreen() {
 
         {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando unidades…</Text>
           </View>
         ) : erroCarregar ? (
           <Pressable style={styles.erroBox} onPress={carregar}>
-            <Ionicons name="refresh" size={16} color={Brand.brand} />
+            <Ionicons name="refresh" size={16} color={t.brand} />
             <Text style={styles.erroBoxTxt}>Não foi possível carregar. Toque para tentar novamente.</Text>
           </Pressable>
         ) : unidades.length === 0 ? (
@@ -95,13 +97,13 @@ export default function NovaConversaScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={`Conversar com ${u.nome}`}>
                   <View style={styles.unidadeIcone}>
-                    <Ionicons name="business-outline" size={20} color={Brand.brandDeep} />
+                    <Ionicons name="business-outline" size={20} color={t.brandDeep} />
                   </View>
                   <Text style={styles.unidadeNome} numberOfLines={2}>{u.nome}</Text>
                   {abrindo ? (
-                    <ActivityIndicator color={Brand.brand} />
+                    <ActivityIndicator color={t.brand} />
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color={Brand.muted} />
+                    <Ionicons name="chevron-forward" size={20} color={t.muted} />
                   )}
                 </Pressable>
               );
@@ -120,34 +122,35 @@ export default function NovaConversaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 8,
     paddingBottom: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: '#EAF2EF' },
-  headerTitulo: { fontSize: 17, fontWeight: '800', color: Brand.ink },
+  backPressed: { backgroundColor: t.brandTint },
+  headerTitulo: { fontSize: 17, fontWeight: '800', color: t.ink },
 
   corpo: { flex: 1 },
-  label: { fontSize: 13, fontWeight: '700', color: Brand.muted, marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '700', color: t.muted, marginBottom: 12 },
 
   estado: { paddingVertical: 30, alignItems: 'center', gap: 8 },
-  estadoTxt: { fontSize: 13, color: Brand.muted },
-  vazioTxt: { fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+  estadoTxt: { fontSize: 13, color: t.muted },
+  vazioTxt: { fontSize: 13.5, color: t.muted, lineHeight: 19 },
 
   erroBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14,
-    backgroundColor: Brand.surface, borderRadius: 12, borderWidth: 1, borderColor: Brand.line,
+    backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.line,
   },
-  erroBoxTxt: { flex: 1, fontSize: 13, color: Brand.muted },
+  erroBoxTxt: { flex: 1, fontSize: 13, color: t.muted },
 
   lista: { gap: 10 },
   unidade: {
@@ -157,16 +160,16 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
   },
-  unidadePressed: { backgroundColor: '#F1FAF7' },
+  unidadePressed: { backgroundColor: t.brandTint },
   unidadeDesativada: { opacity: 0.5 },
   unidadeIcone: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#E3F1EC',
+    backgroundColor: t.brandTint,
   },
-  unidadeNome: { flex: 1, fontSize: 15, fontWeight: '600', color: Brand.ink },
+  unidadeNome: { flex: 1, fontSize: 15, fontWeight: '600', color: t.ink },
 
   erroAbrir: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
   erroAbrirTxt: { flex: 1, fontSize: 13, color: '#B23B4E' },

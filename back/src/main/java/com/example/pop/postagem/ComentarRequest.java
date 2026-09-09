@@ -1,9 +1,11 @@
 package com.example.pop.postagem;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
+/**
+ * Corpo de um comentário/resposta. O autor NÃO vem do corpo: é resolvido no servidor
+ * pelos ids do comentário (paciente pelo token; "Administração" quando é do back-office).
+ */
 public record ComentarRequest(
-        @NotBlank @Size(max = 80) String autor,
         @NotBlank String texto) {
 }

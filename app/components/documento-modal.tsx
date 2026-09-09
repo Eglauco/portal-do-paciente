@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 
 interface Props {
   visivel: boolean;
@@ -12,13 +13,15 @@ interface Props {
 }
 
 export function DocumentoModal({ visivel, nome, onAbrir, onBaixar, onFechar }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
       <Pressable style={styles.backdrop} onPress={onFechar}>
         {/* Impede o toque no card de fechar o modal */}
         <Pressable style={styles.card} onPress={() => {}}>
           <View style={styles.icone}>
-            <Ionicons name="document-text" size={26} color={Brand.brandDeep} />
+            <Ionicons name="document-text" size={26} color={t.brandDeep} />
           </View>
 
           <Text style={styles.titulo} numberOfLines={2}>
@@ -36,7 +39,7 @@ export function DocumentoModal({ visivel, nome, onAbrir, onBaixar, onFechar }: P
           <Pressable
             style={({ pressed }) => [styles.btnBaixar, pressed && styles.btnBaixarPressed]}
             onPress={onBaixar}>
-            <Ionicons name="download-outline" size={20} color={Brand.brandDeep} />
+            <Ionicons name="download-outline" size={20} color={t.brandDeep} />
             <Text style={styles.btnBaixarTxt}>Baixar / Compartilhar</Text>
           </Pressable>
 
@@ -49,10 +52,11 @@ export function DocumentoModal({ visivel, nome, onAbrir, onBaixar, onFechar }: P
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
+    backgroundColor: alpha(t.brandPine, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -60,7 +64,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
@@ -69,15 +73,15 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 18,
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
   },
-  titulo: { fontSize: 18, fontWeight: '800', color: Brand.ink, textAlign: 'center', letterSpacing: -0.3 },
+  titulo: { fontSize: 18, fontWeight: '800', color: t.ink, textAlign: 'center', letterSpacing: -0.3 },
   subtitulo: {
     fontSize: 13.5,
-    color: Brand.muted,
+    color: t.muted,
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 20,
@@ -91,7 +95,7 @@ const styles = StyleSheet.create({
     gap: 8,
     height: 52,
     borderRadius: 16,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   pressed: { opacity: 0.9 },
   btnAbrirTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
@@ -105,11 +109,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#CDE9E1',
-    backgroundColor: Brand.surface,
+    borderColor: t.brandTintStrong,
+    backgroundColor: t.surface,
   },
-  btnBaixarPressed: { backgroundColor: '#F1F8F5' },
-  btnBaixarTxt: { color: Brand.brandDeep, fontSize: 15, fontWeight: '700' },
+  btnBaixarPressed: { backgroundColor: t.brandTint },
+  btnBaixarTxt: { color: t.brandDeep, fontSize: 15, fontWeight: '700' },
   btnCancelar: {
     width: '100%',
     height: 48,
@@ -117,5 +121,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 6,
   },
-  btnCancelarTxt: { color: Brand.muted, fontSize: 14.5, fontWeight: '600' },
+  btnCancelarTxt: { color: t.muted, fontSize: 14.5, fontWeight: '600' },
 });

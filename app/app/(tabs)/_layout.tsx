@@ -5,12 +5,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { TopBar } from '@/components/top-bar';
-import { Brand } from '@/constants/theme';
 import { useSessao } from '@/hooks/use-sessao';
+import { useTema } from '@/hooks/use-tema';
 import { podeVer } from '@/services/sessao';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const t = useTema();
   const { sessao } = useSessao();
   // Perfil dependente sem acesso a uma funcionalidade → a aba some (href: null).
   // Prontuário e NPS não são controlados: sempre visíveis.
@@ -21,12 +22,12 @@ export default function TabLayout() {
       screenOptions={{
         header: () => <TopBar />,
         tabBarButton: HapticTab,
-        tabBarActiveTintColor: Brand.brandDeep,
-        tabBarInactiveTintColor: Brand.muted,
+        tabBarActiveTintColor: t.brandDeep,
+        tabBarInactiveTintColor: t.muted,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarStyle: {
-          backgroundColor: Brand.surface,
-          borderTopColor: Brand.line,
+          backgroundColor: t.surface,
+          borderTopColor: t.line,
           height: 62 + insets.bottom,
           paddingTop: 6,
           paddingBottom: insets.bottom,

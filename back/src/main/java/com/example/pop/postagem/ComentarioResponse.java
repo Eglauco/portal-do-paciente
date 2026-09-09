@@ -21,29 +21,36 @@ public record ComentarioResponse(
         String motivoModeracao,
         List<ComentarioResponse> respostas) {
 
-    /** Janela em que o autor ainda pode editar o próprio comentário (fonte única). */
+    /**
+     * Janela PADRÃO (minutos) para editar o próprio comentário — usada como semente da
+     * migration e como fallback. Em runtime o valor vem da configuração
+     * {@code MINUTOS_PARA_EDITAR_COMENTARIO}, passado como {@code janelaMinutos}.
+     */
     public static final int JANELA_EDICAO_MINUTOS = 15;
 
     /**
-     * Comentário/resposta sem filhos aninhados. {@code fotoDoPaciente} resolve a foto
-     * (URL pré-assinada) pelo {@code pacienteId} do autor — null quando não é do paciente
-     * ou não tem foto. {@code nomeDoResponsavel} resolve o nome (abreviado) pelo
-     * {@code responsavelId} — null quando foi o próprio paciente. O "dono" é conferido
-     * contra o paciente logado ({@code pacienteAtual}) OU o admin logado ({@code adminAtual}).
+     * Comentário/resposta sem filhos aninhados. {@code autorDoComentario} resolve o nome de
+     * exibição (negrito) do autor pelos ids do comentário — em tempo de leitura, não de um
+     * campo gravado. {@code fotoDoPaciente} resolve a foto (URL pré-assinada) pelo
+     * {@code pacienteId} do autor — null quando não é do paciente ou não tem foto.
+     * {@code nomeDoResponsavel} resolve o nome (abreviado) pelo {@code responsavelId} — null
+     * quando foi o próprio paciente. O "dono" é conferido contra o paciente logado
+     * ({@code pacienteAtual}) OU o admin logado ({@code adminAtual}).
      */
     public static ComentarioResponse from(Comentario c, Long pacienteAtual, Long adminAtual,
-            Function<Long, String> fotoDoPaciente, Function<Long, String> nomeDoResponsavel) {
+            Function<Comentario, String> autorDoComentario, Function<Long, String> fotoDoPaciente,
+            Function<Long, String> nomeDoResponsavel, int janelaMinutos) {
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
-                c.getAutor(),
+                autorDoComentario.apply(c),
                 fotoDoPaciente.apply(c.getPacienteId()),
                 nomeDoResponsavel.apply(c.getResponsavelId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,
                 dono,
-                dono && dentroDaJanela(c),
+                dono && dentroDaJanela(c, janelaMinutos),
                 c.getStatusModeracao(),
                 adminAtual != null ? c.getMotivoModeracao() : null,
                 List.of());
@@ -51,20 +58,23 @@ public record ComentarioResponse(
 
     /** Comentário-raiz com suas respostas (as respostas não aninham mais níveis). */
     public static ComentarioResponse from(Comentario c, List<Comentario> respostas, Long pacienteAtual,
-            Long adminAtual, Function<Long, String> fotoDoPaciente, Function<Long, String> nomeDoResponsavel) {
+            Long adminAtual, Function<Comentario, String> autorDoComentario, Function<Long, String> fotoDoPaciente,
+            Function<Long, String> nomeDoResponsavel, int janelaMinutos) {
         List<ComentarioResponse> filhos = respostas.stream()
-                .map(r -> from(r, pacienteAtual, adminAtual, fotoDoPaciente, nomeDoResponsavel)).toList();
+                .map(r -> from(r, pacienteAtual, adminAtual, autorDoComentario, fotoDoPaciente, nomeDoResponsavel,
+                        janelaMinutos))
+                .toList();
         boolean dono = ehDono(c, pacienteAtual, adminAtual);
         return new ComentarioResponse(
                 c.getId(),
-                c.getAutor(),
+                autorDoComentario.apply(c),
                 fotoDoPaciente.apply(c.getPacienteId()),
                 nomeDoResponsavel.apply(c.getResponsavelId()),
                 c.getTexto(),
                 c.getCriadoEm(),
                 c.getEditadoEm() != null,
                 dono,
-                dono && dentroDaJanela(c),
+                dono && dentroDaJanela(c, janelaMinutos),
                 c.getStatusModeracao(),
                 adminAtual != null ? c.getMotivoModeracao() : null,
                 filhos);
@@ -80,8 +90,8 @@ public record ComentarioResponse(
      * true se ainda está dentro da janela de edição. Calculado no servidor (relógio
      * consistente): os clientes não fazem conta de tempo/fuso — só mostram/ocultam "Editar".
      */
-    private static boolean dentroDaJanela(Comentario c) {
+    private static boolean dentroDaJanela(Comentario c, int janelaMinutos) {
         return c.getCriadoEm() != null
-                && c.getCriadoEm().isAfter(LocalDateTime.now().minusMinutes(JANELA_EDICAO_MINUTOS));
+                && c.getCriadoEm().isAfter(LocalDateTime.now().minusMinutes(janelaMinutos));
     }
 }

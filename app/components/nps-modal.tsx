@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { CategoriaNota, CategoriaNps } from '@/services/nps';
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 
 export interface NpsModalDados {
   especialidade: string;
@@ -69,6 +69,8 @@ export function NpsModal({
   onEnviar,
   onFechar,
 }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [notas, setNotas] = useState<Record<number, number>>({});
   const [observacao, setObservacao] = useState('');
 
@@ -102,12 +104,12 @@ export function NpsModal({
             disabled={processando}
             accessibilityRole="button"
             accessibilityLabel="Fechar">
-            <Ionicons name="close" size={20} color={Brand.muted} />
+            <Ionicons name="close" size={20} color={t.muted} />
           </Pressable>
 
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.icone}>
-              <Ionicons name={avaliar ? 'star' : 'star-outline'} size={24} color={Brand.brandDeep} />
+              <Ionicons name={avaliar ? 'star' : 'star-outline'} size={24} color={t.brandDeep} />
             </View>
 
             <Text style={styles.titulo}>{avaliar ? 'Avaliar atendimento' : 'Sua avaliação'}</Text>
@@ -122,16 +124,16 @@ export function NpsModal({
                 <Text style={styles.detEsp}>{dados.especialidade}</Text>
                 {!!dados.profissional && (
                   <View style={styles.detLinha}>
-                    <Ionicons name="person-outline" size={15} color={Brand.muted} />
+                    <Ionicons name="person-outline" size={15} color={t.muted} />
                     <Text style={styles.detTxt}>{dados.profissional}</Text>
                   </View>
                 )}
                 <View style={styles.detLinha}>
-                  <Ionicons name="calendar-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="calendar-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>{dataHoraFmt(dados.dataHora)}</Text>
                 </View>
                 <View style={styles.detLinha}>
-                  <Ionicons name="location-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="location-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>{dados.unidade}</Text>
                 </View>
               </View>
@@ -140,7 +142,7 @@ export function NpsModal({
             {avaliar ? (
               <>
                 {carregandoCategorias ? (
-                  <ActivityIndicator color={Brand.brand} style={{ marginVertical: 16 }} />
+                  <ActivityIndicator color={t.brand} style={{ marginVertical: 16 }} />
                 ) : categorias.length === 0 ? (
                   <Text style={styles.semCategorias}>Nenhuma categoria disponível para avaliação.</Text>
                 ) : (
@@ -265,10 +267,11 @@ export function NpsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
+    backgroundColor: alpha(t.brandPine, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -277,7 +280,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     maxHeight: '88%',
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 24,
     padding: 22,
   },
@@ -290,7 +293,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     zIndex: 2,
   },
   scroll: { alignItems: 'center', paddingBottom: 4 },
@@ -298,48 +301,48 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
     marginTop: 4,
   },
-  titulo: { fontSize: 19, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
-  subtitulo: { fontSize: 13, color: Brand.muted, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 18 },
+  titulo: { fontSize: 19, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
+  subtitulo: { fontSize: 13, color: t.muted, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 18 },
 
   detalhe: {
     width: '100%',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 14,
     marginBottom: 16,
     gap: 7,
   },
-  detEsp: { fontSize: 15.5, fontWeight: '800', color: Brand.ink, marginBottom: 1 },
+  detEsp: { fontSize: 15.5, fontWeight: '800', color: t.ink, marginBottom: 1 },
   detLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detTxt: { fontSize: 13, color: '#40514C' },
 
-  semCategorias: { alignSelf: 'flex-start', fontSize: 13, color: Brand.muted, marginBottom: 12 },
+  semCategorias: { alignSelf: 'flex-start', fontSize: 13, color: t.muted, marginBottom: 12 },
   catBloco: { width: '100%', marginBottom: 14 },
-  catNome: { fontSize: 13.5, fontWeight: '700', color: Brand.ink, marginBottom: 8 },
+  catNome: { fontSize: 13.5, fontWeight: '700', color: t.ink, marginBottom: 8 },
   estrelas: { flexDirection: 'row', width: '100%', marginTop: 2 },
   estrelaBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
   estrelasVer: { flexDirection: 'row', gap: 2 },
 
-  rotulo: { alignSelf: 'flex-start', fontSize: 12.5, fontWeight: '700', color: Brand.muted, marginTop: 6, marginBottom: 8 },
+  rotulo: { alignSelf: 'flex-start', fontSize: 12.5, fontWeight: '700', color: t.muted, marginTop: 6, marginBottom: 8 },
   obsInput: {
     width: '100%',
     minHeight: 66,
     maxHeight: 120,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 12,
     fontSize: 14.5,
-    color: Brand.ink,
+    color: t.ink,
     textAlignVertical: 'top',
   },
   btnEnviar: {
@@ -351,7 +354,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     marginTop: 16,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   btnEnviarDesativado: { opacity: 0.5 },
   btnEnviarTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
@@ -361,35 +364,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     paddingVertical: 14,
     paddingHorizontal: 20,
     marginBottom: 4,
     alignSelf: 'stretch',
     justifyContent: 'center',
   },
-  verMediaNum: { fontSize: 44, fontWeight: '800', color: Brand.brandDeep, letterSpacing: -1 },
-  verMediaDe: { fontSize: 15, color: Brand.muted, fontWeight: '600' },
+  verMediaNum: { fontSize: 44, fontWeight: '800', color: t.brandDeep, letterSpacing: -1 },
+  verMediaDe: { fontSize: 15, color: t.muted, fontWeight: '600' },
   verNotas: { width: '100%', gap: 8 },
   verNotaLinha: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  verNotaCat: { flex: 1, fontSize: 14, fontWeight: '600', color: Brand.ink },
-  verObs: { alignSelf: 'flex-start', fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
-  verObsVazio: { alignSelf: 'flex-start', fontSize: 14, color: Brand.muted, fontStyle: 'italic' },
-  verQuando: { alignSelf: 'flex-start', fontSize: 12, color: Brand.muted, marginTop: 12 },
+  verNotaCat: { flex: 1, fontSize: 14, fontWeight: '600', color: t.ink },
+  verObs: { alignSelf: 'flex-start', fontSize: 14.5, color: t.ink, lineHeight: 20 },
+  verObsVazio: { alignSelf: 'flex-start', fontSize: 14, color: t.muted, fontStyle: 'italic' },
+  verQuando: { alignSelf: 'flex-start', fontSize: 12, color: t.muted, marginTop: 12 },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', marginTop: 6 },
   viaRespTxt: { fontSize: 12.5, fontWeight: '600', color: '#8A5A00' },
   viaRespNome: { fontWeight: '800', color: '#8A5A00' },

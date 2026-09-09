@@ -1,5 +1,6 @@
 package com.example.pop.postagem;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +33,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.configuracao.ChaveConfiguracao;
+import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
@@ -57,10 +60,13 @@ public class PostagemController {
     private final StorageService storageService;
     private final PushService pushService;
     private final ExportacaoService exportacaoService;
+    private final ConfiguracaoService configuracaoService;
+    private final AutorComentarioService autorService;
 
     public PostagemController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, UnidadeRepository unidadeRepository,
-            StorageService storageService, PushService pushService, ExportacaoService exportacaoService) {
+            StorageService storageService, PushService pushService, ExportacaoService exportacaoService,
+            ConfiguracaoService configuracaoService, AutorComentarioService autorService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
@@ -68,6 +74,18 @@ public class PostagemController {
         this.storageService = storageService;
         this.pushService = pushService;
         this.exportacaoService = exportacaoService;
+        this.configuracaoService = configuracaoService;
+        this.autorService = autorService;
+    }
+
+    /** Minutos da janela de edição de comentário (config {@code MINUTOS_PARA_EDITAR_COMENTARIO}). */
+    private int janelaEdicaoMinutos() {
+        try {
+            BigDecimal minutos = configuracaoService.lerNumerico(ChaveConfiguracao.MINUTOS_PARA_EDITAR_COMENTARIO);
+            return minutos == null ? ComentarioResponse.JANELA_EDICAO_MINUTOS : minutos.intValue();
+        } catch (RuntimeException e) {
+            return ComentarioResponse.JANELA_EDICAO_MINUTOS; // config ausente: usa o padrão
+        }
     }
 
     @GetMapping
@@ -257,7 +275,9 @@ public class PostagemController {
         Comentario c = comentarioRepository.findById(comentarioId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado"));
         c.setStatusModeracao(decisao);
-        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null, rid -> null);
+        Comentario salvo = comentarioRepository.save(c);
+        return ComentarioResponse.from(salvo, null, adminId, autorService.autores(List.of(salvo)),
+                pid -> null, rid -> null, janelaEdicaoMinutos());
     }
 
     /** Responde a um comentário (administração respondendo dúvidas dos pacientes). */
@@ -275,15 +295,17 @@ public class PostagemController {
         Comentario resposta = new Comentario();
         resposta.setPostagem(pai.getPostagem());
         resposta.setComentarioPai(raiz);
-        resposta.setAutor(request.autor().trim());
-        resposta.setUsuarioId(adminId); // dono admin — pode editar por 15 min; sem dono paciente
+        resposta.setUsuarioId(adminId); // dono admin — pode editar na janela configurável; sem dono paciente
         resposta.setTexto(request.texto().trim());
         resposta.setCriadoEm(LocalDateTime.now());
+        // Autor exibido = "Administração" (resolvido pelo usuarioId no read-time), nunca do corpo.
+        Comentario salva = comentarioRepository.save(resposta);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ComentarioResponse.from(comentarioRepository.save(resposta), null, adminId, pid -> null, rid -> null));
+                .body(ComentarioResponse.from(salva, null, adminId, autorService.autores(List.of(salva)),
+                        pid -> null, rid -> null, janelaEdicaoMinutos()));
     }
 
-    /** Edita o próprio comentário do admin — permitido só até 15 min após criar. */
+    /** Edita o próprio comentário do admin — permitido só dentro da janela configurável. */
     @PutMapping("/comentario/{comentarioId}")
     @Transactional
     public ComentarioResponse editarComentario(@PathVariable Long comentarioId,
@@ -294,13 +316,16 @@ public class PostagemController {
         if (adminId == null || !adminId.equals(c.getUsuarioId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só o autor pode editar este comentário.");
         }
-        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(ComentarioResponse.JANELA_EDICAO_MINUTOS))) {
+        int janela = janelaEdicaoMinutos();
+        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(janela))) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "O prazo para editar este comentário (" + ComentarioResponse.JANELA_EDICAO_MINUTOS + " min) expirou.");
+                    "O prazo para editar este comentário (" + janela + " min) expirou.");
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
-        return ComentarioResponse.from(comentarioRepository.save(c), null, adminId, pid -> null, rid -> null);
+        Comentario salvo = comentarioRepository.save(c);
+        return ComentarioResponse.from(salvo, null, adminId, autorService.autores(List.of(salvo)),
+                pid -> null, rid -> null, janela);
     }
 
     /** Id do usuário admin a partir do claim "uid" do token; nulo se ausente. */

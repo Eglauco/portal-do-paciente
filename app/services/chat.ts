@@ -19,6 +19,8 @@ export interface ChatItem {
   ultimaMensagemDe: Remetente | null;
   ultimaMensagemEm: string | null;
   naoLidas: number;
+  /** Há mensagem da unidade que este paciente ainda não leu (bolinha/negrito na lista). */
+  naoLidaPaciente: boolean;
   atualizadoEm: string;
 }
 
@@ -131,5 +133,14 @@ export async function confirmarEntrega(id: number | string): Promise<void> {
     await fetchMeu(`/meu/chats/${id}/entregue`, { method: 'POST' });
   } catch {
     // entrega é best-effort; não deve quebrar a conversa
+  }
+}
+
+/** Marca a conversa como lida por mim (limpa o indicador na lista e mostra "lido" ao atendente). */
+export async function marcarLido(id: number | string): Promise<void> {
+  try {
+    await fetchMeu(`/meu/chats/${id}/lida`, { method: 'POST' });
+  } catch {
+    // best-effort; não deve quebrar a conversa
   }
 }

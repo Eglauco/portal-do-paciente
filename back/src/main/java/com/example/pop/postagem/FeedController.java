@@ -1,7 +1,10 @@
 package com.example.pop.postagem;
 
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,12 +36,15 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
+import com.example.pop.configuracao.ChaveConfiguracao;
+import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.notificacaoadmin.NotificacaoAdminService;
+import com.example.pop.notificacaoadmin.TipoNotificacaoAdmin;
 import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.Responsavel;
-import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -59,21 +65,83 @@ public class FeedController {
     private final StorageService storageService;
     private final PacienteAcessoService acessoService;
     private final PacienteRepository pacienteRepository;
-    private final ResponsavelRepository responsavelRepository;
     private final ModeracaoService moderacaoService;
+    private final NotificacaoAdminService notificacaoAdminService;
+    private final ConfiguracaoService configuracaoService;
+    private final AutorComentarioService autorService;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, StorageService storageService,
             PacienteAcessoService acessoService, PacienteRepository pacienteRepository,
-            ResponsavelRepository responsavelRepository, ModeracaoService moderacaoService) {
+            ModeracaoService moderacaoService, NotificacaoAdminService notificacaoAdminService,
+            ConfiguracaoService configuracaoService, AutorComentarioService autorService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
         this.storageService = storageService;
         this.acessoService = acessoService;
         this.pacienteRepository = pacienteRepository;
-        this.responsavelRepository = responsavelRepository;
         this.moderacaoService = moderacaoService;
+        this.notificacaoAdminService = notificacaoAdminService;
+        this.configuracaoService = configuracaoService;
+        this.autorService = autorService;
+    }
+
+    /**
+     * Minutos da janela de edição de comentário — vem da configuração
+     * {@code MINUTOS_PARA_EDITAR_COMENTARIO}; cai no padrão se o valor estiver vazio.
+     */
+    private int janelaEdicaoMinutos() {
+        try {
+            BigDecimal minutos = configuracaoService.lerNumerico(ChaveConfiguracao.MINUTOS_PARA_EDITAR_COMENTARIO);
+            return minutos == null ? JANELA_EDICAO_MIN : minutos.intValue();
+        } catch (RuntimeException e) {
+            // Config ausente/indisponível: usa o padrão — nunca derruba o feed (caminho público).
+            return JANELA_EDICAO_MIN;
+        }
+    }
+
+    /**
+     * Exige a idade mínima para comentar na rede social (config
+     * {@code IDADE_MINIMA_COMENTARIOS_REDES_SOCIAIS}). Libera se o PACIENTE ou o RESPONSÁVEL
+     * (quando comenta por ele) tiver ao menos a idade mínima; sem data de nascimento para
+     * validar, bloqueia (422). 0 = sem restrição.
+     */
+    private void exigirIdadeParaComentar(Paciente paciente, Responsavel responsavel) {
+        int minima = idadeMinimaComentarios();
+        if (minima <= 0) {
+            return; // config desligada: sem restrição de idade
+        }
+        if (atingeIdade(paciente.getDataNascimento(), minima)
+                || (responsavel != null && atingeIdade(responsavel.getDataNascimento(), minima))) {
+            return; // paciente OU responsável atinge a idade mínima
+        }
+        // Bloqueado: sem NENHUMA data de nascimento para validar → pede o cadastro; senão, idade.
+        boolean semData = paciente.getDataNascimento() == null
+                && (responsavel == null || responsavel.getDataNascimento() == null);
+        String mensagem = semData
+                ? "Cadastre a data de nascimento para poder comentar na rede social."
+                : "É necessário ter ao menos " + minima + " anos para comentar na rede social.";
+        throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, mensagem);
+    }
+
+    /** true se a data de nascimento existe e a idade (em anos completos) é >= à mínima. */
+    private boolean atingeIdade(LocalDate nascimento, int minima) {
+        return nascimento != null && Period.between(nascimento, LocalDate.now()).getYears() >= minima;
+    }
+
+    /**
+     * Idade mínima para comentar — config {@code IDADE_MINIMA_COMENTARIOS_REDES_SOCIAIS};
+     * 0 (sem restrição) se ausente/vazia/indisponível (fail-open: config quebrada não trava
+     * os comentários de todo mundo).
+     */
+    private int idadeMinimaComentarios() {
+        try {
+            BigDecimal anos = configuracaoService.lerNumerico(ChaveConfiguracao.IDADE_MINIMA_COMENTARIOS_REDES_SOCIAIS);
+            return anos == null ? 0 : anos.intValue();
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 
     @GetMapping("/feed")
@@ -174,7 +242,11 @@ public class FeedController {
         boolean autenticado = pacienteAtual != null || adminAtual != null;
         Function<Long, String> fotoDoPaciente = autenticado ? resolverFotos(todos) : pid -> null;
 
-        Function<Long, String> nomeDoResponsavel = resolverNomesResponsavel(todos);
+        // Nome exibido resolvido pelos ids (paciente/usuário) em tempo de leitura, e nome do
+        // responsável pelo responsavelId — ambos abreviados conforme NOME_PACIENTE_RESPONSAVEL_ABREVIADO_NA_REDESOCIAL.
+        Function<Comentario, String> autorDoComentario = autorService.autores(todos);
+        Function<Long, String> nomeDoResponsavel = autorService.nomesResponsavel(todos);
+        int janela = janelaEdicaoMinutos();
         // As raízes já vêm filtradas do banco; aqui filtram-se as RESPOSTAS ocultas (ex.: resposta
         // pendente de outro paciente sob um comentário publicado).
         List<ComentarioResponse> content = raizesList.stream()
@@ -183,7 +255,7 @@ public class FeedController {
                             .filter(r -> visivel(r, pacienteAtual, adminAtual))
                             .toList();
                     return ComentarioResponse.from(c, respostas, pacienteAtual, adminAtual,
-                            fotoDoPaciente, nomeDoResponsavel);
+                            autorDoComentario, fotoDoPaciente, nomeDoResponsavel, janela);
                 })
                 .toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
@@ -203,9 +275,9 @@ public class FeedController {
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         acessoService.exigirUnidade(paciente, postagem.getUnidadeSaude().getId());
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        exigirIdadeParaComentar(paciente, responsavel);
         Comentario comentario = new Comentario();
         comentario.setPostagem(postagem);
-        comentario.setAutor(nomeExibicao(paciente.getNome()));
         comentario.setPacienteId(paciente.getId());
         if (responsavel != null) {
             comentario.setResponsavelId(responsavel.getId());
@@ -215,7 +287,11 @@ public class FeedController {
         moderarSeNecessario(postagem, comentario);
         Comentario salvo = comentarioRepository.save(comentario);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salvo, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
+        notificarModeracaoSePendente(postagem, salvo);
+        String autor = autorService.autorPaciente(paciente.getNome());
+        String nomeResponsavel = autorService.nomeResponsavel(responsavel);
+        return ComentarioResponse.from(salvo, paciente.getId(), null, c -> autor, umaFoto(paciente),
+                rid -> nomeResponsavel, janelaEdicaoMinutos());
     }
 
     /**
@@ -240,12 +316,12 @@ public class FeedController {
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         acessoService.exigirUnidade(paciente, postagem.getUnidadeSaude().getId());
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
+        exigirIdadeParaComentar(paciente, responsavel);
         // Threading de 1 nível: a resposta se ancora sempre no comentário-raiz.
         Comentario raiz = pai.getComentarioPai() != null ? pai.getComentarioPai() : pai;
         Comentario resposta = new Comentario();
         resposta.setPostagem(postagem);
         resposta.setComentarioPai(raiz);
-        resposta.setAutor(nomeExibicao(paciente.getNome()));
         resposta.setPacienteId(paciente.getId());
         if (responsavel != null) {
             resposta.setResponsavelId(responsavel.getId());
@@ -255,12 +331,17 @@ public class FeedController {
         moderarSeNecessario(postagem, resposta);
         Comentario salva = comentarioRepository.save(resposta);
         marcarComentarioNovo(postagem);
-        return ComentarioResponse.from(salva, paciente.getId(), null, umaFoto(paciente), umNomeResponsavel(responsavel));
+        notificarModeracaoSePendente(postagem, salva);
+        String autor = autorService.autorPaciente(paciente.getNome());
+        String nomeResponsavel = autorService.nomeResponsavel(responsavel);
+        return ComentarioResponse.from(salva, paciente.getId(), null, c -> autor, umaFoto(paciente),
+                rid -> nomeResponsavel, janelaEdicaoMinutos());
     }
 
     /**
-     * Edita o próprio comentário — permitido só até {@value #JANELA_EDICAO_MIN} min após criar.
-     * Sem {@code @Transactional} (a moderação faz chamada HTTP; não segura conexão do pool).
+     * Edita o próprio comentário — permitido só dentro da janela configurável
+     * ({@code MINUTOS_PARA_EDITAR_COMENTARIO}) após criar. Sem {@code @Transactional}
+     * (a moderação faz chamada HTTP; não segura conexão do pool).
      */
     @PutMapping("/postagem/{id}/comentarios/{comentarioId}")
     public ComentarioResponse editar(@PathVariable Long id, @PathVariable Long comentarioId,
@@ -269,17 +350,23 @@ public class FeedController {
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         Comentario c = comentarioDaPostagem(id, comentarioId);
         exigirDono(c, paciente);
-        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(JANELA_EDICAO_MIN))) {
+        // Editar republica conteúdo: aplica a mesma trava de idade mínima do comentar/responder
+        // (um menor não reescreve o próprio comentário para conteúdo novo).
+        exigirIdadeParaComentar(paciente, acessoService.responsavelDaSessao(jwt).orElse(null));
+        int janela = janelaEdicaoMinutos();
+        if (c.getCriadoEm().isBefore(LocalDateTime.now().minusMinutes(janela))) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                    "O prazo para editar este comentário (" + JANELA_EDICAO_MIN + " min) expirou.");
+                    "O prazo para editar este comentário (" + janela + " min) expirou.");
         }
         c.setTexto(request.texto().trim());
         c.setEditadoEm(LocalDateTime.now());
         // Segurança: um comentário já publicado pode ser reescrito para conteúdo ofensivo dentro
         // da janela de edição. Se a postagem exige validação por IA, revalida o texto editado.
         remoderarAoEditar(c);
-        return ComentarioResponse.from(comentarioRepository.save(c), paciente.getId(), null, umaFoto(paciente),
-                resolverNomesResponsavel(List.of(c)));
+        Comentario salvo = comentarioRepository.save(c);
+        notificarModeracaoSePendente(salvo.getPostagem(), salvo);
+        return ComentarioResponse.from(salvo, paciente.getId(), null, autorService.autores(List.of(salvo)),
+                umaFoto(paciente), autorService.nomesResponsavel(List.of(salvo)), janela);
     }
 
     /**
@@ -349,6 +436,22 @@ public class FeedController {
         }
     }
 
+    /**
+     * Se o comentário ficou PENDENTE (retido pela IA), avisa o back-office (sino do admin):
+     * conteúdo oculto do público aguardando aprovar/rejeitar. Best-effort e sem transação em
+     * volta (o comentário já foi salvo), então não segura conexão nem deixa notificação órfã.
+     */
+    private void notificarModeracaoSePendente(Postagem postagem, Comentario c) {
+        if (c.getStatusModeracao() != StatusModeracao.PENDENTE) {
+            return;
+        }
+        notificacaoAdminService.registrar(TipoNotificacaoAdmin.MODERACAO,
+                postagem.getUnidadeSaude().getId(),
+                "Comentário para revisar",
+                "Um comentário foi retido para moderação e aguarda sua aprovação.",
+                c.getId(), "/postagens/" + postagem.getId() + "#coment-" + c.getId());
+    }
+
     /** Visível ao leitor: admin vê tudo; público só PUBLICADO; o autor vê o próprio PENDENTE. */
     private boolean visivel(Comentario c, Long pacienteAtual, Long adminAtual) {
         if (adminAtual != null) {
@@ -397,22 +500,6 @@ public class FeedController {
     }
 
     /**
-     * Nome exibido no comentário: primeiro nome + inicial do sobrenome
-     * (ex.: "Mariana D."), por privacidade no feed público.
-     */
-    private String nomeExibicao(String nome) {
-        if (nome == null || nome.isBlank()) {
-            return "Paciente";
-        }
-        String[] partes = nome.trim().split("\\s+");
-        if (partes.length == 1) {
-            return partes[0];
-        }
-        String sobrenome = partes[partes.length - 1];
-        return partes[0] + " " + Character.toUpperCase(sobrenome.charAt(0)) + ".";
-    }
-
-    /**
      * Resolve a foto (URL pré-assinada) de cada autor pelo {@code pacienteId}, buscando
      * os pacientes de uma vez. Sem paciente (comentário do admin/antigo) ou sem foto → null.
      */
@@ -433,28 +520,6 @@ public class FeedController {
     private Function<Long, String> umaFoto(Paciente paciente) {
         String foto = storageService.urlVisualizacao(paciente.getFotoUrl(), VALIDADE_FOTO);
         return pid -> foto;
-    }
-
-    /**
-     * Resolve o nome do responsável de cada comentário pelo {@code responsavelId},
-     * buscando os responsáveis de uma vez. Nome COMPLETO (será configurável por tela
-     * futura). Sem responsável (comentário do próprio paciente) → null.
-     */
-    private Function<Long, String> resolverNomesResponsavel(List<Comentario> comentarios) {
-        Set<Long> ids = comentarios.stream().map(Comentario::getResponsavelId)
-                .filter(Objects::nonNull).collect(Collectors.toSet());
-        if (ids.isEmpty()) {
-            return rid -> null;
-        }
-        Map<Long, String> nomes = responsavelRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(Responsavel::getId, Responsavel::getNome));
-        return rid -> rid == null ? null : nomes.get(rid);
-    }
-
-    /** Resolver de nome de responsável para um único comentário/resposta recém-criado. */
-    private Function<Long, String> umNomeResponsavel(Responsavel responsavel) {
-        String nome = responsavel == null ? null : responsavel.getNome();
-        return rid -> nome;
     }
 
     private Postagem obter(Long id) {

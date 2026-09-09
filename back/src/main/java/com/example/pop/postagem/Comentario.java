@@ -38,9 +38,6 @@ public class Comentario {
     @JoinColumn(name = "comentario_pai_id")
     private Comentario comentarioPai;
 
-    @Column(nullable = false, length = 80)
-    private String autor;
-
     /** Dono do comentário quando é do paciente (app). Nulo em comentários antigos ou do admin. */
     @Column(name = "paciente_id")
     private Long pacienteId;

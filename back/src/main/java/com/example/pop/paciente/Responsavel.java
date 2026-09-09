@@ -1,5 +1,6 @@
 package com.example.pop.paciente;
 
+import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -52,6 +53,10 @@ public class Responsavel {
     /** Telefone (somente dígitos). Opcional. */
     @Column(length = 20)
     private String telefone;
+
+    /** Data de nascimento (opcional). Usada p/ validar idade mínima ao comentar na rede social. */
+    @Column(name = "data_nascimento")
+    private LocalDate dataNascimento;
 
     /**
      * Ativo (soft-delete/acesso). Inativo = sem acesso ao perfil do paciente no app

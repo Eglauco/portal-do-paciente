@@ -65,6 +65,8 @@ export interface ChatDetalhe {
   /** Atendente responsável pela conversa (só ele pode enviar). null = ninguém assumiu. */
   responsavelId?: number | null;
   responsavelNome?: string | null;
+  /** Até quando o paciente leu: mensagens da unidade até esta data mostram "lido". Null = não leu. */
+  pacienteLeuEm?: string | null;
   mensagens: Mensagem[];
 }
 

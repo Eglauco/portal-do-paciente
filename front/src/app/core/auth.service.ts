@@ -47,7 +47,11 @@ export interface UsuarioLogado {
  * acesso), o usuário cai na primeira tela liberada desta lista.
  */
 const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
-  ['DASHBOARD', '/dashboards/geral'],
+  ['DASHBOARD_GERAL', '/dashboards/geral'],
+  ['DASHBOARD_AGENDAMENTOS', '/dashboards/agendamentos'],
+  ['DASHBOARD_CHATS', '/dashboards/chats'],
+  ['DASHBOARD_SAU', '/dashboards/sau'],
+  ['DASHBOARD_NPS', '/dashboards/nps'],
   ['AGENDAMENTOS', '/agendamentos'],
   ['CHATS', '/chats'],
   ['SAU', '/sau'],
@@ -113,10 +117,10 @@ export class AuthService {
     }
   }
 
-  login(email: string, senha: string, lembrar: boolean): Observable<LoginResponse> {
+  login(email: string, senha: string): Observable<LoginResponse> {
     return this.http
       .post<LoginResponse>(`${this.base}/login`, { email, senha })
-      .pipe(tap((r) => this.armazenarSessao(r, lembrar)));
+      .pipe(tap((r) => this.armazenarSessao(r)));
   }
 
   /** Troca a unidade ativa (persiste no backend) e atualiza a sessão local. */
@@ -173,7 +177,7 @@ export class AuthService {
     return bruto;
   }
 
-  private armazenarSessao(r: LoginResponse, lembrar: boolean): void {
+  private armazenarSessao(r: LoginResponse): void {
     const usuario: UsuarioLogado = {
       nome: r.nome,
       email: r.email,
@@ -184,13 +188,14 @@ export class AuthService {
     };
     this._usuario.set(usuario);
     if (!this.ehNavegador) return;
-    const usar = lembrar ? localStorage : sessionStorage;
-    const outro = lembrar ? sessionStorage : localStorage;
+    // A sessão fica sempre em localStorage: é COMPARTILHADA entre abas, então abrir um link
+    // em nova aba (ou várias) mantém o login. O sessionStorage é por-aba e fazia a aba nova
+    // cair no login. O token já expira sozinho (8h), então a sessão não fica eterna.
     try {
-      outro.removeItem(CHAVE_TOKEN);
-      outro.removeItem(CHAVE_USUARIO);
-      usar.setItem(CHAVE_TOKEN, r.token);
-      usar.setItem(CHAVE_USUARIO, JSON.stringify(usuario));
+      sessionStorage.removeItem(CHAVE_TOKEN);
+      sessionStorage.removeItem(CHAVE_USUARIO);
+      localStorage.setItem(CHAVE_TOKEN, r.token);
+      localStorage.setItem(CHAVE_USUARIO, JSON.stringify(usuario));
     } catch {
       /* storage indisponível — mantém a sessão em memória */
     }

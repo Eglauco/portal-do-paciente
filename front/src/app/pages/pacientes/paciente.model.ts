@@ -52,6 +52,8 @@ export interface Responsavel {
   id?: number;
   nome: string;
   telefone?: string | null;
+  /** Data de nascimento (ISO, opcional). Usada p/ validar a idade mínima ao comentar na rede social. */
+  dataNascimento?: string | null;
   permissoes?: PermissoesResponsavel;
   /** Ativo (soft-delete/acesso). Inativo perde acesso ao perfil no app. */
   ativo?: boolean;
@@ -64,6 +66,7 @@ export interface ResponsavelEntrada {
   id?: number | null;
   nome: string;
   telefone?: string | null;
+  dataNascimento?: string | null;
   permissoes: PermissoesResponsavel;
   ativo: boolean;
 }

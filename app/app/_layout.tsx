@@ -13,6 +13,7 @@ import { LembretePopup } from '@/components/lembrete-popup';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PerfilFotoProvider } from '@/hooks/use-perfil-foto';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
+import { TemaProvider } from '@/hooks/use-tema';
 import { notificarAtualizacao } from '@/services/atualizacao';
 import { ehChatAtivo } from '@/services/chat-ativo';
 import { registrarParaPush } from '@/services/notificacoes';
@@ -169,13 +170,15 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <SessaoProvider>
-        <PerfilFotoProvider>
-          <Navegacao />
-        </PerfilFotoProvider>
-      </SessaoProvider>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <TemaProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <SessaoProvider>
+          <PerfilFotoProvider>
+            <Navegacao />
+          </PerfilFotoProvider>
+        </SessaoProvider>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </TemaProvider>
   );
 }

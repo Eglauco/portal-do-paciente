@@ -20,7 +20,6 @@ export class Login {
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly showPassword = signal(false);
-  protected readonly remember = signal(false);
   protected readonly entrando = signal(false);
   protected readonly erro = signal<string | null>(null);
 
@@ -41,7 +40,7 @@ export class Login {
 
     this.entrando.set(true);
     this.erro.set(null);
-    this.auth.login(email, senha, this.remember()).subscribe({
+    this.auth.login(email, senha).subscribe({
       next: () => this.router.navigate(['/inicio']),
       error: (e) => {
         this.entrando.set(false);
@@ -60,9 +59,5 @@ export class Login {
 
   protected updatePassword(event: Event): void {
     this.password.set((event.target as HTMLInputElement).value);
-  }
-
-  protected updateRemember(event: Event): void {
-    this.remember.set((event.target as HTMLInputElement).checked);
   }
 }

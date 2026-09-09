@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 
 /** Caixa de edição inline de um comentário — mantém o texto em estado próprio
  *  (não re-renderiza a lista a cada tecla). Usada na tela e na folha de comentários. */
@@ -16,6 +16,8 @@ export function EdicaoComentario({
   onSalvar: (texto: string) => void;
   onCancelar: () => void;
 }) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [txt, setTxt] = useState(inicial);
   const bloqueado = salvando || !txt.trim();
   return (
@@ -28,7 +30,7 @@ export function EdicaoComentario({
         autoFocus
         editable={!salvando}
         placeholder="Edite seu comentário"
-        placeholderTextColor={Brand.muted}
+        placeholderTextColor={t.muted}
       />
       <View style={styles.editAcoes}>
         <Pressable onPress={onCancelar} hitSlop={6} disabled={salvando}>
@@ -44,21 +46,22 @@ export function EdicaoComentario({
   );
 }
 
-const styles = StyleSheet.create({
-  editBox: { marginTop: 2 },
-  editInput: {
-    borderWidth: 1,
-    borderColor: Brand.line,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: Brand.ink,
-    backgroundColor: '#fff',
-    minHeight: 38,
-  },
-  editAcoes: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
-  acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
-  acaoSalvar: { fontSize: 12.5, fontWeight: '800', color: Brand.brandDeep },
-  acaoDesabilitada: { opacity: 0.5 },
-});
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+    editBox: { marginTop: 2 },
+    editInput: {
+      borderWidth: 1,
+      borderColor: t.line,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      fontSize: 14,
+      color: t.ink,
+      backgroundColor: '#fff',
+      minHeight: 38,
+    },
+    editAcoes: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18, marginTop: 6 },
+    acaoLink: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep },
+    acaoSalvar: { fontSize: 12.5, fontWeight: '800', color: t.brandDeep },
+    acaoDesabilitada: { opacity: 0.5 },
+  });

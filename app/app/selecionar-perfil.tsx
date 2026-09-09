@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { abaInicial, listarPerfis, type Perfil } from '@/services/sessao';
 
@@ -19,6 +19,8 @@ function iniciais(nome: string): string {
 }
 
 export default function SelecionarPerfilScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { sessao, trocarPerfil, sair } = useSessao();
@@ -79,7 +81,7 @@ export default function SelecionarPerfilScreen() {
     <View style={styles.root}>
       <SafeAreaView edges={['top']} style={styles.brand}>
         <View style={styles.mark}>
-          <Ionicons name="people" size={22} color={Brand.glow} />
+          <Ionicons name="people" size={22} color={t.glow} />
         </View>
         <Text style={styles.titulo}>Selecionar perfil</Text>
         <Text style={styles.subtitulo}>Escolha por qual perfil você deseja continuar.</Text>
@@ -88,13 +90,13 @@ export default function SelecionarPerfilScreen() {
       <View style={styles.sheet}>
         {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando perfis…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão e tente novamente.</Text>
@@ -117,7 +119,7 @@ export default function SelecionarPerfilScreen() {
         ) : perfis.length === 0 ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="people-outline" size={26} color={Brand.muted} />
+              <Ionicons name="people-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Nenhum perfil disponível</Text>
             <Text style={styles.estadoTxt}>
@@ -152,7 +154,7 @@ export default function SelecionarPerfilScreen() {
                       <Ionicons
                         name={p.proprio ? 'person' : 'people'}
                         size={11}
-                        color={p.proprio ? Brand.brandDeep : '#8A5A00'}
+                        color={p.proprio ? t.brandDeep : '#8A5A00'}
                       />
                       <Text style={[styles.tagTxt, p.proprio ? styles.tagTxtVoce : styles.tagTxtResp]}>
                         {p.proprio ? 'Você' : 'Responsável'}
@@ -160,9 +162,9 @@ export default function SelecionarPerfilScreen() {
                     </View>
                   </View>
                   {escolhendo ? (
-                    <ActivityIndicator size="small" color={Brand.brand} />
+                    <ActivityIndicator size="small" color={t.brand} />
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color={Brand.muted} />
+                    <Ionicons name="chevron-forward" size={20} color={t.muted} />
                   )}
                 </Pressable>
               );
@@ -186,8 +188,9 @@ export default function SelecionarPerfilScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Brand.brandDeep },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  root: { flex: 1, backgroundColor: t.brandDeep },
   brand: { paddingHorizontal: 28, paddingTop: 8, paddingBottom: 28 },
   mark: {
     width: 44,
@@ -197,14 +200,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(234,250,244,0.28)',
+    borderColor: alpha(t.onBrand, 0.28),
     marginBottom: 16,
   },
-  titulo: { color: Brand.onBrand, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
-  subtitulo: { color: 'rgba(234,250,244,0.72)', fontSize: 14.5, marginTop: 6, lineHeight: 20 },
+  titulo: { color: t.onBrand, fontSize: 26, fontWeight: '700', letterSpacing: -0.3 },
+  subtitulo: { color: alpha(t.onBrand, 0.72), fontSize: 14.5, marginTop: 6, lineHeight: 20 },
   sheet: {
     flex: 1,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     marginTop: -8,
@@ -216,20 +219,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  cardPressed: { backgroundColor: '#F4FAF8' },
+  cardPressed: { backgroundColor: t.brandTint },
   cardBusy: { opacity: 0.7 },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: Brand.line },
-  avatarVazio: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
-  avatarIniciais: { fontSize: 18, fontWeight: '800', color: Brand.brandDeep },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: t.line },
+  avatarVazio: { alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandTint },
+  avatarIniciais: { fontSize: 18, fontWeight: '800', color: t.brandDeep },
   cardBody: { flex: 1, minWidth: 0, gap: 6 },
-  cardNome: { fontSize: 16.5, fontWeight: '700', color: Brand.ink },
+  cardNome: { fontSize: 16.5, fontWeight: '700', color: t.ink },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,24 +242,24 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 20,
   },
-  tagVoce: { backgroundColor: '#E7F3EF' },
+  tagVoce: { backgroundColor: t.brandTint },
   tagResp: { backgroundColor: '#FBF1DE' },
   tagTxt: { fontSize: 11.5, fontWeight: '700' },
-  tagTxtVoce: { color: Brand.brandDeep },
+  tagTxtVoce: { color: t.brandDeep },
   tagTxtResp: { color: '#8A5A00' },
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 10 },
   estadoIcone: {
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -265,7 +268,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
   sairWrap: { paddingHorizontal: 20, paddingTop: 12 },
@@ -274,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#F3D6DB',

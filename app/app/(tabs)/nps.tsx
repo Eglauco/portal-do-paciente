@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { NpsModal, NpsModalDados } from '@/components/nps-modal';
 import { SemAcesso } from '@/components/sem-acesso';
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import {
@@ -27,6 +27,8 @@ function dataCurta(iso: string): string {
 }
 
 export default function NpsScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   const verNps = podeVer(sessao, 'NPS');
   const podeAvaliar = podeLancar(sessao, 'NPS');
@@ -151,7 +153,7 @@ export default function NpsScreen() {
         style={styles.screen}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>
         <Text style={styles.title}>NPS</Text>
         <Text style={styles.subtitle}>
@@ -159,14 +161,14 @@ export default function NpsScreen() {
         </Text>
         {!podeAvaliar && (
           <View style={styles.somenteLeitura}>
-            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Ionicons name="eye-outline" size={15} color={t.muted} />
             <Text style={styles.somenteLeituraTxt}>Você pode visualizar, mas não avaliar.</Text>
           </View>
         )}
 
         {carregando && (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando avaliações…</Text>
           </View>
         )}
@@ -174,7 +176,7 @@ export default function NpsScreen() {
         {!carregando && erro && (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -205,7 +207,7 @@ export default function NpsScreen() {
                     style={({ pressed }) => [styles.pendente, pressed && podeAvaliar && styles.pendentePressed]}>
                     <View style={styles.pendenteTopo}>
                       <View style={styles.pendenteTag}>
-                        <Ionicons name="star-outline" size={12} color={Brand.brandPine} />
+                        <Ionicons name="star-outline" size={12} color={t.brandPine} />
                         <Text style={styles.pendenteTagTxt}>Aguardando avaliação</Text>
                       </View>
                       <Text style={styles.pendenteData}>{dataCurta(n.dataHora)}</Text>
@@ -213,7 +215,7 @@ export default function NpsScreen() {
 
                     <Text style={styles.pendenteEsp}>{n.especialidade.nome}</Text>
                     <View style={styles.pendenteMeta}>
-                      <Ionicons name="location-outline" size={14} color={Brand.onBrand} />
+                      <Ionicons name="location-outline" size={14} color={t.onBrand} />
                       <Text style={styles.pendenteMetaTxt} numberOfLines={1}>
                         {n.unidadeSaude.nome}
                       </Text>
@@ -222,7 +224,7 @@ export default function NpsScreen() {
                     {podeAvaliar && (
                       <View style={styles.pendenteCta}>
                         <Text style={styles.pendenteCtaTxt}>Toque para avaliar</Text>
-                        <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
+                        <Ionicons name="arrow-forward" size={16} color={t.glow} />
                       </View>
                     )}
                   </Pressable>
@@ -280,7 +282,7 @@ export default function NpsScreen() {
                       </View>
                     )}
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={Brand.muted} />
+                  <Ionicons name="chevron-forward" size={20} color={t.muted} />
                 </Pressable>
               ))
             )}
@@ -307,22 +309,23 @@ export default function NpsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   content: { padding: 20, paddingBottom: 32 },
-  title: { fontSize: 26, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
-  subtitle: { fontSize: 14, color: Brand.muted, marginTop: 4, marginBottom: 18 },
+  title: { fontSize: 26, fontWeight: '800', color: t.ink, letterSpacing: -0.4 },
+  subtitle: { fontSize: 14, color: t.muted, marginTop: 4, marginBottom: 18 },
   somenteLeitura: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#EEF3F1',
+    backgroundColor: t.brandTint,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
     marginBottom: 16,
   },
-  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
 
   // Estados
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
@@ -330,14 +333,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -346,7 +349,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
@@ -363,23 +366,23 @@ const styles = StyleSheet.create({
   destaqueTitulo: { flex: 1, fontSize: 13.5, fontWeight: '800', color: '#8A5A00', letterSpacing: 0.2 },
   destaqueBadge: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#C77700', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   destaqueBadgeTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  pendente: { backgroundColor: Brand.brandDeep, borderRadius: 16, padding: 16, marginTop: 8 },
-  pendentePressed: { backgroundColor: Brand.brandPine },
+  pendente: { backgroundColor: t.brandDeep, borderRadius: 16, padding: 16, marginTop: 8 },
+  pendentePressed: { backgroundColor: t.brandPine },
   pendenteTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   pendenteTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Brand.glow,
+    backgroundColor: t.glow,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  pendenteTagTxt: { fontSize: 11, fontWeight: '800', color: Brand.brandPine },
+  pendenteTagTxt: { fontSize: 11, fontWeight: '800', color: t.brandPine },
   pendenteData: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: Brand.onBrand,
+    color: t.onBrand,
     backgroundColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -388,7 +391,7 @@ const styles = StyleSheet.create({
   },
   pendenteEsp: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
   pendenteMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
-  pendenteMetaTxt: { fontSize: 12.5, color: 'rgba(234,250,244,0.82)', flexShrink: 1 },
+  pendenteMetaTxt: { fontSize: 12.5, color: alpha(t.onBrand, 0.82), flexShrink: 1 },
   pendenteCta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -398,55 +401,55 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.14)',
   },
-  pendenteCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: Brand.glow },
+  pendenteCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.glow },
 
   // Resumo
   resumo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 18,
     marginBottom: 22,
   },
   mediaBox: { alignItems: 'center', width: 96 },
-  mediaNum: { fontSize: 40, fontWeight: '800', color: Brand.brandDeep, letterSpacing: -1 },
+  mediaNum: { fontSize: 40, fontWeight: '800', color: t.brandDeep, letterSpacing: -1 },
   mediaEstrelas: { flexDirection: 'row', gap: 1, marginTop: 2 },
-  mediaLabel: { fontSize: 12, color: Brand.muted, marginTop: 2 },
-  divisor: { width: 1, alignSelf: 'stretch', backgroundColor: Brand.line, marginHorizontal: 16 },
+  mediaLabel: { fontSize: 12, color: t.muted, marginTop: 2 },
+  divisor: { width: 1, alignSelf: 'stretch', backgroundColor: t.line, marginHorizontal: 16 },
   resumoInfo: { flex: 1 },
-  resumoInfoNum: { fontSize: 26, fontWeight: '800', color: Brand.ink },
-  resumoInfoLabel: { fontSize: 13, color: Brand.muted, marginTop: 2 },
+  resumoInfoNum: { fontSize: 26, fontWeight: '800', color: t.ink },
+  resumoInfoLabel: { fontSize: 13, color: t.muted, marginTop: 2 },
 
-  secao: { fontSize: 13, fontWeight: '700', color: Brand.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
-  vazioTxt: { fontSize: 13.5, color: Brand.muted, paddingVertical: 8 },
+  secao: { fontSize: 13, fontWeight: '700', color: t.muted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
+  vazioTxt: { fontSize: 13.5, color: t.muted, paddingVertical: 8 },
 
   // Card avaliado
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 12,
     marginBottom: 10,
   },
-  cardPressed: { backgroundColor: '#F1F6F4' },
+  cardPressed: { backgroundColor: t.brandTint },
   nota: {
     width: 52,
     height: 52,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   notaNum: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  especialidade: { fontSize: 15, fontWeight: '700', color: Brand.ink },
-  meta: { fontSize: 12.5, color: Brand.muted, marginTop: 3 },
+  especialidade: { fontSize: 15, fontWeight: '700', color: t.ink },
+  meta: { fontSize: 12.5, color: t.muted, marginTop: 3 },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   viaRespTxt: { flex: 1, fontSize: 11.5, fontWeight: '600', color: '#8A5A00' },
 });

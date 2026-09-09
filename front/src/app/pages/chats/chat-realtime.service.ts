@@ -110,6 +110,13 @@ export class ChatRealtimeService {
     return this.inscrever(`/topic/chat/${chatId}/entregue`, () => callback());
   }
 
+  /** Observa o recibo de leitura (o paciente leu a conversa até `pacienteLeuEm`). */
+  observarLeitura(chatId: number, callback: (pacienteLeuEm: string) => void): () => void {
+    return this.inscrever(`/topic/chat/${chatId}/lido`, (msg) =>
+      callback((JSON.parse(msg.body) as { pacienteLeuEm: string }).pacienteLeuEm),
+    );
+  }
+
   /** Observa a troca de responsável (bloqueia o atendente anterior em tempo real). */
   observarResponsavel(
     chatId: number,

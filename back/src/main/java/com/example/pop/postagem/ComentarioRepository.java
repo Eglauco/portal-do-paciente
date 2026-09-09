@@ -65,4 +65,7 @@ public interface ComentarioRepository extends JpaRepository<Comentario, Long> {
 
     /** O responsável tem algum comentário (lançamento no feed)? Trava a remoção do responsável. */
     boolean existsByResponsavelId(Long responsavelId);
+
+    /** Comentários feitos por um paciente (qualquer postagem). */
+    List<Comentario> findByPacienteId(Long pacienteId);
 }

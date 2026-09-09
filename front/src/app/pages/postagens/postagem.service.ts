@@ -77,8 +77,9 @@ export class PostagemService {
     return this.http.delete<void>(`${this.base}/comentario/${comentarioId}`);
   }
 
-  responderComentario(comentarioId: number, autor: string, texto: string): Observable<Comentario> {
-    return this.http.post<Comentario>(`${this.base}/comentario/${comentarioId}/responder`, { autor, texto });
+  responderComentario(comentarioId: number, texto: string): Observable<Comentario> {
+    // O autor exibido é resolvido no servidor ("Administração", pelo usuarioId); não vai no corpo.
+    return this.http.post<Comentario>(`${this.base}/comentario/${comentarioId}/responder`, { texto });
   }
 
   /** Edita um comentário do próprio admin (permitido só até 15 min após criar). */

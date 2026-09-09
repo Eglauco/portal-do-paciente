@@ -23,32 +23,32 @@ export const routes: Routes = [
       {
         path: 'dashboards/geral',
         loadComponent: () => import('./pages/dashboards/geral/geral').then((m) => m.DashboardGeral),
-        canActivate: [telaGuard('DASHBOARD')],
+        canActivate: [telaGuard('DASHBOARD_GERAL')],
         title: 'Dashboard · Visão geral — Portal do Paciente · Admin',
       },
       {
         path: 'dashboards/agendamentos',
         loadComponent: () =>
           import('./pages/dashboards/agendamentos/agendamentos').then((m) => m.DashboardAgendamentos),
-        canActivate: [telaGuard('DASHBOARD')],
+        canActivate: [telaGuard('DASHBOARD_AGENDAMENTOS')],
         title: 'Dashboard · Agendamentos — Portal do Paciente · Admin',
       },
       {
         path: 'dashboards/chats',
         loadComponent: () => import('./pages/dashboards/chats/chats').then((m) => m.DashboardChats),
-        canActivate: [telaGuard('DASHBOARD')],
+        canActivate: [telaGuard('DASHBOARD_CHATS')],
         title: 'Dashboard · Chats ao vivo — Portal do Paciente · Admin',
       },
       {
         path: 'dashboards/sau',
         loadComponent: () => import('./pages/dashboards/sau/sau').then((m) => m.DashboardSau),
-        canActivate: [telaGuard('DASHBOARD')],
+        canActivate: [telaGuard('DASHBOARD_SAU')],
         title: 'Dashboard · SAU — Portal do Paciente · Admin',
       },
       {
         path: 'dashboards/nps',
         loadComponent: () => import('./pages/dashboards/nps/nps').then((m) => m.DashboardNps),
-        canActivate: [telaGuard('DASHBOARD')],
+        canActivate: [telaGuard('DASHBOARD_NPS')],
         title: 'Dashboard · NPS — Portal do Paciente · Admin',
       },
       { path: 'inicio', canActivate: [inicioGuard], children: [] },
@@ -370,19 +370,21 @@ export const routes: Routes = [
       },
       {
         path: 'configuracoes',
+        loadComponent: () =>
+          import('./pages/configuracoes/configuracoes-list').then((m) => m.ConfiguracoesList),
         canActivate: [telaGuard('CONFIGURACOES')],
-        ...secao('Configurações', 'Ajuste as preferências do sistema.'),
+        title: 'Configurações — Portal do Paciente · Admin',
+      },
+      {
+        path: 'configuracoes/:id',
+        loadComponent: () =>
+          import('./pages/configuracoes/configuracao-form').then((m) => m.ConfiguracaoForm),
+        canActivate: [telaGuard('CONFIGURACOES')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar configuração — Portal do Paciente · Admin',
       },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],
   },
   { path: '**', redirectTo: 'login' },
 ];
-
-function secao(title: string, description: string) {
-  return {
-    loadComponent: () => import('./pages/placeholder/placeholder').then((m) => m.Placeholder),
-    title: `${title} — Portal do Paciente · Admin`,
-    data: { title, description },
-  };
-}

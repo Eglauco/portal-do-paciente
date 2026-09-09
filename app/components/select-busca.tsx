@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 
 export interface ItemSelect {
   id: number;
@@ -58,6 +58,8 @@ export function SelectBusca({
   desabilitado = false,
   onAbertoChange,
 }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -99,7 +101,7 @@ export function SelectBusca({
         <Text style={[styles.campoTexto, !selecionado && styles.campoPlaceholder]} numberOfLines={1}>
           {selecionado ? selecionado.nome : placeholder}
         </Text>
-        {!desabilitado && <Ionicons name="chevron-down" size={20} color={Brand.muted} />}
+        {!desabilitado && <Ionicons name="chevron-down" size={20} color={t.muted} />}
       </Pressable>
 
       <Modal
@@ -122,12 +124,12 @@ export function SelectBusca({
                 style={styles.fechar}
                 accessibilityRole="button"
                 accessibilityLabel="Fechar">
-                <Ionicons name="close" size={20} color={Brand.muted} />
+                <Ionicons name="close" size={20} color={t.muted} />
               </Pressable>
             </View>
 
             <View style={styles.buscaBox}>
-              <Ionicons name="search" size={18} color={Brand.muted} />
+              <Ionicons name="search" size={18} color={t.muted} />
               <TextInput
                 ref={inputRef}
                 style={styles.buscaInput}
@@ -141,7 +143,7 @@ export function SelectBusca({
               />
               {busca.length > 0 && (
                 <Pressable onPress={() => setBusca('')} accessibilityRole="button" accessibilityLabel="Limpar busca">
-                  <Ionicons name="close-circle" size={18} color={Brand.muted} />
+                  <Ionicons name="close-circle" size={18} color={t.muted} />
                 </Pressable>
               )}
             </View>
@@ -165,7 +167,7 @@ export function SelectBusca({
                       <Text style={[styles.opcaoTexto, ativo && styles.opcaoTextoAtivo]} numberOfLines={2}>
                         {item.nome}
                       </Text>
-                      {ativo && <Ionicons name="checkmark" size={20} color={Brand.brand} />}
+                      {ativo && <Ionicons name="checkmark" size={20} color={t.brand} />}
                     </Pressable>
                   );
                 })
@@ -178,75 +180,76 @@ export function SelectBusca({
   );
 }
 
-const styles = StyleSheet.create({
-  campo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 52,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    borderRadius: 14,
-    backgroundColor: Brand.surface,
-  },
-  campoDesabilitado: { backgroundColor: Brand.bg },
-  campoTexto: { flex: 1, fontSize: 15, color: Brand.ink },
-  campoPlaceholder: { color: '#9AAAA5' },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+    campo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      minHeight: 52,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: t.line,
+      borderRadius: 14,
+      backgroundColor: t.surface,
+    },
+    campoDesabilitado: { backgroundColor: t.bg },
+    campoTexto: { flex: 1, fontSize: 15, color: t.ink },
+    campoPlaceholder: { color: '#9AAAA5' },
 
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-    backgroundColor: Brand.surface,
-    borderRadius: 24,
-    padding: 18,
-  },
-  cabecalho: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  titulo: { flex: 1, fontSize: 17, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
-  fechar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Brand.bg,
-  },
+    backdrop: {
+      flex: 1,
+      backgroundColor: alpha(t.brandPine, 0.55),
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    card: {
+      width: '100%',
+      maxWidth: 400,
+      maxHeight: '80%',
+      backgroundColor: t.surface,
+      borderRadius: 24,
+      padding: 18,
+    },
+    cabecalho: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+    titulo: { flex: 1, fontSize: 17, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
+    fechar: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.bg,
+    },
 
-  buscaBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    height: 46,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    borderRadius: 12,
-    backgroundColor: Brand.bg,
-    marginBottom: 10,
-  },
-  buscaInput: { flex: 1, fontSize: 15, color: Brand.ink, paddingVertical: 0 },
+    buscaBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      height: 46,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: t.line,
+      borderRadius: 12,
+      backgroundColor: t.bg,
+      marginBottom: 10,
+    },
+    buscaInput: { flex: 1, fontSize: 15, color: t.ink, paddingVertical: 0 },
 
-  lista: { flexShrink: 1 },
-  vazio: { fontSize: 14, color: Brand.muted, textAlign: 'center', paddingVertical: 24 },
-  opcao: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F4F2',
-  },
-  opcaoPressed: { backgroundColor: '#EEF3F1' },
-  opcaoTexto: { flex: 1, fontSize: 15, color: Brand.ink },
-  opcaoTextoAtivo: { fontWeight: '700', color: Brand.brandDeep },
-});
+    lista: { flexShrink: 1 },
+    vazio: { fontSize: 14, color: t.muted, textAlign: 'center', paddingVertical: 24 },
+    opcao: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: t.brandTint,
+    },
+    opcaoPressed: { backgroundColor: t.brandTint },
+    opcaoTexto: { flex: 1, fontSize: 15, color: t.ink },
+    opcaoTextoAtivo: { fontWeight: '700', color: t.brandDeep },
+  });

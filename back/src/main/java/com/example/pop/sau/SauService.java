@@ -18,6 +18,8 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.common.Ref;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
+import com.example.pop.notificacaoadmin.NotificacaoAdminService;
+import com.example.pop.notificacaoadmin.TipoNotificacaoAdmin;
 import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.Responsavel;
@@ -45,12 +47,14 @@ public class SauService {
     private final ResponsavelRepository responsavelRepository;
     private final PushService pushService;
     private final NotificacaoService notificacaoService;
+    private final NotificacaoAdminService notificacaoAdminService;
     private final StorageService storageService;
 
     public SauService(ManifestacaoRepository repository, ManifestacaoMensagemRepository mensagemRepository,
             UnidadeRepository unidadeRepository, TipoManifestacaoRepository tipoRepository,
             UsuarioRepository usuarioRepository, ResponsavelRepository responsavelRepository,
-            PushService pushService, NotificacaoService notificacaoService, StorageService storageService) {
+            PushService pushService, NotificacaoService notificacaoService,
+            NotificacaoAdminService notificacaoAdminService, StorageService storageService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.unidadeRepository = unidadeRepository;
@@ -59,6 +63,7 @@ public class SauService {
         this.responsavelRepository = responsavelRepository;
         this.pushService = pushService;
         this.notificacaoService = notificacaoService;
+        this.notificacaoAdminService = notificacaoAdminService;
         this.storageService = storageService;
     }
 
@@ -86,6 +91,14 @@ public class SauService {
         m.setAtualizadoEm(agora);
         repository.save(m);
         criarMensagem(m, AutorManifestacao.PACIENTE, null, texto, responsavelId);
+        // Sino do back-office: nova manifestação aguardando o SAU (só admins com a tela SAU + a unidade).
+        Long manifestacaoId = m.getId();
+        Long unidadeIdEvento = unidade.getId();
+        String tipoNome = tipo.getNome();
+        aposCommit(() -> notificacaoAdminService.registrar(TipoNotificacaoAdmin.SAU, unidadeIdEvento,
+                "Nova manifestação no SAU",
+                "Nova manifestação de " + tipoNome + " aguardando atendimento.",
+                manifestacaoId, "/sau/" + manifestacaoId));
         return m;
     }
 

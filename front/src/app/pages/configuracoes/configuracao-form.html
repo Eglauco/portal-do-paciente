@@ -1,0 +1,149 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Editar configuração</h1>
+      <p class="page-sub">Altere apenas o valor. Nome, chave e tipo são definidos pelo sistema.</p>
+    </div>
+  </header>
+
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    @if (erroCarregar()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>A configuração não foi encontrada ou o servidor está indisponível.</p>
+        <button type="button" class="btn btn--ghost" (click)="cancelar()">Voltar</button>
+      </div>
+    } @else if (config(); as c) {
+      <div class="form-grid">
+        <div class="form-field form-field--sm">
+          <label class="label" for="codigo">Código</label>
+          <input id="codigo" class="input input--readonly" [value]="codigo()" readonly tabindex="-1" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="nome">Nome</label>
+          <input id="nome" class="input input--readonly" [value]="c.nome" readonly tabindex="-1" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="chave">Chave</label>
+          <input id="chave" class="input input--readonly mono" [value]="c.chave" readonly tabindex="-1" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="tipo">Tipo</label>
+          <input id="tipo" class="input input--readonly" [value]="rotuloTipo(c.tipoConfiguracao)" readonly tabindex="-1" />
+        </div>
+
+        @if (c.descricao) {
+          <div class="form-field form-field--full">
+            <label class="label" for="descricao">Descrição</label>
+            <input id="descricao" class="input input--readonly" [value]="c.descricao" readonly tabindex="-1" />
+          </div>
+        }
+
+        <!-- Valor (único campo editável, conforme o tipo) -->
+        @switch (c.tipoConfiguracao) {
+          @case ('BOOLEANO') {
+            <div class="form-field form-field--full">
+              <span class="label">Valor</span>
+              <label class="check">
+                <input type="checkbox" formControlName="valorBooleano" />
+                <span class="check__box" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+                </span>
+                Ativado (Sim)
+              </label>
+            </div>
+          }
+          @case ('NUMERICO') {
+            <div class="form-field">
+              <label class="label" for="valorNumerico">Valor</label>
+              <input
+                id="valorNumerico"
+                type="number"
+                step="any"
+                class="input"
+                formControlName="valorNumerico"
+                autocomplete="off"
+              />
+            </div>
+          }
+          @case ('TEXTO') {
+            <div class="form-field form-field--full">
+              <label class="label" for="valorTexto">Valor</label>
+              <textarea id="valorTexto" class="input input--area" formControlName="valorTexto"></textarea>
+            </div>
+          }
+          @case ('COR') {
+            <div class="form-field">
+              <label class="label" for="valorCor">Valor</label>
+              <div class="cor-pick">
+                <input
+                  id="valorCor"
+                  type="color"
+                  class="cor-pick__input"
+                  formControlName="valorCor"
+                  #corInput
+                  (change)="atualizarPreview(corInput.value)"
+                  aria-label="Selecionar a cor da plataforma"
+                />
+                <span class="mono">{{ form.controls.valorCor.value }}</span>
+              </div>
+            </div>
+            @if (preview(); as p) {
+              <div class="form-field form-field--full">
+                <span class="label">Prévia dos tons derivados</span>
+                <div class="cor-preview">
+                  <span class="cor-swatch" [style.background]="p.brand" title="Marca">
+                    <b [style.color]="p.onBrand">Aa</b>
+                  </span>
+                  <span class="cor-swatch" [style.background]="p.brandDeep" title="Escuro"></span>
+                  <span class="cor-swatch" [style.background]="p.brandPine" title="Pinho"></span>
+                  <span class="cor-swatch" [style.background]="p.glow" title="Realce"></span>
+                </div>
+                <p class="field-hint">
+                  A cor é aplicada em todo o sistema após salvar. Tons muito claros ou escuros são
+                  ajustados automaticamente para manter a legibilidade (contraste).
+                </p>
+              </div>
+            }
+          }
+        }
+      </div>
+
+      @if (c.atualizadoPorNome) {
+        <p class="field-hint">Última alteração por {{ c.atualizadoPorNome }}.</p>
+      }
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+        <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando…' : 'Salvar' }}
+        </button>
+      </div>
+    } @else {
+      <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando configuração…</p></div>
+    }
+  </form>
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="confirm-msg" (click)="$event.stopPropagation()">
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}

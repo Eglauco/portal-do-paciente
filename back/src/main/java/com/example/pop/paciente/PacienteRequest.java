@@ -61,13 +61,15 @@ public record PacienteRequest(
             Long id,
             @NotBlank @Size(min = 2, max = 120) String nome,
             @Size(max = 20) String telefone,
+            /** Data de nascimento (opcional); valida a idade mínima p/ comentar na rede social. */
+            LocalDate dataNascimento,
             Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes,
             /** Situação do responsável: ausente (null) = ativo. Inativo perde acesso ao app. */
             Boolean ativo) {
 
         /** Compat (testes/cadastros mínimos): sem permissões nem situação explícitas → SEM_ACESSO e ativo. */
         public ResponsavelRequest(Long id, String nome, String telefone) {
-            this(id, nome, telefone, null, null);
+            this(id, nome, telefone, null, null, null);
         }
 
         /** Situação efetiva: ausente (null) = ativo (true). */

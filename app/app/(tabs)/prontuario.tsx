@@ -3,7 +3,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { useFocusEffect } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,8 @@ import {
 
 import { DocumentoModal } from '@/components/documento-modal';
 import { SemAcesso } from '@/components/sem-acesso';
-import { Brand, DocTipo } from '@/constants/theme';
+import { DocTipo } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { DocumentoApi, listarProntuarios, ProntuarioDetalhe } from '@/services/prontuario';
@@ -84,6 +85,8 @@ function inferirTipo(nome: string): TipoDoc {
 }
 
 export default function ProntuarioScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   const verProntuario = podeVer(sessao, 'PRONTUARIO');
   const [atendimentos, setAtendimentos] = useState<ProntuarioDetalhe[]>([]);
@@ -199,14 +202,14 @@ export default function ProntuarioScreen() {
       style={styles.screen}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+        <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
       }>
       <Text style={styles.title}>Prontuário</Text>
       <Text style={styles.subtitle}>Seus documentos, organizados por atendimento.</Text>
 
       {carregando && (
         <View style={styles.estado}>
-          <ActivityIndicator color={Brand.brand} />
+          <ActivityIndicator color={t.brand} />
           <Text style={styles.estadoTxt}>Carregando prontuário…</Text>
         </View>
       )}
@@ -214,7 +217,7 @@ export default function ProntuarioScreen() {
       {!carregando && erro && (
         <View style={styles.estado}>
           <View style={styles.estadoIcone}>
-            <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+            <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
           </View>
           <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
           <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -228,7 +231,7 @@ export default function ProntuarioScreen() {
       {!carregando && !erro && atendimentos.length === 0 && (
         <View style={styles.estado}>
           <View style={styles.estadoIcone}>
-            <Ionicons name="document-text-outline" size={26} color={Brand.muted} />
+            <Ionicons name="document-text-outline" size={26} color={t.muted} />
           </View>
           <Text style={styles.estadoTitulo}>Nenhum documento</Text>
           <Text style={styles.estadoTxt}>Seus atendimentos e documentos aparecerão aqui.</Text>
@@ -241,7 +244,7 @@ export default function ProntuarioScreen() {
           <View key={at.id} style={styles.grupo}>
             <View style={styles.grupoHeader}>
               <View style={styles.dataTag}>
-                <Ionicons name="calendar-clear-outline" size={13} color={Brand.brandDeep} />
+                <Ionicons name="calendar-clear-outline" size={13} color={t.brandDeep} />
                 <Text style={styles.dataTxt}>{dataLonga(at.dataHora)}</Text>
               </View>
               <Text style={styles.docCount}>{at.documentos.length} docs</Text>
@@ -277,13 +280,13 @@ export default function ProntuarioScreen() {
                         accessibilityRole="button"
                         accessibilityLabel={`Baixar ${doc.nome}`}>
                         {emDownload ? (
-                          <ActivityIndicator size="small" color={Brand.brand} />
+                          <ActivityIndicator size="small" color={t.brand} />
                         ) : (
-                          <Ionicons name="download-outline" size={20} color={Brand.brand} />
+                          <Ionicons name="download-outline" size={20} color={t.brand} />
                         )}
                       </Pressable>
                     ) : (
-                      <Ionicons name="document-outline" size={20} color={Brand.line} />
+                      <Ionicons name="document-outline" size={20} color={t.line} />
                     )}
                   </View>
                 );
@@ -304,16 +307,17 @@ export default function ProntuarioScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   content: { padding: 20, paddingBottom: 32 },
-  title: { fontSize: 26, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
-  subtitle: { fontSize: 14, color: Brand.muted, marginTop: 4, marginBottom: 18 },
+  title: { fontSize: 26, fontWeight: '800', color: t.ink, letterSpacing: -0.4 },
+  subtitle: { fontSize: 14, color: t.muted, marginTop: 4, marginBottom: 18 },
   grupo: {
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 16,
     marginBottom: 14,
   },
@@ -327,18 +331,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  dataTxt: { fontSize: 12.5, fontWeight: '700', color: Brand.brandDeep },
-  docCount: { fontSize: 12, color: Brand.muted, fontWeight: '600' },
-  especialidade: { fontSize: 16, fontWeight: '700', color: Brand.ink },
-  profissional: { fontSize: 13, color: Brand.muted, marginTop: 2, marginBottom: 6 },
+  dataTxt: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep },
+  docCount: { fontSize: 12, color: t.muted, fontWeight: '600' },
+  especialidade: { fontSize: 16, fontWeight: '700', color: t.ink },
+  profissional: { fontSize: 13, color: t.muted, marginTop: 2, marginBottom: 6 },
   docs: { marginTop: 8 },
   docRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
-  docRowBorder: { borderTopWidth: 1, borderTopColor: '#EEF3F1' },
+  docRowBorder: { borderTopWidth: 1, borderTopColor: t.brandTint },
   docIcon: {
     width: 38,
     height: 38,
@@ -346,8 +350,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docTitulo: { fontSize: 14.5, fontWeight: '600', color: Brand.ink },
-  docTipo: { fontSize: 12, color: Brand.muted, marginTop: 1 },
+  docTitulo: { fontSize: 14.5, fontWeight: '600', color: t.ink },
+  docTipo: { fontSize: 12, color: t.muted, marginTop: 1 },
   docBaixar: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
   // Estados (carregando / erro / vazio)
@@ -356,14 +360,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,7 +376,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

@@ -320,6 +320,25 @@
                 [attr.aria-label]="'Telefone do responsável ' + ($index + 1)"
               />
 
+              <div class="form-field">
+                <input
+                  class="input"
+                  formControlName="dataNascimento"
+                  mask="00/00/0000"
+                  [dropSpecialCharacters]="false"
+                  [validation]="false"
+                  placeholder="Nascimento (dd/mm/aaaa)"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  [attr.aria-label]="'Data de nascimento do responsável ' + ($index + 1)"
+                  [class.input--error]="responsavelDataInvalida($index)"
+                  [attr.aria-invalid]="responsavelDataInvalida($index)"
+                />
+                @if (responsavelDataInvalida($index)) {
+                  <span class="field-error" role="alert">Data inválida.</span>
+                }
+              </div>
+
               <div class="resp-perms" formGroupName="permissoes">
                 <p class="resp-perms__titulo">Permissões no aplicativo</p>
                 <p class="resp-perms__hint">O que este responsável pode acessar ao entrar como este paciente.</p>

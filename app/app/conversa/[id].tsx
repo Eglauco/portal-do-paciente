@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { podeLancar } from '@/services/sessao';
@@ -23,6 +23,7 @@ import {
   ChatDetalhe,
   confirmarEntrega,
   enviarMensagemPaciente,
+  marcarLido,
   Mensagem,
   novoClienteId,
 } from '@/services/chat';
@@ -61,6 +62,8 @@ function iniciais(nome: string): string {
 }
 
 export default function ConversaScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,6 +105,8 @@ export default function ConversaScreen() {
       rolarParaFim(false);
       // Confirma a entrega das mensagens da unidade que chegaram neste aparelho.
       confirmarEntrega(id);
+      // Marca a conversa como lida por mim (limpa o indicador na lista).
+      marcarLido(id);
     } catch {
       if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {
@@ -138,8 +143,11 @@ export default function ConversaScreen() {
         const base = m.remetente === 'PACIENTE' ? d.mensagens.filter((x) => !ehOtimista(x)) : d.mensagens;
         return { ...d, mensagens: [...base, m] };
       });
-      // Recibo de entrega: a mensagem da unidade chegou neste aparelho.
-      if (m.remetente === 'UNIDADE') confirmarEntrega(id);
+      // Mensagem da unidade chegou enquanto estou na conversa: confirma entrega E marca lida.
+      if (m.remetente === 'UNIDADE') {
+        confirmarEntrega(id);
+        marcarLido(id);
+      }
       rolarParaFim();
     });
     const cancelarDig = observarDigitando(id, (e) => {
@@ -271,13 +279,13 @@ export default function ConversaScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={Brand.ink} />
+          <Ionicons name="chevron-back" size={26} color={t.ink} />
         </Pressable>
         <View style={styles.avatar}>
           {detalhe ? (
             <Text style={styles.avatarTxt}>{iniciais(detalhe.unidadeSaude.nome)}</Text>
           ) : (
-            <Ionicons name="medical" size={18} color={Brand.glow} />
+            <Ionicons name="medical" size={18} color={t.glow} />
           )}
         </View>
         <View style={{ flex: 1 }}>
@@ -306,12 +314,12 @@ export default function ConversaScreen() {
 
       {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando conversa…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
-            <Ionicons name="cloud-offline-outline" size={28} color={Brand.muted} />
+            <Ionicons name="cloud-offline-outline" size={28} color={t.muted} />
             <Text style={styles.estadoTitulo}>Não foi possível abrir</Text>
             <Pressable style={styles.estadoBtn} onPress={carregar}>
               <Ionicons name="refresh" size={16} color="#fff" />
@@ -405,7 +413,7 @@ export default function ConversaScreen() {
         )}
         {!carregando && !erro && !podeEnviar && (
           <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Ionicons name="eye-outline" size={15} color={t.muted} />
             <Text style={styles.somenteLeituraTxt}>Você pode ler esta conversa, mas não enviar mensagens.</Text>
           </View>
         )}
@@ -413,32 +421,33 @@ export default function ConversaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#EEF3F1' },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.brandTint },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 8,
     paddingBottom: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: '#EAF2EF' },
+  backPressed: { backgroundColor: t.brandTint },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brandDeep,
+    backgroundColor: t.brandDeep,
   },
-  avatarTxt: { color: Brand.onBrand, fontSize: 14, fontWeight: '800' },
-  contatoNome: { fontSize: 15.5, fontWeight: '700', color: Brand.ink },
-  contatoStatus: { fontSize: 12, color: Brand.muted, marginTop: 1 },
-  digitando: { fontSize: 12, color: Brand.brand, fontWeight: '700', fontStyle: 'italic', marginTop: 1 },
+  avatarTxt: { color: t.onBrand, fontSize: 14, fontWeight: '800' },
+  contatoNome: { fontSize: 15.5, fontWeight: '700', color: t.ink },
+  contatoStatus: { fontSize: 12, color: t.muted, marginTop: 1 },
+  digitando: { fontSize: 12, color: t.brand, fontWeight: '700', fontStyle: 'italic', marginTop: 1 },
 
   mensagens: { flex: 1 },
   mensagensContent: { padding: 14, paddingBottom: 8 },
@@ -468,16 +477,16 @@ const styles = StyleSheet.create({
   direita: { alignSelf: 'flex-end' },
   bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
   bolhaUnidade: {
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderTopLeftRadius: 4,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
   },
   bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
-  atendente: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep, marginBottom: 2 },
+  atendente: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   viaRespTxt: { fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
-  texto: { fontSize: 14.5, color: Brand.ink, lineHeight: 20 },
+  texto: { fontSize: 14.5, color: t.ink, lineHeight: 20 },
   rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
   hora: { fontSize: 10.5, color: '#7C8C87' },
   reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
@@ -489,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 12,
     paddingTop: 10,
-    backgroundColor: '#EEF3F1',
+    backgroundColor: t.brandTint,
   },
   somenteLeitura: {
     flexDirection: 'row',
@@ -497,36 +506,36 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 12,
-    backgroundColor: '#EEF3F1',
+    backgroundColor: t.brandTint,
   },
-  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
   inputWrap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     paddingHorizontal: 14,
     paddingVertical: Platform.OS === 'ios' ? 10 : 4,
     minHeight: 46,
   },
-  input: { flex: 1, fontSize: 15, color: Brand.ink, maxHeight: 100 },
+  input: { flex: 1, fontSize: 15, color: t.ink, maxHeight: 100 },
   enviar: {
     width: 46,
     height: 46,
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   enviarDesativado: { opacity: 0.6 },
 
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center' },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,7 +544,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

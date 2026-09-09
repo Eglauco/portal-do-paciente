@@ -45,7 +45,7 @@ class PerfilControllerTest {
         assertEquals(Tela.values().length, controller.telas().size());
 
         PerfilResponse criado = controller.criar(
-                new PerfilRequest("Perfil Teste CRUD", EnumSet.of(Tela.SAU, Tela.DASHBOARD), List.of(1L, 2L)));
+                new PerfilRequest("Perfil Teste CRUD", EnumSet.of(Tela.SAU, Tela.DASHBOARD_GERAL), List.of(1L, 2L)));
         Long id = criado.id();
         assertNotNull(id);
         assertTrue(criado.telas().contains("SAU"));

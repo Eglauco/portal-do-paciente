@@ -283,6 +283,36 @@ public class ChatService {
     public record EntregaEvento(Long chatId) {
     }
 
+    /**
+     * Marca a conversa como LIDA PELO PACIENTE (cursor {@code pacienteLeuEm}) quando ele abre
+     * a conversa (ou recebe uma mensagem estando dentro dela). Só avança/emite se houver
+     * mensagem da unidade ainda não lida — evita gravações e eventos redundantes. Avisa o
+     * back-office em tempo real (recibo "lido" 3º check) e as listas.
+     */
+    public void marcarLidoPeloPaciente(Chat chat) {
+        Mensagem ultimaUnidade = mensagemRepository
+                .findFirstByChatIdAndRemetenteOrderByEnviadaEmDesc(chat.getId(), RemetenteMensagem.UNIDADE)
+                .orElse(null);
+        if (ultimaUnidade == null) {
+            return; // nada da unidade para ler
+        }
+        LocalDateTime lidoAte = chat.getPacienteLeuEm();
+        if (lidoAte != null && !ultimaUnidade.getEnviadaEm().isAfter(lidoAte)) {
+            return; // já leu tudo que a unidade mandou
+        }
+        LocalDateTime agora = LocalDateTime.now();
+        chat.setPacienteLeuEm(agora);
+        repository.save(chat);
+        aposCommit(() -> {
+            messagingTemplate.convertAndSend("/topic/chat/" + chat.getId() + "/lido", new LeituraEvento(chat.getId(), agora));
+            messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chat.getId()));
+        });
+    }
+
+    /** Sinal de que o paciente leu a conversa até {@code pacienteLeuEm} (recibo para o atendente). */
+    public record LeituraEvento(Long chatId, LocalDateTime pacienteLeuEm) {
+    }
+
     /** Marca as mensagens do paciente como lidas (lado da unidade). */
     public void marcarMensagensDoPacienteComoLidas(Long chatId) {
         List<Mensagem> naoLidas = mensagemRepository
@@ -308,9 +338,17 @@ public class ChatService {
                 ultima != null ? ultima.getRemetente() : null,
                 ultima != null ? ultima.getEnviadaEm() : null,
                 naoLidas,
+                naoLidaPeloPaciente(chat, ultima),
                 chat.getAtualizadoEm(),
                 chat.getResponsavel() != null ? chat.getResponsavel().getId() : null,
                 chat.getResponsavel() != null ? chat.getResponsavel().getNome() : null);
+    }
+
+    /** Há mensagem da UNIDADE mais nova que a última leitura do paciente? (indicador do app). */
+    private boolean naoLidaPeloPaciente(Chat chat, Mensagem ultima) {
+        return ultima != null
+                && ultima.getRemetente() == RemetenteMensagem.UNIDADE
+                && (chat.getPacienteLeuEm() == null || ultima.getEnviadaEm().isAfter(chat.getPacienteLeuEm()));
     }
 
     public ChatDetalheResponse toDetalhe(Chat chat) {
@@ -330,6 +368,7 @@ public class ChatService {
                 pacienteUsandoApp(chat.getPaciente()),
                 chat.getResponsavel() != null ? chat.getResponsavel().getId() : null,
                 chat.getResponsavel() != null ? chat.getResponsavel().getNome() : null,
+                chat.getPacienteLeuEm(),
                 mensagens);
     }
 

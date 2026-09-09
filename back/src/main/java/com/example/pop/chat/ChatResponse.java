@@ -17,6 +17,8 @@ public record ChatResponse(
         RemetenteMensagem ultimaMensagemDe,
         LocalDateTime ultimaMensagemEm,
         long naoLidas,
+        /** Há mensagem da unidade que o PACIENTE ainda não leu (indicador no app do paciente). */
+        boolean naoLidaPaciente,
         LocalDateTime atualizadoEm,
         /** Atendente responsável pela conversa (nulo = ninguém assumiu). */
         Long responsavelId,

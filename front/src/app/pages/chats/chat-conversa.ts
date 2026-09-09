@@ -323,6 +323,7 @@ export class ChatConversa {
       this.realtime.observarMensagens(id, (m) => this.aoReceberMensagem(m)),
       this.realtime.observarDigitando(id, (e) => this.aoDigitandoRecebido(e)),
       this.realtime.observarEntrega(id, () => this.aoEntregaConfirmada()),
+      this.realtime.observarLeitura(id, (lido) => this.aoLeituraRecebida(lido)),
       this.realtime.observarResponsavel(id, (e) => this.aoResponsavelMudou(e)),
       // Ao (re)conectar, recarrega o retrato: recupera o "entregue" da 1ª
       // mensagem, cujo evento pode ter ocorrido antes de a inscrição ficar ativa.
@@ -343,10 +344,39 @@ export class ChatConversa {
       next: (d) => {
         if (this.idAtual() !== id) return;
         this.detalhe.update((prev) =>
-          !prev || prev.id !== d.id ? prev : { ...prev, mensagens: this.mesclarMensagens(prev.mensagens, d.mensagens) },
+          !prev || prev.id !== d.id
+            ? prev
+            // pacienteLeuEm só AVANÇA (monotônico): um GET atrasado não pode regredir os
+            // recibos "lido" quando um evento /lido mais novo já chegou.
+            : {
+                ...prev,
+                pacienteLeuEm: this.cursorMaisRecente(prev.pacienteLeuEm, d.pacienteLeuEm),
+                mensagens: this.mesclarMensagens(prev.mensagens, d.mensagens),
+              },
         );
       },
     });
+  }
+
+  /** O paciente leu a conversa: avança o cursor para os recibos "lido" atualizarem. */
+  private aoLeituraRecebida(pacienteLeuEm: string): void {
+    this.detalhe.update((d) =>
+      d ? { ...d, pacienteLeuEm: this.cursorMaisRecente(d.pacienteLeuEm, pacienteLeuEm) } : d,
+    );
+  }
+
+  /** Mantém o cursor de leitura mais recente (nunca regride numa re-sincronização atrasada). */
+  private cursorMaisRecente(a: string | null | undefined, b: string | null | undefined): string | null | undefined {
+    if (!a) return b;
+    if (!b) return a;
+    return new Date(a).getTime() >= new Date(b).getTime() ? a : b;
+  }
+
+  /** Mensagem da unidade já lida pelo paciente? (recibo "lido" — checks azuis). */
+  protected lidaPeloPaciente(m: Mensagem): boolean {
+    const d = this.detalhe();
+    if (!d?.pacienteLeuEm || m.remetente !== 'UNIDADE' || m.pendente || m.falha) return false;
+    return new Date(m.enviadaEm).getTime() <= new Date(d.pacienteLeuEm).getTime();
   }
 
   /**

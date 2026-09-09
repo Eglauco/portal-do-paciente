@@ -8,8 +8,9 @@ import { AgendamentoModal } from '@/components/agendamento-modal';
 import { FaltaModal } from '@/components/falta-modal';
 import { SemAcesso } from '@/components/sem-acesso';
 import { Agendamento, MotivoFalta } from '@/constants/agendamentos';
-import { Brand, Status } from '@/constants/theme';
+import { Status } from '@/constants/theme';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { podeLancar, podeVer } from '@/services/sessao';
 import {
@@ -34,6 +35,8 @@ const capitalizar = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Relógio do prazo de cancelamento no card (variante clara/escura conforme o fundo). */
 function RelogioCancelamento({ a, agora, escuro }: { a: Agendamento; agora: number; escuro?: boolean }) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const info = infoCancelamento(a, agora);
   if (!info) return null;
   if (!info.podeCancelar) {
@@ -45,7 +48,7 @@ function RelogioCancelamento({ a, agora, escuro }: { a: Agendamento; agora: numb
       </View>
     );
   }
-  const cor = escuro ? Brand.glow : Brand.brandDeep;
+  const cor = escuro ? t.glow : t.brandDeep;
   return (
     <View style={styles.relogioLinha}>
       <Ionicons name="timer-outline" size={13} color={cor} />
@@ -58,6 +61,8 @@ function RelogioCancelamento({ a, agora, escuro }: { a: Agendamento; agora: numb
 
 /** Botão discreto que abre o histórico de status do agendamento (variante clara/escura). */
 function BotaoHistorico({ onPress, escuro }: { onPress: () => void; escuro?: boolean }) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   return (
     <Pressable
       onPress={onPress}
@@ -65,12 +70,14 @@ function BotaoHistorico({ onPress, escuro }: { onPress: () => void; escuro?: boo
       style={({ pressed }) => [styles.histBtn, escuro && styles.histBtnEscuro, pressed && { opacity: 0.6 }]}
       accessibilityRole="button"
       accessibilityLabel="Ver histórico de status">
-      <Ionicons name="time-outline" size={16} color={escuro ? Brand.glow : Brand.brandDeep} />
+      <Ionicons name="time-outline" size={16} color={escuro ? t.glow : t.brandDeep} />
     </Pressable>
   );
 }
 
 export default function AgendamentosScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   // Travas do perfil dependente: ver a agenda vs. lançar (confirmar/cancelar/justificar).
   const verAgenda = podeVer(sessao, 'AGENDAMENTOS');
@@ -138,8 +145,8 @@ export default function AgendamentosScreen() {
   // Relógio: só liga o tick (30s) quando há agendamentos confirmados (onde a contagem aparece).
   useEffect(() => {
     if (!temConfirmados) return;
-    const t = setInterval(() => setAgora(Date.now()), 30_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setAgora(Date.now()), 30_000);
+    return () => clearInterval(timer);
   }, [temConfirmados]);
 
   const abrirCancelamento = (a: Agendamento) => {
@@ -240,13 +247,13 @@ export default function AgendamentosScreen() {
         style={styles.screen}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>
         <Text style={styles.title}>Agendamentos</Text>
         <Text style={styles.subtitle}>Acompanhe suas consultas e exames.</Text>
         {!podeLancarAgenda && (
           <View style={styles.somenteLeitura}>
-            <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+            <Ionicons name="eye-outline" size={15} color={t.muted} />
             <Text style={styles.somenteLeituraTxt}>Você pode visualizar, mas não confirmar ou cancelar.</Text>
           </View>
         )}
@@ -254,7 +261,7 @@ export default function AgendamentosScreen() {
         {/* Carregando (primeira carga) */}
         {carregando && (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando agendamentos…</Text>
           </View>
         )}
@@ -263,7 +270,7 @@ export default function AgendamentosScreen() {
         {!carregando && erro && (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -278,7 +285,7 @@ export default function AgendamentosScreen() {
         {!carregando && !erro && lista.length === 0 && (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="calendar-outline" size={26} color={Brand.muted} />
+              <Ionicons name="calendar-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Nenhum agendamento</Text>
             <Text style={styles.estadoTxt}>Você ainda não possui agendamentos cadastrados.</Text>
@@ -310,7 +317,7 @@ export default function AgendamentosScreen() {
                 style={({ pressed }) => [styles.pendente, pressed && podeLancarAgenda && styles.pendentePressed]}>
                 <View style={styles.pendenteTopo}>
                   <View style={styles.pendenteTag}>
-                    <Ionicons name="time" size={12} color={Brand.brandPine} />
+                    <Ionicons name="time" size={12} color={t.brandPine} />
                     <Text style={styles.pendenteTagTxt}>Aguardando confirmação</Text>
                   </View>
                   <View style={styles.pendenteTopoDir}>
@@ -326,10 +333,10 @@ export default function AgendamentosScreen() {
                 <Text style={styles.pendenteEsp}>{a.especialidade}</Text>
                 <Text style={styles.pendenteProf}>{a.profissional}</Text>
                 <View style={styles.pendenteMeta}>
-                  <Ionicons name="time-outline" size={14} color={Brand.onBrand} />
+                  <Ionicons name="time-outline" size={14} color={t.onBrand} />
                   <Text style={styles.pendenteMetaTxt}>{a.hora}</Text>
                   <Text style={styles.pendenteDot}>·</Text>
-                  <Ionicons name="location-outline" size={14} color={Brand.onBrand} />
+                  <Ionicons name="location-outline" size={14} color={t.onBrand} />
                   <Text style={styles.pendenteMetaTxt} numberOfLines={1}>
                     {a.unidade}
                   </Text>
@@ -338,7 +345,7 @@ export default function AgendamentosScreen() {
                 {podeLancarAgenda && (
                   <View style={styles.pendenteCta}>
                     <Text style={styles.pendenteCtaTxt}>Toque para confirmar</Text>
-                    <Ionicons name="arrow-forward" size={16} color={Brand.glow} />
+                    <Ionicons name="arrow-forward" size={16} color={t.glow} />
                   </View>
                 )}
               </Pressable>
@@ -380,10 +387,10 @@ export default function AgendamentosScreen() {
                 <Text style={styles.pendenteEsp}>{a.especialidade}</Text>
                 <Text style={styles.pendenteProf}>{a.profissional}</Text>
                 <View style={styles.pendenteMeta}>
-                  <Ionicons name="time-outline" size={14} color={Brand.onBrand} />
+                  <Ionicons name="time-outline" size={14} color={t.onBrand} />
                   <Text style={styles.pendenteMetaTxt}>{a.hora}</Text>
                   <Text style={styles.pendenteDot}>·</Text>
-                  <Ionicons name="location-outline" size={14} color={Brand.onBrand} />
+                  <Ionicons name="location-outline" size={14} color={t.onBrand} />
                   <Text style={styles.pendenteMetaTxt} numberOfLines={1}>
                     {a.unidade}
                   </Text>
@@ -446,10 +453,10 @@ export default function AgendamentosScreen() {
                       </View>
                       <Text style={styles.profissional}>{a.profissional}</Text>
                       <View style={styles.metaRow}>
-                        <Ionicons name="time-outline" size={14} color={Brand.muted} />
+                        <Ionicons name="time-outline" size={14} color={t.muted} />
                         <Text style={styles.meta}>{a.hora}</Text>
                         <Text style={styles.metaDot}>·</Text>
-                        <Ionicons name="location-outline" size={14} color={Brand.muted} />
+                        <Ionicons name="location-outline" size={14} color={t.muted} />
                         <Text style={styles.meta} numberOfLines={1}>
                           {a.unidade}
                         </Text>
@@ -505,22 +512,23 @@ export default function AgendamentosScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   content: { padding: 20, paddingBottom: 32 },
-  title: { fontSize: 26, fontWeight: '800', color: Brand.ink, letterSpacing: -0.4 },
-  subtitle: { fontSize: 14, color: Brand.muted, marginTop: 4, marginBottom: 18 },
+  title: { fontSize: 26, fontWeight: '800', color: t.ink, letterSpacing: -0.4 },
+  subtitle: { fontSize: 14, color: t.muted, marginTop: 4, marginBottom: 18 },
   somenteLeitura: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
-    backgroundColor: '#EEF3F1',
+    backgroundColor: t.brandTint,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
     marginBottom: 16,
   },
-  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
 
   // Estados (carregando / erro / vazio)
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
@@ -528,14 +536,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 24, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -544,10 +552,10 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-  semItens: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingVertical: 24 },
+  semItens: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingVertical: 24 },
 
   // Destaque
   destaque: {
@@ -563,12 +571,12 @@ const styles = StyleSheet.create({
   destaqueBadge: { minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#C77700', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   destaqueBadgeTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
   pendente: {
-    backgroundColor: Brand.brandDeep,
+    backgroundColor: t.brandDeep,
     borderRadius: 16,
     padding: 16,
     marginTop: 8,
   },
-  pendentePressed: { backgroundColor: Brand.brandPine },
+  pendentePressed: { backgroundColor: t.brandPine },
   pendenteTopo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   pendenteTopoDir: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   histBtn: {
@@ -577,33 +585,33 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
   },
   histBtnEscuro: { backgroundColor: 'rgba(255,255,255,0.14)' },
   pendenteTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: Brand.glow,
+    backgroundColor: t.glow,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  pendenteTagTxt: { fontSize: 11, fontWeight: '800', color: Brand.brandPine },
+  pendenteTagTxt: { fontSize: 11, fontWeight: '800', color: t.brandPine },
   pendenteData: {
     backgroundColor: 'rgba(255,255,255,0.12)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
   },
-  pendenteDataTxt: { fontSize: 12.5, fontWeight: '800', color: Brand.onBrand },
+  pendenteDataTxt: { fontSize: 12.5, fontWeight: '800', color: t.onBrand },
   pendenteEsp: { fontSize: 18, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
-  pendenteProf: { fontSize: 13.5, color: 'rgba(234,250,244,0.82)', marginTop: 2 },
+  pendenteProf: { fontSize: 13.5, color: alpha(t.onBrand, 0.82), marginTop: 2 },
   pendenteMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
-  pendenteMetaTxt: { fontSize: 12.5, color: 'rgba(234,250,244,0.82)', flexShrink: 1 },
+  pendenteMetaTxt: { fontSize: 12.5, color: alpha(t.onBrand, 0.82), flexShrink: 1 },
   relogioLinha: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 },
   relogioTxt: { fontSize: 12, fontWeight: '700', flexShrink: 1 },
-  pendenteDot: { color: 'rgba(234,250,244,0.6)', marginHorizontal: 2 },
+  pendenteDot: { color: alpha(t.onBrand, 0.6), marginHorizontal: 2 },
   pendenteCta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -613,7 +621,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.14)',
   },
-  pendenteCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: Brand.glow },
+  pendenteCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: t.glow },
 
   // Destaque de falta (aguardando justificativa)
   destaqueFalta: {
@@ -649,42 +657,42 @@ const styles = StyleSheet.create({
   faltaCtaTxt: { flex: 1, fontSize: 13.5, fontWeight: '700', color: '#fff' },
 
   // Segmented
-  segment: { flexDirection: 'row', backgroundColor: '#EAF1EE', borderRadius: 12, padding: 4, marginBottom: 18 },
+  segment: { flexDirection: 'row', backgroundColor: t.brandTint, borderRadius: 12, padding: 4, marginBottom: 18 },
   segmentBtn: { flex: 1, paddingVertical: 8, borderRadius: 9, alignItems: 'center' },
   segmentBtnAtivo: {
-    backgroundColor: Brand.surface,
-    shadowColor: Brand.brandDeep,
+    backgroundColor: t.surface,
+    shadowColor: t.brandDeep,
     shadowOpacity: 0.12,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  segmentTxt: { fontSize: 13, fontWeight: '600', color: Brand.muted },
-  segmentTxtAtivo: { color: Brand.brandDeep },
+  segmentTxt: { fontSize: 13, fontWeight: '600', color: t.muted },
+  segmentTxtAtivo: { color: t.brandDeep },
 
   // Card normal
   card: {
     flexDirection: 'row',
     gap: 14,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 14,
     marginBottom: 12,
   },
-  cardPressed: { backgroundColor: '#F1F6F4' },
-  dateBox: { width: 58, borderRadius: 14, backgroundColor: '#E7F3EF', alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
-  dateDay: { fontSize: 22, fontWeight: '800', color: Brand.brandDeep, lineHeight: 24 },
-  dateMonth: { fontSize: 11, fontWeight: '700', color: Brand.brand, letterSpacing: 1 },
-  dateWeek: { fontSize: 11, color: Brand.muted, marginTop: 2 },
+  cardPressed: { backgroundColor: t.brandTint },
+  dateBox: { width: 58, borderRadius: 14, backgroundColor: t.brandTint, alignItems: 'center', justifyContent: 'center', paddingVertical: 10 },
+  dateDay: { fontSize: 22, fontWeight: '800', color: t.brandDeep, lineHeight: 24 },
+  dateMonth: { fontSize: 11, fontWeight: '700', color: t.brand, letterSpacing: 1 },
+  dateWeek: { fontSize: 11, color: t.muted, marginTop: 2 },
   info: { flex: 1, justifyContent: 'center' },
   infoTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  especialidade: { flex: 1, fontSize: 15, fontWeight: '700', color: Brand.ink },
+  especialidade: { flex: 1, fontSize: 15, fontWeight: '700', color: t.ink },
   pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 20 },
   pillTxt: { fontSize: 11, fontWeight: '700' },
   profissional: { fontSize: 13, color: '#40514C', marginTop: 3 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  meta: { fontSize: 12.5, color: Brand.muted, flexShrink: 1 },
-  metaDot: { color: Brand.muted, marginHorizontal: 2 },
+  meta: { fontSize: 12.5, color: t.muted, flexShrink: 1 },
+  metaDot: { color: t.muted, marginHorizontal: 2 },
 });

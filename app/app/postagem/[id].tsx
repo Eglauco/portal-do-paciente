@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EdicaoComentario } from '@/components/comentario-edicao';
 import { AvatarFoto } from '@/components/avatar-paciente';
 import { ComentarioInput, ComentarioInputHandle } from '@/components/comentario-input';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import {
@@ -56,6 +56,8 @@ export default function PostagemDetalheScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   const AUTOR = sessao?.nome ?? 'Paciente';
 
@@ -162,7 +164,7 @@ export default function PostagemDetalheScreen() {
       try {
         let criado: Comentario;
         if (respondendo) {
-          criado = await responder(id, respondendo.raizId, AUTOR, conteudo);
+          criado = await responder(id, respondendo.raizId, conteudo);
           setComentarios((lista) =>
             lista.map((c) =>
               c.id === respondendo.raizId ? { ...c, respostas: [...(c.respostas ?? []), criado] } : c,
@@ -171,7 +173,7 @@ export default function PostagemDetalheScreen() {
           setPost((p) => (p ? { ...p, totalComentarios: p.totalComentarios + 1 } : p));
           setRespondendo(null);
         } else {
-          criado = await comentar(id, AUTOR, conteudo);
+          criado = await comentar(id, conteudo);
           setComentarios((lista) => [criado, ...lista]);
           setPost((p) => (p ? { ...p, totalComentarios: p.totalComentarios + 1 } : p));
         }
@@ -183,7 +185,9 @@ export default function PostagemDetalheScreen() {
           );
         }
         return true;
-      } catch {
+      } catch (e) {
+        // Mostra o motivo do backend (ex.: idade mínima para comentar).
+        Alert.alert('Não foi possível comentar', e instanceof Error ? e.message : 'Tente novamente.');
         return false;
       }
     },
@@ -232,7 +236,7 @@ export default function PostagemDetalheScreen() {
           );
         }
       } catch {
-        Alert.alert('Não foi possível editar', 'Talvez o prazo de 15 minutos tenha expirado. Tente novamente.');
+        Alert.alert('Não foi possível editar', 'Talvez o prazo de edição tenha expirado. Tente novamente.');
       } finally {
         setSalvandoEdicao(false);
       }
@@ -354,12 +358,12 @@ export default function PostagemDetalheScreen() {
             <Ionicons
               name={post.curtidoPorMim ? 'heart' : 'heart-outline'}
               size={27}
-              color={post.curtidoPorMim ? '#E0245E' : Brand.ink}
+              color={post.curtidoPorMim ? '#E0245E' : t.ink}
             />
           </Pressable>
           {post.habilitarComentarios && (
             <View style={styles.acaoComentar}>
-              <Ionicons name="chatbubble-outline" size={24} color={Brand.ink} />
+              <Ionicons name="chatbubble-outline" size={24} color={t.ink} />
               {post.totalComentarios > 0 && <Text style={styles.acaoContagem}>{post.totalComentarios}</Text>}
             </View>
           )}
@@ -428,19 +432,19 @@ export default function PostagemDetalheScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={Brand.ink} />
+          <Ionicons name="chevron-back" size={26} color={t.ink} />
         </Pressable>
         <Text style={styles.headerTitulo}>Publicação</Text>
       </View>
 
       {carregando ? (
         <View style={styles.estado}>
-          <ActivityIndicator color={Brand.brand} />
+          <ActivityIndicator color={t.brand} />
           <Text style={styles.estadoTxt}>Carregando publicação…</Text>
         </View>
       ) : erro || !post ? (
         <View style={styles.estado}>
-          <Ionicons name="cloud-offline-outline" size={28} color={Brand.muted} />
+          <Ionicons name="cloud-offline-outline" size={28} color={t.muted} />
           <Text style={styles.estadoTitulo}>Não foi possível abrir</Text>
           <Pressable style={styles.estadoBtn} onPress={() => router.back()}>
             <Text style={styles.estadoBtnTxt}>Voltar</Text>
@@ -459,7 +463,7 @@ export default function PostagemDetalheScreen() {
             onEndReachedThreshold={0.4}
             keyboardShouldPersistTaps="handled"
             ListFooterComponent={
-              carregandoMais ? <ActivityIndicator style={styles.maisSpinner} color={Brand.brand} /> : null
+              carregandoMais ? <ActivityIndicator style={styles.maisSpinner} color={t.brand} /> : null
             }
             ListEmptyComponent={
               post.habilitarComentarios ? (
@@ -484,61 +488,62 @@ export default function PostagemDetalheScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.surface },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.surface },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 8,
     paddingBottom: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: '#EAF2EF' },
-  headerTitulo: { fontSize: 17, fontWeight: '800', color: Brand.ink },
+  backPressed: { backgroundColor: t.brandTint },
+  headerTitulo: { fontSize: 17, fontWeight: '800', color: t.ink },
 
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center' },
-  estadoBtn: { marginTop: 4, height: 44, paddingHorizontal: 20, borderRadius: 14, backgroundColor: Brand.brand, alignItems: 'center', justifyContent: 'center' },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
+  estadoBtn: { marginTop: 4, height: 44, paddingHorizontal: 20, borderRadius: 14, backgroundColor: t.brand, alignItems: 'center', justifyContent: 'center' },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   conteudo: { paddingBottom: 16 },
 
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
-  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.brandDeep },
-  avatarTxt: { color: Brand.onBrand, fontSize: 13, fontWeight: '800' },
-  unidade: { flex: 1, fontSize: 14.5, fontWeight: '700', color: Brand.ink },
-  tempoTopo: { fontSize: 12, color: Brand.muted },
+  avatar: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandDeep },
+  avatarTxt: { color: t.onBrand, fontSize: 13, fontWeight: '800' },
+  unidade: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.ink },
+  tempoTopo: { fontSize: 12, color: t.muted },
 
-  imagem: { width: '100%', aspectRatio: 4 / 5, backgroundColor: '#E7EDEA' },
+  imagem: { width: '100%', aspectRatio: 4 / 5, backgroundColor: t.brandTint },
 
   acoes: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 4 },
   acaoComentar: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  acaoContagem: { fontSize: 14, fontWeight: '600', color: Brand.ink },
-  curtidas: { paddingHorizontal: 14, fontSize: 13.5, fontWeight: '700', color: Brand.ink, marginTop: 2 },
-  legenda: { paddingHorizontal: 14, marginTop: 4, fontSize: 14, color: Brand.ink, lineHeight: 20 },
+  acaoContagem: { fontSize: 14, fontWeight: '600', color: t.ink },
+  curtidas: { paddingHorizontal: 14, fontSize: 13.5, fontWeight: '700', color: t.ink, marginTop: 2 },
+  legenda: { paddingHorizontal: 14, marginTop: 4, fontSize: 14, color: t.ink, lineHeight: 20 },
   legendaUnidade: { fontWeight: '700' },
   descricao: { paddingHorizontal: 14, marginTop: 3, fontSize: 13.5, color: '#40514C', lineHeight: 19 },
 
   comentariosCab: { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4 },
-  comentariosTitulo: { fontSize: 14, fontWeight: '800', color: Brand.ink },
-  desativados: { paddingHorizontal: 14, paddingTop: 16, fontSize: 13, color: Brand.muted, fontStyle: 'italic' },
+  comentariosTitulo: { fontSize: 14, fontWeight: '800', color: t.ink },
+  desativados: { paddingHorizontal: 14, paddingTop: 16, fontSize: 13, color: t.muted, fontStyle: 'italic' },
 
   item: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 14 },
-  itemAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
-  itemAvatarTxt: { color: Brand.brandDeep, fontSize: 12, fontWeight: '800' },
-  itemTexto: { fontSize: 14, color: Brand.ink, lineHeight: 19 },
+  itemAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandTint },
+  itemAvatarTxt: { color: t.brandDeep, fontSize: 12, fontWeight: '800' },
+  itemTexto: { fontSize: 14, color: t.ink, lineHeight: 19 },
   itemAutor: { fontWeight: '700' },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   viaRespTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
-  itemTempo: { fontSize: 11.5, color: Brand.muted },
-  responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
-  acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  itemTempo: { fontSize: 11.5, color: t.muted },
+  responder: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep },
+  acaoLink: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep },
   lixeira: { marginLeft: 'auto', padding: 2 },
   analise: {
     flexDirection: 'row',
@@ -554,8 +559,8 @@ const styles = StyleSheet.create({
   analiseTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   respostas: { paddingLeft: 44 },
   itemResposta: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingTop: 12 },
-  itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
-  itemAvatarTxtSm: { color: Brand.brandDeep, fontSize: 10.5, fontWeight: '800' },
+  itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandTint },
+  itemAvatarTxtSm: { color: t.brandDeep, fontSize: 10.5, fontWeight: '800' },
   maisSpinner: { marginVertical: 14 },
-  vazioTxt: { paddingHorizontal: 14, paddingTop: 14, fontSize: 13.5, color: Brand.muted },
+  vazioTxt: { paddingHorizontal: 14, paddingTop: 14, fontSize: 13.5, color: t.muted },
 });

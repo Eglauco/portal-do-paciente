@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import {
   Notificacao,
@@ -56,6 +56,8 @@ function horaDe(iso: string, grupo: string): string {
 const ORDEM_GRUPOS = ['Hoje', 'Ontem', 'Anteriores'] as const;
 
 export default function NotificacoesScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [itens, setItens] = useState<Notificacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -140,10 +142,10 @@ export default function NotificacoesScreen() {
             accessibilityState={{ busy: marcandoTodas, disabled: marcandoTodas }}
             style={({ pressed }) => [styles.barraBtn, pressed && styles.barraBtnPressed]}>
             {marcandoTodas ? (
-              <ActivityIndicator size="small" color={Brand.brand} />
+              <ActivityIndicator size="small" color={t.brand} />
             ) : (
               <>
-                <Ionicons name="checkmark-done" size={16} color={Brand.brand} />
+                <Ionicons name="checkmark-done" size={16} color={t.brand} />
                 <Text style={styles.barraBtnTxt}>Marcar todas como lidas</Text>
               </>
             )}
@@ -153,17 +155,17 @@ export default function NotificacoesScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, itens.length === 0 && styles.vazioContent]}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>
         {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando notificações…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -175,7 +177,7 @@ export default function NotificacoesScreen() {
         ) : itens.length === 0 ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="notifications-off-outline" size={26} color={Brand.muted} />
+              <Ionicons name="notifications-off-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Nenhuma notificação</Text>
             <Text style={styles.estadoTxt}>
@@ -188,6 +190,10 @@ export default function NotificacoesScreen() {
               <Text style={styles.grupoTitulo}>{grupo.titulo}</Text>
               {grupo.itens.map((n) => {
                 const e = ESTILO_TIPO[n.tipo];
+                // Agendamento/Lembrete são da marca → seguem o tema; os demais são semânticos (fixos).
+                const tipoMarca = n.tipo === 'AGENDAMENTO' || n.tipo === 'LEMBRETE';
+                const iconeBg = tipoMarca ? t.brandTintStrong : e.bg;
+                const iconeFg = tipoMarca ? t.brand : e.fg;
                 return (
                   <Pressable
                     key={n.id}
@@ -199,8 +205,8 @@ export default function NotificacoesScreen() {
                       !n.lida && styles.itemNaoLido,
                       pressed && styles.itemPressed,
                     ]}>
-                    <View style={[styles.icon, { backgroundColor: e.bg }]}>
-                      <Ionicons name={e.icon as never} size={18} color={e.fg} />
+                    <View style={[styles.icon, { backgroundColor: iconeBg }]}>
+                      <Ionicons name={e.icon as never} size={18} color={iconeFg} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={styles.itemTop}>
@@ -225,19 +231,20 @@ export default function NotificacoesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   barra: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
-  barraInfo: { fontSize: 13, fontWeight: '600', color: Brand.muted },
+  barraInfo: { fontSize: 13, fontWeight: '600', color: t.muted },
   barraBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -245,17 +252,17 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: '#EAF6F2',
+    backgroundColor: t.brandTint,
   },
   barraBtnPressed: { backgroundColor: '#DCEFE9' },
-  barraBtnTxt: { fontSize: 13, fontWeight: '700', color: Brand.brand },
+  barraBtnTxt: { fontSize: 13, fontWeight: '700', color: t.brand },
   content: { padding: 16, paddingBottom: 40 },
   vazioContent: { flexGrow: 1 },
   grupo: { marginBottom: 20 },
   grupoTitulo: {
     fontSize: 12,
     fontWeight: '700',
-    color: Brand.muted,
+    color: t.muted,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 10,
@@ -265,15 +272,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 14,
     marginBottom: 10,
   },
-  itemNaoLido: { borderColor: '#CDE9E1', backgroundColor: '#F6FCFA' },
-  itemPressed: { backgroundColor: '#EEF3F1' },
+  itemNaoLido: { borderColor: t.brandTintStrong, backgroundColor: t.brandTint },
+  itemPressed: { backgroundColor: t.brandTint },
   icon: {
     width: 40,
     height: 40,
@@ -282,22 +289,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  titulo: { flex: 1, fontSize: 14.5, fontWeight: '700', color: Brand.ink },
+  titulo: { flex: 1, fontSize: 14.5, fontWeight: '700', color: t.ink },
   tituloForte: { fontWeight: '800' },
-  hora: { fontSize: 11.5, color: Brand.muted },
+  hora: { fontSize: 11.5, color: t.muted },
   descricao: { fontSize: 13, color: '#40514C', marginTop: 2, lineHeight: 18 },
-  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: Brand.brand },
+  dot: { width: 9, height: 9, borderRadius: 5, backgroundColor: t.brand },
 
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
   estadoIcone: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: Brand.bg,
-    borderWidth: 1, borderColor: Brand.line, alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: 18, backgroundColor: t.bg,
+    borderWidth: 1, borderColor: t.line, alignItems: 'center', justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 6, height: 44,
-    paddingHorizontal: 18, borderRadius: 14, backgroundColor: Brand.brand,
+    paddingHorizontal: 18, borderRadius: 14, backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

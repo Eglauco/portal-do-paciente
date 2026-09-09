@@ -5,6 +5,7 @@ import java.time.ZoneId;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -15,12 +16,16 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.categorianps.CategoriaNps;
 import com.example.pop.categorianps.CategoriaNpsRepository;
+import com.example.pop.notificacaoadmin.NotificacaoAdminService;
+import com.example.pop.notificacaoadmin.TipoNotificacaoAdmin;
 import com.example.pop.paciente.Responsavel;
 import com.example.pop.paciente.ResponsavelRepository;
 import com.example.pop.push.PushService;
@@ -29,10 +34,13 @@ import com.example.pop.push.PushService;
 public class NpsService {
 
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
+    /** Média (1..5) igual ou abaixo disto conta como detrator → notifica o back-office. */
+    private static final double MEDIA_DETRATOR = 2.0;
 
     private final NpsRepository repository;
     private final CategoriaNpsRepository categoriaRepository;
     private final PushService pushService;
+    private final NotificacaoAdminService notificacaoAdminService;
     private final ResponsavelRepository responsavelRepository;
 
     /** Proxy do próprio bean, para chamar dispararUm() com transação por item (evita self-invocation). */
@@ -41,10 +49,11 @@ public class NpsService {
     private NpsService self;
 
     public NpsService(NpsRepository repository, CategoriaNpsRepository categoriaRepository, PushService pushService,
-            ResponsavelRepository responsavelRepository) {
+            NotificacaoAdminService notificacaoAdminService, ResponsavelRepository responsavelRepository) {
         this.repository = repository;
         this.categoriaRepository = categoriaRepository;
         this.pushService = pushService;
+        this.notificacaoAdminService = notificacaoAdminService;
         this.responsavelRepository = responsavelRepository;
     }
 
@@ -158,7 +167,42 @@ public class NpsService {
         nps.setResponsavelId(responsavelId);
         nps.setStatus(StatusNps.RESPONDIDO);
         nps.setRespondidoEm(LocalDateTime.now());
-        return repository.save(nps);
+        Nps salvo = repository.save(nps);
+        notificarSeDetrator(salvo);
+        return salvo;
+    }
+
+    /**
+     * Sino do back-office: só quando a média é baixa (detrator) — evento raro e acionável,
+     * mantendo o sino relevante. Captura os dados ainda na transação (agendamento é LAZY) e
+     * grava após o commit, para não deixar notificação órfã se o tx de negócio reverter.
+     */
+    private void notificarSeDetrator(Nps nps) {
+        if (nps.getMedia() == null || nps.getMedia() > MEDIA_DETRATOR) {
+            return;
+        }
+        Long npsId = nps.getId();
+        Long unidadeIdEvento = nps.getAgendamento().getUnidadeSaude().getId();
+        double media = nps.getMedia();
+        aposCommit(() -> notificacaoAdminService.registrar(TipoNotificacaoAdmin.NPS, unidadeIdEvento,
+                "NPS com nota baixa",
+                String.format(Locale.forLanguageTag("pt-BR"),
+                        "Um paciente avaliou o atendimento com média %.1f de 5.", media),
+                npsId, "/nps/" + npsId));
+    }
+
+    /** Executa a ação após o commit da transação atual (ou imediatamente, se não houver). */
+    private void aposCommit(Runnable acao) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    acao.run();
+                }
+            });
+        } else {
+            acao.run();
+        }
     }
 
     /** Nome (completo) do responsável, ou null (id nulo, ou responsável já removido). */

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarFoto, AvatarPaciente } from '@/components/avatar-paciente';
 import { EdicaoComentario } from '@/components/comentario-edicao';
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import {
   comentar,
@@ -56,6 +56,8 @@ interface Props {
 
 export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentario }: Props) {
   const insets = useSafeAreaInsets();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   const AUTOR = sessao?.nome ?? 'Paciente';
   // Responsável só-leitura na Rede Social: lê os comentários, mas não comenta/responde.
@@ -130,7 +132,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
     try {
       let criado: Comentario;
       if (respondendo) {
-        criado = await responder(postagemId, respondendo.raizId, AUTOR, conteudo);
+        criado = await responder(postagemId, respondendo.raizId, conteudo);
         setComentarios((lista) =>
           lista.map((c) =>
             c.id === respondendo.raizId ? { ...c, respostas: [...(c.respostas ?? []), criado] } : c,
@@ -138,7 +140,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
         );
         setRespondendo(null);
       } else {
-        criado = await comentar(postagemId, AUTOR, conteudo);
+        criado = await comentar(postagemId, conteudo);
         setComentarios((lista) => [criado, ...lista]); // mais recente no topo
       }
       setTexto('');
@@ -150,8 +152,9 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
           'Para manter um ambiente seguro, seu comentário passará por uma análise rápida antes de aparecer para todos. Por enquanto, só você o vê aqui.',
         );
       }
-    } catch {
-      // mantém o texto
+    } catch (e) {
+      // Mantém o texto e mostra o motivo do backend (ex.: idade mínima para comentar).
+      Alert.alert('Não foi possível comentar', e instanceof Error ? e.message : 'Tente novamente.');
     } finally {
       setEnviando(false);
     }
@@ -199,7 +202,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
         );
       }
     } catch {
-      Alert.alert('Não foi possível editar', 'Talvez o prazo de 15 minutos tenha expirado. Tente novamente.');
+      Alert.alert('Não foi possível editar', 'Talvez o prazo de edição tenha expirado. Tente novamente.');
     } finally {
       setSalvandoEdicao(false);
     }
@@ -333,14 +336,14 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
           <View style={styles.cabecalho}>
             <Text style={styles.titulo}>Comentários</Text>
             <Pressable onPress={onFechar} hitSlop={10} accessibilityLabel="Fechar">
-              <Ionicons name="close" size={22} color={Brand.muted} />
+              <Ionicons name="close" size={22} color={t.muted} />
             </Pressable>
           </View>
           <View style={styles.divisor} />
 
           {carregando ? (
             <View style={styles.estado}>
-              <ActivityIndicator color={Brand.brand} />
+              <ActivityIndicator color={t.brand} />
             </View>
           ) : erro ? (
             <View style={styles.estado}>
@@ -358,11 +361,11 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
               onEndReachedThreshold={0.4}
               keyboardShouldPersistTaps="handled"
               ListFooterComponent={
-                carregandoMais ? <ActivityIndicator style={styles.maisSpinner} color={Brand.brand} /> : null
+                carregandoMais ? <ActivityIndicator style={styles.maisSpinner} color={t.brand} /> : null
               }
               ListEmptyComponent={
                 <View style={styles.vazio}>
-                  <Ionicons name="chatbubbles-outline" size={30} color={Brand.muted} />
+                  <Ionicons name="chatbubbles-outline" size={30} color={t.muted} />
                   <Text style={styles.vazioTxt}>Seja o primeiro a comentar.</Text>
                 </View>
               }
@@ -375,7 +378,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
                 Respondendo a <Text style={styles.faixaNome}>{respondendo.autor}</Text>
               </Text>
               <Pressable onPress={() => setRespondendo(null)} hitSlop={8} accessibilityLabel="Cancelar resposta">
-                <Ionicons name="close" size={18} color={Brand.muted} />
+                <Ionicons name="close" size={18} color={t.muted} />
               </Pressable>
             </View>
           ) : null}
@@ -411,7 +414,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
             </View>
           ) : (
             <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-              <Ionicons name="eye-outline" size={15} color={Brand.muted} />
+              <Ionicons name="eye-outline" size={15} color={t.muted} />
               <Text style={styles.somenteLeituraTxt}>Você pode ler os comentários, mas não comentar.</Text>
             </View>
           )}
@@ -421,27 +424,28 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(7,46,43,0.45)',
+    backgroundColor: alpha(t.brandPine, 0.45),
   },
   overlayTopo: { flex: 1 },
   sheet: {
     height: '82%',
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     overflow: 'hidden',
   },
   puxador: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#D4DEDA', marginTop: 8 },
   cabecalho: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  titulo: { fontSize: 16, fontWeight: '800', color: Brand.ink },
-  divisor: { height: 1, backgroundColor: Brand.line },
+  titulo: { fontSize: 16, fontWeight: '800', color: t.ink },
+  divisor: { height: 1, backgroundColor: t.line },
 
   estado: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center' },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
 
   lista: { flex: 1 },
   listaConteudo: { padding: 16, gap: 16, flexGrow: 1 },
@@ -452,17 +456,17 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
   },
-  itemAvatarTxt: { color: Brand.brandDeep, fontSize: 12, fontWeight: '800' },
-  itemTexto: { fontSize: 14, color: Brand.ink, lineHeight: 19 },
+  itemAvatarTxt: { color: t.brandDeep, fontSize: 12, fontWeight: '800' },
+  itemTexto: { fontSize: 14, color: t.ink, lineHeight: 19 },
   itemAutor: { fontWeight: '700' },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   viaRespTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   itemMeta: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 3 },
-  itemTempo: { fontSize: 11.5, color: Brand.muted },
-  responder: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
-  acaoLink: { fontSize: 11.5, fontWeight: '700', color: Brand.brandDeep },
+  itemTempo: { fontSize: 11.5, color: t.muted },
+  responder: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep },
+  acaoLink: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep },
   lixeira: { marginLeft: 'auto', padding: 2 },
   analise: {
     flexDirection: 'row',
@@ -478,8 +482,8 @@ const styles = StyleSheet.create({
   analiseTxt: { fontSize: 11, fontWeight: '700', color: '#8A5A00' },
   respostas: { paddingLeft: 44, gap: 12, marginTop: 12 },
   itemResposta: { flexDirection: 'row', gap: 10 },
-  itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E7F3EF' },
-  itemAvatarTxtSm: { color: Brand.brandDeep, fontSize: 10.5, fontWeight: '800' },
+  itemAvatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: t.brandTint },
+  itemAvatarTxtSm: { color: t.brandDeep, fontSize: 10.5, fontWeight: '800' },
   maisSpinner: { marginVertical: 12 },
 
   faixa: {
@@ -490,14 +494,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: Brand.line,
-    backgroundColor: '#F1F6F4',
+    borderTopColor: t.line,
+    backgroundColor: t.brandTint,
   },
-  faixaTxt: { flex: 1, fontSize: 12.5, color: Brand.muted },
-  faixaNome: { fontWeight: '700', color: Brand.ink },
+  faixaTxt: { flex: 1, fontSize: 12.5, color: t.muted },
+  faixaNome: { fontWeight: '700', color: t.ink },
 
   vazio: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 60 },
-  vazioTxt: { fontSize: 13.5, color: Brand.muted },
+  vazioTxt: { fontSize: 13.5, color: t.muted },
 
   input: {
     flexDirection: 'row',
@@ -506,8 +510,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderTopColor: t.line,
+    backgroundColor: t.surface,
   },
   somenteLeitura: {
     flexDirection: 'row',
@@ -516,33 +520,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderTopColor: t.line,
+    backgroundColor: t.surface,
   },
-  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: Brand.muted, lineHeight: 17 },
+  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
   inputAvatar: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brandDeep,
+    backgroundColor: t.brandDeep,
     marginBottom: 4,
   },
-  inputAvatarTxt: { color: Brand.onBrand, fontSize: 12, fontWeight: '800' },
+  inputAvatarTxt: { color: t.onBrand, fontSize: 12, fontWeight: '800' },
   inputAvatarFoto: { marginBottom: 4 },
   campo: {
     flex: 1,
     minHeight: 42,
     maxHeight: 110,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'ios' ? 10 : 6,
     fontSize: 15,
-    color: Brand.ink,
+    color: t.ink,
   },
   enviar: {
     width: 42,
@@ -550,7 +554,7 @@ const styles = StyleSheet.create({
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   enviarDesativado: { opacity: 0.5 },
 });

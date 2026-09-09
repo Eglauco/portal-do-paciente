@@ -40,6 +40,8 @@ type ResponsavelForm = FormGroup<{
   id: FormControl<number | null>;
   nome: FormControl<string>;
   telefone: FormControl<string>;
+  /** Data de nascimento (DD/MM/AAAA); valida a idade mínima p/ comentar na rede social. */
+  dataNascimento: FormControl<string>;
   permissoes: PermissoesForm;
   /** Situação (soft-delete): inativo perde acesso ao perfil no app. */
   ativo: FormControl<boolean>;
@@ -223,6 +225,10 @@ export class PacienteForm implements PodeSair {
         validators: [Validators.required, Validators.minLength(2)],
       }),
       telefone: new FormControl(r.telefone ?? '', { nonNullable: true }),
+      dataNascimento: new FormControl(this.isoParaData(r.dataNascimento ?? null), {
+        nonNullable: true,
+        validators: [dataNascimentoValidator],
+      }),
       permissoes: new FormGroup(controlesPermissoes),
       ativo: new FormControl(r.ativo ?? true, { nonNullable: true }),
       temLancamentos: new FormControl(r.temLancamentos ?? false, { nonNullable: true }),
@@ -282,6 +288,12 @@ export class PacienteForm implements PodeSair {
   /** Erro de "nome obrigatório" de uma linha de responsável (após toque/edição). */
   protected responsavelNomeInvalido(indice: number): boolean {
     const c = this.responsaveis.at(indice).controls.nome;
+    return c.invalid && (c.touched || c.dirty);
+  }
+
+  /** Erro de data de nascimento inválida de uma linha de responsável (após toque/edição). */
+  protected responsavelDataInvalida(indice: number): boolean {
+    const c = this.responsaveis.at(indice).controls.dataNascimento;
     return c.invalid && (c.touched || c.dirty);
   }
 
@@ -408,6 +420,7 @@ export class PacienteForm implements PodeSair {
           id: g.controls.id.value ?? null,
           nome: (g.controls.nome.value ?? '').trim(),
           telefone: (g.controls.telefone.value ?? '').trim() || null,
+          dataNascimento: this.dataParaIso(g.controls.dataNascimento.value),
           permissoes: this.permissoesDoGrupo(g.controls.permissoes),
           ativo: g.controls.ativo.value,
         }))

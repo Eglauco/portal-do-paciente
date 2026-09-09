@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 
 interface Props {
   visivel: boolean;
@@ -32,6 +32,8 @@ const COR_ESTRELA = '#F2A900';
  * KeyboardAvoidingView) para o teclado não cobrir o campo no Android edge-to-edge.
  */
 export function AvaliacaoSauModal({ visivel, processando = false, erro, onEnviar, onFechar }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [nota, setNota] = useState(0);
   const [comentario, setComentario] = useState('');
 
@@ -63,12 +65,12 @@ export function AvaliacaoSauModal({ visivel, processando = false, erro, onEnviar
             disabled={processando}
             accessibilityRole="button"
             accessibilityLabel="Fechar">
-            <Ionicons name="close" size={20} color={Brand.muted} />
+            <Ionicons name="close" size={20} color={t.muted} />
           </Pressable>
 
           <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <View style={styles.icone}>
-              <Ionicons name="star" size={24} color={Brand.brandDeep} />
+              <Ionicons name="star" size={24} color={t.brandDeep} />
             </View>
             <Text style={styles.titulo}>Encerrar e avaliar</Text>
             <Text style={styles.subtitulo}>Como foi o atendimento do SAU? Dê uma nota de 1 a 5 estrelas para encerrar.</Text>
@@ -131,30 +133,31 @@ export function AvaliacaoSauModal({ visivel, processando = false, erro, onEnviar
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(7,46,43,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  card: { width: '100%', maxWidth: 400, maxHeight: '88%', backgroundColor: Brand.surface, borderRadius: 24, padding: 22 },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: alpha(t.brandPine, 0.55), alignItems: 'center', justifyContent: 'center', padding: 24 },
+  card: { width: '100%', maxWidth: 400, maxHeight: '88%', backgroundColor: t.surface, borderRadius: 24, padding: 22 },
   fechar: {
     position: 'absolute', top: 14, right: 14, width: 34, height: 34, borderRadius: 17,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.bg, zIndex: 2,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: t.bg, zIndex: 2,
   },
   scroll: { alignItems: 'center', paddingBottom: 4 },
   icone: {
-    width: 56, height: 56, borderRadius: 18, backgroundColor: '#E7F3EF',
+    width: 56, height: 56, borderRadius: 18, backgroundColor: t.brandTint,
     alignItems: 'center', justifyContent: 'center', marginBottom: 12, marginTop: 4,
   },
-  titulo: { fontSize: 19, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
-  subtitulo: { fontSize: 13, color: Brand.muted, textAlign: 'center', marginTop: 6, marginBottom: 12, lineHeight: 18 },
+  titulo: { fontSize: 19, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
+  subtitulo: { fontSize: 13, color: t.muted, textAlign: 'center', marginTop: 6, marginBottom: 12, lineHeight: 18 },
   estrelas: { flexDirection: 'row', width: '100%', marginTop: 2, marginBottom: 6 },
   estrelaBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  rotulo: { alignSelf: 'flex-start', fontSize: 12.5, fontWeight: '700', color: Brand.muted, marginTop: 8, marginBottom: 8 },
+  rotulo: { alignSelf: 'flex-start', fontSize: 12.5, fontWeight: '700', color: t.muted, marginTop: 8, marginBottom: 8 },
   input: {
-    width: '100%', minHeight: 76, maxHeight: 130, backgroundColor: Brand.bg, borderRadius: 14,
-    borderWidth: 1, borderColor: Brand.line, padding: 12, fontSize: 14.5, color: Brand.ink, textAlignVertical: 'top',
+    width: '100%', minHeight: 76, maxHeight: 130, backgroundColor: t.bg, borderRadius: 14,
+    borderWidth: 1, borderColor: t.line, padding: 12, fontSize: 14.5, color: t.ink, textAlignVertical: 'top',
   },
   enviar: {
     width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    height: 52, borderRadius: 16, marginTop: 16, backgroundColor: Brand.brand,
+    height: 52, borderRadius: 16, marginTop: 16, backgroundColor: t.brand,
   },
   enviarDesativado: { opacity: 0.5 },
   enviarTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },

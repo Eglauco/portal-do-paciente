@@ -66,4 +66,9 @@ export class DashboardGeral {
   protected media(v: number | null): string {
     return v === null || v === undefined ? '—' : v.toFixed(1);
   }
+
+  /** Só mostra o atalho para outro dashboard se o usuário tiver acesso a ele. */
+  protected temTela(chave: string): boolean {
+    return this.auth.temTela(chave);
+  }
 }

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { Agendamento, MotivoFalta } from '@/constants/agendamentos';
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 
 interface Props {
   visivel: boolean;
@@ -35,6 +35,8 @@ export function FaltaModal({
   onJustificar,
   onFechar,
 }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [texto, setTexto] = useState('');
 
@@ -67,7 +69,7 @@ export function FaltaModal({
             disabled={processando}
             accessibilityRole="button"
             accessibilityLabel="Fechar">
-            <Ionicons name="close" size={20} color={Brand.muted} />
+            <Ionicons name="close" size={20} color={t.muted} />
           </Pressable>
 
           <ScrollView
@@ -87,13 +89,13 @@ export function FaltaModal({
               <View style={styles.detalhe}>
                 <Text style={styles.detEspecialidade}>{agendamento.especialidade}</Text>
                 <View style={styles.detLinha}>
-                  <Ionicons name="calendar-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="calendar-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>
                     {agendamento.dia} {agendamento.mes} · {agendamento.hora}
                   </Text>
                 </View>
                 <View style={styles.detLinha}>
-                  <Ionicons name="location-outline" size={15} color={Brand.muted} />
+                  <Ionicons name="location-outline" size={15} color={t.muted} />
                   <Text style={styles.detTxt}>{agendamento.unidade}</Text>
                 </View>
               </View>
@@ -101,7 +103,7 @@ export function FaltaModal({
 
             <Text style={styles.secao}>Selecione o(s) motivo(s)</Text>
             {carregandoMotivos ? (
-              <ActivityIndicator color={Brand.brand} style={{ marginVertical: 12 }} />
+              <ActivityIndicator color={t.brand} style={{ marginVertical: 12 }} />
             ) : motivos.length === 0 ? (
               <Text style={styles.semMotivos}>Nenhum motivo disponível no momento.</Text>
             ) : (
@@ -158,10 +160,11 @@ export function FaltaModal({
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
+    backgroundColor: alpha(t.brandPine, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -170,7 +173,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     maxHeight: '86%',
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 24,
     padding: 24,
   },
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
   },
   scroll: { alignItems: 'center', paddingBottom: 4 },
   icone: {
@@ -197,10 +200,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     marginTop: 6,
   },
-  titulo: { fontSize: 20, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3, textAlign: 'center' },
+  titulo: { fontSize: 20, fontWeight: '800', color: t.ink, letterSpacing: -0.3, textAlign: 'center' },
   subtitulo: {
     fontSize: 13.5,
-    color: Brand.muted,
+    color: t.muted,
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 16,
@@ -208,18 +211,18 @@ const styles = StyleSheet.create({
   },
   detalhe: {
     width: '100%',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     padding: 14,
     gap: 7,
   },
-  detEspecialidade: { fontSize: 15.5, fontWeight: '800', color: Brand.ink, marginBottom: 2 },
+  detEspecialidade: { fontSize: 15.5, fontWeight: '800', color: t.ink, marginBottom: 2 },
   detLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detTxt: { fontSize: 13, color: '#40514C' },
-  secao: { alignSelf: 'flex-start', fontSize: 13, fontWeight: '800', color: Brand.ink, marginTop: 18, marginBottom: 10 },
-  semMotivos: { alignSelf: 'flex-start', fontSize: 13, color: Brand.muted },
+  secao: { alignSelf: 'flex-start', fontSize: 13, fontWeight: '800', color: t.ink, marginTop: 18, marginBottom: 10 },
+  semMotivos: { alignSelf: 'flex-start', fontSize: 13, color: t.muted },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, width: '100%' },
   chip: {
     flexDirection: 'row',
@@ -229,24 +232,24 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
   },
-  chipAtivo: { backgroundColor: Brand.brand, borderColor: Brand.brand },
-  chipTxt: { fontSize: 13, fontWeight: '600', color: Brand.ink },
+  chipAtivo: { backgroundColor: t.brand, borderColor: t.brand },
+  chipTxt: { fontSize: 13, fontWeight: '600', color: t.ink },
   chipTxtAtivo: { color: '#fff' },
   campo: {
     width: '100%',
     minHeight: 74,
     maxHeight: 130,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14.5,
-    color: Brand.ink,
+    color: t.ink,
     textAlignVertical: 'top',
   },
   btnEnviar: {
@@ -258,7 +261,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     marginTop: 18,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   btnEnviarInativo: { opacity: 0.5 },
   btnEnviarTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },

@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Brand } from '@/constants/theme';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { AgendamentoLog, listarLogsAgendamento } from '@/services/agendamentos';
 
 interface Props {
@@ -39,6 +39,8 @@ function autoria(log: AgendamentoLog): { texto: string; responsavel: boolean } {
 }
 
 export function AgendamentoHistoricoModal({ visivel, agendamentoId, onFechar }: Props) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const [logs, setLogs] = useState<AgendamentoLog[]>([]);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(false);
@@ -81,24 +83,24 @@ export function AgendamentoHistoricoModal({ visivel, agendamentoId, onFechar }: 
           <View style={styles.cabecalho}>
             <Text style={styles.titulo}>Histórico de status</Text>
             <Pressable style={styles.fechar} onPress={onFechar} accessibilityRole="button" accessibilityLabel="Fechar">
-              <Ionicons name="close" size={20} color={Brand.muted} />
+              <Ionicons name="close" size={20} color={t.muted} />
             </Pressable>
           </View>
           <Text style={styles.subtitulo}>Quem realizou cada mudança de status deste agendamento.</Text>
 
           {carregando ? (
             <View style={styles.estado}>
-              <ActivityIndicator color={Brand.brand} />
+              <ActivityIndicator color={t.brand} />
               <Text style={styles.estadoTxt}>Carregando histórico…</Text>
             </View>
           ) : erro ? (
             <View style={styles.estado}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
               <Text style={styles.estadoTxt}>Não foi possível carregar o histórico.</Text>
             </View>
           ) : logs.length === 0 ? (
             <View style={styles.estado}>
-              <Ionicons name="time-outline" size={26} color={Brand.muted} />
+              <Ionicons name="time-outline" size={26} color={t.muted} />
               <Text style={styles.estadoTxt}>Nenhuma mudança de status registrada ainda.</Text>
             </View>
           ) : (
@@ -147,10 +149,11 @@ export function AgendamentoHistoricoModal({ visivel, agendamentoId, onFechar }: 
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(7,46,43,0.55)',
+    backgroundColor: alpha(t.brandPine, 0.55),
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -159,24 +162,24 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     maxHeight: '80%',
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderRadius: 24,
     padding: 22,
   },
   cabecalho: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  titulo: { fontSize: 18, fontWeight: '800', color: Brand.ink, letterSpacing: -0.3 },
+  titulo: { fontSize: 18, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
   fechar: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
   },
-  subtitulo: { fontSize: 13, color: Brand.muted, marginTop: 4, marginBottom: 14, lineHeight: 18 },
+  subtitulo: { fontSize: 13, color: t.muted, marginTop: 4, marginBottom: 14, lineHeight: 18 },
 
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 10 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 16, lineHeight: 19 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 16, lineHeight: 19 },
 
   lista: { flexGrow: 0 },
   listaContent: { paddingVertical: 2 },
@@ -186,18 +189,18 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
     marginTop: 3,
   },
   dotResp: { backgroundColor: '#B98900', borderWidth: 2, borderColor: '#F2E3C4' },
-  linha: { flex: 1, width: 2, backgroundColor: Brand.line, marginTop: 2, minHeight: 14 },
+  linha: { flex: 1, width: 2, backgroundColor: t.line, marginTop: 2, minHeight: 14 },
   conteudo: { flex: 1, paddingBottom: 18 },
-  status: { fontSize: 14.5, fontWeight: '800', color: Brand.ink },
-  transicao: { fontSize: 12.5, color: Brand.muted, marginTop: 1 },
+  status: { fontSize: 14.5, fontWeight: '800', color: t.ink },
+  transicao: { fontSize: 12.5, color: t.muted, marginTop: 1 },
   quemLinha: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   quem: { fontSize: 13, color: '#40514C', fontWeight: '600' },
   quemResp: { color: '#8A5A00', fontWeight: '700' },
-  data: { fontSize: 11.5, color: Brand.muted, marginTop: 3 },
+  data: { fontSize: 11.5, color: t.muted, marginTop: 3 },
 
   btnFechar: {
     marginTop: 8,
@@ -205,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
   },
-  btnFecharTxt: { fontSize: 14.5, fontWeight: '700', color: Brand.brandDeep },
+  btnFecharTxt: { fontSize: 14.5, fontWeight: '700', color: t.brandDeep },
 });

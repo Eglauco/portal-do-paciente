@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.AfterEach;
@@ -21,6 +23,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
+import com.example.pop.configuracao.ChaveConfiguracao;
+import com.example.pop.configuracao.Configuracao;
+import com.example.pop.configuracao.ConfiguracaoRepository;
+import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
@@ -48,7 +55,13 @@ class PostagemControllerTest {
     @Autowired
     private ComentarioRepository comentarioRepository;
     @Autowired
+    private PostagemRepository postagemRepository;
+    @Autowired
     private UsuarioRepository usuarioRepository;
+    @Autowired
+    private ConfiguracaoRepository configuracaoRepository;
+    @Autowired
+    private ConfiguracaoService configuracaoService;
     @Autowired
     private JwtDecoder jwtDecoder;
     @MockitoBean
@@ -66,7 +79,11 @@ class PostagemControllerTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        // Configs da rede social no PADRÃO a cada teste — isola os testes que as alteram
+        // (evita que um deixe OCULTAR/IDADE mudado e quebre a asserção de outro).
+        definirOcultarNomeUsuario(true);
+        definirIdadeMinimaComentarios(0);
+        limparPacienteDeTeste(TEL);
         // Vincula o paciente à unidade 1 (as postagens dos testes usam unidadeSaudeId=1).
         pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL, java.util.List.of(1L)), null).getId();
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
@@ -76,7 +93,23 @@ class PostagemControllerTest {
 
     @AfterEach
     void limpar() {
-        pacienteRepository.deleteById(pacienteId);
+        limparPacienteDeTeste(TEL);
+    }
+
+    /**
+     * Remove o paciente de teste de forma segura: apaga antes as postagens que carregam
+     * comentários dele (o ON DELETE CASCADE limpa os comentários), senão a FK
+     * comentario→paciente impede o delete quando um teste falhou antes do próprio excluir.
+     */
+    private void limparPacienteDeTeste(String telefone) {
+        pacienteRepository.findByTelefone(telefone).ifPresent(p -> {
+            var postagens = comentarioRepository.findByPacienteId(p.getId()).stream()
+                    .map(c -> c.getPostagem().getId()).distinct().toList();
+            if (!postagens.isEmpty()) {
+                postagemRepository.deleteAllById(postagens);
+            }
+            pacienteRepository.deleteById(p.getId());
+        });
     }
 
     @Test
@@ -111,9 +144,10 @@ class PostagemControllerTest {
         assertTrue(meu.curtidoPorMim());
         assertEquals(1, meu.totalCurtidas());
 
-        // Comentar — o autor vem do token do paciente (primeiro nome + inicial), não do corpo
-        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "Muito bom!"), jwt);
-        assertEquals("Joao T.", c.autor());
+        // Comentar — o autor é resolvido pelo id do paciente (nome abreviado por
+        // NOME_PACIENTE_RESPONSAVEL_ABREVIADO_NA_REDESOCIAL, ligado por padrão: "J. T."), nunca vindo do corpo.
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("Muito bom!"), jwt);
+        assertEquals("J. T.", c.autor());
         assertTrue(c.meu(), "o comentário recém-criado é do paciente logado");
         assertFalse(c.editado());
         Pagina<ComentarioResponse> lista = feedController.comentarios(id, 0, 20, jwt);
@@ -133,20 +167,20 @@ class PostagemControllerTest {
 
         // Comentário-raiz do paciente
         ComentarioResponse raiz = feedController.comentar(id,
-                new ComentarRequest("Mariana Duarte", "Que dia será esse evento?"), jwt);
+                new ComentarRequest("Que dia será esse evento?"), jwt);
         assertTrue(raiz.respostas().isEmpty());
 
-        // Administração responde (lado admin: autor vem do corpo)
+        // Administração responde (lado admin: autor = "Administração", resolvido pelo usuarioId)
         ComentarioResponse respAdmin = controller
-                .responderComentario(raiz.id(), new ComentarRequest("Administração", "Será dia 10"), adminJwt()).getBody();
+                .responderComentario(raiz.id(), new ComentarRequest("Será dia 10"), adminJwt()).getBody();
         assertNotNull(respAdmin);
         assertEquals("Administração", respAdmin.autor());
 
         // Paciente responde no mesmo comentário-raiz
-        feedController.responder(id, raiz.id(), new ComentarRequest("João", "Também quero saber"), jwt);
+        feedController.responder(id, raiz.id(), new ComentarRequest("Também quero saber"), jwt);
 
         // Responder a uma resposta continua ancorado na raiz (threading de 1 nível)
-        feedController.responder(id, respAdmin.id(), new ComentarRequest("Mariana Duarte", "Qual horário?"), jwt);
+        feedController.responder(id, respAdmin.id(), new ComentarRequest("Qual horário?"), jwt);
 
         // Listagem: 1 comentário-raiz com 3 respostas
         Pagina<ComentarioResponse> pagina = feedController.comentarios(id, 0, 20, jwt);
@@ -167,14 +201,14 @@ class PostagemControllerTest {
                 "Aviso importante", "Sem comentários", true, false, 1L, IMG));
         Long id = criada.id();
         assertThrows(ResponseStatusException.class,
-                () -> feedController.comentar(id, new ComentarRequest("Ana", "oi"), jwt));
+                () -> feedController.comentar(id, new ComentarRequest("oi"), jwt));
         controller.excluir(id);
     }
 
     @Test
     void editarProprioComentarioDentroDaJanela() {
         Long id = controller.criar(new PostagemRequest("Dica", "Beba água", true, true, 1L, IMG)).id();
-        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "otimo"), jwt);
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("otimo"), jwt);
         assertFalse(c.editado());
 
         ComentarioResponse editado = feedController.editar(id, c.id(),
@@ -189,7 +223,7 @@ class PostagemControllerTest {
     @Test
     void naoEditaComentarioForaDaJanelaMasAindaExclui() {
         Long id = controller.criar(new PostagemRequest("Aviso", "texto", true, true, 1L, IMG)).id();
-        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "antigo"), jwt);
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("antigo"), jwt);
         // Envelhece o comentário além dos 15 min.
         Comentario entidade = comentarioRepository.findById(c.id()).orElseThrow();
         entidade.setCriadoEm(LocalDateTime.now().minusMinutes(20));
@@ -208,9 +242,9 @@ class PostagemControllerTest {
     @Test
     void excluirComentarioRaizRemoveTodasAsRespostas() {
         Long id = controller.criar(new PostagemRequest("Mutirão", "Sábado", true, true, 1L, IMG)).id();
-        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "que horas?"), jwt);
-        feedController.responder(id, raiz.id(), new ComentarRequest("João", "eu também"), jwt);
-        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "às 9h"), adminJwt()); // resposta de outro
+        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("que horas?"), jwt);
+        feedController.responder(id, raiz.id(), new ComentarRequest("eu também"), jwt);
+        controller.responderComentario(raiz.id(), new ComentarRequest("às 9h"), adminJwt()); // resposta de outro
         assertEquals(3, feedController.postagem(jwt, id, "dev-x").totalComentarios());
 
         // O dono exclui o raiz → apaga o raiz e TODAS as respostas (inclusive a do admin).
@@ -229,7 +263,7 @@ class PostagemControllerTest {
         Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro")).token());
 
         Long id = controller.criar(new PostagemRequest("Regras", "teste", true, true, 1L, IMG)).id();
-        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("João", "meu comentário"), jwt);
+        ComentarioResponse c = feedController.comentar(id, new ComentarRequest("meu comentário"), jwt);
 
         // Outro paciente não pode editar nem excluir (403).
         assertEquals(403, assertThrows(ResponseStatusException.class,
@@ -247,9 +281,9 @@ class PostagemControllerTest {
     @Test
     void adminEditaOProprioComentarioDentroDaJanela() {
         Long id = controller.criar(new PostagemRequest("Aviso admin", "texto", true, true, 1L, IMG)).id();
-        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("João", "dúvida"), jwt);
+        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("dúvida"), jwt);
         ComentarioResponse resp = controller
-                .responderComentario(raiz.id(), new ComentarRequest("Administração", "resposta"), adminJwt()).getBody();
+                .responderComentario(raiz.id(), new ComentarRequest("resposta"), adminJwt()).getBody();
         assertNotNull(resp);
         assertTrue(resp.meu(), "a resposta é do admin logado");
         assertFalse(resp.editado());
@@ -285,7 +319,7 @@ class PostagemControllerTest {
         assertFalse(novoNaLista(id), "recém-criada não deve estar como 'novo comentário'");
 
         // Paciente comenta → vira "novo comentário".
-        feedController.comentar(id, new ComentarRequest("João", "primeiro!"), jwt);
+        feedController.comentar(id, new ComentarRequest("primeiro!"), jwt);
         assertTrue(novoNaLista(id), "comentário de paciente marca a postagem como nova");
         // Filtro "com novos" traz; "sem novos" não traz.
         assertTrue(controller.listar(null, null, null, true, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
@@ -297,12 +331,94 @@ class PostagemControllerTest {
 
         // Resposta do próprio admin NÃO remarca; resposta de paciente remarca.
         var raiz = feedController.comentarios(id, 0, 20, jwt).content().get(0);
-        controller.responderComentario(raiz.id(), new ComentarRequest("Administração", "obrigado"), adminJwt());
+        controller.responderComentario(raiz.id(), new ComentarRequest("obrigado"), adminJwt());
         assertFalse(novoNaLista(id), "resposta do admin não marca como novo");
-        feedController.responder(id, raiz.id(), new ComentarRequest("João", "de nada"), jwt);
+        feedController.responder(id, raiz.id(), new ComentarRequest("de nada"), jwt);
         assertTrue(novoNaLista(id), "resposta de paciente marca como novo");
 
         controller.excluir(id);
+    }
+
+    @Test
+    void nomeDoUsuarioNaRedeSocialConformeConfig() {
+        Long id = controller.criar(new PostagemRequest("Config autor", "texto", true, true, 1L, IMG)).id();
+        ComentarioResponse raiz = feedController.comentar(id, new ComentarRequest("pergunta"), jwt);
+        Long adminUid = usuarioRepository.findAll().get(0).getId();
+        String nomeAdmin = usuarioRepository.findById(adminUid).orElseThrow().getNome();
+        Jwt admin = Jwt.withTokenValue("t").header("alg", "none").claim("uid", adminUid).build();
+        controller.responderComentario(raiz.id(), new ComentarRequest("resposta oficial"), admin);
+
+        // Padrão (OCULTAR ligado): comentário da unidade aparece como "Administração".
+        assertEquals("Administração",
+                feedController.comentarios(id, 0, 20, jwt).content().get(0).respostas().get(0).autor());
+
+        try {
+            definirOcultarNomeUsuario(false);
+            // Config desligada: aparece o nome COMPLETO do usuário que comentou.
+            assertEquals(nomeAdmin,
+                    feedController.comentarios(id, 0, 20, jwt).content().get(0).respostas().get(0).autor());
+        } finally {
+            definirOcultarNomeUsuario(true); // restaura para não afetar os outros testes
+        }
+
+        controller.excluir(id);
+    }
+
+    @Test
+    void idadeMinimaParaComentarNaRedeSocial() {
+        Long id = controller.criar(new PostagemRequest("Idade mínima", "texto", true, true, 1L, IMG)).id();
+        try {
+            definirIdadeMinimaComentarios(18);
+
+            // Paciente sem data de nascimento → bloqueia (422) pedindo o cadastro.
+            ResponseStatusException semData = assertThrows(ResponseStatusException.class,
+                    () -> feedController.comentar(id, new ComentarRequest("oi"), jwt));
+            assertEquals(422, semData.getStatusCode().value());
+
+            // Menor de idade → continua bloqueado (422).
+            definirDataNascimentoPaciente(LocalDate.now().minusYears(10));
+            assertEquals(422, assertThrows(ResponseStatusException.class,
+                    () -> feedController.comentar(id, new ComentarRequest("oi"), jwt)).getStatusCode().value());
+
+            // Com idade suficiente → comenta normalmente.
+            definirDataNascimentoPaciente(LocalDate.now().minusYears(20));
+            ComentarioResponse ok = feedController.comentar(id, new ComentarRequest("agora vai"), jwt);
+            assertNotNull(ok.id());
+
+            // Editar também respeita a idade (republica conteúdo): vira menor → bloqueia.
+            definirDataNascimentoPaciente(LocalDate.now().minusYears(10));
+            assertEquals(422, assertThrows(ResponseStatusException.class,
+                    () -> feedController.editar(id, ok.id(), new EditarComentarioRequest("novo texto"), jwt))
+                    .getStatusCode().value());
+        } finally {
+            definirIdadeMinimaComentarios(0); // restaura (desliga a restrição p/ os demais testes)
+        }
+        controller.excluir(id);
+    }
+
+    /** Define o valor da config de idade mínima e invalida o cache. */
+    private void definirIdadeMinimaComentarios(int anos) {
+        Configuracao c = configuracaoRepository
+                .findByChave(ChaveConfiguracao.IDADE_MINIMA_COMENTARIOS_REDES_SOCIAIS).orElseThrow();
+        c.setValorNumerico(BigDecimal.valueOf(anos));
+        configuracaoRepository.save(c);
+        configuracaoService.invalidarCache();
+    }
+
+    /** Ajusta a data de nascimento do paciente de teste. */
+    private void definirDataNascimentoPaciente(LocalDate data) {
+        Paciente p = pacienteRepository.findById(pacienteId).orElseThrow();
+        p.setDataNascimento(data);
+        pacienteRepository.save(p);
+    }
+
+    /** Liga/desliga OCULTAR_NOME_USUARIO_NA_REDESOCIAL e invalida o cache da config. */
+    private void definirOcultarNomeUsuario(boolean ocultar) {
+        Configuracao c = configuracaoRepository.findByChave(ChaveConfiguracao.OCULTAR_NOME_USUARIO_NA_REDESOCIAL)
+                .orElseThrow();
+        c.setValorBooleano(ocultar);
+        configuracaoRepository.save(c);
+        configuracaoService.invalidarCache();
     }
 
     /** True se a postagem aparece com "novo comentário" na listagem do admin. */

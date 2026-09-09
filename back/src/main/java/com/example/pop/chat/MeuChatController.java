@@ -127,17 +127,28 @@ public class MeuChatController {
     }
 
     /**
+     * Marca a conversa como LIDA pelo paciente (ao abrir a conversa ou ao receber uma
+     * mensagem estando dentro dela): limpa o indicador no app e mostra "lido" ao atendente.
+     */
+    @PostMapping("/{id}/lida")
+    @Transactional
+    public void marcarLida(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.CHAT);
+        chatService.marcarLidoPeloPaciente(minhaConversa(jwt, id));
+    }
+
+    /**
      * Remove o id interno do atendente (PK de usuário) das respostas ao paciente:
      * o app só precisa do NOME do responsável, não do identificador do admin.
      */
     private ChatDetalheResponse semResponsavelId(ChatDetalheResponse d) {
         return new ChatDetalheResponse(d.id(), d.paciente(), d.pacienteFotoUrl(), d.unidadeSaude(), d.status(),
-                d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.mensagens());
+                d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.pacienteLeuEm(), d.mensagens());
     }
 
     private ChatResponse semResponsavelId(ChatResponse c) {
         return new ChatResponse(c.id(), c.paciente(), c.pacienteFotoUrl(), c.unidadeSaude(), c.status(), c.statusDescricao(),
-                c.ultimaMensagem(), c.ultimaMensagemDe(), c.ultimaMensagemEm(), c.naoLidas(),
+                c.ultimaMensagem(), c.ultimaMensagemDe(), c.ultimaMensagemEm(), c.naoLidas(), c.naoLidaPaciente(),
                 c.atualizadoEm(), null, c.responsavelNome());
     }
 

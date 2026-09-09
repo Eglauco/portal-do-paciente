@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { SemAcesso } from '@/components/sem-acesso';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { ChatItem, listarChats } from '@/services/chat';
@@ -46,6 +46,8 @@ function iniciais(nome: string): string {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
   const verChat = podeVer(sessao, 'CHAT');
   const podeIniciarConversa = podeLancar(sessao, 'CHAT');
@@ -114,7 +116,7 @@ export default function ChatScreen() {
       {/* Busca */}
       <View style={styles.buscaWrap}>
         <View style={styles.busca}>
-          <Ionicons name="search" size={18} color={Brand.muted} />
+          <Ionicons name="search" size={18} color={t.muted} />
           <TextInput
             style={styles.buscaInput}
             value={busca}
@@ -125,7 +127,7 @@ export default function ChatScreen() {
           />
           {busca.length > 0 && (
             <Pressable onPress={() => setBusca('')} accessibilityLabel="Limpar busca">
-              <Ionicons name="close-circle" size={18} color={Brand.muted} />
+              <Ionicons name="close-circle" size={18} color={t.muted} />
             </Pressable>
           )}
         </View>
@@ -135,17 +137,17 @@ export default function ChatScreen() {
         style={styles.lista}
         contentContainerStyle={[styles.listaContent, filtrados.length === 0 && styles.listaVaziaContent]}
         refreshControl={
-          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={Brand.brand} colors={[Brand.brand]} />
+          <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>
         {carregando ? (
           <View style={styles.estado}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.estadoTxt}>Carregando conversas…</Text>
           </View>
         ) : erro ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="cloud-offline-outline" size={26} color={Brand.muted} />
+              <Ionicons name="cloud-offline-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
@@ -157,7 +159,7 @@ export default function ChatScreen() {
         ) : filtrados.length === 0 ? (
           <View style={styles.estado}>
             <View style={styles.estadoIcone}>
-              <Ionicons name="chatbubbles-outline" size={26} color={Brand.muted} />
+              <Ionicons name="chatbubbles-outline" size={26} color={t.muted} />
             </View>
             <Text style={styles.estadoTitulo}>{busca ? 'Nada encontrado' : 'Nenhuma conversa'}</Text>
             <Text style={styles.estadoTxt}>
@@ -166,7 +168,7 @@ export default function ChatScreen() {
           </View>
         ) : (
           filtrados.map((c) => {
-            const novaResposta = c.ultimaMensagemDe === 'UNIDADE' && c.status !== 'RESOLVIDO';
+            const novaResposta = c.naoLidaPaciente;
             const prefixo = c.ultimaMensagemDe === 'PACIENTE' ? 'Você: ' : '';
             return (
               <Pressable
@@ -213,22 +215,23 @@ export default function ChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.surface },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.surface },
 
-  buscaWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, backgroundColor: Brand.surface },
+  buscaWrap: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6, backgroundColor: t.surface },
   busca: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     paddingHorizontal: 14,
     height: 42,
   },
-  buscaInput: { flex: 1, fontSize: 15, color: Brand.ink },
+  buscaInput: { flex: 1, fontSize: 15, color: t.ink },
 
   lista: { flex: 1 },
   listaContent: { paddingBottom: 92 },
@@ -241,7 +244,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -259,28 +262,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F4F2',
+    borderBottomColor: t.brandTint,
   },
-  rowPressed: { backgroundColor: '#EEF3F1' },
+  rowPressed: { backgroundColor: t.brandTint },
   avatar: {
     width: 52,
     height: 52,
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.brandDeep,
+    backgroundColor: t.brandDeep,
   },
-  avatarTxt: { color: Brand.onBrand, fontSize: 16, fontWeight: '800' },
+  avatarTxt: { color: t.onBrand, fontSize: 16, fontWeight: '800' },
   rowBody: { flex: 1, justifyContent: 'center', gap: 4 },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  nome: { flex: 1, fontSize: 15.5, fontWeight: '600', color: Brand.ink },
+  nome: { flex: 1, fontSize: 15.5, fontWeight: '600', color: t.ink },
   nomeForte: { fontWeight: '800' },
-  hora: { fontSize: 12, color: Brand.muted },
-  horaForte: { color: Brand.brand, fontWeight: '700' },
+  hora: { fontSize: 12, color: t.muted },
+  horaForte: { color: t.brand, fontWeight: '700' },
   rowBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  previa: { flex: 1, fontSize: 13.5, color: Brand.muted },
+  previa: { flex: 1, fontSize: 13.5, color: t.muted },
   previaForte: { color: '#40514C', fontWeight: '600' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Brand.brand },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: t.brand },
 
   // Estados
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 10 },
@@ -288,14 +291,14 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 18,
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: Brand.ink, marginTop: 2 },
-  estadoTxt: { fontSize: 13.5, color: Brand.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
+  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink, marginTop: 2 },
+  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 19 },
   estadoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -304,7 +307,7 @@ const styles = StyleSheet.create({
     height: 44,
     paddingHorizontal: 18,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });

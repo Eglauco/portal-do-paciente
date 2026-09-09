@@ -66,9 +66,13 @@
                       <circle cx="12" cy="12" r="8" /><path d="M12 8.5v4l2.5 1.5" />
                     </svg>
                   } @else {
-                    <span class="wa__checks" [attr.aria-label]="m.entregue ? 'Entregue no aparelho' : 'Enviada ao servidor'">
+                    <span
+                      class="wa__checks"
+                      [class.wa__checks--lida]="lidaPeloPaciente(m)"
+                      [attr.aria-label]="lidaPeloPaciente(m) ? 'Lida pelo paciente' : (m.entregue ? 'Entregue no aparelho' : 'Enviada ao servidor')"
+                    >
                       <svg class="wa__tick" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 13 5 5L20 6" /></svg>
-                      @if (m.entregue) {
+                      @if (m.entregue || lidaPeloPaciente(m)) {
                         <svg class="wa__tick wa__tick--2" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 13 5 5L20 6" /></svg>
                       }
                     </span>

@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
@@ -13,6 +13,8 @@ import { contarNaoLidas } from '@/services/notificacoes-lista';
 
 export function TopBar() {
   const insets = useSafeAreaInsets();
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const { sessao } = useSessao();
   const { fotoUrl } = usePerfilFoto();
@@ -45,7 +47,7 @@ export function TopBar() {
           <Image source={fotoUrl} style={styles.avatar} contentFit="cover" transition={200} />
         ) : (
           <View style={[styles.avatar, styles.avatarVazio]}>
-            <Ionicons name="person" size={24} color={Brand.muted} />
+            <Ionicons name="person" size={24} color={t.muted} />
           </View>
         )}
         <View>
@@ -61,7 +63,7 @@ export function TopBar() {
         accessibilityLabel={
           naoLidas > 0 ? `Notificações, ${naoLidas} não lidas` : 'Notificações'
         }>
-        <Ionicons name="notifications-outline" size={22} color={Brand.ink} />
+        <Ionicons name="notifications-outline" size={22} color={t.ink} />
         {naoLidas > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeTxt}>{naoLidas > 99 ? '99+' : naoLidas}</Text>
@@ -72,16 +74,17 @@ export function TopBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 14,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   left: {
     flexDirection: 'row',
@@ -92,27 +95,27 @@ const styles = StyleSheet.create({
     marginLeft: -4,
   },
   leftPressed: {
-    backgroundColor: '#EAF2EF',
+    backgroundColor: t.brandTint,
   },
   avatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: Brand.line,
+    backgroundColor: t.line,
   },
   avatarVazio: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#E7F3EF',
+    backgroundColor: t.brandTint,
   },
   hello: {
     fontSize: 12,
-    color: Brand.muted,
+    color: t.muted,
   },
   name: {
     fontSize: 16,
     fontWeight: '700',
-    color: Brand.ink,
+    color: t.ink,
     letterSpacing: -0.2,
   },
   bell: {
@@ -121,12 +124,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Brand.bg,
+    backgroundColor: t.bg,
     borderWidth: 1,
-    borderColor: Brand.line,
+    borderColor: t.line,
   },
   bellPressed: {
-    backgroundColor: '#EAF2EF',
+    backgroundColor: t.brandTint,
   },
   badge: {
     position: 'absolute',
@@ -138,7 +141,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     backgroundColor: '#E0952A',
     borderWidth: 2,
-    borderColor: Brand.surface,
+    borderColor: t.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },

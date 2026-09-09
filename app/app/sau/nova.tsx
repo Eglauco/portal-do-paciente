@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SelectBusca } from '@/components/select-busca';
-import { Brand } from '@/constants/theme';
+import { type Tema, useTema } from '@/hooks/use-tema';
 import {
   TipoManifestacao,
   UnidadeRef,
@@ -24,6 +24,8 @@ import {
 } from '@/services/sau';
 
 export default function NovaManifestacaoScreen() {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -85,8 +87,8 @@ export default function NovaManifestacaoScreen() {
   // senão a rolagem aconteceria com a altura antiga e o botão ficaria coberto.
   useEffect(() => {
     if (alturaTeclado > 0) {
-      const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+      return () => clearTimeout(timer);
     }
   }, [alturaTeclado]);
 
@@ -114,7 +116,7 @@ export default function NovaManifestacaoScreen() {
           onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={Brand.ink} />
+          <Ionicons name="chevron-back" size={26} color={t.ink} />
         </Pressable>
         <Text style={styles.headerTitulo}>Nova manifestação</Text>
       </View>
@@ -133,12 +135,12 @@ export default function NovaManifestacaoScreen() {
         keyboardDismissMode="interactive">
         {carregando ? (
           <View style={styles.carregando}>
-            <ActivityIndicator color={Brand.brand} />
+            <ActivityIndicator color={t.brand} />
             <Text style={styles.carregandoTxt}>Carregando opções…</Text>
           </View>
         ) : erroCarregar ? (
           <Pressable style={styles.unidadesErro} onPress={carregar}>
-            <Ionicons name="refresh" size={16} color={Brand.brand} />
+            <Ionicons name="refresh" size={16} color={t.brand} />
             <Text style={styles.unidadesErroTxt}>Não foi possível carregar. Toque para tentar novamente.</Text>
           </Pressable>
         ) : (
@@ -149,13 +151,13 @@ export default function NovaManifestacaoScreen() {
               <Text style={styles.vazioTxt}>Nenhum tipo disponível no momento. Fale com a unidade de saúde.</Text>
             ) : (
               <View style={styles.tipos}>
-                {tipos.map((t) => {
-                  const ativo = tipoId === t.id;
+                {tipos.map((tipo) => {
+                  const ativo = tipoId === tipo.id;
                   return (
                     <Pressable
-                      key={t.id}
+                      key={tipo.id}
                       onPress={() => {
-                        setTipoId(t.id);
+                        setTipoId(tipo.id);
                         if (erroEnvio) setErroEnvio(null);
                       }}
                       style={[styles.tipoCard, ativo && styles.tipoCardAtivo]}
@@ -165,11 +167,11 @@ export default function NovaManifestacaoScreen() {
                         <Ionicons
                           name="chatbox-ellipses-outline"
                           size={22}
-                          color={ativo ? Brand.brand : Brand.muted}
+                          color={ativo ? t.brand : t.muted}
                         />
-                        <Text style={[styles.tipoRotulo, ativo && styles.tipoRotuloAtivo]}>{t.nome}</Text>
+                        <Text style={[styles.tipoRotulo, ativo && styles.tipoRotuloAtivo]}>{tipo.nome}</Text>
                       </View>
-                      {t.descricao ? <Text style={styles.tipoDescricao}>{t.descricao}</Text> : null}
+                      {tipo.descricao ? <Text style={styles.tipoDescricao}>{tipo.descricao}</Text> : null}
                     </Pressable>
                   );
                 })}
@@ -208,8 +210,8 @@ export default function NovaManifestacaoScreen() {
             <TextInput
               style={styles.textarea}
               value={texto}
-              onChangeText={(t) => {
-                setTexto(t);
+              onChangeText={(valor) => {
+                setTexto(valor);
                 if (erroEnvio) setErroEnvio(null);
               }}
               placeholder="Escreva sua mensagem para o SAU"
@@ -246,56 +248,57 @@ export default function NovaManifestacaoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Brand.bg },
+const criarEstilos = (t: Tema) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 8,
     paddingBottom: 10,
-    backgroundColor: Brand.surface,
+    backgroundColor: t.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Brand.line,
+    borderBottomColor: t.line,
   },
   back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: '#EAF2EF' },
-  headerTitulo: { fontSize: 17, fontWeight: '800', color: Brand.ink },
+  backPressed: { backgroundColor: t.brandTint },
+  headerTitulo: { fontSize: 17, fontWeight: '800', color: t.ink },
 
   corpo: { flex: 1 },
-  label: { fontSize: 13, fontWeight: '700', color: Brand.muted, marginBottom: 10 },
+  label: { fontSize: 13, fontWeight: '700', color: t.muted, marginBottom: 10 },
 
   carregando: { paddingVertical: 30, alignItems: 'center', gap: 8 },
-  carregandoTxt: { fontSize: 13, color: Brand.muted },
-  vazioTxt: { fontSize: 13.5, color: Brand.muted, lineHeight: 19 },
+  carregandoTxt: { fontSize: 13, color: t.muted },
+  vazioTxt: { fontSize: 13.5, color: t.muted, lineHeight: 19 },
 
   tipos: { gap: 10 },
   tipoCard: {
     borderWidth: 1.5,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
     borderRadius: 14,
     padding: 14,
     gap: 6,
   },
-  tipoCardAtivo: { borderColor: Brand.brand, backgroundColor: '#F1FAF7' },
+  tipoCardAtivo: { borderColor: t.brand, backgroundColor: t.brandTint },
   tipoCabecalho: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tipoRotulo: { fontSize: 15, fontWeight: '800', color: Brand.ink },
-  tipoRotuloAtivo: { color: Brand.brandDeep },
-  tipoDescricao: { fontSize: 12.5, color: Brand.muted },
+  tipoRotulo: { fontSize: 15, fontWeight: '800', color: t.ink },
+  tipoRotuloAtivo: { color: t.brandDeep },
+  tipoDescricao: { fontSize: 12.5, color: t.muted },
 
-  unidadesErro: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: Brand.surface, borderRadius: 12, borderWidth: 1, borderColor: Brand.line },
-  unidadesErroTxt: { flex: 1, fontSize: 13, color: Brand.muted },
+  unidadesErro: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, backgroundColor: t.surface, borderRadius: 12, borderWidth: 1, borderColor: t.line },
+  unidadesErroTxt: { flex: 1, fontSize: 13, color: t.muted },
 
   textarea: {
     minHeight: 130,
     borderWidth: 1,
-    borderColor: Brand.line,
-    backgroundColor: Brand.surface,
+    borderColor: t.line,
+    backgroundColor: t.surface,
     borderRadius: 14,
     padding: 14,
     fontSize: 15,
-    color: Brand.ink,
+    color: t.ink,
     lineHeight: 21,
   },
 
@@ -310,7 +313,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     height: 52,
     borderRadius: 14,
-    backgroundColor: Brand.brand,
+    backgroundColor: t.brand,
   },
   enviarDesativado: { opacity: 0.5 },
   enviarTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },

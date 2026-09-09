@@ -19,6 +19,9 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
 
     Mensagem findFirstByChatIdOrderByEnviadaEmDesc(Long chatId);
 
+    /** Última mensagem de um remetente (ex.: UNIDADE) — para saber se o paciente já leu tudo. */
+    Optional<Mensagem> findFirstByChatIdAndRemetenteOrderByEnviadaEmDesc(Long chatId, RemetenteMensagem remetente);
+
     /** O responsável enviou alguma mensagem no chat (lançamento)? Trava a remoção do responsável. */
     boolean existsByResponsavelId(Long responsavelId);
 

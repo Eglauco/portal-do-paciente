@@ -73,7 +73,7 @@
 .periodo__btn.is-active {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 3px rgba(7, 46, 43, 0.12);
+  box-shadow: 0 1px 3px rgba(var(--brand-pine-rgb), 0.12);
 }
 
 /* Cartões de KPI */
@@ -143,14 +143,14 @@
 .linechart__dot {
   position: absolute; width: 9px; height: 9px; border-radius: 50%;
   border: 2px solid var(--surface); transform: translate(-50%, -50%);
-  pointer-events: none; box-shadow: 0 1px 4px rgba(7, 46, 43, 0.25);
+  pointer-events: none; box-shadow: 0 1px 4px rgba(var(--brand-pine-rgb), 0.25);
 }
 .linechart__tip {
   position: absolute; top: 2px; transform: translateX(-50%);
   display: flex; align-items: baseline; gap: 0.4rem;
   background: var(--ink); color: #fff; padding: 0.22rem 0.5rem;
   border-radius: 8px; font-size: 0.72rem; white-space: nowrap;
-  pointer-events: none; box-shadow: 0 6px 16px rgba(7, 46, 43, 0.22); z-index: 2;
+  pointer-events: none; box-shadow: 0 6px 16px rgba(var(--brand-pine-rgb), 0.22); z-index: 2;
 }
 .linechart__tip.tip--r { transform: translateX(-92%); }
 .linechart__tip.tip--l { transform: translateX(-8%); }
