@@ -138,6 +138,41 @@ public class PacienteLogService {
         repository.save(novoEvento(p, TipoEventoPaciente.REATIVACAO, usuarioId));
     }
 
+    /**
+     * O PRÓPRIO paciente adicionou uma pessoa autorizada pelo app (autor = PACIENTE).
+     * Registrado como ALTERAÇÃO, no mesmo formato do back-office: uma linha "Responsável
+     * adicionado: Nome (telefone) — Agendamentos: visualizar e lançar".
+     */
+    public void registrarResponsavelAdicionadoPeloPaciente(Paciente paciente, Responsavel novo) {
+        PacienteLog log = novoEventoPeloPaciente(paciente, TipoEventoPaciente.ALTERACAO);
+        log.getAlteracoes().add(alteracao(log, "RESPONSAVEL", "Responsável adicionado: " + novo.getNome(),
+                null, detalhes(novo.getNome(), novo.getTelefone(), novo.getPermissoes())));
+        repository.save(log);
+    }
+
+    /**
+     * O PRÓPRIO paciente removeu DEFINITIVAMENTE uma pessoa autorizada pelo app (autor =
+     * PACIENTE). Só ocorre quando ela não tem lançamentos — com lançamentos, o app inativa
+     * (ver {@link #registrarResponsavelSituacaoPeloPaciente}) em vez de excluir.
+     */
+    public void registrarResponsavelRemovidoPeloPaciente(Paciente paciente, Responsavel removido) {
+        PacienteLog log = novoEventoPeloPaciente(paciente, TipoEventoPaciente.ALTERACAO);
+        log.getAlteracoes().add(alteracao(log, "RESPONSAVEL", "Responsável removido: " + removido.getNome(),
+                detalhes(removido.getNome(), removido.getTelefone(), removido.getPermissoes()), null));
+        repository.save(log);
+    }
+
+    /**
+     * O PRÓPRIO paciente inativou (ativo=false) ou reativou (ativo=true) uma pessoa autorizada
+     * pelo app (autor = PACIENTE). Grava a mudança de situação de fato ocorrida.
+     */
+    public void registrarResponsavelSituacaoPeloPaciente(Paciente paciente, Responsavel r, boolean novoAtivo) {
+        PacienteLog log = novoEventoPeloPaciente(paciente, TipoEventoPaciente.ALTERACAO);
+        log.getAlteracoes().add(alteracao(log, "RESPONSAVEL", "Responsável " + r.getNome() + " — Situação",
+                novoAtivo ? "inativo" : "ativo", novoAtivo ? "ativo" : "inativo"));
+        repository.save(log);
+    }
+
     /** Linha do tempo de auditoria do paciente (mais antigo primeiro). */
     @Transactional(readOnly = true)
     public List<PacienteLogResponse> listar(Long pacienteId) {
@@ -267,6 +302,17 @@ public class PacienteLogService {
         Usuario usuario = usuarioId == null ? null : usuarioRepository.findById(usuarioId).orElse(null);
         log.setUsuario(usuario);
         log.setAutor(usuario != null ? AutorLogPaciente.UNIDADE : AutorLogPaciente.SISTEMA);
+        return log;
+    }
+
+    /** Evento originado no app pelo PRÓPRIO paciente: autor = PACIENTE, ator = ele mesmo. */
+    private PacienteLog novoEventoPeloPaciente(Paciente paciente, TipoEventoPaciente tipo) {
+        PacienteLog log = new PacienteLog();
+        log.setPaciente(paciente);
+        log.setTipo(tipo);
+        log.setCriadoEm(LocalDateTime.now(FUSO));
+        log.setPacienteAtor(paciente); // o próprio paciente agiu pelo app
+        log.setAutor(AutorLogPaciente.PACIENTE);
         return log;
     }
 

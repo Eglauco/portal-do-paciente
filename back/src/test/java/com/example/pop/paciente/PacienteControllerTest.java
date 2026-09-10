@@ -113,6 +113,34 @@ class PacienteControllerTest {
     }
 
     @Test
+    void naoPermiteResponsaveisComTelefoneDuplicado() {
+        limparResiduos("11955550002", null);
+        // Dois responsáveis com o mesmo telefone (um mascarado) → 409.
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.criar(new PacienteRequest(
+                        "Paciente Dup", "11955550002", null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null, null, null, null, null,
+                        List.of(
+                                new PacienteRequest.ResponsavelRequest(null, "Ana", "11988887777"),
+                                new PacienteRequest.ResponsavelRequest(null, "Bia", "(11) 98888-7777")),
+                        List.of()), null));
+        assertEquals(409, ex.getStatusCode().value(), "dois responsáveis com o mesmo telefone");
+    }
+
+    @Test
+    void naoPermiteResponsavelComTelefoneDoPaciente() {
+        limparResiduos("11955550003", null);
+        // Responsável com o telefone do próprio paciente → 422 (tem de ser outra pessoa).
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> controller.criar(new PacienteRequest(
+                        "Paciente Igual", "11955550003", null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null, null, null, null, null,
+                        List.of(new PacienteRequest.ResponsavelRequest(null, "Clone", "11955550003")),
+                        List.of()), null));
+        assertEquals(422, ex.getStatusCode().value(), "responsável com o telefone do próprio paciente");
+    }
+
+    @Test
     void cpfInvalidoRejeita() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.criar(minimo("CPF Ruim", "529.982.247-24", null), null));

@@ -120,6 +120,7 @@ function Navegacao() {
         <Stack.Screen name="selecionar-perfil" options={{ headerShown: false }} />
         <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
+        <Stack.Screen name="responsaveis" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />

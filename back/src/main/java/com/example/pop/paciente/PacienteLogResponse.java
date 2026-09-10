@@ -5,8 +5,9 @@ import java.util.List;
 
 /**
  * Item da linha do tempo de auditoria do cadastro: o evento (tipo, quem, quando) e os
- * campos que mudaram. {@code autorNome} é o nome do responsável pela ação (o atendente
- * do back-office); nulo = ação sem ator identificado (exibir como "Sistema").
+ * campos que mudaram. {@code autorNome} é o nome de quem fez a ação — o atendente do
+ * back-office (UNIDADE) ou o próprio paciente pelo app (PACIENTE); nulo = ação sem ator
+ * identificado (exibir como "Sistema").
  */
 public record PacienteLogResponse(
         Long id,

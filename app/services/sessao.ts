@@ -50,6 +50,17 @@ export function podeVer(sessao: SessaoPaciente | null, funcionalidade: Funcional
   return nivelAtual(sessao, funcionalidade) !== 'SEM_ACESSO';
 }
 
+/**
+ * true se o perfil ATIVO é o PRÓPRIO paciente (não um responsável agindo por outro).
+ * Só o próprio paciente gerencia as pessoas autorizadas (o backend também recusa com 403).
+ * Sessão antiga sem a lista de perfis → assume próprio; o backend é a autoridade.
+ */
+export function ehPerfilProprio(sessao: SessaoPaciente | null): boolean {
+  if (!sessao) return false;
+  const ativo = sessao.perfis.find((p) => p.pacienteId === sessao.pacienteId);
+  return ativo ? ativo.proprio : true;
+}
+
 /** O perfil ativo pode fazer LANÇAMENTOS na funcionalidade (Visualizar e lançar). */
 export function podeLancar(sessao: SessaoPaciente | null, funcionalidade: FuncionalidadeApp): boolean {
   return nivelAtual(sessao, funcionalidade) === 'VISUALIZAR_LANCAR';

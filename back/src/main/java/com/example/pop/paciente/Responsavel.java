@@ -58,6 +58,11 @@ public class Responsavel {
     @Column(name = "data_nascimento")
     private LocalDate dataNascimento;
 
+    /** Quem criou: ADMIN (back-office) ou PACIENTE (app; escopo travado em AGENDAMENTOS). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrigemResponsavel origem = OrigemResponsavel.ADMIN;
+
     /**
      * Ativo (soft-delete/acesso). Inativo = sem acesso ao perfil do paciente no app
      * (some do seletor e a próxima ação é negada), mas preservado para não perder a

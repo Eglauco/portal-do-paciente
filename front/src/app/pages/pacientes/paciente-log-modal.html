@@ -30,7 +30,12 @@
                 <span class="plog__tipo">{{ log.tipoDescricao }}</span>
                 <span class="plog__quando">{{ log.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
               </div>
-              <p class="plog__autor">por <b>{{ log.autorNome || 'Sistema' }}</b></p>
+              <!-- Origem no app (o próprio paciente ou um responsável) fica marcada como "pelo app". -->
+              @if (log.autor === 'PACIENTE' || log.autor === 'RESPONSAVEL') {
+                <p class="plog__autor">pelo app — <b>{{ log.autorNome || 'Paciente' }}</b></p>
+              } @else {
+                <p class="plog__autor">por <b>{{ log.autorNome || 'Sistema' }}</b></p>
+              }
 
               @if (log.alteracoes.length) {
                 <ul class="plog__campos">

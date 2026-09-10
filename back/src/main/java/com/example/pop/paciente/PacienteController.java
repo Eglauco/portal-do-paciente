@@ -392,8 +392,35 @@ public class PacienteController {
      * existentes por id, cria os novos (id nulo) e remove os que saíram (orphanRemoval).
      * Muta a coleção no lugar — nunca substitui a instância (exigência do orphanRemoval).
      */
+    /**
+     * Integridade dos telefones dos responsáveis (mesma regra do app): nenhum pode repetir o
+     * telefone de outro responsável do paciente, nem coincidir com um telefone do próprio
+     * paciente (principal ou adicional) — o responsável tem de ser outra pessoa.
+     */
+    private void validarTelefonesDosResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> entradas) {
+        Set<String> vistos = new HashSet<>();
+        for (PacienteRequest.ResponsavelRequest entrada : entradas) {
+            if (limpar(entrada.nome()) == null) {
+                continue; // linha em branco: não vira responsável
+            }
+            String telefone = Documentos.somenteDigitos(entrada.telefone());
+            if (telefone == null || telefone.isBlank()) {
+                continue; // telefone do responsável é opcional no back-office
+            }
+            if (ResponsavelTelefones.ehDoPaciente(p, telefone)) {
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "O responsável precisa ter um telefone diferente do paciente.");
+            }
+            if (!vistos.add(telefone)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Há mais de um responsável com o mesmo telefone.");
+            }
+        }
+    }
+
     private void aplicarResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> reqs) {
         List<PacienteRequest.ResponsavelRequest> entradas = reqs == null ? List.of() : reqs;
+        validarTelefonesDosResponsaveis(p, entradas);
 
         Map<Long, Responsavel> existentes = new HashMap<>();
         for (Responsavel r : p.getResponsaveis()) {

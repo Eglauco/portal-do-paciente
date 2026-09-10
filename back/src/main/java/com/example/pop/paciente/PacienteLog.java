@@ -27,8 +27,9 @@ import lombok.Setter;
 /**
  * Evento de auditoria do cadastro do paciente (uma ação de salvar): CRIACAO, ALTERACAO,
  * INATIVACAO ou REATIVACAO — quem fez e quando. Os campos alterados vêm em
- * {@link #alteracoes}. Só uma referência de ator é preenchida, conforme {@link #autor}
- * (hoje sempre a UNIDADE, via {@link #usuario}).
+ * {@link #alteracoes}. Só uma referência de ator é preenchida, conforme {@link #autor}:
+ * UNIDADE → {@link #usuario}; PACIENTE → {@link #pacienteAtor} (ações do app, ex.:
+ * adicionar/remover pessoa autorizada); SISTEMA → nenhuma.
  */
 @Entity
 @Table(name = "paciente_log")
@@ -54,7 +55,7 @@ public class PacienteLog {
     @Column(nullable = false, length = 20)
     private AutorLogPaciente autor;
 
-    /** Paciente que fez a ação pelo app (reservado para o futuro; hoje nulo). */
+    /** Paciente que fez a ação pelo app (autor = PACIENTE), ex.: adicionar/remover pessoa autorizada. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "paciente_ator_id")
     private Paciente pacienteAtor;

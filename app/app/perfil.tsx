@@ -11,7 +11,7 @@ import { type Tema, useTema } from '@/hooks/use-tema';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
 import { carregarPerfil, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
-import { podeLancar, podeVer } from '@/services/sessao';
+import { ehPerfilProprio, podeLancar, podeVer } from '@/services/sessao';
 
 const SEXO_LABEL: Record<SexoPaciente, string> = {
   MASCULINO: 'Masculino',
@@ -308,6 +308,18 @@ export default function PerfilScreen() {
               </View>
             ))}
           </>
+        )}
+
+        {/* Só o próprio paciente autoriza outras pessoas a agendar por ele. */}
+        {ehPerfilProprio(sessao) && (
+          <Pressable
+            style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
+            onPress={() => router.push('/responsaveis')}
+            accessibilityRole="button"
+            accessibilityLabel="Pessoas autorizadas">
+            <Ionicons name="person-add-outline" size={20} color={t.brandDeep} />
+            <Text style={styles.selecionarTxt}>Pessoas autorizadas</Text>
+          </Pressable>
         )}
 
         <Pressable
