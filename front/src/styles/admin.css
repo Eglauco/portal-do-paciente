@@ -1081,7 +1081,7 @@
 
 .filters__row {
   display: grid;
-  grid-template-columns: 160px 1fr 1fr auto;
+  grid-template-columns: 160px 1fr 1fr;
   gap: 0.85rem;
   align-items: center;
 }
@@ -1806,7 +1806,7 @@
 /* ---------- Filtros com 2 campos (ex.: Unidades) ---------- */
 .filters__row2 {
   display: grid;
-  grid-template-columns: 160px 1fr auto;
+  grid-template-columns: 160px 1fr;
   gap: 0.85rem;
   align-items: center;
 }
