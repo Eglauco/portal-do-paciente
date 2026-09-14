@@ -5,6 +5,8 @@ import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { AuthService } from '../../core/auth.service';
 import { Postagem } from './postagem.model';
 import { PostagemBuscaStore } from './postagem-busca.store';
@@ -24,7 +26,7 @@ const NOVO_COMENTARIO_OPCOES = [
 
 @Component({
   selector: 'app-postagens-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './postagens-list.html',
 })
 export class PostagensList {
@@ -50,6 +52,8 @@ export class PostagensList {
   });
 
   protected readonly size = signal(this.store.size);
+  /** Ordenação multi-coluna (vazia = padrão do backend: mais recentes primeiro). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
   protected readonly registros = signal<Postagem[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
@@ -121,6 +125,7 @@ export class PostagensList {
     this.store.titulo = f.titulo;
     this.store.comentarios = f.comentarios;
     this.store.novoComentario = f.novoComentario;
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
@@ -136,6 +141,7 @@ export class PostagensList {
         },
         this.page(),
         this.size(),
+        this.ordenacoes(),
       )
       .subscribe({
         next: (pagina) => {
@@ -161,6 +167,21 @@ export class PostagensList {
     this.router.navigate(['/postagens', p.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -184,6 +205,7 @@ export class PostagensList {
           novoComentario: f.novoComentario,
         },
         colunas,
+        this.ordenacoes(),
       )
       .subscribe({
         next: (blob) => {

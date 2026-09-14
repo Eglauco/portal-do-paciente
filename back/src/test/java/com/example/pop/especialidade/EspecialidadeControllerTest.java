@@ -17,7 +17,7 @@ class EspecialidadeControllerTest {
 
     @Test
     void listaEspecialidadesSemeadas() {
-        Pagina<Especialidade> pagina = controller.listar(null, null, 0, 10);
+        Pagina<Especialidade> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 8, "esperado ao menos as especialidades semeadas");
         assertTrue(pagina.content().size() <= 10);
         assertTrue(pagina.first());
@@ -25,14 +25,14 @@ class EspecialidadeControllerTest {
 
     @Test
     void filtraPorNome() {
-        Pagina<Especialidade> pagina = controller.listar(null, "Cardio", 0, 10);
+        Pagina<Especialidade> pagina = controller.listar(null, "Cardio", null, 0, 10);
         assertEquals(1, pagina.totalElements());
         assertEquals("Cardiologia", pagina.content().get(0).getNome());
     }
 
     @Test
     void tamanhoAcimaDoLimiteEhReduzidoPara100() {
-        Pagina<Especialidade> pagina = controller.listar(null, null, 0, 500);
+        Pagina<Especialidade> pagina = controller.listar(null, null, null, 0, 500);
         assertEquals(100, pagina.size());
     }
 }

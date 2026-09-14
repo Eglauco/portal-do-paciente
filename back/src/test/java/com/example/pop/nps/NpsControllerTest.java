@@ -35,7 +35,7 @@ class NpsControllerTest {
 
     @Test
     void listaContemRegistrosSemeados() {
-        Pagina<NpsResponse> pagina = controller.listar(null, null, null, 0, 10);
+        Pagina<NpsResponse> pagina = controller.listar(null, null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 8, "esperado ao menos os NPS semeados");
         assertNotNull(pagina.content().get(0).paciente());
         assertNotNull(pagina.content().get(0).unidadeSaude());
@@ -44,7 +44,7 @@ class NpsControllerTest {
     @Test
     void filtraPorStatus() {
         // As respostas semeadas foram reiniciadas para PENDENTE na V19 (nova rotina por categoria).
-        Pagina<NpsResponse> pagina = controller.listar(StatusNps.PENDENTE, null, null, 0, 50);
+        Pagina<NpsResponse> pagina = controller.listar(StatusNps.PENDENTE, null, null, null, 0, 50);
         assertTrue(pagina.totalElements() >= 1);
         pagina.content().forEach(r -> assertEquals(StatusNps.PENDENTE, r.status()));
     }

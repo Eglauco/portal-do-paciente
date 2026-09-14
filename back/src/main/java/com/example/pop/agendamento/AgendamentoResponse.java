@@ -16,9 +16,12 @@ public record AgendamentoResponse(
         boolean faltaJustificada,
         String justificativaFalta,
         List<RefResponse> motivosFalta,
-        Integer horasCancelamento) {
+        Integer horasCancelamento,
+        EstadoEntrega entregaResumo,
+        String entregaResumoDescricao) {
 
     public static AgendamentoResponse from(Agendamento a) {
+        EstadoEntrega entrega = a.getEntregaResumo();
         return new AgendamentoResponse(
                 a.getId(),
                 a.getDataHora(),
@@ -34,6 +37,8 @@ public record AgendamentoResponse(
                 a.getMotivosFalta().stream()
                         .map(m -> new RefResponse(m.getId(), m.getMotivo()))
                         .toList(),
-                a.getProcedimento().getHorasCancelamento());
+                a.getProcedimento().getHorasCancelamento(),
+                entrega,
+                entrega != null ? entrega.getDescricao() : null);
     }
 }

@@ -2,6 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { Pagina, Procedimento, ProcedimentoFiltro } from './procedimento.model';
 
 @Injectable({ providedIn: 'root' })
@@ -16,19 +17,31 @@ export class ProcedimentoService {
   /** Quantidade padrão exibida ao abrir a tela. */
   static readonly TAMANHO_PADRAO = 10;
 
-  listar(filtro: ProcedimentoFiltro = {}, page = 0, size = ProcedimentoService.TAMANHO_PADRAO): Observable<Pagina<Procedimento>> {
+  listar(
+    filtro: ProcedimentoFiltro = {},
+    page = 0,
+    size = ProcedimentoService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Pagina<Procedimento>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Procedimento>>(this.base, { params });
   }
 
-  /** Exporta os procedimentos dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ProcedimentoFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta os procedimentos dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: ProcedimentoFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

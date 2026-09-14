@@ -28,7 +28,7 @@ class PacienteControllerTest {
 
     @Test
     void listaPacientesSemeados() {
-        Pagina<Paciente> pagina = controller.listar(null, null, null, null, null, 0, 10);
+        Pagina<Paciente> pagina = controller.listar(null, null, null, null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 10, "esperado ao menos os pacientes semeados");
         assertTrue(pagina.content().size() <= 10);
         assertTrue(pagina.first());
@@ -36,15 +36,33 @@ class PacienteControllerTest {
 
     @Test
     void filtraPorNome() {
-        Pagina<Paciente> pagina = controller.listar(null, "Ramalho", null, null, null, 0, 10);
+        Pagina<Paciente> pagina = controller.listar(null, "Ramalho", null, null, null, null, 0, 10);
         assertEquals(1, pagina.totalElements());
         assertEquals("Beatriz Ramalho", pagina.content().get(0).getNome());
     }
 
     @Test
     void tamanhoAcimaDoLimiteEhReduzidoPara100() {
-        Pagina<Paciente> pagina = controller.listar(null, null, null, null, null, 0, 500);
+        Pagina<Paciente> pagina = controller.listar(null, null, null, null, null, null, 0, 500);
         assertEquals(100, pagina.size());
+    }
+
+    @Test
+    void ordenaPorCodigoDescendente() {
+        // "codigo" mapeia para o id (numérico e único) → ordem decrescente estrita, sem depender de collation.
+        List<Long> ids = controller.listar(null, null, null, null, "TODOS", List.of("codigo:desc"), 0, 100)
+                .content().stream().map(Paciente::getId).toList();
+        for (int i = 1; i < ids.size(); i++) {
+            assertTrue(ids.get(i - 1) > ids.get(i), "ids devem vir em ordem decrescente");
+        }
+    }
+
+    @Test
+    void ordenacaoComCampoInvalidoCaiNoPadraoSemErro() {
+        // Campo fora da whitelist é ignorado (segurança) e a listagem cai na ordenação padrão.
+        Pagina<Paciente> pagina = controller.listar(null, null, null, null, null, List.of("dropTable:asc"), 0, 10);
+        assertTrue(pagina.first());
+        assertTrue(pagina.totalElements() >= 10);
     }
 
     @Test
@@ -68,8 +86,8 @@ class PacienteControllerTest {
             // Telefones adicionais: só dígitos, sem repetido nem vazio.
             assertEquals(List.of("11900000002"), p.getTelefonesAdicionais());
             // Filtra por CPF (com máscara) e por prontuário.
-            assertEquals(1, controller.listar(null, null, "529.982.247-25", null, null, 0, 10).totalElements());
-            assertEquals(1, controller.listar(null, null, null, "PRONT-A", null, 0, 10).totalElements());
+            assertEquals(1, controller.listar(null, null, "529.982.247-25", null, null, null, 0, 10).totalElements());
+            assertEquals(1, controller.listar(null, null, null, "PRONT-A", null, null, 0, 10).totalElements());
         } finally {
             controller.excluir(p.getId());
         }
@@ -178,7 +196,7 @@ class PacienteControllerTest {
             repository.findByTelefone(telefone).ifPresent(x -> controller.excluir(x.getId()));
         }
         if (cpf != null) {
-            controller.listar(null, null, cpf, null, "TODOS", 0, 100).content()
+            controller.listar(null, null, cpf, null, "TODOS", null, 0, 100).content()
                     .forEach(x -> controller.excluir(x.getId()));
         }
     }

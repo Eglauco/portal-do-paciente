@@ -70,7 +70,7 @@ public class MeusAgendamentosController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "dataHora"));
-        Page<Agendamento> resultado = repository.search(null, pacienteId, null, pageable);
+        Page<Agendamento> resultado = repository.findByPaciente_Id(pacienteId, pageable);
         List<AgendamentoResponse> content = resultado.getContent().stream()
                 .map(AgendamentoResponse::from)
                 .toList();

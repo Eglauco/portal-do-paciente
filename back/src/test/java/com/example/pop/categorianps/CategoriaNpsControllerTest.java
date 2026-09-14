@@ -21,7 +21,7 @@ class CategoriaNpsControllerTest {
 
     @Test
     void listaCategoriasSemeadas() {
-        Pagina<CategoriaNps> pagina = controller.listar(null, null, 0, 10);
+        Pagina<CategoriaNps> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 5, "esperado ao menos as categorias semeadas");
     }
 

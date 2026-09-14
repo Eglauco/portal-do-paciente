@@ -1,7 +1,10 @@
+import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Paciente } from './paciente.model';
 import { PacienteBuscaStore } from './paciente-busca.store';
 import { PacienteService } from './paciente.service';
@@ -10,7 +13,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-pacientes-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, DatePipe, Ordenavel],
   templateUrl: './pacientes-list.html',
 })
 export class PacientesList {
@@ -32,6 +35,8 @@ export class PacientesList {
   protected readonly cpf = signal(this.store.cpf);
   protected readonly prontuario = signal(this.store.prontuario);
   protected readonly situacao = signal<'ATIVO' | 'INATIVO' | 'TODOS'>(this.store.situacao);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly loading = signal(false);
@@ -118,6 +123,7 @@ export class PacientesList {
     this.store.cpf = this.cpf();
     this.store.prontuario = this.prontuario();
     this.store.situacao = this.situacao();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
@@ -134,6 +140,7 @@ export class PacientesList {
         },
         this.page(),
         this.size(),
+        this.ordenacoes(),
       )
       .subscribe({
       next: (pagina) => {
@@ -159,6 +166,21 @@ export class PacientesList {
     this.router.navigate(['/pacientes', paciente.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -182,6 +204,7 @@ export class PacientesList {
           situacao: this.situacao(),
         },
         colunas,
+        this.ordenacoes(),
       )
       .subscribe({
         next: (blob) => {

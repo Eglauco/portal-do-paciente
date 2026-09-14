@@ -1,5 +1,12 @@
 import { Component, afterNextRender, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
@@ -8,6 +15,17 @@ import { PodeSair } from '../../core/pending-changes.guard';
 import { Perfil } from '../perfis/perfil.model';
 import { PerfilService } from '../perfis/perfil.service';
 import { UsuarioService } from './usuario.service';
+
+/**
+ * A confirmação deve conferir com a senha. O gatilho é a SENHA preenchida (não ambas):
+ * assim, senha preenchida + confirmação vazia já acusa erro; e na EDIÇÃO com as duas em
+ * branco (mantém a senha atual) não exige confirmação.
+ */
+function senhasConferem(group: AbstractControl): ValidationErrors | null {
+  const senha = group.get('senha')?.value ?? '';
+  const confirmar = group.get('confirmarSenha')?.value ?? '';
+  return senha && senha !== confirmar ? { senhaNaoConfere: true } : null;
+}
 
 @Component({
   selector: 'app-usuario-form',
@@ -26,22 +44,26 @@ export class UsuarioForm implements PodeSair {
   protected readonly unidades = this.auth.unidadesAcessiveis;
   protected readonly perfis = signal<Perfil[]>([]);
 
-  protected readonly form = new FormGroup({
-    nome: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.minLength(3)],
-    }),
-    email: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.required, Validators.email],
-    }),
-    senha: new FormControl('', {
-      nonNullable: true,
-      validators: [Validators.minLength(6)],
-    }),
-    unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
-    perfilIds: new FormControl<number[]>([], { nonNullable: true, validators: [Validators.required] }),
-  });
+  protected readonly form = new FormGroup(
+    {
+      nome: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.minLength(3)],
+      }),
+      email: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.email],
+      }),
+      senha: new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.minLength(6)],
+      }),
+      confirmarSenha: new FormControl('', { nonNullable: true }),
+      unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+      perfilIds: new FormControl<number[]>([], { nonNullable: true, validators: [Validators.required] }),
+    },
+    { validators: senhasConferem },
+  );
 
   protected readonly editando = signal(false);
   protected readonly codigo = signal<number | null>(null);
@@ -101,6 +123,11 @@ export class UsuarioForm implements PodeSair {
   protected invalido(campo: 'nome' | 'email' | 'senha' | 'unidadeSaudeId' | 'perfilIds'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
+  }
+
+  /** true quando a confirmação não bate com a senha (só após o campo ser tocado). */
+  protected get senhaNaoConfere(): boolean {
+    return this.form.hasError('senhaNaoConfere') && !!this.form.controls.confirmarSenha.touched;
   }
 
   protected salvar(event: Event): void {

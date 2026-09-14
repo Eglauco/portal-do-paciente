@@ -58,6 +58,8 @@ export interface ManifestacaoFiltro {
   unidadeId?: number | null;
   tipoId?: number | null;
   status?: StatusManifestacao | null;
+  /** Busca parcial pelo nome do paciente. */
+  nome?: string | null;
 }
 
 export interface Pagina<T> {

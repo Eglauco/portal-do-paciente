@@ -61,6 +61,10 @@ public class Configuracao {
     @Column(name = "valor_cor", length = 9)
     private String valorCor;
 
+    /** Valor do tipo IMAGEM: URL do objeto no S3 (pasta "configuracao"). */
+    @Column(name = "valor_imagem", columnDefinition = "TEXT")
+    private String valorImagem;
+
     /** Auditoria leve: quando e por quem o valor foi alterado pela última vez. */
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;

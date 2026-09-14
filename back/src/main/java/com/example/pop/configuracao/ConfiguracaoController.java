@@ -1,5 +1,7 @@
 package com.example.pop.configuracao;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,9 +37,10 @@ public class ConfiguracaoController {
     public Pagina<ConfiguracaoResponse> listar(
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) TipoConfiguracao tipo,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return service.listar(busca, tipo, page, size);
+        return service.listar(busca, tipo, ordenar, page, size);
     }
 
     @GetMapping("/{id}")

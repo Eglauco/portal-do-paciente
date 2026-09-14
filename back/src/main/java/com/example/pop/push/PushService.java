@@ -38,7 +38,9 @@ public class PushService {
 
     private static final Logger log = LoggerFactory.getLogger(PushService.class);
     private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+    private static final String EXPO_RECEIPTS_URL = "https://exp.host/--/api/v2/push/getReceipts";
     private static final int LOTE = 100;
+    private static final int LOTE_RECEIPTS = 1000; // limite da Expo por consulta de getReceipts
     private static final DateTimeFormatter DATA_FMT = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
 
     private final DispositivoRepository repository;
@@ -65,16 +67,6 @@ public class PushService {
             restClient = RestClient.builder().requestFactory(factory).build();
         }
         return restClient;
-    }
-
-    /** Novo agendamento aguardando confirmação — só o paciente dono. */
-    public void notificarNovoAgendamento(Agendamento a) {
-        String corpo = "Consulta de " + a.getEspecialidade().getNome()
-                + " em " + a.getDataHora().format(DATA_FMT)
-                + ". Toque para confirmar ou cancelar.";
-        Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId());
-        notificacaoService.registrar(a.getPaciente().getId(), TipoNotificacao.AGENDAMENTO, "Novo agendamento", corpo, a.getId());
-        notificarPaciente(a.getPaciente().getId(), FuncionalidadeApp.AGENDAMENTOS, "Novo agendamento", corpo, data);
     }
 
     /** Falta registrada — pede ao paciente para justificar a ausência. */
@@ -201,5 +193,101 @@ public class PushService {
         } catch (RuntimeException e) {
             log.warn("Falha ao enviar notificação push: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Resultado do envio de UM token: se a Expo ACEITOU a mensagem (ticket "ok") e o
+     * {@code receiptId} do ticket (para consultar a entrega depois via getReceipts). receiptId
+     * é nulo quando não foi aceito.
+     */
+    public record ResultadoEnvio(String token, boolean aceito, String receiptId) {
+    }
+
+    /**
+     * Envia e DEVOLVE o resultado por token (lê os tickets da Expo, que o envio comum
+     * descarta) — base do rastreio de entrega do agendamento. Uma falha de rede/Expo marca
+     * todos os tokens do lote como não aceitos (não sabemos se chegaram).
+     */
+    public List<ResultadoEnvio> enviarComResultado(String titulo, String corpo, Map<String, Object> data,
+            List<String> tokens) {
+        List<ResultadoEnvio> resultados = new ArrayList<>();
+        for (int i = 0; i < tokens.size(); i += LOTE) {
+            List<String> lote = tokens.subList(i, Math.min(i + LOTE, tokens.size()));
+            resultados.addAll(enviarLoteComResultado(lote, titulo, corpo, data));
+        }
+        return resultados;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ResultadoEnvio> enviarLoteComResultado(List<String> tokens, String titulo, String corpo,
+            Map<String, Object> data) {
+        List<Map<String, Object>> mensagens = new ArrayList<>();
+        for (String token : tokens) {
+            mensagens.add(Map.of(
+                    "to", token,
+                    "title", titulo,
+                    "body", corpo,
+                    "data", data,
+                    "channelId", "default",
+                    "priority", "high",
+                    "sound", "default"));
+        }
+        try {
+            Map<String, Object> resposta = client().post()
+                    .uri(EXPO_PUSH_URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(mensagens)
+                    .retrieve()
+                    .body(Map.class);
+            // A Expo devolve { "data": [ {status:"ok"|"error", ...}, ... ] } alinhado por índice.
+            List<Map<String, Object>> tickets = resposta == null ? null
+                    : (List<Map<String, Object>>) resposta.get("data");
+            List<ResultadoEnvio> out = new ArrayList<>();
+            for (int i = 0; i < tokens.size(); i++) {
+                Map<String, Object> ticket = (tickets != null && i < tickets.size()) ? tickets.get(i) : null;
+                boolean aceito = ticket != null && "ok".equals(String.valueOf(ticket.get("status")));
+                String receiptId = aceito && ticket.get("id") != null ? String.valueOf(ticket.get("id")) : null;
+                out.add(new ResultadoEnvio(tokens.get(i), aceito, receiptId));
+            }
+            return out;
+        } catch (RuntimeException e) {
+            log.warn("Falha ao enviar notificação push (com resultado): {}", e.getMessage());
+            return tokens.stream().map(t -> new ResultadoEnvio(t, false, null)).toList();
+        }
+    }
+
+    /**
+     * Consulta os RECEIPTS (getReceipts) da Expo para confirmar a ENTREGA ao aparelho.
+     * Devolve: id presente = true (entregue/ok) ou false (erro, ex.: DeviceNotRegistered);
+     * id AUSENTE do mapa = ainda não pronto (tentar de novo depois). Falha de rede não
+     * resolve nada (ids ficam ausentes).
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Boolean> consultarReceipts(List<String> receiptIds) {
+        Map<String, Boolean> resultado = new HashMap<>();
+        for (int i = 0; i < receiptIds.size(); i += LOTE_RECEIPTS) {
+            List<String> lote = receiptIds.subList(i, Math.min(i + LOTE_RECEIPTS, receiptIds.size()));
+            try {
+                Map<String, Object> resposta = client().post()
+                        .uri(EXPO_RECEIPTS_URL)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .body(Map.of("ids", lote))
+                        .retrieve()
+                        .body(Map.class);
+                Object data = resposta == null ? null : resposta.get("data");
+                if (data instanceof Map<?, ?> mapa) {
+                    mapa.forEach((id, valor) -> {
+                        if (valor instanceof Map<?, ?> receipt) {
+                            resultado.put(String.valueOf(id), "ok".equals(String.valueOf(receipt.get("status"))));
+                        }
+                    });
+                }
+            } catch (RuntimeException e) {
+                log.warn("Falha ao consultar receipts push: {}", e.getMessage());
+            }
+        }
+        return resultado;
     }
 }

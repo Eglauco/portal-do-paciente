@@ -29,7 +29,7 @@
   <!-- Filtros -->
   <form class="filters" (submit)="buscar($event)">
     <p class="section-label">Filtros</p>
-    <div class="filters__row2">
+    <div class="filters__row2 filters__row2--nome">
       <input
         class="input"
         placeholder="Nome"
@@ -61,9 +61,19 @@
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Dados</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -91,10 +101,10 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th class="col-cod">Código</th>
-              <th>Nome</th>
-              <th>Descrição</th>
-              <th class="col-sit">Situação</th>
+              <th class="col-cod" appOrdenavel="codigo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Código</th>
+              <th appOrdenavel="nome" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Nome</th>
+              <th appOrdenavel="descricao" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Descrição</th>
+              <th class="col-sit" appOrdenavel="ativo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Situação</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>

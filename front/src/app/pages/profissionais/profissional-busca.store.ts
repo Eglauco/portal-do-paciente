@@ -1,20 +1,27 @@
 import { Injectable } from '@angular/core';
+import { Ordenacao } from '../../shared/ordenacao/ordenacao.model';
 import { ProfissionalSaudeService } from './profissional.service';
 
 /**
- * Mantém o último estado da pesquisa de profissionais (filtros, página e tamanho)
+ * Mantém o último estado da pesquisa de profissionais (filtros, ordenação, página e tamanho)
  * para que ele seja preservado ao sair da listagem e voltar.
  */
 @Injectable({ providedIn: 'root' })
 export class ProfissionalSaudeBuscaStore {
   codigo = '';
   nome = '';
+  /** Situação do cadastro: Ativos (padrão), Inativos ou Todos. */
+  situacao: 'ATIVO' | 'INATIVO' | 'TODOS' = 'ATIVO';
+  /** Ordenação multi-coluna escolhida nos cabeçalhos (vazia = padrão do backend). */
+  ordenacoes: Ordenacao[] = [];
   page = 0;
   size = ProfissionalSaudeService.TAMANHO_PADRAO;
 
+  /** Limpa apenas os filtros (a ordenação tem o próprio "Limpar ordenação"). */
   limpar(): void {
     this.codigo = '';
     this.nome = '';
+    this.situacao = 'ATIVO';
     this.page = 0;
     this.size = ProfissionalSaudeService.TAMANHO_PADRAO;
   }

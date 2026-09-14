@@ -21,7 +21,7 @@ class MotivoFaltaControllerTest {
 
     @Test
     void listaMotivosSemeados() {
-        Pagina<MotivoFalta> pagina = controller.listar(null, null, 0, 10);
+        Pagina<MotivoFalta> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 8, "esperado ao menos os motivos semeados");
     }
 

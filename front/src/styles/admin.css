@@ -19,43 +19,48 @@
 .sidebar__brand {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 1.4rem 1.25rem;
+  gap: 0.8rem;
+  padding: 1.4rem 1.1rem;
 }
 
 .sidebar__mark {
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
+  flex-shrink: 0;
+  width: 4.25rem;
+  height: 4.25rem;
+  border-radius: 1rem;
   color: #fff;
   background: linear-gradient(150deg, var(--brand) 0%, var(--brand-deep) 100%);
-  box-shadow: 0 8px 18px -10px rgba(var(--brand-deep-rgb), 0.7);
+  box-shadow: 0 10px 22px -12px rgba(var(--brand-deep-rgb), 0.7);
 }
 
 .sidebar__mark svg {
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 2.4rem;
+  height: 2.4rem;
   stroke: var(--glow);
 }
 
+.sidebar__brandtext {
+  min-width: 0;
+}
+
 .sidebar__name {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
+  display: block;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 1.35rem;
-  letter-spacing: 0.02em;
+  font-size: 0.95rem;
+  line-height: 1.15;
+  letter-spacing: 0.01em;
   color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
 .sidebar__ver {
   display: block;
   font-size: 0.72rem;
   color: var(--muted);
-  margin-top: 0.1rem;
+  margin-top: 0.15rem;
 }
 
 .nav {
@@ -1157,6 +1162,11 @@
   gap: 1.1rem;
 }
 
+/* Variante: 1ª coluna estreita (ex.: Sigla) + 2ª ocupando o resto (ex.: Nome). */
+.form-grid--sm-first {
+  grid-template-columns: 200px 1fr;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
@@ -1218,6 +1228,37 @@
 .result-count {
   font-size: 0.85rem;
   color: var(--muted);
+}
+
+/* Cabeçalho do painel: grupo à direita (limpar ordenação + contagem). */
+.panel__head-right {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.sort-clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.sort-clear:hover {
+  color: var(--brand-deep);
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--line));
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.sort-clear svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  stroke: currentColor;
 }
 
 /* Tabela de dados (reutilizável nos CRUDs) */
@@ -1759,7 +1800,8 @@
   .filters__actions {
     justify-content: flex-end;
   }
-  .form-grid {
+  .form-grid,
+  .form-grid--sm-first {
     grid-template-columns: 1fr;
   }
 }
@@ -1824,6 +1866,67 @@
   .filters__row2 {
     grid-template-columns: 1fr;
   }
+}
+
+/* Variante: Nome grande + Select estreito, com o Select no MESMO visual do input
+   (ex.: Tipos de Manifestação). Escopada para não afetar quem usa .filters__row2 com 2 inputs. */
+.filters__row2--nome {
+  grid-template-columns: 1fr 220px;
+}
+.filters__row2--nome .select select {
+  height: 3rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  background: #f7faf9;
+  border-radius: 0.7rem;
+}
+@media (max-width: 900px) {
+  .filters__row2--nome {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Grade de filtros responsiva (ex.: Agendamentos) ---------- */
+.filters__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* 3 em cima, 3 embaixo */
+  gap: 1rem 0.85rem;
+  align-items: end;
+}
+@media (max-width: 860px) {
+  .filters__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .filters__grid {
+    grid-template-columns: 1fr;
+  }
+}
+.filters__grid .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.filters__grid .field > .label {
+  margin-bottom: 0;
+}
+.filters__grid .select {
+  display: flex;
+  width: 100%;
+}
+/* Selects dos filtros seguem o MESMO padrão dos inputs de texto (altura, fonte, fundo, raio). */
+.filters__grid .select select {
+  width: 100%;
+  height: 3rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  background: #f7faf9;
+  border-radius: 0.7rem;
+}
+/* Alinha o texto dos campos de busca com o rótulo/selects (tira o espaço inicial extra). */
+.filters__grid .input {
+  padding-left: 0.75rem;
 }
 
 /* Ícone dentro do avatar da tabela (quando não há iniciais) */
@@ -1910,6 +2013,37 @@
 .status-pill[data-st='FALTA_PACIENTE'] { color: #8a5a00; background: #fbe9cf; }
 .status-pill[data-st='PRESENCA_PACIENTE'] { color: #2f6df6; background: #e9f0fe; }
 
+/* Entrega da notificação do agendamento ao destino (paciente/responsáveis) */
+.entrega-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.28rem 0.62rem;
+  border-radius: 2rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.entrega-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.entrega-pill[data-ent='NOTIFICACAO_ENTREGUE'] { color: #0a7d5a; background: #e3f6ec; }
+.entrega-pill[data-ent='NOTIFICACAO_ENVIADA'] { color: #2f6df6; background: #e9f0fe; }
+.entrega-pill[data-ent='PACIENTE_SEM_APLICATIVO'] { color: #a5741a; background: #fbf0d6; }
+.entrega-pill[data-ent='SEM_NOTIFICACAO_ATIVA'] { color: #b23b4e; background: #fbe4e7; }
+
+/* Destinatários da notificação: um grupo por pessoa, com a linha do tempo dos eventos */
+.entrega-grupo { padding: 0.85rem 0; border-top: 1px solid var(--line); }
+.entrega-grupo:first-child { border-top: none; padding-top: 0.25rem; }
+.entrega-grupo__nome { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+.entrega-grupo__tel { font-size: 0.8rem; color: var(--muted); margin: 2px 0 0; }
+.entrega-grupo .tl { margin-top: 0.6rem; }
+.entrega-grupo .tl__body .entrega-pill { margin-bottom: 3px; }
+
 .cell-data { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
 
 /* Filtro em linha (rótulo + select) */
@@ -1949,6 +2083,8 @@
 
 /* Filtros do chat */
 .filters__chat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; }
+/* Pacientes: linha 1 = Código/Prontuário/CPF; Nome ocupa a linha de baixo inteira. */
+.filters__chat--pacientes .filters__campo--largo { grid-column: 1 / -1; }
 .filters__chat-acoes { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 0.9rem; flex-wrap: wrap; }
 .check { display: inline-flex; align-items: center; gap: 0.55rem; font-size: 0.9rem; color: var(--muted); cursor: pointer; user-select: none; }
 .check input { position: absolute; opacity: 0; width: 0; height: 0; }

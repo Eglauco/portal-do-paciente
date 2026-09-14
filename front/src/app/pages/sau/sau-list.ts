@@ -37,6 +37,7 @@ export class SauList {
   protected readonly tipos = signal<TipoManifestacao[]>([]);
 
   protected readonly filtro = new FormGroup({
+    nome: new FormControl<string | null>(this.store.nome),
     tipoId: new FormControl<number | null>(this.store.tipoId),
     status: new FormControl<StatusManifestacao | null>(this.store.status),
   });
@@ -89,7 +90,7 @@ export class SauList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ tipoId: null, status: null });
+    this.filtro.reset({ nome: null, tipoId: null, status: null });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -119,13 +120,18 @@ export class SauList {
     const f = this.filtro.getRawValue();
     this.store.tipoId = f.tipoId;
     this.store.status = f.status;
+    this.store.nome = f.nome;
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status }, this.page(), this.size())
+      .listar(
+        { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status, nome: f.nome },
+        this.page(),
+        this.size(),
+      )
       .subscribe({
         next: (pagina) => {
           this.manifestacoes.set(pagina.content);
@@ -160,7 +166,11 @@ export class SauList {
     const f = this.filtro.getRawValue();
     this.exportando.set(formato);
     this.service
-      .exportar(formato, { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status }, colunas)
+      .exportar(
+        formato,
+        { unidadeId: this.auth.unidadeId(), tipoId: f.tipoId, status: f.status, nome: f.nome },
+        colunas,
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `sau.${formato}`);

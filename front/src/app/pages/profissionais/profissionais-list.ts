@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { ProfissionalSaude } from './profissional.model';
 import { ProfissionalSaudeBuscaStore } from './profissional-busca.store';
 import { ProfissionalSaudeService } from './profissional.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-profissionais-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './profissionais-list.html',
 })
 export class ProfissionalSaudesList {
@@ -29,6 +31,9 @@ export class ProfissionalSaudesList {
 
   protected readonly codigo = signal(this.store.codigo);
   protected readonly nome = signal(this.store.nome);
+  protected readonly situacao = signal<'ATIVO' | 'INATIVO' | 'TODOS'>(this.store.situacao);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly profissionais = signal<ProfissionalSaude[]>([]);
   protected readonly loading = signal(false);
@@ -76,6 +81,13 @@ export class ProfissionalSaudesList {
     this.store.limpar();
     this.codigo.set('');
     this.nome.set('');
+    this.situacao.set('ATIVO');
+    this.page.set(0);
+    this.carregar();
+  }
+
+  protected updateSituacao(event: Event): void {
+    this.situacao.set((event.target as HTMLSelectElement).value as 'ATIVO' | 'INATIVO' | 'TODOS');
     this.page.set(0);
     this.carregar();
   }
@@ -103,12 +115,21 @@ export class ProfissionalSaudesList {
   private carregar(): void {
     this.store.codigo = this.codigo();
     this.store.nome = this.nome();
+    this.store.situacao = this.situacao();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size()).subscribe({
+    this.service
+      .listar(
+        { codigo: this.codigo(), nome: this.nome(), situacao: this.situacao() },
+        this.page(),
+        this.size(),
+        this.ordenacoes(),
+      )
+      .subscribe({
       next: (pagina) => {
         this.profissionais.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -132,6 +153,29 @@ export class ProfissionalSaudesList {
     this.router.navigate(['/profissionais', profissional.id]);
   }
 
+  /** Iniciais do nome (fallback do avatar quando o profissional não tem foto). */
+  protected iniciais(nome: string): string {
+    const partes = nome.trim().split(/\s+/);
+    const primeira = partes[0]?.charAt(0) ?? '';
+    const ultima = partes.length > 1 ? partes[partes.length - 1].charAt(0) : '';
+    return (primeira + ultima).toUpperCase();
+  }
+
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -144,7 +188,14 @@ export class ProfissionalSaudesList {
     this.formatoModal.set(null);
     if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas).subscribe({
+    this.service
+      .exportar(
+        formato,
+        { codigo: this.codigo(), nome: this.nome(), situacao: this.situacao() },
+        colunas,
+        this.ordenacoes(),
+      )
+      .subscribe({
       next: (blob) => {
         this.baixar(blob, `profissionais.${formato}`);
         this.exportando.set(null);

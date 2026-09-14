@@ -9,5 +9,7 @@ public enum TipoConfiguracao {
     NUMERICO,
     TEXTO,
     /** Cor (hex {@code #RRGGBB}) guardada em {@code valorCor}; a tela mostra um seletor RGB. */
-    COR
+    COR,
+    /** Imagem: a URL do objeto no S3 (pasta "configuracao") guardada em {@code valorImagem}; a tela sobe o arquivo. */
+    IMAGEM
 }

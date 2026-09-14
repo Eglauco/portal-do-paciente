@@ -1,6 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Configuracao, TipoConfiguracao } from './configuracao.model';
 import { ConfiguracaoBuscaStore } from './configuracao-busca.store';
 import { ConfiguracaoService } from './configuracao.service';
@@ -9,7 +11,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-configuracoes-list',
-  imports: [DatePipe],
+  imports: [DatePipe, Ordenavel],
   templateUrl: './configuracoes-list.html',
 })
 export class ConfiguracoesList {
@@ -21,6 +23,8 @@ export class ConfiguracoesList {
   protected readonly size = signal(this.store.size);
 
   protected readonly busca = signal(this.store.busca);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly configuracoes = signal<Configuracao[]>([]);
   protected readonly loading = signal(false);
@@ -91,12 +95,13 @@ export class ConfiguracoesList {
 
   private carregar(): void {
     this.store.busca = this.busca();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ busca: this.busca() }, this.page(), this.size()).subscribe({
+    this.service.listar({ busca: this.busca() }, this.page(), this.size(), this.ordenacoes()).subscribe({
       next: (pagina) => {
         this.configuracoes.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -120,6 +125,21 @@ export class ConfiguracoesList {
     this.router.navigate(['/configuracoes', c.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   protected updateBusca(event: Event): void {
     this.busca.set((event.target as HTMLInputElement).value);
   }
@@ -132,7 +152,9 @@ export class ConfiguracoesList {
         ? 'Numérico'
         : tipo === 'COR'
           ? 'Cor'
-          : 'Texto';
+          : tipo === 'IMAGEM'
+            ? 'Imagem'
+            : 'Texto';
   }
 
   /** Valor atual formatado para a tabela. */
@@ -146,6 +168,8 @@ export class ConfiguracoesList {
         return c.valorTexto && c.valorTexto.trim() ? c.valorTexto : '—';
       case 'COR':
         return c.valorCor ?? '—';
+      case 'IMAGEM':
+        return c.valorImagem ? 'Imagem enviada' : '—';
     }
   }
 }

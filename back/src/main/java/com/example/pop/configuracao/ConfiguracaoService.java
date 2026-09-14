@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.usuario.Usuario;
 import com.example.pop.usuario.UsuarioRepository;
@@ -34,6 +35,16 @@ import com.example.pop.usuario.UsuarioRepository;
 public class ConfiguracaoService {
 
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome",
+            "chave", "chave",
+            "tipoConfiguracao", "tipoConfiguracao",
+            "atualizadoEm", "atualizadoEm");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final ConfiguracaoRepository repository;
     private final UsuarioRepository usuarioRepository;
@@ -49,9 +60,9 @@ public class ConfiguracaoService {
     // ---------- CRUD (tela) ----------
 
     @Transactional(readOnly = true)
-    public Pagina<ConfiguracaoResponse> listar(String busca, TipoConfiguracao tipo, int page, int size) {
+    public Pagina<ConfiguracaoResponse> listar(String busca, TipoConfiguracao tipo, List<String> ordenar, int page, int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Sort.by(Sort.Direction.ASC, "nome"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Configuracao> resultado = repository.search(busca == null ? "" : busca.trim(), tipo, pageable);
         Map<Long, String> nomes = nomesEditores(resultado.getContent());
         List<ConfiguracaoResponse> content = resultado.getContent().stream()
@@ -80,6 +91,8 @@ public class ConfiguracaoService {
                         : req.valorNumerico().setScale(4, RoundingMode.HALF_UP));
                 case TEXTO -> c.setValorTexto(req.valorTexto());
                 case COR -> c.setValorCor(normalizarCor(req.valorCor()));
+                // Guarda a URL do objeto já enviado ao S3 pelo front (vazio → limpa a imagem).
+                case IMAGEM -> c.setValorImagem(vazioParaNulo(req.valorImagem()));
             }
             c.setAtualizadoEm(LocalDateTime.now());
             c.setAtualizadoPor(usuarioId);
@@ -125,6 +138,15 @@ public class ConfiguracaoService {
     /** Valor cor (hex {@code #RRGGBB}) da chave. Erro se a chave não existir ou o tipo divergir. */
     public String lerCor(String chave) {
         return obrigatoria(chave, TipoConfiguracao.COR).getValorCor();
+    }
+
+    /** URL da imagem (S3) da chave; pode ser null. Erro se a chave não existir ou o tipo divergir. */
+    public String lerImagem(String chave) {
+        return obrigatoria(chave, TipoConfiguracao.IMAGEM).getValorImagem();
+    }
+
+    private static String vazioParaNulo(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     /** Normaliza e valida uma cor {@code #RRGGBB} (maiúscula); 422 se o formato for inválido. */

@@ -3,7 +3,6 @@ package com.example.pop.paciente;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +34,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -49,6 +49,16 @@ public class PacienteController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome",
+            "cpf", "cpf",
+            "prontuario", "prontuario",
+            "dataNascimento", "dataNascimento");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final PacienteRepository repository;
     private final PacienteAcessoService acessoService;
@@ -82,6 +92,7 @@ public class PacienteController {
             @RequestParam(required = false) String cpf,
             @RequestParam(required = false) String prontuario,
             @RequestParam(required = false) String situacao,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
@@ -90,7 +101,7 @@ public class PacienteController {
         String filtroCpf = digitos(cpf);
         String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Paciente> resultado = repository.search(codigo, situacaoFiltro(situacao), filtroNome, filtroCpf, filtroProntuario, pageable);
         // Avatar da lista: troca a URL crua da foto pela GET pré-assinada (só p/ exibição;
         // as entidades já estão destacadas fora de transação, então não persiste nada).
@@ -110,7 +121,7 @@ public class PacienteController {
 
     /**
      * Exporta os pacientes que batem com os MESMOS filtros da tela (todos os
-     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por nome.
      */
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportar(
@@ -120,14 +131,13 @@ public class PacienteController {
             @RequestParam(required = false) String cpf,
             @RequestParam(required = false) String prontuario,
             @RequestParam(required = false) String situacao,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroCpf = digitos(cpf);
         String filtroProntuario = (prontuario == null) ? "" : prontuario.trim();
-        List<Paciente> dados = repository.search(codigo, situacaoFiltro(situacao), filtroNome, filtroCpf, filtroProntuario, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Paciente::getId))
-                .toList();
+        List<Paciente> dados = repository.search(codigo, situacaoFiltro(situacao), filtroNome, filtroCpf,
+                filtroProntuario, Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<Paciente>> cols = ExportacaoService.filtrar(colunasPaciente(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

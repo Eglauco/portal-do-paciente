@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
                         // Tema (cor da plataforma): leitura pública p/ o front e o app aplicarem no boot.
                         .requestMatchers(HttpMethod.GET, "/tema").permitAll()
+                        // Marca (white-label: nome + textos do login): leitura pública p/ o login pintar.
+                        .requestMatchers(HttpMethod.GET, "/marca").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
@@ -81,9 +83,9 @@ public class SecurityConfig {
                         // Back-office (admin): o front do admin envia o token em todas as chamadas.
                         .requestMatchers("/auth/**", "/paciente/**", "/prontuario/**", "/storage/**", "/usuario/**",
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
-                                "/procedimento/**", "/profissional/**", "/motivo-falta/**", "/categoria-nps/**",
-                                "/postagem/**", "/sau/**", "/tipo-manifestacao/**", "/dashboard/**",
-                                "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
+                                "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
+                                "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
+                                "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())

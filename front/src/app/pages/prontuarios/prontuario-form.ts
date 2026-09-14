@@ -5,7 +5,7 @@ import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
 import { PodeSair } from '../../core/pending-changes.guard';
-import { Agendamento } from '../agendamentos/agendamento.model';
+import { Agendamento, filtroVazio } from '../agendamentos/agendamento.model';
 import { AgendamentoService } from '../agendamentos/agendamento.service';
 import { ProntuarioRequest } from './prontuario.model';
 import { ProntuarioService } from './prontuario.service';
@@ -241,9 +241,8 @@ export class ProntuarioForm implements PodeSair {
   }
 
   private carregarOpcoes(): void {
-    // Assinatura: listar(status, unidadeId, page, size). Sem o unidadeId a chamada
-    // ficava desalinhada (unidadeId=0, page=100) e o seletor vinha sempre vazio.
-    this.agendamentoService.listar(null, null, 0, 100).subscribe({
+    // Todos os agendamentos (sem filtro) para o seletor; unidadeId nulo = todas as unidades.
+    this.agendamentoService.listar(filtroVazio(), null, 0, 100).subscribe({
       next: (p) => this.agendamentos.set(p.content.map((a) => ({ id: a.id!, rotulo: this.rotuloAgendamento(a) }))),
       error: () => this.toastr.error('Não foi possível carregar os agendamentos.'),
     });

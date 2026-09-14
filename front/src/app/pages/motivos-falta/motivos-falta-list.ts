@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { MotivoFalta } from './motivo-falta.model';
 import { MotivoFaltaBuscaStore } from './motivo-falta-busca.store';
 import { MotivoFaltaService } from './motivo-falta.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-motivos-falta-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './motivos-falta-list.html',
 })
 export class MotivosFaltaList {
@@ -29,6 +31,8 @@ export class MotivosFaltaList {
 
   protected readonly codigo = signal(this.store.codigo);
   protected readonly motivo = signal(this.store.motivo);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Motivo A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly motivos = signal<MotivoFalta[]>([]);
   protected readonly loading = signal(false);
@@ -103,12 +107,15 @@ export class MotivosFaltaList {
   private carregar(): void {
     this.store.codigo = this.codigo();
     this.store.motivo = this.motivo();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), motivo: this.motivo() }, this.page(), this.size()).subscribe({
+    this.service
+      .listar({ codigo: this.codigo(), motivo: this.motivo() }, this.page(), this.size(), this.ordenacoes())
+      .subscribe({
       next: (pagina) => {
         this.motivos.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -132,6 +139,21 @@ export class MotivosFaltaList {
     this.router.navigate(['/motivos-falta', motivo.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -144,7 +166,9 @@ export class MotivosFaltaList {
     this.formatoModal.set(null);
     if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), motivo: this.motivo() }, colunas).subscribe({
+    this.service
+      .exportar(formato, { codigo: this.codigo(), motivo: this.motivo() }, colunas, this.ordenacoes())
+      .subscribe({
       next: (blob) => {
         this.baixar(blob, `motivos-falta.${formato}`);
         this.exportando.set(null);

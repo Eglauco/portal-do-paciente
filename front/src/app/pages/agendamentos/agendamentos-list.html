@@ -27,34 +27,84 @@
   </header>
 
   <!-- Filtros -->
-  <div class="filters">
+  <form class="filters" (submit)="pesquisar($event)">
     <p class="section-label">Filtros</p>
-    <div class="filters__agenda">
-      <label class="field-inline">
-        <span class="field-inline__label">Status</span>
-        <span class="select select--full">
-          <select aria-label="Filtrar por status" (change)="alterarStatus($event)">
-            <option value="" [selected]="status() === null">Todos os status</option>
+    <div class="filters__grid">
+      <label class="field">
+        <span class="label">Paciente</span>
+        <input class="input" type="text" placeholder="Nome do paciente" [value]="nome()" (input)="updateNome($event)" />
+      </label>
+
+      <label class="field">
+        <span class="label">Status</span>
+        <span class="select">
+          <select aria-label="Status" (change)="updateStatus($event)">
+            <option value="" [selected]="status() === null">Todos</option>
             @for (opt of statusOpcoes; track opt.value) {
               <option [value]="opt.value" [selected]="status() === opt.value">{{ opt.label }}</option>
             }
           </select>
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         </span>
       </label>
-      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+
+      <label class="field">
+        <span class="label">Especialidade</span>
+        <input class="input" type="text" placeholder="Nome da especialidade" [value]="especialidadeNome()" (input)="updateEspecialidade($event)" />
+      </label>
+
+      <label class="field">
+        <span class="label">Profissional</span>
+        <input class="input" type="text" placeholder="Nome do profissional" [value]="profissionalNome()" (input)="updateProfissional($event)" />
+      </label>
+
+      <label class="field">
+        <span class="label">Notificação</span>
+        <span class="select">
+          <select aria-label="Estado da notificação" (change)="updateEntrega($event)">
+            <option value="" [selected]="entregaResumo() === null">Todas</option>
+            @for (opt of entregaOpcoes; track opt.value) {
+              <option [value]="opt.value" [selected]="entregaResumo() === opt.value">{{ opt.label }}</option>
+            }
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </label>
+
+      <label class="field">
+        <span class="label">Data</span>
+        <input class="input" type="date" [value]="data()" (change)="updateData($event)" />
+      </label>
     </div>
-  </div>
+
+    <div class="filters__actions">
+      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+      <button type="submit" class="btn btn--solid">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        Pesquisar
+      </button>
+    </div>
+  </form>
 
   <!-- Dados -->
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Dados</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -67,7 +117,7 @@
         <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
         <h3>Não foi possível carregar</h3>
         <p>Verifique se o servidor está disponível e tente novamente.</p>
-        <button type="button" class="btn btn--solid" (click)="limpar()">Tentar novamente</button>
+        <button type="button" class="btn btn--solid" (click)="tentarNovamente()">Tentar novamente</button>
       </div>
     } @else if (agendamentos().length === 0) {
       <div class="state">
@@ -85,13 +135,13 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Data / Hora</th>
-              <th>Paciente</th>
-              <th>Especialidade</th>
-              <th>Profissional</th>
-              <th>Procedimento</th>
-              <th>Unidade</th>
-              <th>Status</th>
+              <th appOrdenavel="dataHora" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Data / Hora</th>
+              <th appOrdenavel="paciente" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Paciente</th>
+              <th appOrdenavel="especialidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Especialidade</th>
+              <th appOrdenavel="profissional" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Profissional</th>
+              <th appOrdenavel="procedimento" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Procedimento</th>
+              <th appOrdenavel="status" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Status</th>
+              <th appOrdenavel="entregaResumo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Notificação</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -109,11 +159,17 @@
                 <td class="muted-cell">{{ a.especialidade.nome }}</td>
                 <td class="muted-cell">{{ a.profissionalSaude.nome }}</td>
                 <td class="muted-cell">{{ a.procedimento.nome }}</td>
-                <td class="muted-cell">{{ a.unidadeSaude.nome }}</td>
                 <td>
                   <span class="status-pill" [attr.data-st]="a.statusAgendamento">
                     {{ rotuloStatus(a.statusAgendamento) }}
                   </span>
+                </td>
+                <td>
+                  @if (a.entregaResumo) {
+                    <span class="entrega-pill" [attr.data-ent]="a.entregaResumo">{{ rotuloEntrega(a.entregaResumo) }}</span>
+                  } @else {
+                    <span class="muted-cell">—</span>
+                  }
                 </td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">

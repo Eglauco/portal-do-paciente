@@ -1,6 +1,7 @@
 import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { MarcaService } from '../../core/marca.service';
 
 @Component({
   selector: 'app-login',
@@ -9,6 +10,8 @@ import { AuthService } from '../../core/auth.service';
 export class Login {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  /** Textos de marca (white-label) para o painel de login. */
+  protected readonly marca = inject(MarcaService);
 
   constructor() {
     // Quem já está autenticado não precisa ver o login.

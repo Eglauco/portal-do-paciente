@@ -1,12 +1,14 @@
 import { Component, afterNextRender, DestroyRef, ElementRef, inject, signal, viewChild } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService, UnidadeRef } from '../../core/auth.service';
+import { MarcaService } from '../../core/marca.service';
 import { NotificacaoAdmin, NotificacaoService } from '../../core/notificacao.service';
+import { BuscaFuncionalidades } from '../../shared/busca-funcionalidades/busca-funcionalidades';
 import { TrocarSenhaModal } from './trocar-senha-modal';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal, BuscaFuncionalidades],
   templateUrl: './shell.html',
   host: { '(document:keydown.escape)': 'aoEscape()' },
 })
@@ -15,6 +17,8 @@ export class Shell {
   private readonly notif = inject(NotificacaoService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  /** Nome da plataforma (white-label) para o rodapé da sidebar. */
+  protected readonly marca = inject(MarcaService);
 
   protected readonly usuario = this.auth.usuario;
   /** Contagem e lista do sino de notificações. */

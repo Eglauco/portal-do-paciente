@@ -1,6 +1,8 @@
 export interface Especialidade {
   id?: number;
   nome: string;
+  /** Código da especialidade em um sistema externo (integração); único quando preenchido. */
+  codigoIntegracao?: string | null;
 }
 
 export interface EspecialidadeFiltro {

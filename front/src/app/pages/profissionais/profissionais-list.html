@@ -46,14 +46,29 @@
         (input)="updateNome($event)"
       />
     </div>
-    <div class="filters__actions">
-      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
-      <button type="submit" class="btn btn--solid">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
-        </svg>
-        Pesquisar
-      </button>
+    <div class="filters__chat-acoes">
+      <label class="page-size">
+        Situação
+        <span class="select">
+          <select (change)="updateSituacao($event)" aria-label="Situação do cadastro">
+            <option value="ATIVO" [selected]="situacao() === 'ATIVO'">Ativos</option>
+            <option value="INATIVO" [selected]="situacao() === 'INATIVO'">Inativos</option>
+            <option value="TODOS" [selected]="situacao() === 'TODOS'">Todos</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </span>
+      </label>
+      <div class="filters__actions">
+        <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+        <button type="submit" class="btn btn--solid">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          Pesquisar
+        </button>
+      </div>
     </div>
   </form>
 
@@ -61,9 +76,19 @@
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Dados</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -94,8 +119,10 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th class="col-cod">Código</th>
-              <th>Nome</th>
+              <th class="col-cod" appOrdenavel="codigo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Código</th>
+              <th appOrdenavel="nome" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Nome</th>
+              <th>Conselho</th>
+              <th>Situação</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -111,13 +138,27 @@
                 <td class="mono">{{ u.id }}</td>
                 <td>
                   <span class="user-cell">
-                    <span class="avatar" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" /><path d="M14 10h4a2 2 0 0 1 2 2v9" /><path d="M3 21h18" /><path d="M8 8v0M8 12v0M8 16v0" />
-                      </svg>
-                    </span>
+                    @if (u.fotoUrl) {
+                      <img class="avatar av-foto" [src]="u.fotoUrl" (error)="u.fotoUrl = null" alt="" />
+                    } @else {
+                      <span class="avatar" aria-hidden="true">{{ iniciais(u.nome) }}</span>
+                    }
                     <b>{{ u.nome }}</b>
                   </span>
+                </td>
+                <td class="muted-cell">
+                  @if (u.conselho) {
+                    <span [title]="u.conselho.nome"><b>{{ u.conselho.sigla }}</b>{{ u.numeroConselho ? ' ' + u.numeroConselho : '' }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td>
+                  @if (u.ativo === false) {
+                    <span class="badge-inativo">Inativo</span>
+                  } @else {
+                    <span class="muted-cell">Ativo</span>
+                  }
                 </td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">

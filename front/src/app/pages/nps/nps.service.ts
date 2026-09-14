@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { Nps, NpsDetalhe, NpsFiltro, Pagina } from './nps.model';
 
 @Injectable({ providedIn: 'root' })
@@ -12,21 +13,33 @@ export class NpsService {
   static readonly TAMANHOS = [10, 25, 50, 100];
   static readonly TAMANHO_PADRAO = 10;
 
-  listar(filtro: NpsFiltro = {}, page = 0, size = NpsService.TAMANHO_PADRAO): Observable<Pagina<Nps>> {
+  listar(
+    filtro: NpsFiltro = {},
+    page = 0,
+    size = NpsService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Pagina<Nps>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.status) params = params.set('status', filtro.status);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Nps>>(this.base, { params });
   }
 
-  /** Exporta as avaliações dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: NpsFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta as avaliações dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: NpsFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.status) params = params.set('status', filtro.status);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

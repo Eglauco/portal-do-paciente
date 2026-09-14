@@ -17,7 +17,7 @@ class ProcedimentoControllerTest {
 
     @Test
     void listaProcedimentosSemeadas() {
-        Pagina<Procedimento> pagina = controller.listar(null, null, 0, 10);
+        Pagina<Procedimento> pagina = controller.listar(null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 6, "esperado ao menos as procedimentos semeadas");
         assertTrue(pagina.content().size() <= 10);
         assertTrue(pagina.first());
@@ -25,14 +25,14 @@ class ProcedimentoControllerTest {
 
     @Test
     void filtraPorNome() {
-        Pagina<Procedimento> pagina = controller.listar(null, "raio", 0, 10);
+        Pagina<Procedimento> pagina = controller.listar(null, "raio", null, 0, 10);
         assertEquals(1, pagina.totalElements());
         assertEquals("Exame de raio-x", pagina.content().get(0).getNome());
     }
 
     @Test
     void tamanhoAcimaDoLimiteEhReduzidoPara100() {
-        Pagina<Procedimento> pagina = controller.listar(null, null, 0, 500);
+        Pagina<Procedimento> pagina = controller.listar(null, null, null, 0, 500);
         assertEquals(100, pagina.size());
     }
 }

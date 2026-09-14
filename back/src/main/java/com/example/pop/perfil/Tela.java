@@ -25,6 +25,7 @@ public enum Tela {
     POSTAGENS("Rede Social"),
     ESPECIALIDADES("Especialidades"),
     PROFISSIONAIS("Profissionais"),
+    CONSELHOS("Conselhos"),
     PROCEDIMENTOS("Procedimentos"),
     MOTIVOS_FALTA("Motivos de falta"),
     UNIDADES("Unidades"),

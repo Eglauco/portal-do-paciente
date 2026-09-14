@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import {
   Pagina,
   Prontuario,
@@ -22,21 +23,31 @@ export class ProntuarioService {
     filtro: ProntuarioFiltro = {},
     page = 0,
     size = ProntuarioService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
   ): Observable<Pagina<Prontuario>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.numero) params = params.set('numero', filtro.numero);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.especialidade?.trim()) params = params.set('especialidade', filtro.especialidade.trim());
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Prontuario>>(this.base, { params });
   }
 
-  /** Exporta os prontuários dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: ProntuarioFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta os prontuários dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: ProntuarioFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.numero) params = params.set('numero', filtro.numero);
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
+    if (filtro.especialidade?.trim()) params = params.set('especialidade', filtro.especialidade.trim());
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

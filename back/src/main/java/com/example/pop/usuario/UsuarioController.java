@@ -1,9 +1,9 @@
 package com.example.pop.usuario;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.dao.DataIntegrityViolationException;
@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -47,6 +48,14 @@ public class UsuarioController {
     private static final int TAMANHO_MAXIMO = 100;
     /** Tamanho mínimo da senha. */
     private static final int SENHA_MIN = 6;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome",
+            "email", "email");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final UsuarioRepository repository;
     private final PasswordEncoder passwordEncoder;
@@ -73,6 +82,7 @@ public class UsuarioController {
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String email,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
@@ -80,7 +90,7 @@ public class UsuarioController {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroEmail = (email == null) ? "" : email.trim();
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Usuario> resultado = repository.search(codigo, filtroNome, filtroEmail, pageable);
 
         return new Pagina<>(
@@ -95,7 +105,7 @@ public class UsuarioController {
 
     /**
      * Exporta os usuários que batem com os MESMOS filtros da tela (todos os
-     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por nome.
      */
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportar(
@@ -103,14 +113,14 @@ public class UsuarioController {
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) String email,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
         String filtroEmail = (email == null) ? "" : email.trim();
 
-        List<Usuario> dados = repository.search(codigo, filtroNome, filtroEmail, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Usuario::getId))
-                .toList();
+        // Ordena no BANCO (mesma collation do grid) para o export bater com a tela.
+        List<Usuario> dados = repository.search(codigo, filtroNome, filtroEmail,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<Usuario>> cols = ExportacaoService.filtrar(colunasUsuario(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

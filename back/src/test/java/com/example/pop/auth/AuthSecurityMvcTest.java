@@ -109,6 +109,20 @@ class AuthSecurityMvcTest {
     }
 
     @Test
+    void conselhoExigeTokenDeAdmin() throws Exception {
+        // Regressão: o CRUD de conselhos é back-office e NÃO pode ficar aberto. Sem token → 401.
+        mvc.perform(get("/conselho").param("size", "1")).andExpect(status().isUnauthorized());
+
+        // Com o token do admin → 200.
+        MvcResult login = mvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON).content(LOGIN_OK))
+                .andExpect(status().isOk()).andReturn();
+        String token = login.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
+        mvc.perform(get("/conselho").param("size", "1").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void trocarUnidadeExigeTokenEResponde() throws Exception {
         // Sem token → 401
         mvc.perform(put("/auth/unidade").contentType(MediaType.APPLICATION_JSON).content("{\"unidadeSaudeId\":1}"))

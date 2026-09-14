@@ -1,5 +1,5 @@
 /** Tipo do valor (espelha TipoConfiguracao no back) — define qual campo de valor usar. */
-export type TipoConfiguracao = 'BOOLEANO' | 'NUMERICO' | 'TEXTO' | 'COR';
+export type TipoConfiguracao = 'BOOLEANO' | 'NUMERICO' | 'TEXTO' | 'COR' | 'IMAGEM';
 
 export interface Configuracao {
   id: number;
@@ -12,6 +12,8 @@ export interface Configuracao {
   valorNumerico?: number | null;
   /** Valor do tipo COR: hex #RRGGBB. */
   valorCor?: string | null;
+  /** Valor do tipo IMAGEM: URL do objeto no S3. */
+  valorImagem?: string | null;
   atualizadoEm?: string | null;
   /** Nome de quem fez a última alteração (auditoria). */
   atualizadoPorNome?: string | null;
@@ -23,6 +25,7 @@ export interface ConfiguracaoValor {
   valorTexto?: string | null;
   valorNumerico?: number | null;
   valorCor?: string | null;
+  valorImagem?: string | null;
 }
 
 export interface ConfiguracaoFiltro {

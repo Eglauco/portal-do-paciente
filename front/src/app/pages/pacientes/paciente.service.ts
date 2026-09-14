@@ -2,6 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { Pagina, Paciente, PacienteEntrada, PacienteFiltro, PacienteLog } from './paciente.model';
 
 @Injectable({ providedIn: 'root' })
@@ -16,18 +17,29 @@ export class PacienteService {
   /** Quantidade padrão exibida ao abrir a tela. */
   static readonly TAMANHO_PADRAO = 10;
 
-  listar(filtro: PacienteFiltro = {}, page = 0, size = PacienteService.TAMANHO_PADRAO): Observable<Pagina<Paciente>> {
+  listar(
+    filtro: PacienteFiltro = {},
+    page = 0,
+    size = PacienteService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Pagina<Paciente>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     if (filtro.cpf?.trim()) params = params.set('cpf', filtro.cpf.trim());
     if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
     if (filtro.situacao) params = params.set('situacao', filtro.situacao);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Paciente>>(this.base, { params });
   }
 
-  /** Exporta os pacientes dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: PacienteFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta os pacientes dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: PacienteFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
@@ -35,6 +47,7 @@ export class PacienteService {
     if (filtro.prontuario?.trim()) params = params.set('prontuario', filtro.prontuario.trim());
     if (filtro.situacao) params = params.set('situacao', filtro.situacao);
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

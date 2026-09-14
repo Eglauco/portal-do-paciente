@@ -21,11 +21,15 @@ import org.apache.poi.ss.util.WorkbookUtil;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import com.example.pop.marca.MarcaService;
+import com.example.pop.tema.PaletaTema;
+import com.example.pop.tema.TemaService;
 import com.lowagie.text.Chunk;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Element;
 import com.lowagie.text.FontFactory;
+import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
@@ -53,6 +57,16 @@ public class ExportacaoService {
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
     private static final DateTimeFormatter GERADO = DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm");
 
+    /** Nome da plataforma (white-label) para o rodapé do PDF. */
+    private final MarcaService marcaService;
+    /** Paleta derivada da cor primária configurada (COR_PRIMARIA_PLATAFORMA) — mesma do app. */
+    private final TemaService temaService;
+
+    public ExportacaoService(MarcaService marcaService, TemaService temaService) {
+        this.marcaService = marcaService;
+        this.temaService = temaService;
+    }
+
     /**
      * Filtra as colunas mantendo só as selecionadas (casando pelo título), na ordem
      * DEFINIDA. Seleção nula/vazia → todas as colunas (retrocompatível).
@@ -66,16 +80,48 @@ public class ExportacaoService {
 
     public static final String TIPO_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    // Paleta da marca (mesma do app/front).
-    private static final Color BRAND = new Color(0x0E, 0x8C, 0x7F);
-    private static final Color BRAND_DEEP = new Color(0x0A, 0x5F, 0x57);
+    // Neutros (texto/linhas): NÃO seguem a cor da marca — ficam fixos para legibilidade.
     private static final Color INK = new Color(0x0C, 0x1F, 0x1C);
     private static final Color MUTED = new Color(0x56, 0x68, 0x63);
     private static final Color LINE = new Color(0xE2, 0xEA, 0xE6);
-    private static final Color HEADER_TINT = new Color(0xEA, 0xF6, 0xF2);
-    private static final Color ZEBRA = new Color(0xF9, 0xFC, 0xFB);
-    private static final Color CARD_BG = new Color(0xF4, 0xFA, 0xF8);
     private static final Color DIVIDER = new Color(0xB4, 0xC8, 0xC2);
+
+    /**
+     * Cores de marca do PDF, derivadas da cor primária configurada (COR_PRIMARIA_PLATAFORMA)
+     * via {@link TemaService} — os mesmos tons do app. Os fundos claros são a marca misturada
+     * com branco nas proporções que reproduzem o verde padrão e acompanham qualquer cor nova.
+     */
+    private record Paleta(Color brand, Color brandDeep, Color headerTint, Color cardBg, Color zebra) {
+    }
+
+    private Paleta paleta() {
+        PaletaTema t = temaService.tema(); // deriva de COR_PRIMARIA_PLATAFORMA (fallback: verde padrão)
+        Color brand = hex(t.brand());
+        Color brandDeep = hex(t.brandDeep());
+        return new Paleta(brand, brandDeep,
+                mistura(brand, 0.09f),   // fundo do cabeçalho da tabela (era #EAF6F2 no verde)
+                mistura(brand, 0.05f),   // fundo do card de filtros (era #F4FAF8)
+                mistura(brand, 0.025f)); // zebra das linhas (era #F9FCFB)
+    }
+
+    /** Mistura a cor com branco: {@code peso} da marca + {@code (1-peso)} de branco. */
+    private static Color mistura(Color base, float peso) {
+        return new Color(
+                Math.round(base.getRed() * peso + 255 * (1 - peso)),
+                Math.round(base.getGreen() * peso + 255 * (1 - peso)),
+                Math.round(base.getBlue() * peso + 255 * (1 - peso)));
+    }
+
+    /** "#RRGGBB" → Color (inválido → verde padrão da marca). */
+    private static Color hex(String valor) {
+        if (valor == null || !valor.trim().matches("^#[0-9A-Fa-f]{6}$")) {
+            return new Color(0x0E, 0x8C, 0x7F);
+        }
+        String h = valor.trim();
+        return new Color(Integer.parseInt(h.substring(1, 3), 16),
+                Integer.parseInt(h.substring(3, 5), 16),
+                Integer.parseInt(h.substring(5, 7), 16));
+    }
 
     // ============================== Excel ==============================
 
@@ -130,10 +176,15 @@ public class ExportacaoService {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
             PdfWriter writer = PdfWriter.getInstance(doc, out);
-            writer.setPageEvent(new Rodape(titulo));
+            writer.setPageEvent(new Rodape(titulo, marcaService.nomePlataforma()));
             doc.open();
 
-            Paragraph tit = new Paragraph(titulo, fonte(19, com.lowagie.text.Font.BOLD, BRAND_DEEP));
+            Paleta pal = paleta();
+
+            // Logomarca white-label no topo (se houver e for raster suportado); senão, só o título.
+            adicionarLogo(doc);
+
+            Paragraph tit = new Paragraph(titulo, fonte(19, com.lowagie.text.Font.BOLD, pal.brandDeep()));
             tit.setSpacingAfter(1);
             doc.add(tit);
 
@@ -143,14 +194,14 @@ public class ExportacaoService {
             sub.setSpacingAfter(9);
             doc.add(sub);
 
-            doc.add(regua(BRAND, 1.4f));
+            doc.add(regua(pal.brand(), 1.4f));
 
             if (filtros != null && !filtros.isEmpty()) {
-                doc.add(cartaoFiltros(filtros));
+                doc.add(cartaoFiltros(pal, filtros));
             }
 
             if (!colunas.isEmpty()) {
-                doc.add(tabela(colunas, dados));
+                doc.add(tabela(pal, colunas, dados));
             }
 
             doc.close();
@@ -163,17 +214,33 @@ public class ExportacaoService {
         }
     }
 
+    /** Adiciona a logomarca configurada ao topo do PDF; ignora silenciosamente se não houver ou não for raster. */
+    private void adicionarLogo(Document doc) {
+        byte[] bytes = marcaService.logoBytes();
+        if (bytes == null || bytes.length == 0) {
+            return;
+        }
+        try {
+            Image logo = Image.getInstance(bytes); // PNG/JPG/GIF; SVG/WebP lançam → cai no catch
+            logo.scaleToFit(150, 34); // limita altura ~34pt mantendo proporção
+            logo.setSpacingAfter(6);
+            doc.add(logo);
+        } catch (Exception e) {
+            // formato não suportado pelo PDF (SVG/WebP) ou bytes inválidos → segue sem logo
+        }
+    }
+
     /** Card sutil com os filtros aplicados (acento à esquerda + rótulo minúsculo). */
-    private static PdfPTable cartaoFiltros(List<FiltroAplicado> filtros) {
+    private static PdfPTable cartaoFiltros(Paleta pal, List<FiltroAplicado> filtros) {
         PdfPTable card = new PdfPTable(1);
         card.setWidthPercentage(100);
         card.setSpacingBefore(2);
         card.setSpacingAfter(12);
 
         PdfPCell cell = new PdfPCell();
-        cell.setBackgroundColor(CARD_BG);
+        cell.setBackgroundColor(pal.cardBg());
         cell.setBorder(Rectangle.LEFT);
-        cell.setBorderColorLeft(BRAND);
+        cell.setBorderColorLeft(pal.brand());
         cell.setBorderWidthLeft(2.5f);
         cell.setPaddingTop(9);
         cell.setPaddingBottom(10);
@@ -190,7 +257,7 @@ public class ExportacaoService {
         linha.setLeading(14);
         for (int i = 0; i < filtros.size(); i++) {
             FiltroAplicado f = filtros.get(i);
-            linha.add(new Chunk(f.rotulo() + ": ", fonte(9.5f, com.lowagie.text.Font.BOLD, BRAND_DEEP)));
+            linha.add(new Chunk(f.rotulo() + ": ", fonte(9.5f, com.lowagie.text.Font.BOLD, pal.brandDeep())));
             linha.add(new Chunk(nn(f.valor()), fonte(9.5f, com.lowagie.text.Font.NORMAL, INK)));
             if (i < filtros.size() - 1) {
                 linha.add(new Chunk("     ·     ", fonte(9.5f, com.lowagie.text.Font.NORMAL, DIVIDER)));
@@ -203,21 +270,21 @@ public class ExportacaoService {
     }
 
     /** Tabela minimalista: cabeçalho em tom da marca + linhas com hairline e zebra discreta. */
-    private static <T> PdfPTable tabela(List<ColunaExport<T>> colunas, List<T> dados) throws DocumentException {
+    private static <T> PdfPTable tabela(Paleta pal, List<ColunaExport<T>> colunas, List<T> dados) throws DocumentException {
         PdfPTable tabela = new PdfPTable(colunas.size());
         tabela.setWidthPercentage(100);
         tabela.setSpacingBefore(2);
         tabela.setHeaderRows(1);
         tabela.setWidths(largurasRelativas(colunas, dados));
 
-        com.lowagie.text.Font fonteCab = fonte(7.5f, com.lowagie.text.Font.BOLD, BRAND_DEEP);
+        com.lowagie.text.Font fonteCab = fonte(7.5f, com.lowagie.text.Font.BOLD, pal.brandDeep());
         for (ColunaExport<T> col : colunas) {
             Chunk ch = new Chunk(nn(col.titulo()).toUpperCase(), fonteCab);
             ch.setCharacterSpacing(0.4f);
             PdfPCell c = new PdfPCell(new Phrase(ch));
-            c.setBackgroundColor(HEADER_TINT);
+            c.setBackgroundColor(pal.headerTint());
             c.setBorder(Rectangle.BOTTOM);
-            c.setBorderColorBottom(BRAND);
+            c.setBorderColorBottom(pal.brand());
             c.setBorderWidthBottom(1.3f);
             c.setPaddingTop(7);
             c.setPaddingBottom(7);
@@ -229,7 +296,7 @@ public class ExportacaoService {
         com.lowagie.text.Font fonteCel = fonte(8f, com.lowagie.text.Font.NORMAL, INK);
         boolean zebra = false;
         for (T item : dados) {
-            Color fundo = zebra ? ZEBRA : Color.WHITE;
+            Color fundo = zebra ? pal.zebra() : Color.WHITE;
             for (ColunaExport<T> col : colunas) {
                 PdfPCell c = new PdfPCell(new Phrase(nn(col.valor().apply(item)), fonteCel));
                 c.setBackgroundColor(fundo);
@@ -298,11 +365,13 @@ public class ExportacaoService {
     private static final class Rodape extends PdfPageEventHelper {
 
         private final String titulo;
+        private final String marca;
         private PdfTemplate totalPaginas;
         private BaseFont baseFont;
 
-        Rodape(String titulo) {
+        Rodape(String titulo, String marca) {
             this.titulo = titulo;
+            this.marca = marca;
         }
 
         @Override
@@ -330,7 +399,7 @@ public class ExportacaoService {
 
             float yRodape = doc.bottomMargin() - 18;
             hairline(cb, esquerda, direita, yRodape + 11);
-            escrever(cb, "Portal do Paciente · Relatório", esquerda, yRodape, Element.ALIGN_LEFT);
+            escrever(cb, marca + " · Relatório", esquerda, yRodape, Element.ALIGN_LEFT);
 
             String prefixo = "Página " + writer.getPageNumber() + " de ";
             float largura = baseFont.getWidthPoint(prefixo, 7.5f);

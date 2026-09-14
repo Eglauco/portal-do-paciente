@@ -11,6 +11,13 @@ export interface Ref {
   nome: string;
 }
 
+/** Estado da entrega da notificação do agendamento ao destino (espelha EstadoEntrega no backend). */
+export type EstadoEntrega =
+  | 'PACIENTE_SEM_APLICATIVO'
+  | 'NOTIFICACAO_ENVIADA'
+  | 'NOTIFICACAO_ENTREGUE'
+  | 'SEM_NOTIFICACAO_ATIVA';
+
 /** Formato de resposta da API. */
 export interface Agendamento {
   id?: number;
@@ -26,6 +33,51 @@ export interface Agendamento {
   faltaJustificada?: boolean;
   justificativaFalta?: string | null;
   motivosFalta?: Ref[];
+  /** Resumo da entrega da notificação (null = sem dado / agendamento anterior à funcionalidade). */
+  entregaResumo?: EstadoEntrega | null;
+  entregaResumoDescricao?: string | null;
+}
+
+/**
+ * Um evento de entrega da notificação (espelha AgendamentoEntregaResponse). A tabela é
+ * append-only: cada mudança de estado é um evento; o front agrupa por pessoa (tipo+responsavelId).
+ */
+export interface AgendamentoEntrega {
+  id: number;
+  tipo: 'PACIENTE' | 'RESPONSAVEL';
+  responsavelId: number | null;
+  nome: string;
+  telefone: string | null;
+  estado: EstadoEntrega;
+  estadoDescricao: string;
+  criadoEm: string;
+}
+
+/** Filtros da tela de listagem de agendamentos (todos opcionais). */
+export interface AgendamentoFiltro {
+  status: StatusAgendamento | null;
+  /** Busca parcial pelo nome do paciente. */
+  nome: string | null;
+  /** Busca parcial pelo nome da especialidade. */
+  especialidadeNome: string | null;
+  /** Busca parcial pelo nome do profissional. */
+  profissionalNome: string | null;
+  /** Estado do resumo de entrega da notificação. */
+  entregaResumo: EstadoEntrega | null;
+  /** Dia único (yyyy-MM-dd) sobre a data/hora do agendamento. */
+  data: string | null;
+}
+
+/** Filtro sem nenhum critério (todos os agendamentos). */
+export function filtroVazio(): AgendamentoFiltro {
+  return {
+    status: null,
+    nome: null,
+    especialidadeNome: null,
+    profissionalNome: null,
+    entregaResumo: null,
+    data: null,
+  };
 }
 
 /** Formato de envio (criação/edição). */
@@ -60,6 +112,22 @@ export const STATUS_OPTIONS: { value: StatusAgendamento; label: string }[] = [
 
 export function statusLabel(valor: StatusAgendamento): string {
   return STATUS_OPTIONS.find((o) => o.value === valor)?.label ?? valor;
+}
+
+/** Rótulo curto do estado de entrega (para o pill da lista e o painel de destinatários). */
+export function entregaLabel(estado: EstadoEntrega | null | undefined): string {
+  switch (estado) {
+    case 'NOTIFICACAO_ENTREGUE':
+      return 'Notificação entregue';
+    case 'NOTIFICACAO_ENVIADA':
+      return 'Notificação enviada';
+    case 'SEM_NOTIFICACAO_ATIVA':
+      return 'Sem notificação ativa';
+    case 'PACIENTE_SEM_APLICATIVO':
+      return 'Sem aplicativo';
+    default:
+      return '—';
+  }
 }
 
 /** Quem fez a troca de status registrada no log. */

@@ -1,8 +1,8 @@
 package com.example.pop.unidade;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -34,6 +35,13 @@ public class UnidadeController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final UnidadeRepository repository;
     private final ExportacaoService exportacaoService;
@@ -51,13 +59,14 @@ public class UnidadeController {
     public Pagina<Unidade> listar(
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         String filtroNome = (nome == null) ? "" : nome.trim();
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Unidade> resultado = repository.search(codigo, filtroNome, pageable);
 
         return new Pagina<>(
@@ -72,20 +81,20 @@ public class UnidadeController {
 
     /**
      * Exporta as unidades que batem com os MESMOS filtros da tela (todos os
-     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenadas por código (id).
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenadas por nome.
      */
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
 
-        List<Unidade> dados = repository.search(codigo, filtroNome, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Unidade::getId))
-                .toList();
+        // Ordena no BANCO (mesma collation do grid) para o export bater com a tela.
+        List<Unidade> dados = repository.search(codigo, filtroNome,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<Unidade>> cols = ExportacaoService.filtrar(colunasUnidade(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

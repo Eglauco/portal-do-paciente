@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Usuario } from './usuario.model';
 import { UsuarioBuscaStore } from './usuario-busca.store';
 import { UsuarioService } from './usuario.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-usuarios-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './usuarios-list.html',
 })
 export class UsuariosList {
@@ -31,6 +33,8 @@ export class UsuariosList {
   protected readonly codigo = signal(this.store.codigo);
   protected readonly nome = signal(this.store.nome);
   protected readonly email = signal(this.store.email);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly usuarios = signal<Usuario[]>([]);
   protected readonly loading = signal(false);
@@ -114,13 +118,19 @@ export class UsuariosList {
     this.store.codigo = this.codigo();
     this.store.nome = this.nome();
     this.store.email = this.email();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ codigo: this.codigo(), nome: this.nome(), email: this.email() }, this.page(), this.size())
+      .listar(
+        { codigo: this.codigo(), nome: this.nome(), email: this.email() },
+        this.page(),
+        this.size(),
+        this.ordenacoes(),
+      )
       .subscribe({
         next: (pagina) => {
           this.usuarios.set(pagina.content);
@@ -145,6 +155,27 @@ export class UsuariosList {
     this.router.navigate(['/usuarios', usuario.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Nomes dos perfis do usuário, separados por vírgula (— quando não há). */
+  protected perfisTexto(usuario: Usuario): string {
+    const nomes = usuario.perfis?.map((p) => p.nome).filter((n) => !!n) ?? [];
+    return nomes.length ? nomes.join(', ') : '—';
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -158,7 +189,12 @@ export class UsuariosList {
     if (!formato) return;
     this.exportando.set(formato);
     this.service
-      .exportar(formato, { codigo: this.codigo(), nome: this.nome(), email: this.email() }, colunas)
+      .exportar(
+        formato,
+        { codigo: this.codigo(), nome: this.nome(), email: this.email() },
+        colunas,
+        this.ordenacoes(),
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `usuarios.${formato}`);

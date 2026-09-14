@@ -24,17 +24,23 @@ public interface ManifestacaoRepository extends JpaRepository<Manifestacao, Long
     /** O responsável abriu alguma manifestação (lançamento no SAU)? Trava a remoção do responsável. */
     boolean existsByResponsavelId(Long responsavelId);
 
-    /** Busca do back-office (SAU): por unidade, tipo e status (todos opcionais). */
+    /**
+     * Busca do back-office (SAU): por unidade, tipo, status e nome do paciente (todos opcionais).
+     * {@code nome} é o padrão LIKE já pronto (minúsculo, com curingas); escape '\' para tratar
+     * %, _ e \ como literais.
+     */
     @Query("""
             select m from Manifestacao m
             where (:unidadeId is null or m.unidadeSaude.id = :unidadeId)
               and (:tipoId is null or m.tipo.id = :tipoId)
               and (:status is null or m.status = :status)
+              and (:nome is null or lower(m.paciente.nome) like :nome escape '\\')
             """)
     Page<Manifestacao> search(
             @Param("unidadeId") Long unidadeId,
             @Param("tipoId") Long tipoId,
             @Param("status") StatusManifestacao status,
+            @Param("nome") String nome,
             Pageable pageable);
 
     // ===================== Dashboard (agregações) =====================

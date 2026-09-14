@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
@@ -37,6 +39,13 @@ public class PerfilController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final PerfilRepository repository;
     private final UnidadeRepository unidadeRepository;
@@ -57,13 +66,14 @@ public class PerfilController {
     public Pagina<PerfilResponse> listar(
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         String filtroNome = (nome == null) ? "" : nome.trim();
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "nome"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Perfil> resultado = repository.search(codigo, filtroNome, pageable);
 
         return new Pagina<>(

@@ -1,0 +1,265 @@
+/* Buscar Funcionalidades — command palette (Alt+1). Usa os tokens do tema (--brand*). */
+.bf {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(0.75rem, 11vh, 8rem) 1rem 1rem;
+  background: rgba(var(--brand-pine-rgb), 0.34);
+  backdrop-filter: blur(5px) saturate(1.08);
+  -webkit-backdrop-filter: blur(5px) saturate(1.08);
+  animation: bf-fade 0.16s ease both;
+  overflow: auto;
+}
+.bf__panel {
+  width: min(92vw, 640px);
+  max-height: min(74vh, 640px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--brand) 16%, var(--line));
+  border-radius: 18px;
+  box-shadow: 0 32px 80px -24px rgba(var(--brand-pine-rgb), 0.6), 0 0 0 1px rgba(var(--brand-rgb), 0.06);
+  overflow: hidden;
+  animation: bf-pop 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.bf__search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.05rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 5%, var(--surface)), var(--surface));
+}
+.bf__search-ico {
+  width: 1.35rem;
+  height: 1.35rem;
+  stroke: var(--brand);
+  flex: none;
+}
+.bf__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 1.18rem;
+  color: var(--ink);
+}
+.bf__input::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+.bf__esc-hint {
+  flex: none;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.16rem 0.42rem;
+}
+.bf__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bf__section {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0.7rem 0.75rem 0.3rem;
+}
+.bf__opt {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 12px;
+  cursor: pointer;
+  scroll-margin: 0.5rem;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.bf__opt.is-active {
+  background: color-mix(in srgb, var(--brand) 11%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.bf__ico {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+.bf__ico ::ng-deep svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+}
+.bf__opt.is-active .bf__ico {
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  color: var(--brand);
+  transform: scale(1.03);
+}
+.bf__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bf__hit {
+  background: transparent;
+  /* --brand-deep passa no contraste AA (o --brand puro fica ~4:1 sobre a linha ativa). */
+  color: var(--brand-deep);
+  font-weight: 800;
+}
+.bf__tag--recente {
+  flex: none;
+  font-size: 0.64rem;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  border-radius: 999px;
+  padding: 0.12rem 0.5rem;
+}
+.bf__grupo {
+  flex: none;
+  font-size: 0.74rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 9%, transparent);
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+}
+.bf__enter {
+  flex: none;
+  width: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--brand);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.bf__opt.is-active .bf__enter {
+  opacity: 1;
+}
+.bf__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.35rem;
+  padding: 2.6rem 1.5rem 3rem;
+  color: var(--muted);
+}
+.bf__empty svg {
+  width: 2.4rem;
+  height: 2.4rem;
+  stroke: color-mix(in srgb, var(--muted) 65%, transparent);
+  margin-bottom: 0.4rem;
+}
+.bf__empty p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.98rem;
+}
+.bf__empty span {
+  font-size: 0.85rem;
+}
+.bf__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--brand) 3%, var(--surface));
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+.bf__foot-hints {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.bf__foot-hints span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.bf__foot kbd {
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 0.35rem;
+  padding: 0.15rem 0.35rem;
+  min-width: 1.1rem;
+  text-align: center;
+}
+.bf__foot-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--brand) 85%, var(--ink));
+  white-space: nowrap;
+}
+.bf__foot-brand svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  stroke: var(--brand);
+}
+.bf__list::-webkit-scrollbar {
+  width: 10px;
+}
+.bf__list::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--muted) 28%, transparent);
+  border: 3px solid var(--surface);
+  border-radius: 999px;
+}
+@keyframes bf-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes bf-pop {
+  from { opacity: 0; transform: translateY(-10px) scale(0.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf,
+  .bf__panel {
+    animation: none;
+  }
+  .bf__opt,
+  .bf__ico,
+  .bf__enter {
+    transition: none;
+  }
+}
+@media (max-width: 560px) {
+  .bf {
+    padding-top: 1rem;
+  }
+  .bf__grupo {
+    display: none;
+  }
+}

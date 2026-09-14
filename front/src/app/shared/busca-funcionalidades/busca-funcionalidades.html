@@ -1,0 +1,99 @@
+@if (aberto()) {
+  <div class="bf" role="presentation" (click)="fechar()">
+    <div
+      class="bf__panel"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Buscar funcionalidades"
+      (click)="$event.stopPropagation()"
+    >
+      <!-- Campo de busca -->
+      <div class="bf__search">
+        <svg class="bf__search-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          #campo
+          class="bf__input"
+          type="text"
+          role="combobox"
+          [attr.aria-expanded]="resultados().length > 0"
+          [attr.aria-controls]="resultados().length ? 'bf-listbox' : null"
+          aria-autocomplete="list"
+          [attr.aria-activedescendant]="resultados().length ? 'bf-opt-' + indiceAtivo() : null"
+          placeholder="Buscar funcionalidades…"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          [value]="query()"
+          (input)="aoDigitar($event)"
+        />
+        <span class="bf__esc-hint" aria-hidden="true">esc</span>
+      </div>
+
+      <!-- Resultados -->
+      @if (resultados().length > 0) {
+        <ul class="bf__list" id="bf-listbox" role="listbox" aria-label="Funcionalidades">
+          @for (item of resultados(); track item.tela; let i = $index) {
+            @if (temRecentes() && i === 0) {
+              <li class="bf__section" role="presentation" aria-hidden="true">Recentes</li>
+            }
+            @if (temRecentes() && !item.recente && (i === 0 || resultados()[i - 1].recente)) {
+              <li class="bf__section" role="presentation" aria-hidden="true">Todas as funcionalidades</li>
+            }
+            <li
+              [id]="'bf-opt-' + i"
+              class="bf__opt"
+              role="option"
+              [class.is-active]="i === indiceAtivo()"
+              [attr.aria-selected]="i === indiceAtivo()"
+              (mouseenter)="passarMouse(i)"
+              (click)="aoClicar(item, $event)"
+              (auxclick)="aoClicarMeio(item, $event)"
+            >
+              <span class="bf__ico" aria-hidden="true" [innerHTML]="icone(item.icone)"></span>
+              <span class="bf__label">
+                @for (p of item.partes; track $index) {
+                  @if (p.hit) {
+                    <mark class="bf__hit">{{ p.t }}</mark>
+                  } @else {
+                    <span>{{ p.t }}</span>
+                  }
+                }
+              </span>
+              @if (item.recente) {
+                <span class="bf__tag bf__tag--recente" aria-hidden="true">recente</span>
+              }
+              <span class="bf__grupo" aria-hidden="true">{{ item.grupo }}</span>
+              <span class="bf__enter" aria-hidden="true">↵</span>
+            </li>
+          }
+        </ul>
+      } @else {
+        <div class="bf__empty" role="status">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /><path d="M8.5 11h5" />
+          </svg>
+          <p>Nada encontrado para “<b>{{ query() }}</b>”.</p>
+          <span>Tente outro termo — nome da tela, categoria ou uma palavra relacionada.</span>
+        </div>
+      }
+
+      <!-- Rodapé com dicas de teclado -->
+      <div class="bf__foot" aria-hidden="true">
+        <span class="bf__foot-hints">
+          <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+          <span><kbd>↵</kbd> abrir</span>
+          <span><kbd>ctrl</kbd><kbd>↵</kbd> nova guia</span>
+          <span><kbd>esc</kbd> fechar</span>
+        </span>
+        <span class="bf__foot-brand">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+          </svg>
+          Buscar Funcionalidades
+        </span>
+      </div>
+    </div>
+  </div>
+}

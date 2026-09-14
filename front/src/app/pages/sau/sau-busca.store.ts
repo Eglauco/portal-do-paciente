@@ -7,12 +7,14 @@ import { SauService } from './sau.service';
 export class SauBuscaStore {
   tipoId: number | null = null;
   status: StatusManifestacao | null = null;
+  nome: string | null = null;
   page = 0;
   size = SauService.TAMANHO_PADRAO;
 
   limpar(): void {
     this.tipoId = null;
     this.status = null;
+    this.nome = null;
     this.page = 0;
     this.size = SauService.TAMANHO_PADRAO;
   }

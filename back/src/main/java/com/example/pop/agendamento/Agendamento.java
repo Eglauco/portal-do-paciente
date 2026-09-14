@@ -82,4 +82,12 @@ public class Agendamento {
             joinColumns = @JoinColumn(name = "agendamento_id"),
             inverseJoinColumns = @JoinColumn(name = "motivo_falta_id"))
     private List<MotivoFalta> motivosFalta = new ArrayList<>();
+
+    /**
+     * Resumo da entrega da notificação ao destino (paciente/responsáveis), aferido no
+     * disparo do novo agendamento. Nulo = sem dado (anterior à funcionalidade / não disparado).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entrega_resumo", length = 30)
+    private EstadoEntrega entregaResumo;
 }

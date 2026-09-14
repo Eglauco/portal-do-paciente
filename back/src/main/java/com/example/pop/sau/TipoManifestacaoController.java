@@ -3,8 +3,8 @@ package com.example.pop.sau;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -38,6 +39,15 @@ import jakarta.validation.Valid;
 public class TipoManifestacaoController {
 
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "nome", "nome",
+            "descricao", "descricao",
+            "ativo", "ativo");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final TipoManifestacaoRepository repository;
     private final ManifestacaoRepository manifestacaoRepository;
@@ -54,10 +64,11 @@ public class TipoManifestacaoController {
     public Pagina<TipoManifestacaoResponse> listar(
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
-        Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Sort.by(Sort.Direction.ASC, "nome"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<TipoManifestacao> resultado = repository.search(nome == null ? "" : nome.trim(), ativo, pageable);
         List<TipoManifestacaoResponse> content = resultado.getContent().stream()
                 .map(TipoManifestacaoResponse::from).toList();
@@ -76,11 +87,10 @@ public class TipoManifestacaoController {
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) Boolean ativo,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<TipoManifestacao> dados = repository.search(nome == null ? "" : nome.trim(), ativo, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(TipoManifestacao::getNome, String.CASE_INSENSITIVE_ORDER))
-                .toList();
+        List<TipoManifestacao> dados = repository.search(nome == null ? "" : nome.trim(), ativo,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<TipoManifestacao>> cols = ExportacaoService.filtrar(colunasTipoManifestacao(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

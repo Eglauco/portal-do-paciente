@@ -2,8 +2,8 @@ package com.example.pop.prontuario;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -44,6 +45,16 @@ import jakarta.validation.Valid;
 public class ProntuarioController {
 
     private static final int TAMANHO_MAXIMO = 100;
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "numeroAtendimento", "numeroAtendimento",
+            "paciente", "agendamento.paciente.nome",
+            "especialidade", "agendamento.especialidade.nome",
+            "unidade", "agendamento.unidadeSaude.nome",
+            "dataHora", "agendamento.dataHora");
+    /** Ordenação usada quando nada é escolhido na tela: por nome do paciente (A→Z). */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "agendamento.paciente.nome", "id");
 
     private final ProntuarioRepository repository;
     private final AgendamentoRepository agendamentoRepository;
@@ -70,13 +81,16 @@ public class ProntuarioController {
             @RequestParam(required = false) String numero,
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) String especialidade,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "id"));
-        Page<Prontuario> resultado = repository.search(numero == null ? "" : numero, pacienteId, unidadeId, pageable);
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
+        Page<Prontuario> resultado = repository.search(numero == null ? "" : numero, pacienteId, unidadeId,
+                especialidade == null ? "" : especialidade.trim(), pageable);
         List<ProntuarioResponse> content = resultado.getContent().stream().map(ProntuarioResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
@@ -95,16 +109,17 @@ public class ProntuarioController {
             @RequestParam(required = false) String numero,
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) String especialidade,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<Prontuario> dados = repository.search(numero == null ? "" : numero, pacienteId, unidadeId, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Prontuario::getId).reversed())
-                .toList();
+        List<Prontuario> dados = repository.search(numero == null ? "" : numero, pacienteId, unidadeId,
+                especialidade == null ? "" : especialidade.trim(),
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<Prontuario>> cols = ExportacaoService.filtrar(colunasProntuario(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Prontuários", filtrosProntuario(numero, pacienteId, unidadeId), cols, dados)
+                ? exportacaoService.pdf("Prontuários", filtrosProntuario(numero, pacienteId, unidadeId, especialidade), cols, dados)
                 : exportacaoService.excel("Prontuários", cols, dados);
         String nome = "prontuarios-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
@@ -121,7 +136,7 @@ public class ProntuarioController {
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosProntuario(String numero, Long pacienteId, Long unidadeId) {
+    private List<FiltroAplicado> filtrosProntuario(String numero, Long pacienteId, Long unidadeId, String especialidade) {
         String paciente = pacienteId == null ? "Todos"
                 : pacienteRepository.findById(pacienteId).map(p -> p.getNome()).orElse("#" + pacienteId);
         String unidade = unidadeId == null ? "Todas"
@@ -129,7 +144,8 @@ public class ProntuarioController {
         return List.of(
                 new FiltroAplicado("Nº atendimento", numero == null || numero.isBlank() ? "Todos" : numero),
                 new FiltroAplicado("Paciente", paciente),
-                new FiltroAplicado("Unidade", unidade));
+                new FiltroAplicado("Unidade", unidade),
+                new FiltroAplicado("Especialidade", especialidade == null || especialidade.isBlank() ? "Todas" : especialidade));
     }
 
     private static List<ColunaExport<Prontuario>> colunasProntuario() {

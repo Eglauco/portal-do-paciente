@@ -1,13 +1,12 @@
 import { DatePipe } from '@angular/common';
-import { afterNextRender, Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
-import { Especialidade } from '../especialidades/especialidade.model';
-import { EspecialidadeService } from '../especialidades/especialidade.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Procedimento } from '../procedimentos/procedimento.model';
@@ -16,7 +15,15 @@ import { ProfissionalSaude } from '../profissionais/profissional.model';
 import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
-import { AgendamentoLog, AgendamentoRequest, Ref, STATUS_OPTIONS, StatusAgendamento } from './agendamento.model';
+import {
+  AgendamentoEntrega,
+  AgendamentoLog,
+  AgendamentoRequest,
+  entregaLabel,
+  Ref,
+  STATUS_OPTIONS,
+  StatusAgendamento,
+} from './agendamento.model';
 import { AgendamentoService } from './agendamento.service';
 
 type Campo =
@@ -27,6 +34,15 @@ type Campo =
   | 'pacienteId'
   | 'unidadeSaudeId';
 
+/** Um destinatário e a linha do tempo dos seus eventos de entrega (append-only). */
+interface DestinatarioEntrega {
+  chave: string;
+  nome: string;
+  tipo: 'PACIENTE' | 'RESPONSAVEL';
+  telefone: string | null;
+  eventos: AgendamentoEntrega[];
+}
+
 @Component({
   selector: 'app-agendamento-form',
   imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
@@ -34,7 +50,6 @@ type Campo =
 })
 export class AgendamentoForm implements PodeSair {
   private readonly service = inject(AgendamentoService);
-  private readonly especialidadeService = inject(EspecialidadeService);
   private readonly profissionalService = inject(ProfissionalSaudeService);
   private readonly procedimentoService = inject(ProcedimentoService);
   private readonly pacienteService = inject(PacienteService);
@@ -48,11 +63,49 @@ export class AgendamentoForm implements PodeSair {
   protected readonly unidadeNome = this.auth.unidadeNome;
 
   protected readonly statusOpcoes = STATUS_OPTIONS;
-  protected readonly especialidades = signal<Especialidade[]>([]);
+  /** Todos os profissionais ativos (a lista visível é filtrada pela unidade ativa). */
   protected readonly profissionais = signal<ProfissionalSaude[]>([]);
   protected readonly procedimentos = signal<Procedimento[]>([]);
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly unidades = signal<Unidade[]>([]);
+
+  /** Profissional selecionado (fonte reativa para derivar as especialidades). */
+  private readonly profissionalSelecionadoId = signal<number | null>(null);
+  /** Na edição, o profissional/especialidade já gravados — mantidos visíveis mesmo fora da regra. */
+  private readonly profissionalSalvado = signal<Ref | null>(null);
+  private readonly especialidadeSalvada = signal<Ref | null>(null);
+
+  /**
+   * Regra do novo agendamento: só aparecem os profissionais vinculados à unidade ativa
+   * (que atendem nela). Na edição, o profissional já gravado é mantido na lista mesmo que
+   * não atenda mais a unidade, para não sumir com o valor do registro.
+   */
+  protected readonly profissionaisDisponiveis = computed<Ref[]>(() => {
+    const unidadeId = this.auth.unidadeId();
+    const daUnidade: Ref[] = this.profissionais()
+      .filter((p) => (p.unidades ?? []).some((u) => u.id === unidadeId))
+      .map((p) => ({ id: p.id!, nome: p.nome }));
+    const salvo = this.profissionalSalvado();
+    if (salvo && !daUnidade.some((p) => p.id === salvo.id)) {
+      return [...daUnidade, salvo];
+    }
+    return daUnidade;
+  });
+
+  /**
+   * Especialidades do profissional selecionado (as que ele atende). Só habilita depois de
+   * escolher o profissional. Na edição, a especialidade já gravada é mantida na lista.
+   */
+  protected readonly especialidadesDisponiveis = computed<Ref[]>(() => {
+    const pid = this.profissionalSelecionadoId();
+    const prof = this.profissionais().find((p) => p.id === pid);
+    const doProf: Ref[] = (prof?.especialidades ?? []).map((e) => ({ id: e.id, nome: e.nome }));
+    const salva = this.especialidadeSalvada();
+    if (salva && !doProf.some((e) => e.id === salva.id)) {
+      return [...doProf, salva];
+    }
+    return doProf;
+  });
 
   protected readonly form = new FormGroup({
     dataHora: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -80,11 +133,68 @@ export class AgendamentoForm implements PodeSair {
   protected readonly carregandoLogs = signal(false);
   protected readonly erroLogs = signal(false);
 
+  // Destinatários da notificação e o estado de entrega de cada um (paciente + responsáveis).
+  // A tabela é append-only: cada mudança é um evento; aqui agrupamos por pessoa (linha do tempo).
+  protected readonly entregas = signal<AgendamentoEntrega[]>([]);
+  protected readonly carregandoEntrega = signal(false);
+  protected readonly erroEntrega = signal(false);
+  protected readonly rotuloEntrega = entregaLabel;
+
+  /** Eventos de entrega agrupados por destinatário, cada um com sua linha do tempo (ordem de chegada). */
+  protected readonly entregasPorPessoa = computed<DestinatarioEntrega[]>(() => {
+    const grupos: DestinatarioEntrega[] = [];
+    const porChave = new Map<string, DestinatarioEntrega>();
+    for (const e of this.entregas()) {
+      // Responsável excluído do cadastro tem responsavelId nulo (FK SET NULL): cai no telefone/nome
+      // congelados, senão dois responsáveis removidos se fundiriam numa só linha do tempo.
+      const chave =
+        e.tipo === 'PACIENTE'
+          ? 'PACIENTE'
+          : e.responsavelId != null
+            ? `RESP-${e.responsavelId}`
+            : `RESP-${e.telefone}|${e.nome}`;
+      let grupo = porChave.get(chave);
+      if (!grupo) {
+        grupo = { chave, nome: e.nome, tipo: e.tipo, telefone: e.telefone, eventos: [] };
+        porChave.set(chave, grupo);
+        grupos.push(grupo);
+      }
+      grupo.eventos.push(e);
+    }
+    return grupos;
+  });
+
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
+  /** True enquanto o formulário é preenchido na edição (evita zerar a especialidade gravada). */
+  private carregando = false;
 
   constructor() {
+    // Especialidade só habilita após escolher o profissional.
+    this.form.controls.especialidadeId.disable();
+
+    // Ao trocar o profissional: deriva as especialidades dele e habilita o campo;
+    // troca manual (fora da carga da edição) zera a especialidade anterior.
+    this.form.controls.profissionalSaudeId.valueChanges
+      .pipe(takeUntilDestroyed())
+      .subscribe((pid) => {
+        this.profissionalSelecionadoId.set(pid ?? null);
+        const especialidade = this.form.controls.especialidadeId;
+        if (pid != null) {
+          especialidade.enable({ emitEvent: false });
+        } else {
+          especialidade.disable({ emitEvent: false });
+        }
+        if (this.carregando) return;
+        // Troca manual de profissional: descarta os valores "gravados" e zera a especialidade.
+        // reset() (e não setValue) também limpa touched/dirty, evitando o erro "obrigatório"
+        // piscar num campo que o usuário ainda não tocou.
+        this.profissionalSalvado.set(null);
+        this.especialidadeSalvada.set(null);
+        especialidade.reset(null);
+      });
+
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       this.editando.set(true);
@@ -98,6 +208,7 @@ export class AgendamentoForm implements PodeSair {
       if (this.editando()) {
         this.carregarAgendamento();
         this.carregarLogs();
+        this.carregarEntrega();
       }
     });
   }
@@ -171,9 +282,7 @@ export class AgendamentoForm implements PodeSair {
   }
 
   private carregarOpcoes(): void {
-    this.especialidadeService.listar({}, 0, 100).subscribe({
-      next: (p) => this.especialidades.set(p.content),
-    });
+    // Especialidades não são mais carregadas globalmente: derivam do profissional escolhido.
     this.profissionalService.listar({}, 0, 100).subscribe({
       next: (p) => this.profissionais.set(p.content),
     });
@@ -191,14 +300,20 @@ export class AgendamentoForm implements PodeSair {
   private carregarAgendamento(): void {
     this.service.buscarPorId(this.codigo()!).subscribe({
       next: (a) => {
+        // Mantém o profissional/especialidade gravados visíveis mesmo que hoje não batam com a regra.
+        this.carregando = true;
+        this.profissionalSalvado.set(a.profissionalSaude);
+        this.especialidadeSalvada.set(a.especialidade);
         this.form.patchValue({
           dataHora: a.dataHora?.slice(0, 16),
-          especialidadeId: a.especialidade.id,
           profissionalSaudeId: a.profissionalSaude.id,
           procedimentoId: a.procedimento.id,
           pacienteId: a.paciente.id,
           statusAgendamento: a.statusAgendamento,
         });
+        // Especialidade depois do profissional (o valueChanges do profissional a zeraria).
+        this.form.controls.especialidadeId.setValue(a.especialidade.id);
+        this.carregando = false;
         this.faltaJustificada.set(a.faltaJustificada ?? false);
         this.justificativaFalta.set(a.justificativaFalta ?? null);
         this.motivosFalta.set(a.motivosFalta ?? []);
@@ -220,6 +335,23 @@ export class AgendamentoForm implements PodeSair {
       error: () => {
         this.erroLogs.set(true);
         this.carregandoLogs.set(false);
+      },
+    });
+  }
+
+  /** Carrega os destinatários e o estado de entrega da notificação deste agendamento (edição). */
+  private carregarEntrega(): void {
+    if (this.codigo() == null) return;
+    this.carregandoEntrega.set(true);
+    this.erroEntrega.set(false);
+    this.service.entrega(this.codigo()!).subscribe({
+      next: (entregas) => {
+        this.entregas.set(entregas);
+        this.carregandoEntrega.set(false);
+      },
+      error: () => {
+        this.erroEntrega.set(true);
+        this.carregandoEntrega.set(false);
       },
     });
   }

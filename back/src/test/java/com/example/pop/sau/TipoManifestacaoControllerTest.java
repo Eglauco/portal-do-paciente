@@ -50,7 +50,7 @@ class TipoManifestacaoControllerTest {
         assertEquals("Descreva o problema.", buscado.descricao());
         assertTrue(buscado.ativo(), "novo tipo nasce ativo por padrão");
 
-        Pagina<TipoManifestacaoResponse> pagina = controller.listar("Reclamação Teste", null, 0, 20);
+        Pagina<TipoManifestacaoResponse> pagina = controller.listar("Reclamação Teste", null, null, 0, 20);
         assertTrue(pagina.content().stream().anyMatch(t -> t.id().equals(id)));
     }
 
@@ -79,7 +79,7 @@ class TipoManifestacaoControllerTest {
         Long ativo = criar("Ativo Teste", null, true);
         Long inativo = criar("Inativo Teste", null, false);
 
-        Pagina<TipoManifestacaoResponse> apenasAtivos = controller.listar(null, true, 0, 100);
+        Pagina<TipoManifestacaoResponse> apenasAtivos = controller.listar(null, true, null, 0, 100);
         assertTrue(apenasAtivos.content().stream().anyMatch(t -> t.id().equals(ativo)));
         assertFalse(apenasAtivos.content().stream().anyMatch(t -> t.id().equals(inativo)));
     }

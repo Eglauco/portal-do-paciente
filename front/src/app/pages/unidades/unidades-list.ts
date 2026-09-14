@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Unidade } from './unidade.model';
 import { UnidadeBuscaStore } from './unidade-busca.store';
 import { UnidadeService } from './unidade.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-unidades-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './unidades-list.html',
 })
 export class UnidadesList {
@@ -29,6 +31,7 @@ export class UnidadesList {
 
   protected readonly codigo = signal(this.store.codigo);
   protected readonly nome = signal(this.store.nome);
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly unidades = signal<Unidade[]>([]);
   protected readonly loading = signal(false);
@@ -80,6 +83,19 @@ export class UnidadesList {
     this.carregar();
   }
 
+  protected aoAlternar(e: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), e.campo, e.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   protected alterarTamanho(event: Event): void {
     this.size.set(Number((event.target as HTMLSelectElement).value));
     this.page.set(0);
@@ -103,12 +119,13 @@ export class UnidadesList {
   private carregar(): void {
     this.store.codigo = this.codigo();
     this.store.nome = this.nome();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size()).subscribe({
+    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size(), this.ordenacoes()).subscribe({
       next: (pagina) => {
         this.unidades.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -144,7 +161,7 @@ export class UnidadesList {
     this.formatoModal.set(null);
     if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas).subscribe({
+    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas, this.ordenacoes()).subscribe({
       next: (blob) => {
         this.baixar(blob, `unidades.${formato}`);
         this.exportando.set(null);

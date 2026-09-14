@@ -17,6 +17,7 @@ export class SauService {
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.tipoId) params = params.set('tipoId', filtro.tipoId);
     if (filtro.status) params = params.set('status', filtro.status);
+    if (filtro.nome && filtro.nome.trim()) params = params.set('nome', filtro.nome.trim());
     return this.http.get<Pagina<Manifestacao>>(this.base, { params });
   }
 
@@ -26,6 +27,7 @@ export class SauService {
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.tipoId) params = params.set('tipoId', filtro.tipoId);
     if (filtro.status) params = params.set('status', filtro.status);
+    if (filtro.nome && filtro.nome.trim()) params = params.set('nome', filtro.nome.trim());
     for (const c of colunas) params = params.append('colunas', c);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }

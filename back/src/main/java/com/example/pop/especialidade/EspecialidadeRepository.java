@@ -19,4 +19,7 @@ public interface EspecialidadeRepository extends JpaRepository<Especialidade, Lo
               and lower(u.nome) like lower(concat('%', :nome, '%'))
             """)
     Page<Especialidade> search(@Param("id") Long id, @Param("nome") String nome, Pageable pageable);
+
+    /** Unicidade do código de integração ignorando o próprio registro (edição passa o id; criação, -1). */
+    boolean existsByCodigoIntegracaoAndIdNot(String codigoIntegracao, Long id);
 }

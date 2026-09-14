@@ -2,7 +2,6 @@ package com.example.pop.nps;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -25,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -43,6 +43,17 @@ public class NpsController {
 
     private static final int TAMANHO_MAXIMO = 100;
     private static final DateTimeFormatter DATA_HORA = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "dataHora", "agendamento.dataHora",
+            "paciente", "agendamento.paciente.nome",
+            "especialidade", "agendamento.especialidade.nome",
+            "unidadeSaude", "agendamento.unidadeSaude.nome",
+            "media", "media",
+            "status", "status");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Order.desc("criadoEm"), Sort.Order.asc("id"));
 
     private final NpsRepository repository;
     private final NpsService npsService;
@@ -66,12 +77,13 @@ public class NpsController {
             @RequestParam(required = false) StatusNps status,
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Nps> resultado = repository.search(status, pacienteId, unidadeId, pageable);
         Map<Long, String> nomes = npsService.nomesDosResponsaveis(resultado.getContent());
         // Guarda o id nulo: quando ninguém da página tem responsável, `nomes` é o Map.of()
@@ -95,11 +107,10 @@ public class NpsController {
             @RequestParam(required = false) StatusNps status,
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<Nps> dados = repository.search(status, pacienteId, unidadeId, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Nps::getCriadoEm).reversed())
-                .toList();
+        List<Nps> dados = repository.search(status, pacienteId, unidadeId,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         Map<Long, String> nomesResp = npsService.nomesDosResponsaveis(dados);
         List<ColunaExport<Nps>> cols = ExportacaoService.filtrar(colunasNps(nomesResp), colunas);
 

@@ -1,5 +1,7 @@
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Perfil } from './perfil.model';
 import { PerfilService } from './perfil.service';
 
@@ -8,7 +10,7 @@ export type PaginaItem = number | 'ellipsis';
 /** Listagem paginada de perfis de acesso, com filtro por código/nome no servidor. */
 @Component({
   selector: 'app-perfis-list',
-  imports: [RouterLink],
+  imports: [RouterLink, Ordenavel],
   templateUrl: './perfis-list.html',
 })
 export class PerfisList {
@@ -20,6 +22,8 @@ export class PerfisList {
 
   protected readonly codigo = signal('');
   protected readonly nome = signal('');
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>([]);
 
   protected readonly perfis = signal<Perfil[]>([]);
   protected readonly loading = signal(false);
@@ -93,7 +97,9 @@ export class PerfisList {
   protected carregar(): void {
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size()).subscribe({
+    this.service
+      .listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size(), this.ordenacoes())
+      .subscribe({
       next: (pagina) => {
         this.perfis.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -126,5 +132,20 @@ export class PerfisList {
 
   protected editar(perfil: Perfil): void {
     this.router.navigate(['/perfis', perfil.id]);
+  }
+
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
   }
 }

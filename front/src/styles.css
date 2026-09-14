@@ -74,9 +74,16 @@ body {
   flex-direction: column;
   justify-content: space-between;
   color: #eafaf4;
+  /* Camadas (topo → base): brilho · AZUL com opacidade alta (destaque) · imagem de fundo
+     (--login-fundo, white-label) · azul sólido de base (fallback se a imagem faltar/expirar). */
   background:
     radial-gradient(120% 90% at 12% 8%, rgba(var(--glow-rgb), 0.22), transparent 55%),
+    linear-gradient(155deg, rgba(var(--brand-deep-rgb), 0.88) 0%, rgba(var(--brand-pine-rgb), 0.92) 100%),
+    var(--login-fundo, none),
     linear-gradient(155deg, var(--brand-deep) 0%, var(--brand-pine) 100%);
+  background-size: auto, auto, cover, auto;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .login__brand-glow {
@@ -113,6 +120,23 @@ body {
   width: 1.5rem;
   height: 1.5rem;
   stroke: var(--glow);
+}
+
+/* Logomarca custom (white-label): preenche a caixa de marca e neutraliza o fundo/gradiente,
+   já que a imagem tem cores próprias (não segue o tema como o SVG). Vale p/ login, trocar
+   unidade e sidebar. */
+.brand-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.wordmark__mark:has(.brand-logo),
+.login__mobilemark .m:has(.brand-logo),
+.sidebar__mark:has(.brand-logo) {
+  background: #fff;
+  box-shadow: none;
+  padding: 0.28rem;
 }
 
 .wordmark__name {
@@ -284,6 +308,14 @@ body {
   text-transform: uppercase;
   font-size: 0.9rem;
   color: var(--brand-deep);
+}
+
+/* Versão ao lado da marca (mobile): pequena e discreta, sem o caixa-alta do nome. */
+.login__mobilemark .login__mobilever {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
 }
 
 .login__title {

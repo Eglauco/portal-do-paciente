@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -16,7 +18,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-nps-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, RelatorioColunasModal],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, RelatorioColunasModal, Ordenavel],
   templateUrl: './nps-list.html',
 })
 export class NpsList {
@@ -44,6 +46,8 @@ export class NpsList {
   });
 
   protected readonly size = signal(this.store.size);
+  /** Ordenação multi-coluna (vazia = padrão do backend: mais recentes primeiro). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
   protected readonly registros = signal<Nps[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
@@ -117,13 +121,19 @@ export class NpsList {
     const f = this.filtro.getRawValue();
     this.store.status = f.status;
     this.store.pacienteId = f.pacienteId;
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, this.page(), this.size())
+      .listar(
+        { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() },
+        this.page(),
+        this.size(),
+        this.ordenacoes(),
+      )
       .subscribe({
         next: (pagina) => {
           this.registros.set(pagina.content);
@@ -148,6 +158,21 @@ export class NpsList {
     this.router.navigate(['/nps', nps.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -162,7 +187,12 @@ export class NpsList {
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, colunas)
+      .exportar(
+        formato,
+        { status: f.status, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() },
+        colunas,
+        this.ordenacoes(),
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `nps.${formato}`);

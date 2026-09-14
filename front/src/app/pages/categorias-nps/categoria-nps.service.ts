@@ -2,6 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { CategoriaNps, CategoriaNpsFiltro, Pagina } from './categoria-nps.model';
 
 @Injectable({ providedIn: 'root' })
@@ -20,19 +21,27 @@ export class CategoriaNpsService {
     filtro: CategoriaNpsFiltro = {},
     page = 0,
     size = CategoriaNpsService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
   ): Observable<Pagina<CategoriaNps>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<CategoriaNps>>(this.base, { params });
   }
 
-  /** Exporta as categorias dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: CategoriaNpsFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta as categorias dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: CategoriaNpsFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

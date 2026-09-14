@@ -2,6 +2,7 @@ import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { MotivoFalta, MotivoFaltaFiltro, Pagina } from './motivo-falta.model';
 
 @Injectable({ providedIn: 'root' })
@@ -20,19 +21,27 @@ export class MotivoFaltaService {
     filtro: MotivoFaltaFiltro = {},
     page = 0,
     size = MotivoFaltaService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
   ): Observable<Pagina<MotivoFalta>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.motivo?.trim()) params = params.set('motivo', filtro.motivo.trim());
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<MotivoFalta>>(this.base, { params });
   }
 
-  /** Exporta os motivos de falta dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: MotivoFaltaFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta os motivos de falta dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: MotivoFaltaFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.motivo?.trim()) params = params.set('motivo', filtro.motivo.trim());
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

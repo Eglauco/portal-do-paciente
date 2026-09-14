@@ -306,7 +306,7 @@ class PostagemControllerTest {
     void filtraPorTitulo() {
         PostagemDetalheResponse criada = controller.criar(new PostagemRequest(
                 "Semana da Saúde 2026", "Programação especial", false, true, 1L, IMG));
-        Pagina<PostagemResponse> pagina = controller.listar("Semana da Saúde", null, null, null, 0, 10);
+        Pagina<PostagemResponse> pagina = controller.listar("Semana da Saúde", null, null, null, null, 0, 10);
         assertTrue(pagina.content().stream().anyMatch(p -> p.id().equals(criada.id())));
         controller.excluir(criada.id());
     }
@@ -322,8 +322,8 @@ class PostagemControllerTest {
         feedController.comentar(id, new ComentarRequest("primeiro!"), jwt);
         assertTrue(novoNaLista(id), "comentário de paciente marca a postagem como nova");
         // Filtro "com novos" traz; "sem novos" não traz.
-        assertTrue(controller.listar(null, null, null, true, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
-        assertFalse(controller.listar(null, null, null, false, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
+        assertTrue(controller.listar(null, null, null, true, null, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
+        assertFalse(controller.listar(null, null, null, false, null, 0, 100).content().stream().anyMatch(p -> p.id().equals(id)));
 
         // Admin abre a postagem (buscar lista os comentários) → zera o status.
         assertEquals(200, controller.buscar(id).getStatusCode().value());
@@ -423,7 +423,7 @@ class PostagemControllerTest {
 
     /** True se a postagem aparece com "novo comentário" na listagem do admin. */
     private boolean novoNaLista(Long id) {
-        return controller.listar(null, null, null, null, 0, 100).content().stream()
+        return controller.listar(null, null, null, null, null, 0, 100).content().stream()
                 .filter(p -> p.id().equals(id))
                 .findFirst()
                 .map(PostagemResponse::novoComentario)

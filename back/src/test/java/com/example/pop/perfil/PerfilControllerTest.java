@@ -107,11 +107,11 @@ class PerfilControllerTest {
         String nomeUnico = "Perfil Filtro XYZ-" + System.nanoTime();
         PerfilResponse perfil = controller.criar(new PerfilRequest(nomeUnico, EnumSet.of(Tela.SAU), List.of(1L)));
         try {
-            var pagina = controller.listar(null, "Filtro XYZ", 0, 10);
+            var pagina = controller.listar(null, "Filtro XYZ", null, 0, 10);
             assertEquals(1, pagina.totalElements());
             assertEquals(nomeUnico, pagina.content().get(0).nome());
             // Filtro por código (id) também retorna o registro.
-            assertEquals(1, controller.listar(perfil.id(), null, 0, 10).totalElements());
+            assertEquals(1, controller.listar(perfil.id(), null, null, 0, 10).totalElements());
         } finally {
             controller.excluir(perfil.id());
         }

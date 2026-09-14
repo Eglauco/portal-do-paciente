@@ -12,8 +12,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> {
 
+    /** Há algum agendamento vinculado a este profissional? (bloqueia a exclusão do profissional). */
+    boolean existsByProfissionalSaude_Id(Long profissionalSaudeId);
+
     /** Carrega um agendamento garantindo que é do paciente informado (escopo do app). */
     Optional<Agendamento> findByIdAndPacienteId(Long id, Long pacienteId);
+
+    /** Agendamentos de um paciente (app "Meus agendamentos"); a ordenação vem do Pageable. */
+    Page<Agendamento> findByPaciente_Id(Long pacienteId, Pageable pageable);
 
     /**
      * Agendamentos de um procedimento que estão na janela de disparo de um lembrete:
@@ -35,17 +41,34 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     @Query(value = """
             select a from Agendamento a
             where (:status is null or a.statusAgendamento = :status)
-              and (:pacienteId is null or a.paciente.id = :pacienteId)
+              and (:nome is null or lower(a.paciente.nome) like :nome escape '\\')
+              and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome escape '\\')
+              and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome escape '\\')
+              and (:entregaResumo is null or a.entregaResumo = :entregaResumo)
+              and a.dataHora >= coalesce(:dataDe, a.dataHora)
+              and a.dataHora <= coalesce(:dataAte, a.dataHora)
               and (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
             """,
             countQuery = """
             select count(a) from Agendamento a
             where (:status is null or a.statusAgendamento = :status)
-              and (:pacienteId is null or a.paciente.id = :pacienteId)
+              and (:nome is null or lower(a.paciente.nome) like :nome escape '\\')
+              and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome escape '\\')
+              and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome escape '\\')
+              and (:entregaResumo is null or a.entregaResumo = :entregaResumo)
+              and a.dataHora >= coalesce(:dataDe, a.dataHora)
+              and a.dataHora <= coalesce(:dataAte, a.dataHora)
               and (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
             """)
-    Page<Agendamento> search(@Param("status") StatusAgendamento status, @Param("pacienteId") Long pacienteId,
-            @Param("unidadeId") Long unidadeId, Pageable pageable);
+    Page<Agendamento> search(@Param("status") StatusAgendamento status,
+            @Param("nome") String nome,
+            @Param("especialidadeNome") String especialidadeNome,
+            @Param("profissionalNome") String profissionalNome,
+            @Param("entregaResumo") EstadoEntrega entregaResumo,
+            @Param("dataDe") LocalDateTime dataDe,
+            @Param("dataAte") LocalDateTime dataAte,
+            @Param("unidadeId") Long unidadeId,
+            Pageable pageable);
 
     // ===================== Dashboard (agregações) =====================
 

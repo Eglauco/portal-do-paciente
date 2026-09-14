@@ -2,14 +2,18 @@ package com.example.pop.agendamento;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
 import com.example.pop.export.ColunaExport;
@@ -52,6 +57,19 @@ public class AgendamentoController {
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
 
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "dataHora", "dataHora",
+            "paciente", "paciente.nome",
+            "especialidade", "especialidade.nome",
+            "profissional", "profissionalSaude.nome",
+            "procedimento", "procedimento.nome",
+            "status", "statusAgendamento",
+            "entregaResumo", "entregaResumo");
+    /** Ordenação usada quando nada é escolhido na tela (mais recentes primeiro, desempate por id). */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.DESC, "dataHora")
+            .and(Sort.by(Sort.Direction.ASC, "id"));
+
     private final AgendamentoRepository repository;
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
@@ -63,12 +81,15 @@ public class AgendamentoController {
     private final PushService pushService;
     private final ExportacaoService exportacaoService;
     private final AgendamentoLogService logService;
+    private final AgendamentoEntregaService entregaService;
+    private final AgendamentoEntregaRepository entregaRepository;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
-            ExportacaoService exportacaoService, AgendamentoLogService logService) {
+            ExportacaoService exportacaoService, AgendamentoLogService logService,
+            AgendamentoEntregaService entregaService, AgendamentoEntregaRepository entregaRepository) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
@@ -80,6 +101,8 @@ public class AgendamentoController {
         this.pushService = pushService;
         this.exportacaoService = exportacaoService;
         this.logService = logService;
+        this.entregaService = entregaService;
+        this.entregaRepository = entregaRepository;
     }
 
     /**
@@ -89,15 +112,21 @@ public class AgendamentoController {
     @GetMapping
     public Pagina<AgendamentoResponse> listar(
             @RequestParam(required = false) StatusAgendamento status,
-            @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String especialidadeNome,
+            @RequestParam(required = false) String profissionalNome,
+            @RequestParam(required = false) EstadoEntrega entregaResumo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "dataHora"));
-        Page<Agendamento> resultado = repository.search(status, pacienteId, unidadeId, pageable);
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
+        Page<Agendamento> resultado = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
+                padraoNome(profissionalNome), entregaResumo, inicioDoDia(data), fimDoDia(data), unidadeId, pageable);
         List<AgendamentoResponse> content = resultado.getContent().stream()
                 .map(AgendamentoResponse::from)
                 .toList();
@@ -122,24 +151,30 @@ public class AgendamentoController {
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) StatusAgendamento status,
-            @RequestParam(required = false) Long pacienteId,
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) String especialidadeNome,
+            @RequestParam(required = false) String profissionalNome,
+            @RequestParam(required = false) EstadoEntrega entregaResumo,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
             @RequestParam(required = false) Long unidadeId,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<Agendamento> dados = repository.search(status, pacienteId, unidadeId, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Agendamento::getDataHora).reversed())
-                .toList();
+        List<Agendamento> dados = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
+                padraoNome(profissionalNome), entregaResumo, inicioDoDia(data), fimDoDia(data), unidadeId,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO)))
+                .getContent();
         List<ColunaExport<Agendamento>> cols = ExportacaoService.filtrar(colunasAgendamento(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Agendamentos", filtrosAgendamento(status, unidadeId), cols, dados)
+                ? exportacaoService.pdf("Agendamentos", filtrosAgendamento(status, nome, especialidadeNome,
+                        profissionalNome, entregaResumo, data, unidadeId), cols, dados)
                 : exportacaoService.excel("Agendamentos", cols, dados);
-        String nome = "agendamentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+        String nomeArquivo = "agendamentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
     }
 
@@ -149,13 +184,61 @@ public class AgendamentoController {
         return colunasAgendamento().stream().map(ColunaExport::titulo).toList();
     }
 
+    private static final DateTimeFormatter DATA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosAgendamento(StatusAgendamento status, Long unidadeId) {
+    private List<FiltroAplicado> filtrosAgendamento(StatusAgendamento status, String nome, String especialidadeNome,
+            String profissionalNome, EstadoEntrega entregaResumo, LocalDate data, Long unidadeId) {
+        List<FiltroAplicado> filtros = new ArrayList<>();
+        filtros.add(new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos"));
+        if (nome != null && !nome.isBlank()) {
+            filtros.add(new FiltroAplicado("Paciente", nome.trim()));
+        }
+        if (especialidadeNome != null && !especialidadeNome.isBlank()) {
+            filtros.add(new FiltroAplicado("Especialidade", especialidadeNome.trim()));
+        }
+        if (profissionalNome != null && !profissionalNome.isBlank()) {
+            filtros.add(new FiltroAplicado("Profissional", profissionalNome.trim()));
+        }
+        if (entregaResumo != null) {
+            filtros.add(new FiltroAplicado("Notificação", entregaResumo.getDescricao()));
+        }
+        if (data != null) {
+            filtros.add(new FiltroAplicado("Data", data.format(DATA)));
+        }
         String unidade = unidadeId == null ? "Todas"
                 : unidadeRepository.findById(unidadeId).map(u -> u.getNome()).orElse("#" + unidadeId);
-        return List.of(
-                new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos"),
-                new FiltroAplicado("Unidade", unidade));
+        filtros.add(new FiltroAplicado("Unidade", unidade));
+        return filtros;
+    }
+
+    /**
+     * Padrão LIKE (minúsculo, com curingas) para a busca parcial por nome; nulo se vazio.
+     * Escapa os metacaracteres LIKE ('\', '%', '_') do texto digitado para que funcionem como
+     * literais — o '\' é declarado como escape na cláusula {@code like ... escape '\'} da query.
+     */
+    private static String padraoNome(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return null;
+        }
+        String escapado = nome.trim().toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\") // a barra primeiro, senão re-escaparia os escapes inseridos depois
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escapado + "%";
+    }
+
+    private static LocalDateTime inicioDoDia(LocalDate d) {
+        return d == null ? null : d.atStartOfDay();
+    }
+
+    /**
+     * Fim do dia com precisão de MICROssegundos (não {@link LocalTime#MAX}): a coluna
+     * data_hora é timestamp(6), e 23:59:59.999999999 (nanos) seria ARREDONDADO pelo driver
+     * para 00:00:00 do dia seguinte, incluindo indevidamente a meia-noite seguinte no período.
+     */
+    private static LocalDateTime fimDoDia(LocalDate d) {
+        return d == null ? null : d.atTime(LocalTime.of(23, 59, 59, 999_999_000));
     }
 
     /** Todas as colunas disponíveis do agendamento (o usuário escolhe quais exportar). */
@@ -214,6 +297,18 @@ public class AgendamentoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** Destinatários da notificação deste agendamento e o estado de entrega de cada um. */
+    @GetMapping("/{id}/entrega")
+    public ResponseEntity<List<AgendamentoEntregaResponse>> entrega(@PathVariable Long id) {
+        if (!repository.existsById(id)) {
+            return ResponseEntity.notFound().build(); // distingue "não existe" de "sem dados de entrega"
+        }
+        List<AgendamentoEntregaResponse> lista = entregaRepository.findByAgendamento_IdOrderByIdAsc(id).stream()
+                .map(AgendamentoEntregaResponse::from)
+                .toList();
+        return ResponseEntity.ok(lista);
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public AgendamentoResponse criar(@Valid @RequestBody AgendamentoRequest request,
@@ -225,8 +320,8 @@ public class AgendamentoController {
         Agendamento salvo = repository.save(agendamento);
         // Primeira linha do histórico: a unidade criou o agendamento (status inicial).
         logService.registrarDaUnidade(salvo, null, StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, uidDoToken(jwt));
-        // Notifica o paciente (push) para confirmar/cancelar o novo agendamento.
-        pushService.notificarNovoAgendamento(salvo);
+        // Notifica o paciente/responsáveis (push) e RASTREIA a entrega por destinatário.
+        entregaService.notificarNovoAgendamento(salvo);
         return AgendamentoResponse.from(salvo);
     }
 

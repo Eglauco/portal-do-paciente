@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { Ordenacao } from '../../shared/ordenacao/ordenacao.model';
 import { UnidadeService } from './unidade.service';
 
 /**
@@ -9,6 +10,7 @@ import { UnidadeService } from './unidade.service';
 export class UnidadeBuscaStore {
   codigo = '';
   nome = '';
+  ordenacoes: Ordenacao[] = [];
   page = 0;
   size = UnidadeService.TAMANHO_PADRAO;
 

@@ -1,17 +1,21 @@
 <main class="login">
   <!-- Painel de marca (mesma identidade do login) -->
-  <section class="login__brand">
+  <section class="login__brand" [style.--login-fundo]="marca.loginFundoCss()">
     <span class="login__brand-glow" aria-hidden="true"></span>
 
     <div class="wordmark">
       <span class="wordmark__mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 12h4l2 5 4-12 2 7h6" />
-        </svg>
+        @if (marca.logoUrl(); as logo) {
+          <img class="brand-logo" [src]="logo" alt="" (error)="marca.descartarLogo()" />
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h4l2 5 4-12 2 7h6" />
+          </svg>
+        }
       </span>
       <span>
         <span class="wordmark__namerow">
-          <span class="wordmark__name">Portal do Paciente</span>
+          <span class="wordmark__name">{{ marca.nomePlataforma() }}</span>
           <span class="badge badge--dark">Admin</span>
         </span>
         <span class="wordmark__sub">Área administrativa</span>
@@ -39,11 +43,15 @@
     <div class="pick">
       <div class="login__mobilemark">
         <span class="m" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12h4l2 5 4-12 2 7h6" />
-          </svg>
+          @if (marca.logoUrl(); as logo) {
+            <img class="brand-logo" [src]="logo" alt="" (error)="marca.descartarLogo()" />
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12h4l2 5 4-12 2 7h6" />
+            </svg>
+          }
         </span>
-        <span>Portal do Paciente</span>
+        <span>{{ marca.nomePlataforma() }}</span>
         <span class="badge badge--light">Admin</span>
       </div>
 

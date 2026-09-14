@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Procedimento } from './procedimento.model';
 import { ProcedimentoBuscaStore } from './procedimento-busca.store';
 import { ProcedimentoService } from './procedimento.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-procedimentos-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './procedimentos-list.html',
 })
 export class ProcedimentosList {
@@ -29,6 +31,8 @@ export class ProcedimentosList {
 
   protected readonly codigo = signal(this.store.codigo);
   protected readonly nome = signal(this.store.nome);
+  /** Ordenação multi-coluna (vazia = padrão do backend: Código crescente). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly procedimentos = signal<Procedimento[]>([]);
   protected readonly loading = signal(false);
@@ -103,12 +107,15 @@ export class ProcedimentosList {
   private carregar(): void {
     this.store.codigo = this.codigo();
     this.store.nome = this.nome();
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size()).subscribe({
+    this.service
+      .listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size(), this.ordenacoes())
+      .subscribe({
       next: (pagina) => {
         this.procedimentos.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -132,6 +139,21 @@ export class ProcedimentosList {
     this.router.navigate(['/procedimentos', procedimento.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -144,7 +166,9 @@ export class ProcedimentosList {
     this.formatoModal.set(null);
     if (!formato) return;
     this.exportando.set(formato);
-    this.service.exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas).subscribe({
+    this.service
+      .exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas, this.ordenacoes())
+      .subscribe({
       next: (blob) => {
         this.baixar(blob, `procedimentos.${formato}`);
         this.exportando.set(null);

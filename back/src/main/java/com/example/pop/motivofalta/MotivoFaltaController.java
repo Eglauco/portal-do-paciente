@@ -1,8 +1,8 @@
 package com.example.pop.motivofalta;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
@@ -37,6 +38,14 @@ public class MotivoFaltaController {
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
 
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "codigo", "id",
+            "motivo", "motivo",
+            "ativo", "ativo");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "motivo", "id");
+
     private final MotivoFaltaRepository repository;
     private final ExportacaoService exportacaoService;
 
@@ -49,13 +58,14 @@ public class MotivoFaltaController {
     public Pagina<MotivoFalta> listar(
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String motivo,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
         String filtroMotivo = (motivo == null) ? "" : motivo.trim();
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<MotivoFalta> resultado = repository.search(codigo, filtroMotivo, pageable);
 
         return new Pagina<>(
@@ -70,19 +80,18 @@ public class MotivoFaltaController {
 
     /**
      * Exporta os motivos de falta que batem com os MESMOS filtros da tela (todos os
-     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
+     * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por motivo.
      */
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportar(
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String motivo,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         String filtroMotivo = (motivo == null) ? "" : motivo.trim();
-        List<MotivoFalta> dados = repository.search(codigo, filtroMotivo, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(MotivoFalta::getId))
-                .toList();
+        List<MotivoFalta> dados = repository.search(codigo, filtroMotivo,
+                Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<MotivoFalta>> cols = ExportacaoService.filtrar(colunasMotivoFalta(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

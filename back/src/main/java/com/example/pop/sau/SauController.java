@@ -2,8 +2,10 @@ package com.example.pop.sau;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -56,17 +58,19 @@ public class SauController {
         this.exportacaoService = exportacaoService;
     }
 
-    /** Lista com filtros opcionais de unidade, tipo e status (mais recentes primeiro). */
+    /** Lista com filtros opcionais de unidade, tipo, status e nome do paciente (mais recentes por criação). */
     @GetMapping
     public Pagina<ManifestacaoResponse> listar(
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Long tipoId,
             @RequestParam(required = false) StatusManifestacao status,
+            @RequestParam(required = false) String nome,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
+        // id como desempate → paginação determinística mesmo com criadoEm iguais.
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), TAMANHO_MAXIMO),
-                Sort.by(Sort.Direction.DESC, "atualizadoEm"));
-        Page<Manifestacao> resultado = repository.search(unidadeId, tipoId, status, pageable);
+                Sort.by(Sort.Direction.DESC, "criadoEm", "id"));
+        Page<Manifestacao> resultado = repository.search(unidadeId, tipoId, status, padraoNome(nome), pageable);
         List<ManifestacaoResponse> content = sauService.toResponse(resultado.getContent());
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -84,22 +88,23 @@ public class SauController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Long tipoId,
             @RequestParam(required = false) StatusManifestacao status,
+            @RequestParam(required = false) String nome,
             @RequestParam(required = false) List<String> colunas) {
         List<ManifestacaoResponse> dados = sauService.toResponse(
-                repository.search(unidadeId, tipoId, status, Pageable.unpaged()).getContent()).stream()
-                .sorted(Comparator.comparing(ManifestacaoResponse::atualizadoEm).reversed())
+                repository.search(unidadeId, tipoId, status, padraoNome(nome), Pageable.unpaged()).getContent()).stream()
+                .sorted(Comparator.comparing(ManifestacaoResponse::criadoEm).reversed())
                 .toList();
         List<ColunaExport<ManifestacaoResponse>> cols = ExportacaoService.filtrar(colunasSau(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Manifestações (SAU)", filtrosSau(unidadeId, tipoId, status), cols, dados)
+                ? exportacaoService.pdf("Manifestações (SAU)", filtrosSau(unidadeId, tipoId, status, nome), cols, dados)
                 : exportacaoService.excel("Manifestações (SAU)", cols, dados);
-        String nome = "sau-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+        String nomeArquivo = "sau-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nome + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + nomeArquivo + "\"")
                 .body(arquivo);
     }
 
@@ -110,15 +115,31 @@ public class SauController {
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosSau(Long unidadeId, Long tipoId, StatusManifestacao status) {
+    private List<FiltroAplicado> filtrosSau(Long unidadeId, Long tipoId, StatusManifestacao status, String nome) {
         String unidade = unidadeId == null ? "Todas"
                 : unidadeRepository.findById(unidadeId).map(u -> u.getNome()).orElse("#" + unidadeId);
         String tipo = tipoId == null ? "Todos"
                 : tipoRepository.findById(tipoId).map(TipoManifestacao::getNome).orElse("#" + tipoId);
-        return List.of(
+        List<FiltroAplicado> filtros = new ArrayList<>(List.of(
                 new FiltroAplicado("Unidade", unidade),
                 new FiltroAplicado("Tipo", tipo),
-                new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos"));
+                new FiltroAplicado("Status", status != null ? status.getDescricao() : "Todos")));
+        if (nome != null && !nome.isBlank()) {
+            filtros.add(new FiltroAplicado("Paciente", nome.trim()));
+        }
+        return filtros;
+    }
+
+    /** Padrão LIKE (minúsculo, com curingas) para a busca parcial por nome do paciente; nulo se vazio. */
+    private static String padraoNome(String nome) {
+        if (nome == null || nome.isBlank()) {
+            return null;
+        }
+        String escapado = nome.trim().toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escapado + "%";
     }
 
     private static List<ColunaExport<ManifestacaoResponse>> colunasSau() {

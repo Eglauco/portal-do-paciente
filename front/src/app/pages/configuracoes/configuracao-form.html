@@ -110,6 +110,31 @@
               </div>
             }
           }
+          @case ('IMAGEM') {
+            <div class="form-field form-field--full">
+              <span class="label">Imagem</span>
+              <div class="img-config">
+                @if (imagemPreview(); as src) {
+                  <span class="img-config__preview"><img [src]="src" alt="Pré-visualização da logomarca" /></span>
+                } @else {
+                  <span class="img-config__vazio">Sem imagem</span>
+                }
+                <div class="img-config__acoes">
+                  <label class="btn btn--ghost" [class.is-disabled]="enviandoImagem()">
+                    {{ enviandoImagem() ? 'Enviando…' : imagemPreview() ? 'Trocar imagem' : 'Enviar imagem' }}
+                    <input type="file" accept="image/*" hidden (change)="aoSelecionarImagem($event)" [disabled]="enviandoImagem()" />
+                  </label>
+                  @if (imagemPreview()) {
+                    <button type="button" class="btn btn--ghost" (click)="removerImagem()" [disabled]="enviandoImagem()">Remover</button>
+                  }
+                </div>
+              </div>
+              <p class="field-hint">
+                PNG ou JPG aparecem em todo lugar, inclusive nos relatórios em PDF. SVG e WebP funcionam
+                nas telas (login, sidebar, favicon), mas não no cabeçalho dos PDFs. Sem imagem, usa a logo padrão.
+              </p>
+            </div>
+          }
         }
       </div>
 

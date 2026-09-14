@@ -25,4 +25,8 @@ public class Especialidade {
 
     @Column(nullable = false, length = 120)
     private String nome;
+
+    /** Código da especialidade em um sistema externo (integração). Único quando preenchido. */
+    @Column(name = "codigo_integracao", length = 60)
+    private String codigoIntegracao;
 }

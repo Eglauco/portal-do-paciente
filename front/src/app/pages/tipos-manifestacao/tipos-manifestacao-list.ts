@@ -2,6 +2,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { TipoManifestacao } from './tipo-manifestacao.model';
 import { TipoManifestacaoBuscaStore } from './tipo-manifestacao-busca.store';
 import { TipoManifestacaoService } from './tipo-manifestacao.service';
@@ -10,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-tipos-manifestacao-list',
-  imports: [RouterLink, RelatorioColunasModal],
+  imports: [RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './tipos-manifestacao-list.html',
 })
 export class TiposManifestacaoList {
@@ -30,6 +32,8 @@ export class TiposManifestacaoList {
   protected readonly nome = signal(this.store.nome);
   /** '' = todos, 'true' = ativos, 'false' = inativos (valor do <select>). */
   protected readonly situacao = signal(this.store.ativo == null ? '' : String(this.store.ativo));
+  /** Ordenação multi-coluna (vazia = padrão do backend: Nome A→Z). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
   protected readonly tipos = signal<TipoManifestacao[]>([]);
   protected readonly loading = signal(false);
@@ -103,12 +107,13 @@ export class TiposManifestacaoList {
     const ativo = this.situacao() === '' ? null : this.situacao() === 'true';
     this.store.nome = this.nome();
     this.store.ativo = ativo;
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
-    this.service.listar({ nome: this.nome(), ativo }, this.page(), this.size()).subscribe({
+    this.service.listar({ nome: this.nome(), ativo }, this.page(), this.size(), this.ordenacoes()).subscribe({
       next: (pagina) => {
         this.tipos.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
@@ -132,6 +137,21 @@ export class TiposManifestacaoList {
     this.router.navigate(['/tipos-manifestacao', tipo.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -145,7 +165,7 @@ export class TiposManifestacaoList {
     if (!formato) return;
     const ativo = this.situacao() === '' ? null : this.situacao() === 'true';
     this.exportando.set(formato);
-    this.service.exportar(formato, { nome: this.nome(), ativo }, colunas).subscribe({
+    this.service.exportar(formato, { nome: this.nome(), ativo }, colunas, this.ordenacoes()).subscribe({
       next: (blob) => {
         this.baixar(blob, `tipos-manifestacao.${formato}`);
         this.exportando.set(null);

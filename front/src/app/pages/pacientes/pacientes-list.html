@@ -29,7 +29,7 @@
   <!-- Filtros -->
   <form class="filters" (submit)="buscar($event)">
     <p class="section-label">Filtros</p>
-    <div class="filters__chat">
+    <div class="filters__chat filters__chat--pacientes">
       <input
         class="input"
         placeholder="Código"
@@ -40,10 +40,10 @@
       />
       <input
         class="input"
-        placeholder="Nome"
-        aria-label="Nome"
-        [value]="nome()"
-        (input)="updateNome($event)"
+        placeholder="Prontuário"
+        aria-label="Prontuário"
+        [value]="prontuario()"
+        (input)="updateProntuario($event)"
       />
       <input
         class="input"
@@ -54,11 +54,11 @@
         (input)="updateCpf($event)"
       />
       <input
-        class="input"
-        placeholder="Prontuário"
-        aria-label="Prontuário"
-        [value]="prontuario()"
-        (input)="updateProntuario($event)"
+        class="input filters__campo--largo"
+        placeholder="Nome"
+        aria-label="Nome"
+        [value]="nome()"
+        (input)="updateNome($event)"
       />
     </div>
     <div class="filters__chat-acoes">
@@ -91,9 +91,19 @@
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Dados</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -124,9 +134,11 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th class="col-cod">Código</th>
-              <th>Nome</th>
-              <th>CPF</th>
+              <th class="col-cod" appOrdenavel="codigo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Código</th>
+              <th appOrdenavel="nome" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Nome</th>
+              <th appOrdenavel="cpf" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">CPF</th>
+              <th appOrdenavel="prontuario" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Prontuário</th>
+              <th appOrdenavel="dataNascimento" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Data de nascimento</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -155,6 +167,8 @@
                   </span>
                 </td>
                 <td class="mono muted-cell">{{ formatarCpf(p.cpf) || '—' }}</td>
+                <td class="muted-cell">{{ p.prontuario || '—' }}</td>
+                <td class="muted-cell">{{ p.dataNascimento ? (p.dataNascimento | date: 'dd/MM/yyyy' : 'UTC') : '—' }}</td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

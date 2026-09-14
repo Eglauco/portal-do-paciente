@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import {
   Comentario,
   Pagina,
@@ -24,6 +25,7 @@ export class PostagemService {
     filtro: PostagemFiltro = {},
     page = 0,
     size = PostagemService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
   ): Observable<Pagina<Postagem>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.titulo) params = params.set('titulo', filtro.titulo);
@@ -34,11 +36,17 @@ export class PostagemService {
     if (filtro.novoComentario !== null && filtro.novoComentario !== undefined) {
       params = params.set('novoComentario', filtro.novoComentario);
     }
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Postagem>>(this.base, { params });
   }
 
-  /** Exporta as postagens dos filtros atuais em Excel ou PDF, só com as colunas escolhidas. */
-  exportar(formato: 'xlsx' | 'pdf', filtro: PostagemFiltro = {}, colunas: string[] = []): Observable<Blob> {
+  /** Exporta as postagens dos filtros/ordenação atuais em Excel ou PDF, só com as colunas escolhidas. */
+  exportar(
+    formato: 'xlsx' | 'pdf',
+    filtro: PostagemFiltro = {},
+    colunas: string[] = [],
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Blob> {
     let params = new HttpParams().set('formato', formato);
     if (filtro.titulo) params = params.set('titulo', filtro.titulo);
     if (filtro.unidadeId) params = params.set('unidadeId', filtro.unidadeId);
@@ -49,6 +57,7 @@ export class PostagemService {
       params = params.set('novoComentario', filtro.novoComentario);
     }
     for (const c of colunas) params = params.append('colunas', c);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
   }
 

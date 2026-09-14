@@ -14,6 +14,8 @@ public record ConfiguracaoResponse(
         String valorTexto,
         BigDecimal valorNumerico,
         String valorCor,
+        /** URL do objeto no S3 (tipo IMAGEM); pode ser null. */
+        String valorImagem,
         LocalDateTime atualizadoEm,
         /** Nome do admin que fez a última alteração (auditoria); null se nunca editado. */
         String atualizadoPorNome) {
@@ -21,6 +23,6 @@ public record ConfiguracaoResponse(
     public static ConfiguracaoResponse from(Configuracao c, String atualizadoPorNome) {
         return new ConfiguracaoResponse(c.getId(), c.getNome(), c.getDescricao(), c.getChave(),
                 c.getTipoConfiguracao(), c.getValorBooleano(), c.getValorTexto(), c.getValorNumerico(),
-                c.getValorCor(), c.getAtualizadoEm(), atualizadoPorNome);
+                c.getValorCor(), c.getValorImagem(), c.getAtualizadoEm(), atualizadoPorNome);
     }
 }

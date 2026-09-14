@@ -5,8 +5,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.common.Ref;
 import com.example.pop.configuracao.ChaveConfiguracao;
@@ -52,6 +53,13 @@ public class PostagemController {
     private static final int TAMANHO_MAXIMO = 100;
     /** Validade das URLs de imagem no feed/edição. */
     static final Duration VALIDADE_IMAGEM = Duration.ofDays(7);
+
+    /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
+    private static final Map<String, String> ORDENAVEIS = Map.of(
+            "titulo", "titulo",
+            "criadoEm", "criadoEm");
+    /** Ordenação usada quando nada é escolhido na tela. */
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.DESC, "criadoEm");
 
     private final PostagemRepository repository;
     private final CurtidaRepository curtidaRepository;
@@ -94,12 +102,13 @@ public class PostagemController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Boolean comentarios,
             @RequestParam(required = false) Boolean novoComentario,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         int pagina = Math.max(page, 0);
 
-        Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "criadoEm"));
+        Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Postagem> resultado = repository.search(titulo == null ? "" : titulo, unidadeId, comentarios,
                 novoComentario, pageable);
         List<PostagemResponse> content = resultado.getContent().stream().map(this::toResponse).toList();
@@ -121,12 +130,12 @@ public class PostagemController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) Boolean comentarios,
             @RequestParam(required = false) Boolean novoComentario,
+            @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         List<Postagem> dados = repository
-                .search(titulo == null ? "" : titulo, unidadeId, comentarios, novoComentario, Pageable.unpaged())
-                .getContent().stream()
-                .sorted(Comparator.comparing(Postagem::getCriadoEm).reversed())
-                .toList();
+                .search(titulo == null ? "" : titulo, unidadeId, comentarios, novoComentario,
+                        Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO)))
+                .getContent();
         List<ColunaExport<Postagem>> cols = ExportacaoService.filtrar(colunasPostagem(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);

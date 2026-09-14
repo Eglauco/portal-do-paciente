@@ -38,4 +38,28 @@ public final class ChaveConfiguracao {
 
     /** Cor primária da plataforma (COR, hex {@code #RRGGBB}) — semente do tema do front/app. */
     public static final String COR_PRIMARIA_PLATAFORMA = "COR_PRIMARIA_PLATAFORMA";
+
+    /**
+     * Nome da plataforma (TEXTO) — white-label. Exibido no login, na tela de trocar unidade,
+     * no rodapé da sidebar, no título das abas do navegador e no rodapé dos relatórios (PDF).
+     */
+    public static final String NOME_PLATAFORMA = "NOME_PLATAFORMA";
+
+    /** Título grande do painel de marca da tela de login (TEXTO) — white-label. */
+    public static final String LOGIN_TITULO = "LOGIN_TITULO";
+
+    /** Subtítulo (texto de apoio) abaixo do título, na tela de login (TEXTO) — white-label. */
+    public static final String LOGIN_SUBTITULO = "LOGIN_SUBTITULO";
+
+    /**
+     * Logomarca da plataforma (IMAGEM, URL no S3) — white-label. Substitui o SVG fixo no
+     * login, na tela de trocar unidade, na sidebar, no favicon e no cabeçalho dos PDFs.
+     */
+    public static final String LOGO_PLATAFORMA = "LOGO_PLATAFORMA";
+
+    /**
+     * Imagem de fundo do painel azul do login/trocar-unidade (IMAGEM, URL no S3) — white-label.
+     * Fica atrás do azul (que cobre em opacidade alta), como textura sutil.
+     */
+    public static final String LOGIN_FUNDO = "LOGIN_FUNDO";
 }

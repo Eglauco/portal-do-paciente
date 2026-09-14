@@ -5,6 +5,8 @@ import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
+import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -16,7 +18,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-prontuarios-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal, Ordenavel],
   templateUrl: './prontuarios-list.html',
 })
 export class ProntuariosList {
@@ -38,9 +40,12 @@ export class ProntuariosList {
   protected readonly filtro = new FormGroup({
     numero: new FormControl<string>(this.store.numero, { nonNullable: true }),
     pacienteId: new FormControl<number | null>(this.store.pacienteId),
+    especialidade: new FormControl<string>(this.store.especialidade, { nonNullable: true }),
   });
 
   protected readonly size = signal(this.store.size);
+  /** Ordenação multi-coluna (vazia = padrão do backend: mais recentes primeiro). */
+  protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
   protected readonly registros = signal<Prontuario[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
@@ -84,7 +89,7 @@ export class ProntuariosList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ numero: '', pacienteId: null });
+    this.filtro.reset({ numero: '', pacienteId: null, especialidade: '' });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -114,13 +119,25 @@ export class ProntuariosList {
     const f = this.filtro.getRawValue();
     this.store.numero = f.numero;
     this.store.pacienteId = f.pacienteId;
+    this.store.especialidade = f.especialidade;
+    this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
 
     this.loading.set(true);
     this.error.set(false);
     this.service
-      .listar({ numero: f.numero, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, this.page(), this.size())
+      .listar(
+        {
+          numero: f.numero,
+          pacienteId: f.pacienteId,
+          especialidade: f.especialidade,
+          unidadeId: this.auth.unidadeId(),
+        },
+        this.page(),
+        this.size(),
+        this.ordenacoes(),
+      )
       .subscribe({
       next: (pagina) => {
         this.registros.set(pagina.content);
@@ -145,6 +162,21 @@ export class ProntuariosList {
     this.router.navigate(['/prontuarios', p.id]);
   }
 
+  /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
+  protected aoAlternar(evento: { campo: string; combinar: boolean }): void {
+    this.ordenacoes.set(alternarOrdenacao(this.ordenacoes(), evento.campo, evento.combinar));
+    this.page.set(0);
+    this.carregar();
+  }
+
+  /** Remove toda a ordenação (volta ao padrão do backend). */
+  protected limparOrdenacao(): void {
+    if (this.ordenacoes().length === 0) return;
+    this.ordenacoes.set([]);
+    this.page.set(0);
+    this.carregar();
+  }
+
   /** Abre o modal de seleção de colunas para o formato escolhido. */
   protected abrirExportacao(formato: 'xlsx' | 'pdf'): void {
     if (this.exportando()) return;
@@ -159,7 +191,17 @@ export class ProntuariosList {
     this.exportando.set(formato);
     const f = this.filtro.getRawValue();
     this.service
-      .exportar(formato, { numero: f.numero, pacienteId: f.pacienteId, unidadeId: this.auth.unidadeId() }, colunas)
+      .exportar(
+        formato,
+        {
+          numero: f.numero,
+          pacienteId: f.pacienteId,
+          especialidade: f.especialidade,
+          unidadeId: this.auth.unidadeId(),
+        },
+        colunas,
+        this.ordenacoes(),
+      )
       .subscribe({
         next: (blob) => {
           this.baixar(blob, `prontuarios.${formato}`);

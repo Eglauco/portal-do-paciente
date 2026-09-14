@@ -60,9 +60,19 @@
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Avaliações</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -92,12 +102,12 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Atendimento</th>
-              <th>Paciente</th>
-              <th>Especialidade</th>
-              <th>Unidade</th>
-              <th>Média</th>
-              <th>Status</th>
+              <th appOrdenavel="dataHora" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Atendimento</th>
+              <th appOrdenavel="paciente" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Paciente</th>
+              <th appOrdenavel="especialidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Especialidade</th>
+              <th appOrdenavel="unidadeSaude" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Unidade</th>
+              <th appOrdenavel="media" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Média</th>
+              <th appOrdenavel="status" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Status</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>

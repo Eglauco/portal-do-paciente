@@ -3,13 +3,17 @@
   <aside class="sidebar">
     <div class="sidebar__brand">
       <span class="sidebar__mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 12h4l2 5 4-12 2 7h6" />
-        </svg>
+        @if (marca.logoUrl(); as logo) {
+          <img class="brand-logo" [src]="logo" alt="" (error)="marca.descartarLogo()" />
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12h4l2 5 4-12 2 7h6" />
+          </svg>
+        }
       </span>
       <span class="sidebar__brandtext">
-        <span class="sidebar__name">POP <span class="badge badge--light">Admin</span></span>
-        <span class="sidebar__ver">Portal do Paciente · v1.0.0</span>
+        <span class="sidebar__name">{{ marca.nomePlataforma() }}</span>
+        <span class="sidebar__ver">v1.0.0</span>
       </span>
     </div>
 
@@ -152,6 +156,15 @@
             <circle cx="12" cy="7" r="3.2" /><path d="M6 21a6 6 0 0 1 12 0" /><path d="M12 13v3M10.5 14.5h3" />
           </svg>
           Profissionais
+        </a>
+      }
+
+      @if (temTela('CONSELHOS')) {
+        <a class="nav__link" routerLink="/conselhos" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.2l5.9-.9z" />
+          </svg>
+          Conselhos
         </a>
       }
 
@@ -394,3 +407,6 @@
 @if (modalSenhaAberto()) {
   <app-trocar-senha-modal (fechar)="fecharTrocarSenha()" />
 }
+
+<!-- Busca de funcionalidades (Alt+1) — overlay que cobre a tela toda. -->
+<app-busca-funcionalidades />

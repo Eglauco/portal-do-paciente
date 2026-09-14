@@ -156,6 +156,29 @@
           <span id="senha-dica" class="field-hint">Deixe em branco para manter a senha atual.</span>
         }
       </div>
+
+      <div class="form-field">
+        <label class="label" for="confirmarSenha">
+          Confirmar senha @if (!editando()) { <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span> }
+        </label>
+        <div class="pass-field">
+          <input
+            id="confirmarSenha"
+            [type]="mostrarSenha() ? 'text' : 'password'"
+            class="input"
+            formControlName="confirmarSenha"
+            placeholder="Repita a senha"
+            autocomplete="new-password"
+            [attr.aria-required]="!editando()"
+            [attr.aria-invalid]="senhaNaoConfere"
+            [attr.aria-describedby]="senhaNaoConfere ? 'confirmar-senha-erro' : null"
+            [class.input--error]="senhaNaoConfere"
+          />
+        </div>
+        @if (senhaNaoConfere) {
+          <span id="confirmar-senha-erro" class="field-error" role="alert">As senhas não conferem.</span>
+        }
+      </div>
     </div>
 
     <div class="form-actions">

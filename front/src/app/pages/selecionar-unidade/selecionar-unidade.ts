@@ -2,6 +2,7 @@ import { afterNextRender, Component, computed, inject, signal } from '@angular/c
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
+import { MarcaService } from '../../core/marca.service';
 import { Unidade } from '../unidades/unidade.model';
 import { UnidadeService } from '../unidades/unidade.service';
 
@@ -14,6 +15,8 @@ export class SelecionarUnidade {
   private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
   private readonly toastr = inject(ToastrService);
+  /** Nome da plataforma (white-label) para os painéis de marca. */
+  protected readonly marca = inject(MarcaService);
 
   protected readonly usuario = this.auth.usuario;
   protected readonly unidades = signal<Unidade[]>([]);

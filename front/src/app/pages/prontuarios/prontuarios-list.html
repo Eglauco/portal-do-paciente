@@ -44,6 +44,10 @@
           placeholder="Todos os pacientes"
         ></ng-select>
       </div>
+      <div class="form-field">
+        <label class="label" for="f-especialidade">Especialidade</label>
+        <input id="f-especialidade" type="text" class="input" formControlName="especialidade" placeholder="Nome da especialidade" />
+      </div>
     </div>
     <div class="filters__actions">
       <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
@@ -60,9 +64,19 @@
   <section class="panel">
     <div class="panel__head">
       <h2 class="panel__title">Dados</h2>
-      @if (carregado() && !error() && !loading()) {
-        <span class="result-count">{{ totalElements() }} registro(s)</span>
-      }
+      <div class="panel__head-right">
+        @if (ordenacoes().length > 0) {
+          <button type="button" class="sort-clear" (click)="limparOrdenacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+            Limpar ordenação
+          </button>
+        }
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ totalElements() }} registro(s)</span>
+        }
+      </div>
     </div>
 
     @if (loading()) {
@@ -93,11 +107,11 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Nº atendimento</th>
-              <th>Paciente</th>
-              <th>Especialidade</th>
-              <th>Unidade</th>
-              <th>Atendimento</th>
+              <th appOrdenavel="numeroAtendimento" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Nº atendimento</th>
+              <th appOrdenavel="paciente" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Paciente</th>
+              <th appOrdenavel="especialidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Especialidade</th>
+              <th appOrdenavel="unidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Unidade</th>
+              <th appOrdenavel="dataHora" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Atendimento</th>
               <th>Documentos</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>

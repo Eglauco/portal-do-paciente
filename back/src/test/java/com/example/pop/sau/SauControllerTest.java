@@ -285,11 +285,11 @@ class SauControllerTest {
                 new AbrirManifestacaoRequest(tipoId, unidadeId, "Ótimo atendimento!")).id();
 
         Pagina<ManifestacaoResponse> porTipo = sauController.listar(null, tipoId,
-                StatusManifestacao.AGUARDANDO_SAU, 0, 50);
+                StatusManifestacao.AGUARDANDO_SAU, null, 0, 50);
         assertTrue(porTipo.content().stream().anyMatch(m -> m.id().equals(id)));
 
         // Filtro por OUTRO tipo não traz esta manifestação.
-        Pagina<ManifestacaoResponse> outroTipo = sauController.listar(null, outroTipoId, null, 0, 50);
+        Pagina<ManifestacaoResponse> outroTipo = sauController.listar(null, outroTipoId, null, null, 0, 50);
         assertFalse(outroTipo.content().stream().anyMatch(m -> m.id().equals(id)));
     }
 }

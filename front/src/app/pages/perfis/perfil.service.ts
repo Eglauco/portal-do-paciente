@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { Pagina, Perfil, PerfilFiltro, PerfilRequest, TelaOpcao } from './perfil.model';
 
 @Injectable({ providedIn: 'root' })
@@ -16,10 +17,16 @@ export class PerfilService {
   static readonly TAMANHO_PADRAO = 10;
 
   /** Lista os perfis de forma paginada, com filtros por código e nome. */
-  listar(filtro: PerfilFiltro = {}, page = 0, size = PerfilService.TAMANHO_PADRAO): Observable<Pagina<Perfil>> {
+  listar(
+    filtro: PerfilFiltro = {},
+    page = 0,
+    size = PerfilService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
+  ): Observable<Pagina<Perfil>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.codigo?.trim()) params = params.set('codigo', filtro.codigo.trim());
     if (filtro.nome?.trim()) params = params.set('nome', filtro.nome.trim());
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Perfil>>(this.base, { params });
   }
 

@@ -172,6 +172,27 @@ public class StorageService {
         return chave != null && chave.startsWith(pastaSegura(pasta) + "/");
     }
 
+    /**
+     * Baixa os bytes do objeto (server-side, endpoint interno) a partir da URL salva.
+     * Devolve null se não configurado, URL inválida ou objeto ausente — útil p/ embutir
+     * a logo no PDF sem quebrar a geração quando não há imagem/S3.
+     */
+    public byte[] baixarBytes(String url) {
+        if (!StringUtils.hasText(url) || !configurado()) {
+            return null;
+        }
+        String chave = chaveDaUrl(url);
+        if (chave == null) {
+            return null;
+        }
+        try {
+            return client().getObjectAsBytes(
+                    GetObjectRequest.builder().bucket(bucket).key(chave).build()).asByteArray();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     /** Remove o objeto no S3 a partir da URL salva no documento. */
     public void excluirPorUrl(String url) {
         if (!StringUtils.hasText(url) || !configurado()) {

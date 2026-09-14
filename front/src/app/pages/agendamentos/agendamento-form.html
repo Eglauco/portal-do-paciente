@@ -35,34 +35,35 @@
       </div>
 
       <div class="form-field">
-        <label class="label" for="especialidade">Especialidade <span class="req" aria-hidden="true">*</span></label>
-        <ng-select
-          labelForId="especialidade"
-          formControlName="especialidadeId"
-          [items]="especialidades()"
-          bindLabel="nome"
-          bindValue="id"
-          placeholder="Selecione a especialidade"
-          notFoundText="Nenhuma especialidade encontrada"
-        ></ng-select>
-        @if (invalido('especialidadeId')) {
-          <span class="field-error">Selecione a especialidade.</span>
-        }
-      </div>
-
-      <div class="form-field">
         <label class="label" for="profissional">Profissional de saúde <span class="req" aria-hidden="true">*</span></label>
         <ng-select
           labelForId="profissional"
           formControlName="profissionalSaudeId"
-          [items]="profissionais()"
+          [items]="profissionaisDisponiveis()"
           bindLabel="nome"
           bindValue="id"
           placeholder="Selecione o profissional"
-          notFoundText="Nenhum profissional encontrado"
+          notFoundText="Nenhum profissional atende nesta unidade"
         ></ng-select>
+        <span class="field-hint">Só aparecem os profissionais que atendem na sua unidade ativa.</span>
         @if (invalido('profissionalSaudeId')) {
           <span class="field-error">Selecione o profissional.</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="especialidade">Especialidade <span class="req" aria-hidden="true">*</span></label>
+        <ng-select
+          labelForId="especialidade"
+          formControlName="especialidadeId"
+          [items]="especialidadesDisponiveis()"
+          bindLabel="nome"
+          bindValue="id"
+          [placeholder]="form.controls.especialidadeId.disabled ? 'Selecione o profissional primeiro' : 'Selecione a especialidade'"
+          notFoundText="Este profissional não tem especialidades vinculadas"
+        ></ng-select>
+        @if (invalido('especialidadeId')) {
+          <span class="field-error">Selecione a especialidade.</span>
         }
       </div>
 
@@ -164,6 +165,51 @@
         <p class="falta-just">{{ justificativaFalta() }}</p>
       } @else {
         <p class="falta-just falta-just--vazio">O paciente não escreveu uma observação.</p>
+      }
+    </section>
+  }
+
+  @if (editando()) {
+    <section class="panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Destinatários da notificação</h2>
+      </div>
+      <p class="section-label">Quem foi notificado deste agendamento e se a notificação chegou ao destino.</p>
+
+      @if (carregandoEntrega()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando destinatários…</p></div>
+      } @else if (erroEntrega()) {
+        <div class="state">
+          <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+          <p>Não foi possível carregar os destinatários.</p>
+        </div>
+      } @else if (entregas().length === 0) {
+        <div class="state"><p>Sem dados de entrega (agendamento anterior a este controle).</p></div>
+      } @else {
+        @for (g of entregasPorPessoa(); track g.chave) {
+          <div class="entrega-grupo">
+            <p class="entrega-grupo__nome">
+              {{ g.nome }}
+              <span class="ag-hist__autor" [class.ag-hist__autor--resp]="g.tipo === 'RESPONSAVEL'">
+                {{ g.tipo === 'RESPONSAVEL' ? 'responsável' : 'paciente' }}
+              </span>
+            </p>
+            @if (g.telefone) {
+              <p class="entrega-grupo__tel">{{ g.telefone }}</p>
+            }
+            <ul class="tl">
+              @for (ev of g.eventos; track ev.id) {
+                <li class="tl__item">
+                  <span class="tl__dot" [class.tl__dot--amber]="g.tipo === 'RESPONSAVEL'" aria-hidden="true"></span>
+                  <div class="tl__body">
+                    <span class="entrega-pill" [attr.data-ent]="ev.estado">{{ rotuloEntrega(ev.estado) }}</span>
+                    <time class="tl__hora">{{ ev.criadoEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        }
       }
     </section>
   }

@@ -25,6 +25,10 @@
     <p class="section-label">Filtros</p>
     <div class="filters__chat">
       <div class="form-field">
+        <label class="label">Paciente</label>
+        <input class="input" type="text" formControlName="nome" placeholder="Nome do paciente" aria-label="Nome do paciente" />
+      </div>
+      <div class="form-field">
         <label class="label">Tipo</label>
         <ng-select
           formControlName="tipoId"
@@ -100,7 +104,7 @@
               <span class="convo__body">
                 <span class="convo__top">
                   <b class="convo__nome">{{ m.paciente.nome }}</b>
-                  <span class="convo__hora">{{ m.atualizadoEm | date: 'dd/MM HH:mm' }}</span>
+                  <span class="convo__hora">{{ m.criadoEm | date: 'dd/MM HH:mm' }}</span>
                 </span>
                 <span class="convo__meta">
                   <span class="convo__unidade">{{ m.unidadeSaude.nome }}</span>

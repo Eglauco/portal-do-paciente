@@ -21,6 +21,7 @@ export class EspecialidadeForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
     }),
+    codigoIntegracao: new FormControl('', { nonNullable: true }),
   });
 
   protected readonly editando = signal(false);
@@ -40,7 +41,11 @@ export class EspecialidadeForm implements PodeSair {
       this.editando.set(true);
       this.codigo.set(id);
       this.service.buscarPorId(id).subscribe({
-        next: (especialidade) => this.form.patchValue({ nome: especialidade.nome }),
+        next: (especialidade) =>
+          this.form.patchValue({
+            nome: especialidade.nome,
+            codigoIntegracao: especialidade.codigoIntegracao ?? '',
+          }),
         error: () => this.erroCarregar.set(true),
       });
     }
@@ -63,7 +68,8 @@ export class EspecialidadeForm implements PodeSair {
       return;
     }
     this.salvando.set(true);
-    const dados = { nome: this.form.controls.nome.value };
+    const codigo = this.form.controls.codigoIntegracao.value.trim();
+    const dados = { nome: this.form.controls.nome.value, codigoIntegracao: codigo || null };
     const requisicao = this.editando()
       ? this.service.atualizar(this.codigo()!, dados)
       : this.service.criar(dados);
@@ -73,9 +79,13 @@ export class EspecialidadeForm implements PodeSair {
         this.toastr.success('Especialidade salva');
         this.router.navigate(['/especialidades']);
       },
-      error: () => {
+      error: (e) => {
         this.salvando.set(false);
-        this.toastr.error('Não foi possível salvar a especialidade.');
+        this.toastr.error(
+          e?.status === 409
+            ? 'Já existe uma especialidade com este código de integração.'
+            : 'Não foi possível salvar a especialidade.',
+        );
       },
     });
   }

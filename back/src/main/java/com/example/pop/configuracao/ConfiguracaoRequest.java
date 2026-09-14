@@ -11,5 +11,7 @@ public record ConfiguracaoRequest(
         Boolean valorBooleano,
         String valorTexto,
         BigDecimal valorNumerico,
-        String valorCor) {
+        String valorCor,
+        /** URL do objeto no S3 (tipo IMAGEM) — o front sobe o arquivo e envia a URL aqui. */
+        String valorImagem) {
 }

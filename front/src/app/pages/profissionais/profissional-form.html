@@ -1,22 +1,57 @@
-<section class="dash">
+<section class="dash" [inert]="confirmacao() !== null">
   <header class="page-head">
     <div>
       <h1 class="page-title">{{ editando() ? 'Editar profissional' : 'Cadastro de profissional' }}</h1>
       <p class="page-sub">
         {{ editando()
-          ? 'Atualize os dados deste profissional.'
-          : 'Preencha os dados para cadastrar uma nova profissional de saúde.' }}
+          ? 'Atualize os dados deste profissional de saúde.'
+          : 'Preencha os dados para cadastrar um novo profissional de saúde.' }}
       </p>
     </div>
     @if (editando()) {
-      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
-        </svg>
-        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
-      </button>
+      <div class="page-head__actions">
+        <button type="button" class="btn btn--ghost" (click)="excluir()" [disabled]="excluindo()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+          </svg>
+          {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+        </button>
+        @if (inativo()) {
+          <button type="button" class="btn btn--solid" (click)="reativar()" [disabled]="alterandoSituacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" />
+            </svg>
+            {{ alterandoSituacao() ? 'Reativando…' : 'Reativar' }}
+          </button>
+        } @else {
+          <button type="button" class="btn btn--danger" (click)="inativar()" [disabled]="alterandoSituacao()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
+            </svg>
+            {{ alterandoSituacao() ? 'Inativando…' : 'Inativar' }}
+          </button>
+        }
+      </div>
     }
   </header>
+
+  @if (editando() && inativo()) {
+    <div class="aviso-inativo">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" />
+      </svg>
+      <span>Profissional <b>inativo</b> — somente leitura e fora das seleções. Reative para poder editar.</span>
+    </div>
+  }
+
+  @if (erroCarregar()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h2>Não foi possível carregar o profissional</h2>
+      <p>Verifique se o servidor está disponível e tente novamente.</p>
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Voltar</button>
+    </div>
+  }
 
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     @if (editando()) {
@@ -26,28 +61,314 @@
       </div>
     }
 
-    <div class="form-grid">
-      <div class="form-field">
-        <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
-        <input
-          id="nome"
-          class="input"
-          formControlName="nome"
-          placeholder="Nome do profissional"
-          autocomplete="off"
-          [class.input--error]="invalido('nome')"
-        />
-        @if (invalido('nome')) {
-          <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
-        }
+    <!-- Foto -->
+    <div class="form-field">
+      <span class="label">Foto</span>
+      <div class="foto">
+        <span class="foto__preview">
+          @if (fotoPreview()) {
+            <img [src]="fotoPreview()!" (error)="fotoPreview.set(null)" [alt]="'Foto de ' + (form.controls.nome.value || 'profissional')" />
+          } @else {
+            {{ iniciais(form.controls.nome.value) }}
+          }
+        </span>
+        <div class="foto__acoes">
+          <label class="btn btn--ghost btn--sm" [class.is-disabled]="inativo() || enviandoFoto()">
+            <input type="file" accept="image/*" hidden (change)="aoSelecionarFoto($event)" [disabled]="inativo() || enviandoFoto()" />
+            {{ enviandoFoto() ? 'Enviando…' : (fotoPreview() ? 'Trocar foto' : 'Enviar foto') }}
+          </label>
+          @if (fotoPreview() && !inativo()) {
+            <button type="button" class="btn btn--ghost btn--sm" (click)="removerFoto()">Remover</button>
+          }
+        </div>
       </div>
     </div>
 
+    <!-- Identificação -->
+    <fieldset class="form-field">
+      <legend class="section-label">Identificação</legend>
+      <div class="form-grid">
+        <div class="form-field form-field--full">
+          <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
+          <input
+            id="nome"
+            class="input"
+            formControlName="nome"
+            placeholder="Nome do profissional"
+            autocomplete="off"
+            [class.input--error]="invalido('nome')"
+            [attr.aria-invalid]="invalido('nome')"
+            [attr.aria-describedby]="invalido('nome') ? 'nome-erro' : null"
+          />
+          @if (invalido('nome')) {
+            <span id="nome-erro" class="field-error" role="alert">Informe o nome (mínimo 3 caracteres).</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="conselhoId">Conselho</label>
+          <ng-select
+            labelForId="conselhoId"
+            formControlName="conselhoId"
+            [items]="conselhos()"
+            bindLabel="label"
+            bindValue="id"
+            placeholder="Selecione o conselho"
+            notFoundText="Nenhum conselho"
+          ></ng-select>
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="numeroConselho">Número do conselho</label>
+          <input id="numeroConselho" class="input" formControlName="numeroConselho" maxlength="40" autocomplete="off" placeholder="Ex.: 12345" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="codigoIntegracao">Código de integração</label>
+          <input id="codigoIntegracao" class="input" formControlName="codigoIntegracao" maxlength="60" autocomplete="off" placeholder="Ex.: ID no sistema externo" />
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Dados pessoais -->
+    <fieldset class="form-field">
+      <legend class="section-label">Dados pessoais</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="sexo">Sexo</label>
+          <ng-select
+            labelForId="sexo"
+            formControlName="sexo"
+            [items]="sexos"
+            bindLabel="label"
+            bindValue="value"
+            placeholder="Selecione"
+            notFoundText="Sem opções"
+          ></ng-select>
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="dataNascimento">Data de nascimento</label>
+          <input
+            id="dataNascimento"
+            class="input"
+            formControlName="dataNascimento"
+            mask="00/00/0000"
+            [dropSpecialCharacters]="false"
+            [validation]="false"
+            placeholder="dd/mm/aaaa"
+            inputmode="numeric"
+            autocomplete="off"
+            [class.input--error]="invalido('dataNascimento')"
+          />
+          @if (invalido('dataNascimento')) {
+            <span class="field-error" role="alert">Data inválida.</span>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="cpf">CPF</label>
+          <input
+            id="cpf"
+            class="input"
+            formControlName="cpf"
+            mask="000.000.000-00"
+            placeholder="000.000.000-00"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="rg">RG</label>
+          <input id="rg" class="input" formControlName="rg" maxlength="20" autocomplete="off" placeholder="RG" />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="cns">CNS</label>
+          <input
+            id="cns"
+            class="input"
+            formControlName="cns"
+            mask="000 0000 0000 0000"
+            placeholder="Cartão Nacional de Saúde"
+            inputmode="numeric"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+    </fieldset>
+
+    <!-- Contato -->
+    <fieldset class="form-field">
+      <legend class="section-label">Contato</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="telefone">Telefone principal</label>
+          <input
+            id="telefone"
+            class="input"
+            formControlName="telefone"
+            appTelefoneBr
+            placeholder="(11) 99999-0000"
+            inputmode="tel"
+            maxlength="15"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-field">
+          <label class="label" for="email">E-mail</label>
+          <input
+            id="email"
+            type="email"
+            class="input"
+            formControlName="email"
+            placeholder="email@exemplo.com"
+            autocomplete="off"
+            [class.input--error]="invalido('email')"
+          />
+          @if (invalido('email')) {
+            <span class="field-error" role="alert">Informe um e-mail válido.</span>
+          }
+        </div>
+      </div>
+
+      <div class="form-field">
+        <span class="label">Telefones adicionais</span>
+        <div class="tel-lista" formArrayName="telefonesAdicionais">
+          @for (ctrl of telefonesAdicionais.controls; track ctrl) {
+            <div class="tel-lista__item">
+              <input
+                class="input"
+                [formControlName]="$index"
+                appTelefoneBr
+                placeholder="(11) 99999-0000"
+                inputmode="tel"
+                maxlength="15"
+                autocomplete="off"
+                [attr.aria-label]="'Telefone adicional ' + ($index + 1)"
+              />
+              @if (!inativo()) {
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm"
+                  (click)="removerTelefone($index)"
+                  [attr.aria-label]="'Remover telefone adicional ' + ($index + 1)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14" />
+                  </svg>
+                  Remover
+                </button>
+              }
+            </div>
+          }
+        </div>
+        @if (!inativo()) {
+          <button type="button" class="btn btn--ghost btn--sm tel-lista__add" (click)="adicionarTelefone()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Adicionar telefone
+          </button>
+        }
+      </div>
+    </fieldset>
+
+    <!-- Vínculos -->
+    <fieldset class="form-field">
+      <legend class="section-label">Vínculos</legend>
+      <div class="form-field">
+        <label class="label" for="especialidadeIds">Especialidades que atende</label>
+        <ng-select
+          labelForId="especialidadeIds"
+          formControlName="especialidadeIds"
+          [items]="especialidades()"
+          bindLabel="nome"
+          bindValue="id"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          placeholder="Selecione as especialidades"
+          notFoundText="Nenhuma especialidade"
+        ></ng-select>
+      </div>
+      <div class="form-field">
+        <label class="label" for="unidadeIds">Unidades de saúde em que atende</label>
+        <ng-select
+          labelForId="unidadeIds"
+          formControlName="unidadeIds"
+          [items]="unidades()"
+          bindLabel="nome"
+          bindValue="id"
+          [multiple]="true"
+          [closeOnSelect]="false"
+          placeholder="Selecione as unidades"
+          notFoundText="Nenhuma unidade"
+        ></ng-select>
+      </div>
+    </fieldset>
+
+    <!-- Endereço -->
+    <fieldset class="form-field">
+      <legend class="section-label">Endereço</legend>
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="cep">CEP</label>
+          <input
+            id="cep"
+            class="input"
+            formControlName="cep"
+            mask="00000-000"
+            [validation]="false"
+            placeholder="00000-000"
+            inputmode="numeric"
+            autocomplete="off"
+            [attr.aria-busy]="buscandoCep()"
+          />
+          <span class="field-hint">{{ buscandoCep() ? 'Buscando endereço…' : 'Preenche o endereço automaticamente.' }}</span>
+        </div>
+
+        <div class="form-field form-field--full">
+          <label class="label" for="rua">Rua</label>
+          <input id="rua" class="input" formControlName="rua" autocomplete="off" placeholder="Logradouro" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="numero">Número</label>
+          <input id="numero" class="input" formControlName="numero" maxlength="20" autocomplete="off" placeholder="Nº" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="bairro">Bairro</label>
+          <input id="bairro" class="input" formControlName="bairro" autocomplete="off" placeholder="Bairro" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="municipio">Município</label>
+          <input id="municipio" class="input" formControlName="municipio" autocomplete="off" placeholder="Cidade" />
+        </div>
+        <div class="form-field">
+          <label class="label" for="uf">UF</label>
+          <ng-select
+            labelForId="uf"
+            formControlName="uf"
+            [items]="ufs"
+            placeholder="UF"
+            notFoundText="Sem opções"
+          ></ng-select>
+        </div>
+        <div class="form-field form-field--full">
+          <label class="label" for="complemento">Complemento</label>
+          <input id="complemento" class="input" formControlName="complemento" autocomplete="off" placeholder="Apto, bloco, referência…" />
+        </div>
+      </div>
+    </fieldset>
+
     <div class="form-actions">
-      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
-      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
-        {{ salvando() ? 'Salvando…' : 'Salvar' }}
-      </button>
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">{{ inativo() ? 'Voltar' : 'Cancelar' }}</button>
+      @if (!inativo()) {
+        <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+          {{ salvando() ? 'Salvando…' : 'Salvar' }}
+        </button>
+      }
     </div>
   </form>
 </section>
@@ -60,7 +381,9 @@
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="confirm-msg"
+      tabindex="-1"
       (click)="$event.stopPropagation()"
+      (keydown.escape)="responderConfirmacao(false)"
     >
       <div class="modal__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -70,7 +393,7 @@
       </div>
       <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
       <div class="modal__actions">
-        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button #botaoNao type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
         <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
       </div>
     </div>

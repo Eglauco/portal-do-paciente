@@ -2,6 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import { Configuracao, ConfiguracaoFiltro, ConfiguracaoValor, Pagina } from './configuracao.model';
 
 @Injectable({ providedIn: 'root' })
@@ -16,10 +17,12 @@ export class ConfiguracaoService {
     filtro: ConfiguracaoFiltro = {},
     page = 0,
     size = ConfiguracaoService.TAMANHO_PADRAO,
+    ordenacoes: readonly Ordenacao[] = [],
   ): Observable<Pagina<Configuracao>> {
     let params = new HttpParams().set('page', page).set('size', size);
     if (filtro.busca?.trim()) params = params.set('busca', filtro.busca.trim());
     if (filtro.tipo) params = params.set('tipo', filtro.tipo);
+    for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Configuracao>>(this.base, { params });
   }
 

@@ -10,9 +10,14 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.example.pop.marca.MarcaService;
+import com.example.pop.tema.TemaService;
+
 class ExportacaoServiceTest {
 
-    private final ExportacaoService service = new ExportacaoService();
+    // Deps null: nomePlataforma()/tema() caem no padrão e logoBytes()=null (sem logo) — basta para o teste.
+    private final ExportacaoService service =
+            new ExportacaoService(new MarcaService(null, null), new TemaService(null));
 
     private record Linha(String nome, int idade) {
     }
