@@ -4,11 +4,15 @@ import { AuthService, UnidadeRef } from '../../core/auth.service';
 import { MarcaService } from '../../core/marca.service';
 import { NotificacaoAdmin, NotificacaoService } from '../../core/notificacao.service';
 import { BuscaFuncionalidades } from '../../shared/busca-funcionalidades/busca-funcionalidades';
+import { RailTooltip } from '../../shared/rail-tooltip.directive';
 import { TrocarSenhaModal } from './trocar-senha-modal';
+
+/** Chave do localStorage que guarda se o menu está recolhido. */
+const CHAVE_MENU_RECOLHIDO = 'pop.menu.recolhido';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal, BuscaFuncionalidades],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal, BuscaFuncionalidades, RailTooltip],
   templateUrl: './shell.html',
   host: { '(document:keydown.escape)': 'aoEscape()' },
 })
@@ -41,6 +45,13 @@ export class Shell {
   /** Submenu "Dashboard" (aberto por padrão para ser descoberto). */
   protected readonly menuDashAberto = signal(true);
 
+  /** Menu recolhido (só ícones). Lido do localStorage no navegador. */
+  protected readonly menuRecolhido = signal(false);
+
+  /** Flyout do grupo Dashboard quando recolhido (posição fixa, à direita do ícone). */
+  protected readonly flyoutDash = signal<{ top: number; left: number } | null>(null);
+  private fecharFlyoutTimer: ReturnType<typeof setTimeout> | null = null;
+
   protected readonly menuUnidadeAberto = signal(false);
   protected readonly trocandoUnidade = signal(false);
 
@@ -55,6 +66,12 @@ export class Shell {
   constructor() {
     afterNextRender(() => {
       this.pronto.set(true);
+      // Estado do menu (recolhido) guardado por navegador.
+      try {
+        this.menuRecolhido.set(localStorage.getItem(CHAVE_MENU_RECOLHIDO) === '1');
+      } catch {
+        // localStorage indisponível (aba privada, bloqueado): mantém expandido.
+      }
       // Recarrega telas/unidades do backend (reflete perfil alterado / sessão antiga sem esses campos).
       // Não redireciona a tela de "sem permissão": quem foi barrado deve permanecer nela.
       this.auth.sincronizar().subscribe({ error: () => {} });
@@ -63,6 +80,7 @@ export class Shell {
       const timer = setInterval(() => this.notif.atualizarContagem(), 45_000);
       this.destroyRef.onDestroy(() => clearInterval(timer));
     });
+    this.destroyRef.onDestroy(() => this.cancelarFecharFlyout());
   }
 
   /** True se o usuário tem acesso à tela (controla a exibição do item de menu). */
@@ -79,6 +97,69 @@ export class Shell {
       this.temTela('DASHBOARD_SAU') ||
       this.temTela('DASHBOARD_NPS')
     );
+  }
+
+  /** Recolhe/expande o menu (só ícones) e guarda a escolha no navegador. */
+  protected alternarMenu(): void {
+    const recolhido = !this.menuRecolhido();
+    this.menuRecolhido.set(recolhido);
+    this.fecharFlyoutDash();
+    try {
+      localStorage.setItem(CHAVE_MENU_RECOLHIDO, recolhido ? '1' : '0');
+    } catch {
+      // sem persistência: vale só para esta sessão.
+    }
+  }
+
+  // ---------- Flyout do Dashboard (menu recolhido) ----------
+
+  /** Abre o flyout do Dashboard à direita do ícone (só quando recolhido). */
+  protected abrirFlyoutDash(evento: Event): void {
+    if (!this.menuRecolhido() || !this.temAlgumDashboard()) return;
+    this.cancelarFecharFlyout();
+    const alvo = (evento.currentTarget as HTMLElement).getBoundingClientRect();
+    this.flyoutDash.set({ top: alvo.top, left: alvo.right + 8 });
+  }
+
+  /** Agenda o fechamento do flyout (dá tempo de mover o mouse do ícone até ele). */
+  protected agendarFecharFlyout(): void {
+    this.cancelarFecharFlyout();
+    this.fecharFlyoutTimer = setTimeout(() => this.flyoutDash.set(null), 160);
+  }
+
+  protected cancelarFecharFlyout(): void {
+    if (this.fecharFlyoutTimer) {
+      clearTimeout(this.fecharFlyoutTimer);
+      this.fecharFlyoutTimer = null;
+    }
+  }
+
+  protected fecharFlyoutDash(): void {
+    this.cancelarFecharFlyout();
+    this.flyoutDash.set(null);
+  }
+
+  /** Clique no Dashboard: expandido alterna o submenu; recolhido navega ao 1º dashboard. */
+  protected aoClicarDashboard(): void {
+    if (this.menuRecolhido()) {
+      const rota = this.primeiraRotaDashboard();
+      if (rota) {
+        this.fecharFlyoutDash();
+        this.router.navigateByUrl(rota);
+      }
+      return;
+    }
+    this.menuDashAberto.set(!this.menuDashAberto());
+  }
+
+  /** Primeira rota de dashboard que o usuário tem acesso (para o clique no menu recolhido). */
+  protected primeiraRotaDashboard(): string | null {
+    if (this.temTela('DASHBOARD_GERAL')) return '/dashboards/geral';
+    if (this.temTela('DASHBOARD_AGENDAMENTOS')) return '/dashboards/agendamentos';
+    if (this.temTela('DASHBOARD_CHATS')) return '/dashboards/chats';
+    if (this.temTela('DASHBOARD_SAU')) return '/dashboards/sau';
+    if (this.temTela('DASHBOARD_NPS')) return '/dashboards/nps';
+    return null;
   }
 
   protected iniciais(nome: string): string {
@@ -132,6 +213,7 @@ export class Shell {
     this.fecharNotif();
     this.fecharMenuUsuario();
     this.fecharMenuUnidade();
+    this.fecharFlyoutDash();
     if (notifEstava) {
       this.sinoBtn()?.nativeElement.focus();
     }
