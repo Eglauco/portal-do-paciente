@@ -18,6 +18,24 @@
     }
   </header>
 
+  @if (editando()) {
+    <div class="form-tabs" role="tablist" aria-label="Seções do cadastro">
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'dados'"
+        [attr.aria-selected]="abaAtiva() === 'dados'"
+        (click)="selecionarAba('dados')"
+      >Dados do procedimento</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'lembretes'"
+        [attr.aria-selected]="abaAtiva() === 'lembretes'"
+        (click)="selecionarAba('lembretes')"
+      >Lembretes</button>
+    </div>
+  }
+
+  @if (!editando() || abaAtiva() === 'dados') {
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     @if (editando()) {
       <div class="form-field form-field--sm">
@@ -106,9 +124,10 @@
       </button>
     </div>
   </form>
+  }
 
   <!-- Lembretes (só ao editar um procedimento já existente) -->
-  @if (editando()) {
+  @if (editando() && abaAtiva() === 'lembretes') {
     <section class="panel form-card lembretes-panel">
       <div class="panel__head">
         <h2 class="panel__title">Lembretes</h2>

@@ -126,7 +126,7 @@ class AgendamentoEntregaIntegrationTest {
 
     /** Cria (e salva) um agendamento com todas as FKs mínimas; registra os ids para limpeza. */
     private Agendamento novoAgendamentoSalvo() {
-        Paciente paciente = pacienteController.criar(new PacienteRequest("Paciente Entrega", null), null);
+        Paciente paciente = pacienteController.criar(new PacienteRequest("Paciente Entrega", "11900000000"), null);
         pacienteId = paciente.getId();
 
         Especialidade esp = new Especialidade();

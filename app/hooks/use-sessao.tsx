@@ -17,9 +17,12 @@ interface SessaoContexto {
   sessao: SessaoPaciente | null;
   /** Enquanto lê a sessão guardada no aparelho (evita piscar a tela de login). */
   carregando: boolean;
-  /** Pede o código de ativação por SMS para o telefone principal. */
-  solicitarCodigo: (telefone: string) => Promise<void>;
-  ativar: (telefone: string, codigo: string) => Promise<void>;
+  /**
+   * Pede o código de ativação por SMS a partir do telefone + CPF + data de nascimento
+   * (ISO "AAAA-MM-DD"); devolve o telefone mascarado do dono.
+   */
+  solicitarCodigo: (cpf: string, dataNascimento: string, telefone: string) => Promise<string>;
+  ativar: (cpf: string, dataNascimento: string, codigo: string, telefone: string) => Promise<void>;
   /** Escolhe o perfil ativo (tela "Selecionar Perfil"). Nunca refaz OTP. */
   trocarPerfil: (pacienteId: number) => Promise<void>;
   sair: () => Promise<void>;
@@ -56,12 +59,12 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     if (sessao) registrarParaPush().catch(() => {});
   }, [sessao?.pacienteId]);
 
-  async function solicitarCodigo(telefone: string) {
-    await solicitarCodigoServico(telefone);
+  async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string) {
+    return solicitarCodigoServico(cpf, dataNascimento, telefone);
   }
 
-  async function ativar(telefone: string, codigo: string) {
-    setSessao(await ativarServico(telefone, codigo));
+  async function ativar(cpf: string, dataNascimento: string, codigo: string, telefone: string) {
+    setSessao(await ativarServico(cpf, dataNascimento, codigo, telefone));
   }
 
   async function trocarPerfil(pacienteId: number) {

@@ -47,10 +47,12 @@ export const NIVEIS_SEM_LANCAMENTO: { value: NivelAcesso; label: string }[] = NI
   (n) => n.value !== 'VISUALIZAR_LANCAR',
 );
 
-/** Responsável do paciente (cadastro paralelo: nome + telefone + permissões). */
+/** Responsável do paciente (cadastro paralelo: nome + cpf + telefone + permissões). */
 export interface Responsavel {
   id?: number;
   nome: string;
+  /** CPF (só dígitos, opcional na resposta). */
+  cpf?: string | null;
   telefone?: string | null;
   /** Data de nascimento (ISO, opcional). Usada p/ validar a idade mínima ao comentar na rede social. */
   dataNascimento?: string | null;
@@ -65,6 +67,8 @@ export interface Responsavel {
 export interface ResponsavelEntrada {
   id?: number | null;
   nome: string;
+  /** CPF (só dígitos); obrigatório no cadastro. */
+  cpf: string;
   telefone?: string | null;
   dataNascimento?: string | null;
   permissoes: PermissoesResponsavel;
@@ -74,7 +78,6 @@ export interface ResponsavelEntrada {
 export interface Paciente {
   id?: number;
   nome: string;
-  telefone?: string | null;
   codigoIntegracao?: string | null;
   prontuario?: string | null;
   sexo?: Sexo | null;
@@ -108,7 +111,6 @@ export interface Paciente {
 /** Campos aceitos ao criar/editar (ativo/código são geridos pelo backend). */
 export interface PacienteEntrada {
   nome: string;
-  telefone?: string | null;
   codigoIntegracao?: string | null;
   prontuario?: string | null;
   sexo?: Sexo | null;

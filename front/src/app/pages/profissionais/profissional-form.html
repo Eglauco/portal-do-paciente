@@ -84,6 +84,26 @@
       </div>
     </div>
 
+    <!-- Abas: dividem o cadastro em seções para não ficar longo. -->
+    <div class="form-tabs" role="tablist" aria-label="Seções do cadastro">
+      @for (aba of abas; track aba.id) {
+        <button
+          type="button"
+          role="tab"
+          class="form-tab"
+          [class.form-tab--ativa]="abaAtiva() === aba.id"
+          [attr.aria-selected]="abaAtiva() === aba.id"
+          (click)="selecionarAba(aba.id)"
+        >
+          {{ aba.label }}
+          @if (abaComErro(aba.id)) {
+            <span class="form-tab__erro" aria-hidden="true" title="Há campos pendentes nesta aba"></span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (abaAtiva() === 'pessoais') {
     <!-- Identificação -->
     <fieldset class="form-field">
       <legend class="section-label">Identificação</legend>
@@ -198,7 +218,9 @@
         </div>
       </div>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'contato') {
     <!-- Contato -->
     <fieldset class="form-field">
       <legend class="section-label">Contato</legend>
@@ -275,7 +297,9 @@
         }
       </div>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'vinculos') {
     <!-- Vínculos -->
     <fieldset class="form-field">
       <legend class="section-label">Vínculos</legend>
@@ -308,7 +332,9 @@
         ></ng-select>
       </div>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'endereco') {
     <!-- Endereço -->
     <fieldset class="form-field">
       <legend class="section-label">Endereço</legend>
@@ -361,6 +387,7 @@
         </div>
       </div>
     </fieldset>
+    }
 
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">{{ inativo() ? 'Voltar' : 'Cancelar' }}</button>

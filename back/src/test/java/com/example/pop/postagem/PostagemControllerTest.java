@@ -41,6 +41,8 @@ class PostagemControllerTest {
 
     private static final String IMG = "http://s3/portal-paciente/prontuarios/teste-postagem.jpg";
     private static final String TEL = "11922221111";
+    private static final String CPF = "10000000090";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
     private PostagemController controller;
@@ -86,8 +88,9 @@ class PostagemControllerTest {
         limparPacienteDeTeste(TEL);
         // Vincula o paciente à unidade 1 (as postagens dos testes usam unidadeSaudeId=1).
         pacienteId = pacienteController.criar(new PacienteRequest("Joao Teste", TEL, java.util.List.of(1L)), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        String token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-post")).token();
+        String token = authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-post", TEL)).token();
         jwt = jwtDecoder.decode(token);
     }
 
@@ -102,7 +105,7 @@ class PostagemControllerTest {
      * comentario→paciente impede o delete quando um teste falhou antes do próprio excluir.
      */
     private void limparPacienteDeTeste(String telefone) {
-        pacienteRepository.findByTelefone(telefone).ifPresent(p -> {
+        pacienteRepository.buscarPorTelefoneNaLista(telefone).forEach(p -> {
             var postagens = comentarioRepository.findByPacienteId(p.getId()).stream()
                     .map(c -> c.getPostagem().getId()).distinct().toList();
             if (!postagens.isEmpty()) {
@@ -258,9 +261,11 @@ class PostagemControllerTest {
     @Test
     void soODonoPodeEditarOuExcluir() {
         String tel2 = "11933332222";
-        pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        String cpf2 = "10000000091";
+        pacienteRepository.buscarPorTelefoneNaLista(tel2).forEach(p -> pacienteRepository.deleteById(p.getId()));
         Long outroId = pacienteController.criar(new PacienteRequest("Maria Outra", tel2), null).getId();
-        Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro")).token());
+        pacienteRepository.findById(outroId).ifPresent(p -> { p.setCpf(cpf2); p.setDataNascimento(DOB); pacienteRepository.save(p); });
+        Jwt jwtOutro = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(cpf2, DOB, "000000", "dev-outro", tel2)).token());
 
         Long id = controller.criar(new PostagemRequest("Regras", "teste", true, true, 1L, IMG)).id();
         ComentarioResponse c = feedController.comentar(id, new ComentarRequest("meu comentário"), jwt);
@@ -370,6 +375,9 @@ class PostagemControllerTest {
         try {
             definirIdadeMinimaComentarios(18);
 
+            // O login exige data de nascimento (setup), mas aqui testamos a regra de idade do
+            // comentário: zera a data para exercitar o caso "sem data" (o token já foi emitido).
+            definirDataNascimentoPaciente(null);
             // Paciente sem data de nascimento → bloqueia (422) pedindo o cadastro.
             ResponseStatusException semData = assertThrows(ResponseStatusException.class,
                     () -> feedController.comentar(id, new ComentarRequest("oi"), jwt));

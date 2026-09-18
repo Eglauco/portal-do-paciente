@@ -10,13 +10,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface ContaAppRepository extends JpaRepository<ContaApp, Long> {
 
-    Optional<ContaApp> findByTelefone(String telefone);
+    /** Conta pelo CPF (dígitos) — a chave da conta/sessão. */
+    Optional<ContaApp> findByCpf(String cpf);
 
-    /** Ids das contas cujos telefones estão no conjunto (fan-out do push). */
-    @Query("select c.id from ContaApp c where c.telefone in :telefones")
-    List<Long> findIdsByTelefoneIn(@Param("telefones") Collection<String> telefones);
+    /** Ids das contas cujos CPFs estão no conjunto (fan-out do push). */
+    @Query("select c.id from ContaApp c where c.cpf in :cpfs")
+    List<Long> findIdsByCpfIn(@Param("cpfs") Collection<String> cpfs);
 
-    /** Existe alguma conta com aparelho ativo entre estes telefones? (paciente alcançável via responsável). */
-    @Query("select count(c) > 0 from ContaApp c where c.telefone in :telefones and c.dispositivoAtivo is not null")
-    boolean existeSessaoAtivaPorTelefones(@Param("telefones") Collection<String> telefones);
+    /** Existe alguma conta com aparelho ativo entre estes CPFs? (paciente alcançável via responsável). */
+    @Query("select count(c) > 0 from ContaApp c where c.cpf in :cpfs and c.dispositivoAtivo is not null")
+    boolean existeSessaoAtivaPorCpfs(@Param("cpfs") Collection<String> cpfs);
 }

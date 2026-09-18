@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Portal do Paciente",
+    "name": "Integra Saúde",
     "slug": "portal-do-paciente",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,10 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "br.com.eglauco.integrasaude"
     },
     "android": {
-      "package": "com.eglauco.portaldopaciente",
+      "package": "br.com.eglauco.integrasaude",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",

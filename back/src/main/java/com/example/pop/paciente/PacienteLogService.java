@@ -173,6 +173,47 @@ public class PacienteLogService {
         repository.save(log);
     }
 
+    /**
+     * O PRÓPRIO paciente editou uma pessoa autorizada pelo app (nome/telefone/data/permissões).
+     * Registra o antes → depois numa linha, no mesmo formato de adição/remoção (autor = PACIENTE).
+     */
+    public void registrarResponsavelEditadoPeloPaciente(Paciente paciente, Responsavel depois,
+            String nomeAntes, String telefoneAntes,
+            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoesAntes) {
+        PacienteLog log = novoEventoPeloPaciente(paciente, TipoEventoPaciente.ALTERACAO);
+        log.getAlteracoes().add(alteracao(log, "RESPONSAVEL", "Responsável alterado: " + depois.getNome(),
+                detalhes(nomeAntes, telefoneAntes, permissoesAntes),
+                detalhes(depois.getNome(), depois.getTelefone(), depois.getPermissoes())));
+        repository.save(log);
+    }
+
+    /**
+     * O paciente editou o PRÓPRIO cadastro pelo app (Meu Perfil). Registra o diff granular
+     * (campos escalares + telefones) com autor PACIENTE (perfil próprio) ou RESPONSAVEL
+     * (quando um responsável com permissão age pelo dependente). Nada mudou → não grava.
+     */
+    public void registrarAlteracaoPeloApp(SnapshotPaciente antes, Paciente depois, Responsavel responsavelAtor) {
+        PacienteLog log = new PacienteLog();
+        log.setPaciente(depois);
+        log.setTipo(TipoEventoPaciente.ALTERACAO);
+        log.setCriadoEm(LocalDateTime.now(FUSO));
+        if (responsavelAtor != null) {
+            log.setResponsavel(responsavelAtor);
+            log.setAutor(AutorLogPaciente.RESPONSAVEL);
+        } else {
+            log.setPacienteAtor(depois);
+            log.setAutor(AutorLogPaciente.PACIENTE);
+        }
+        List<PacienteLogAlteracao> mudancas = new ArrayList<>();
+        diffEscalares(log, antes, depois, mudancas); // só campos escalares e a lista de telefones são
+        diffTelefonesAdicionais(log, antes, depois, mudancas); // editáveis por aqui (não mexe responsável/unidade)
+        if (mudancas.isEmpty()) {
+            return;
+        }
+        log.getAlteracoes().addAll(mudancas);
+        repository.save(log);
+    }
+
     /** Linha do tempo de auditoria do paciente (mais antigo primeiro). */
     @Transactional(readOnly = true)
     public List<PacienteLogResponse> listar(Long pacienteId) {

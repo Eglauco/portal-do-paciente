@@ -13,9 +13,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Conta do app: representa o TELEFONE autenticado por OTP e o aparelho vinculado.
+ * Conta do app: representa o CPF autenticado por OTP e o aparelho vinculado.
  * É o ponto de sessão (cid no token). O perfil ativo (paciente por quem se age)
- * fica no claim pid. Assim um telefone que é só responsável também tem sessão.
+ * fica no claim pid. Assim um CPF que é só responsável também tem sessão. O telefone
+ * deixou de ser identidade — é só o canal por onde o OTP é enviado.
  */
 @Entity
 @Table(name = "conta_app")
@@ -28,9 +29,9 @@ public class ContaApp {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Telefone (somente dígitos). Único: uma conta por telefone. */
-    @Column(nullable = false, length = 20)
-    private String telefone;
+    /** CPF (somente dígitos) — a identidade da conta (uma conta por CPF + aparelho). */
+    @Column(nullable = false, length = 11)
+    private String cpf;
 
     /** Aparelho com a sessão ativa (uma por vez). Trocar de aparelho exige reativar. */
     @Column(name = "dispositivo_ativo", length = 120)

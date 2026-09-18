@@ -184,46 +184,63 @@ async function persistir(): Promise<void> {
 }
 
 /**
- * Pede o código de ativação (OTP) por SMS. O telefone precisa ser de um paciente
- * OU de um responsável; senão → mensagem para procurar a unidade.
+ * Pede o código de ativação (OTP) por SMS a partir do telefone + CPF + data de nascimento
+ * (3 travas de identidade). Os três precisam conferir com o cadastro (paciente ou responsável);
+ * senão o backend responde 401 com mensagem genérica (não revela qual dado está errado).
+ * `telefone` e `cpf` são enviados só com dígitos; `dataNascimento` no formato ISO "AAAA-MM-DD".
+ * Devolve o telefone MASCARADO do dono do CPF (ex.: "(••) •••••-1234"), para o app mostrar
+ * para onde o SMS foi enviado.
  */
-export async function solicitarCodigo(telefone: string): Promise<void> {
+export async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string): Promise<string> {
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  const telLimpo = telefone.replace(/\D/g, '');
   let resposta: Response;
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/solicitar-codigo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefone }),
-    });
-  } catch {
-    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
-  }
-  if (resposta.status === 404) {
-    throw new Error('Telefone não encontrado no cadastro. Entre em contato com a sua unidade de saúde.');
-  }
-  if (!resposta.ok) {
-    throw new Error('Não foi possível enviar o código agora. Tente novamente.');
-  }
-}
-
-/**
- * Autentica o aparelho: envia telefone + código + id do aparelho. Guarda a sessão
- * com um perfil padrão e a lista de perfis; a tela "Selecionar Perfil" confirma a escolha.
- */
-export async function ativar(telefone: string, codigo: string): Promise<SessaoPaciente> {
-  const dispositivoId = await obterDispositivoId();
-  let resposta: Response;
-  try {
-    resposta = await fetch(`${API_URL}/paciente-auth/ativar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telefone, codigo, dispositivoId }),
+      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo }),
     });
   } catch {
     throw new Error('Sem conexão. Verifique a internet e tente novamente.');
   }
   if (resposta.status === 401) {
-    throw new Error('Telefone ou código inválido. Confira com a unidade de saúde.');
+    throw new Error('Telefone, CPF ou data de nascimento não confere. Verifique os dados ou procure a recepção.');
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível enviar o código agora. Tente novamente.');
+  }
+  const dados = (await resposta.json()) as { telefoneMascarado?: string };
+  return dados.telefoneMascarado ?? '';
+}
+
+/**
+ * Autentica o aparelho: envia telefone + CPF + data de nascimento + código + id do aparelho
+ * (a trava de identidade é telefone + CPF + data de nascimento). Guarda a sessão com um perfil
+ * padrão e a lista de perfis; a tela "Selecionar Perfil" confirma a escolha. `telefone` e `cpf`
+ * são enviados só com dígitos; `dataNascimento` no formato ISO "AAAA-MM-DD".
+ */
+export async function ativar(
+  cpf: string,
+  dataNascimento: string,
+  codigo: string,
+  telefone: string,
+): Promise<SessaoPaciente> {
+  const dispositivoId = await obterDispositivoId();
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  const telLimpo = telefone.replace(/\D/g, '');
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/ativar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, codigo, dispositivoId, telefone: telLimpo }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (resposta.status === 401) {
+    throw new Error('Telefone, CPF ou código inválido. Confira com a unidade de saúde.');
   }
   if (!resposta.ok) {
     throw new Error('Não foi possível entrar agora. Tente novamente.');

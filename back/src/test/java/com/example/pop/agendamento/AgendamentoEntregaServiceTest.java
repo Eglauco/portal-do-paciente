@@ -51,6 +51,9 @@ class AgendamentoEntregaServiceTest {
     @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private AgendamentoEntregaService service;
 
+    private static final String PAC_CPF = "10000000200";
+    private static final String RESP_CPF = "10000000201";
+
     @Test
     void pacienteComAppEResponsavelSemApp_enviadaEResumoEnviada() {
         Paciente paciente = paciente(1L, "Ana Titular", "11955557777");
@@ -60,8 +63,8 @@ class AgendamentoEntregaServiceTest {
         // Paciente tem conta + 1 aparelho; responsável ativo com acesso, mas sem conta (nunca logou).
         Responsavel resp = responsavel(7L, "Maria Ajuda", "11988881111", NivelAcessoResponsavel.VISUALIZAR_LANCAR);
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of(resp));
-        when(contaRepository.findByTelefone("11955557777")).thenReturn(Optional.of(conta(10L)));
-        when(contaRepository.findByTelefone("11988881111")).thenReturn(Optional.empty());
+        when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.of(conta(10L)));
+        when(contaRepository.findByCpf(RESP_CPF)).thenReturn(Optional.empty());
         when(dispositivoRepository.findByContaId(10L)).thenReturn(List.of(dispositivo("ExpoTokenA")));
         when(dispositivoRepository.findByPacienteIdAndContaIdIsNull(1L)).thenReturn(List.of());
         // A Expo aceita o token do paciente e devolve um receipt id.
@@ -88,7 +91,7 @@ class AgendamentoEntregaServiceTest {
         Agendamento gerenciado = agendamento(paciente);
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(gerenciado));
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of());
-        when(contaRepository.findByTelefone("11955557777")).thenReturn(Optional.empty());
+        when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.empty());
         when(dispositivoRepository.findByPacienteIdAndContaIdIsNull(1L)).thenReturn(List.of());
 
         service.notificarNovoAgendamento(a);
@@ -107,7 +110,7 @@ class AgendamentoEntregaServiceTest {
         Agendamento gerenciado = agendamento(paciente);
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(gerenciado));
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of());
-        when(contaRepository.findByTelefone("11955557777")).thenReturn(Optional.of(conta(10L)));
+        when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.of(conta(10L)));
         when(dispositivoRepository.findByContaId(10L)).thenReturn(List.of(dispositivo("ExpoTokenMorto")));
         when(dispositivoRepository.findByPacienteIdAndContaIdIsNull(1L)).thenReturn(List.of());
         // A Expo REJEITA (token morto): aceito=false, sem receipt id.
@@ -131,7 +134,7 @@ class AgendamentoEntregaServiceTest {
         inativo.setAtivo(false);
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(agendamento(paciente)));
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of(semAcesso, inativo));
-        when(contaRepository.findByTelefone("11955557777")).thenReturn(Optional.empty());
+        when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.empty());
         when(dispositivoRepository.findByPacienteIdAndContaIdIsNull(1L)).thenReturn(List.of());
 
         service.notificarNovoAgendamento(a);
@@ -327,7 +330,10 @@ class AgendamentoEntregaServiceTest {
         Paciente p = new Paciente();
         p.setId(id);
         p.setNome(nome);
-        p.setTelefone(telefone);
+        if (telefone != null) {
+            p.getTelefonesAdicionais().add(telefone); // telefone principal virou item da lista
+        }
+        p.setCpf(PAC_CPF); // a conta/push é resolvida por CPF
         return p;
     }
 
@@ -336,6 +342,7 @@ class AgendamentoEntregaServiceTest {
         r.setId(id);
         r.setNome(nome);
         r.setTelefone(telefone);
+        r.setCpf(RESP_CPF); // a conta/push do responsável é resolvida por CPF
         r.setAtivo(true);
         r.getPermissoes().put(FuncionalidadeApp.AGENDAMENTOS, nivel);
         return r;

@@ -18,6 +18,30 @@
     }
   </header>
 
+  @if (editando()) {
+    <div class="form-tabs" role="tablist" aria-label="Seções do agendamento">
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'dados'"
+        [attr.aria-selected]="abaAtiva() === 'dados'"
+        (click)="selecionarAba('dados')"
+      >Dados do agendamento</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'destinatarios'"
+        [attr.aria-selected]="abaAtiva() === 'destinatarios'"
+        (click)="selecionarAba('destinatarios')"
+      >Destinatários da notificação</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'historico'"
+        [attr.aria-selected]="abaAtiva() === 'historico'"
+        (click)="selecionarAba('historico')"
+      >Histórico de status</button>
+    </div>
+  }
+
+  @if (!editando() || abaAtiva() === 'dados') {
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     <div class="form-grid">
       <div class="form-field">
@@ -144,8 +168,9 @@
       </button>
     </div>
   </form>
+  }
 
-  @if (editando() && faltaJustificada()) {
+  @if (editando() && abaAtiva() === 'dados' && faltaJustificada()) {
     <section class="panel falta-panel">
       <div class="panel__head">
         <h2 class="panel__title">Motivo da falta informado pelo paciente</h2>
@@ -169,7 +194,7 @@
     </section>
   }
 
-  @if (editando()) {
+  @if (editando() && abaAtiva() === 'destinatarios') {
     <section class="panel">
       <div class="panel__head">
         <h2 class="panel__title">Destinatários da notificação</h2>
@@ -214,7 +239,7 @@
     </section>
   }
 
-  @if (editando()) {
+  @if (editando() && abaAtiva() === 'historico') {
     <section class="panel">
       <div class="panel__head">
         <h2 class="panel__title">Histórico de status</h2>

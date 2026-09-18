@@ -154,7 +154,9 @@ public class ProntuarioController {
                 ColunaExport.de("Paciente", p -> p.getAgendamento().getPaciente().getNome()),
                 ColunaExport.de("CPF do paciente", p -> formatarCpf(p.getAgendamento().getPaciente().getCpf())),
                 ColunaExport.de("Prontuário do paciente", p -> texto(p.getAgendamento().getPaciente().getProntuario())),
-                ColunaExport.de("Telefone do paciente", p -> formatarTelefone(p.getAgendamento().getPaciente().getTelefone())),
+                ColunaExport.de("Telefone do paciente", p -> p.getAgendamento().getPaciente().getTelefonesAdicionais() == null ? ""
+                        : p.getAgendamento().getPaciente().getTelefonesAdicionais().stream()
+                                .map(ProntuarioController::formatarTelefone).collect(java.util.stream.Collectors.joining("; "))),
                 ColunaExport.de("Especialidade", p -> p.getAgendamento().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", p -> p.getAgendamento().getProfissionalSaude().getNome()),
                 ColunaExport.de("Procedimento", p -> p.getAgendamento().getProcedimento().getNome()),

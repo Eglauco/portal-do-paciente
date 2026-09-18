@@ -35,6 +35,9 @@ import { UnidadeService } from '../unidades/unidade.service';
 import { ProfissionalSaudeEntrada } from './profissional.model';
 import { ProfissionalSaudeService } from './profissional.service';
 
+/** Abas do cadastro (dividem o formulário longo em seções). */
+type AbaId = 'pessoais' | 'contato' | 'endereco' | 'vinculos';
+
 const SEXOS = [
   { value: 'MASCULINO', label: 'Masculino' },
   { value: 'FEMININO', label: 'Feminino' },
@@ -81,6 +84,27 @@ function dataNascimentoValidator(control: AbstractControl): ValidationErrors | n
     }
     .foto__preview img { width: 100%; height: 100%; object-fit: cover; }
     .foto__acoes { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    /* Abas do cadastro: dividem o formulário longo em seções (uma visível por vez). */
+    .form-tabs {
+      display: flex; flex-wrap: wrap; gap: 0.35rem;
+      margin-bottom: 1.5rem; border-bottom: 1px solid var(--line);
+    }
+    .form-tab {
+      position: relative; display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.6rem 0.95rem; border: none; background: none; cursor: pointer;
+      font-size: 0.9rem; font-weight: 600; color: var(--muted);
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border-radius: 0.4rem 0.4rem 0 0;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .form-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--brand) 8%, transparent); }
+    .form-tab--ativa { color: var(--brand-deep); border-bottom-color: var(--brand); }
+    .form-tab__erro { width: 7px; height: 7px; border-radius: 50%; background: #b42318; flex: 0 0 auto; }
+    @media (max-width: 640px) {
+      .form-tabs { gap: 0; }
+      .form-tab { flex: 1 1 auto; justify-content: center; padding: 0.55rem 0.5rem; font-size: 0.82rem; }
+    }
   `],
 })
 export class ProfissionalSaudeForm implements PodeSair {
@@ -96,6 +120,36 @@ export class ProfissionalSaudeForm implements PodeSair {
 
   protected readonly sexos = SEXOS;
   protected readonly ufs = UFS;
+
+  /** Abas do formulário (na ordem exibida). */
+  protected readonly abas: { id: AbaId; label: string }[] = [
+    { id: 'pessoais', label: 'Dados pessoais' },
+    { id: 'contato', label: 'Contato' },
+    { id: 'endereco', label: 'Endereço' },
+    { id: 'vinculos', label: 'Vínculos' },
+  ];
+  protected readonly abaAtiva = signal<AbaId>('pessoais');
+
+  protected selecionarAba(id: AbaId): void {
+    this.abaAtiva.set(id);
+  }
+
+  /** Controles (com validação) de cada aba — para sinalizar erro e pular até a aba certa. */
+  private controlesDaAba(aba: AbaId): AbstractControl[] {
+    switch (aba) {
+      case 'pessoais':
+        return [this.form.controls.nome, this.form.controls.dataNascimento];
+      case 'contato':
+        return [this.form.controls.email];
+      default:
+        return []; // Endereço e Vínculos não têm campos obrigatórios
+    }
+  }
+
+  /** A aba tem algum campo inválido já tocado/editado? (mostra o ponto de alerta na aba). */
+  protected abaComErro(aba: AbaId): boolean {
+    return this.controlesDaAba(aba).some((c) => c.invalid && (c.touched || c.dirty));
+  }
 
   protected readonly form = new FormGroup({
     nome: new FormControl('', {
@@ -389,6 +443,9 @@ export class ProfissionalSaudeForm implements PodeSair {
     event.preventDefault();
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      // Leva o usuário até a primeira aba com pendência (o erro pode estar numa aba oculta).
+      const abaComPendencia = this.abas.find((a) => this.abaComErro(a.id));
+      if (abaComPendencia) this.selecionarAba(abaComPendencia.id);
       return;
     }
     this.salvando.set(true);

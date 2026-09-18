@@ -37,6 +37,8 @@ import com.example.pop.verificacao.VerificacaoService;
 class SauControllerTest {
 
     private static final String TEL = "11955550001";
+    private static final String CPF = "10000000100";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
     private static final String NOME_ATENDENTE = "Atendente SAU Teste";
 
     @Autowired
@@ -83,13 +85,14 @@ class SauControllerTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> apagarManifestacoes(p.getId()));
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> apagarManifestacoes(p.getId()));
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(
                 new PacienteRequest("Ana Manifestante", TEL, List.of(unidadeRepository.findAll().get(0).getId())), null)
                 .getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-sau")).token());
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-sau", TEL)).token());
         unidadeId = unidadeRepository.findAll().get(0).getId();
         List<TipoManifestacao> tipos = tipoRepository.findByAtivoTrueOrderByNome();
         tipoId = tipos.get(0).getId();
@@ -219,10 +222,12 @@ class SauControllerTest {
                 new AbrirManifestacaoRequest(tipoId, unidadeId, "Sugiro mais cadeiras.")).id();
 
         String tel2 = "11955550002";
-        pacienteRepository.findByTelefone(tel2).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        String cpf2 = "10000000101";
+        pacienteRepository.buscarPorTelefoneNaLista(tel2).forEach(p -> pacienteRepository.deleteById(p.getId()));
         Long outroId = pacienteController.criar(new PacienteRequest("Outro Paciente", tel2), null).getId();
+        pacienteRepository.findById(outroId).ifPresent(p -> { p.setCpf(cpf2); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         Jwt jwtOutro = jwtDecoder.decode(
-                authController.ativar(new AtivarPacienteRequest(tel2, "000000", "dev-outro-sau")).token());
+                authController.ativar(new AtivarPacienteRequest(cpf2, DOB, "000000", "dev-outro-sau", tel2)).token());
 
         assertEquals(404, assertThrows(ResponseStatusException.class,
                 () -> meuController.buscar(jwtOutro, id)).getStatusCode().value());

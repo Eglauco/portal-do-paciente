@@ -28,6 +28,8 @@ import com.example.pop.verificacao.VerificacaoService;
 class MeuNotificacaoControllerTest {
 
     private static final String TEL = "11955558888";
+    private static final String CPF = "10000000080";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
     private MeuNotificacaoController controller;
@@ -51,15 +53,16 @@ class MeuNotificacaoControllerTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> {
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> {
             notificacaoRepository.deleteAll(
                     notificacaoRepository.findByPacienteIdOrderByCriadoEmDesc(p.getId(),
                             org.springframework.data.domain.PageRequest.of(0, 100)).getContent());
             pacienteRepository.deleteById(p.getId());
         });
         pacienteId = pacienteController.criar(new PacienteRequest("Notif Paciente", TEL), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-notif")).token());
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-notif", TEL)).token());
     }
 
     @AfterEach

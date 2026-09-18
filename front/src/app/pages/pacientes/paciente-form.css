@@ -21,6 +21,59 @@
   font-weight: 700;
 }
 
+/* Abas do cadastro: dividem o formulário longo em seções (uma visível por vez). */
+.form-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.form-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.95rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0.4rem 0.4rem 0 0;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.form-tab:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+}
+.form-tab--ativa {
+  color: var(--brand-deep);
+  border-bottom-color: var(--brand);
+}
+/* Ponto de alerta: a aba tem campos obrigatórios pendentes. */
+.form-tab__erro {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b42318;
+  flex: 0 0 auto;
+}
+@media (max-width: 640px) {
+  .form-tabs {
+    gap: 0;
+  }
+  .form-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0.55rem 0.5rem;
+    font-size: 0.82rem;
+  }
+}
+
 /* Agrupamento por seção (fieldset sem a moldura padrão do navegador). */
 .form-card fieldset {
   border: none;

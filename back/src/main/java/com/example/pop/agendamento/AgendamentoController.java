@@ -248,7 +248,9 @@ public class AgendamentoController {
                 ColunaExport.de("Data/Hora", a -> a.getDataHora() == null ? "" : a.getDataHora().format(DATA_HORA)),
                 ColunaExport.de("Paciente", a -> a.getPaciente().getNome()),
                 ColunaExport.de("CPF do paciente", a -> formatarCpf(a.getPaciente().getCpf())),
-                ColunaExport.de("Telefone do paciente", a -> formatarTelefone(a.getPaciente().getTelefone())),
+                ColunaExport.de("Telefone do paciente", a -> a.getPaciente().getTelefonesAdicionais() == null ? ""
+                        : a.getPaciente().getTelefonesAdicionais().stream().map(AgendamentoController::formatarTelefone)
+                                .collect(java.util.stream.Collectors.joining("; "))),
                 ColunaExport.de("Prontuário", a -> texto(a.getPaciente().getProntuario())),
                 ColunaExport.de("Unidade", a -> a.getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", a -> a.getEspecialidade().getNome()),

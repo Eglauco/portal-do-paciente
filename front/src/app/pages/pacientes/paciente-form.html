@@ -73,6 +73,26 @@
       </div>
     }
 
+    <!-- Abas: dividem o cadastro em seções para não ficar longo. -->
+    <div class="form-tabs" role="tablist" aria-label="Seções do cadastro">
+      @for (aba of abas; track aba.id) {
+        <button
+          type="button"
+          role="tab"
+          class="form-tab"
+          [class.form-tab--ativa]="abaAtiva() === aba.id"
+          [attr.aria-selected]="abaAtiva() === aba.id"
+          (click)="selecionarAba(aba.id)"
+        >
+          {{ aba.label }}
+          @if (abaComErro(aba.id)) {
+            <span class="form-tab__erro" aria-hidden="true" title="Há campos pendentes nesta aba"></span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (abaAtiva() === 'pessoais') {
     <!-- Identificação -->
     <fieldset class="form-field">
       <legend class="section-label">Identificação</legend>
@@ -126,7 +146,9 @@
         </div>
 
         <div class="form-field">
-          <label class="label" for="dataNascimento">Data de nascimento</label>
+          <label class="label" for="dataNascimento">
+            Data de nascimento <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+          </label>
           <input
             id="dataNascimento"
             class="input"
@@ -137,17 +159,22 @@
             placeholder="dd/mm/aaaa"
             inputmode="numeric"
             autocomplete="off"
+            aria-required="true"
             [class.input--error]="invalido('dataNascimento')"
             [attr.aria-invalid]="invalido('dataNascimento')"
             [attr.aria-describedby]="invalido('dataNascimento') ? 'data-erro' : null"
           />
           @if (invalido('dataNascimento')) {
-            <span id="data-erro" class="field-error" role="alert">Data inválida.</span>
+            <span id="data-erro" class="field-error" role="alert">
+              {{ form.controls.dataNascimento.hasError('required') ? 'Informe a data de nascimento.' : 'Data inválida.' }}
+            </span>
           }
         </div>
 
         <div class="form-field">
-          <label class="label" for="cpf">CPF</label>
+          <label class="label" for="cpf">
+            CPF <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+          </label>
           <input
             id="cpf"
             class="input"
@@ -156,12 +183,15 @@
             placeholder="000.000.000-00"
             inputmode="numeric"
             autocomplete="off"
+            aria-required="true"
             [class.input--error]="invalido('cpf')"
             [attr.aria-invalid]="invalido('cpf')"
             [attr.aria-describedby]="invalido('cpf') ? 'cpf-erro' : null"
           />
           @if (invalido('cpf')) {
-            <span id="cpf-erro" class="field-error" role="alert">CPF incompleto.</span>
+            <span id="cpf-erro" class="field-error" role="alert">
+              {{ form.controls.cpf.hasError('required') ? 'Informe o CPF.' : 'CPF incompleto.' }}
+            </span>
           }
         </div>
 
@@ -199,26 +229,13 @@
         </div>
       </div>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'contato') {
     <!-- Contato -->
     <fieldset class="form-field">
       <legend class="section-label">Contato</legend>
       <div class="form-grid">
-        <div class="form-field">
-          <label class="label" for="telefone">Telefone principal</label>
-          <input
-            id="telefone"
-            class="input"
-            formControlName="telefone"
-            appTelefoneBr
-            placeholder="(11) 99999-0000"
-            inputmode="tel"
-            maxlength="15"
-            autocomplete="off"
-          />
-          <span class="field-hint">Usado pelo paciente para entrar no aplicativo.</span>
-        </div>
-
         <div class="form-field">
           <label class="label" for="email">E-mail</label>
           <input
@@ -239,7 +256,9 @@
       </div>
 
       <div class="form-field">
-        <span class="label">Telefones adicionais</span>
+        <span class="label">
+          Telefones <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span>
+        </span>
         <div class="tel-lista" formArrayName="telefonesAdicionais">
           @for (ctrl of telefonesAdicionais.controls; track ctrl) {
             <div class="tel-lista__item">
@@ -251,13 +270,13 @@
                 inputmode="tel"
                 maxlength="15"
                 autocomplete="off"
-                [attr.aria-label]="'Telefone adicional ' + ($index + 1)"
+                [attr.aria-label]="'Telefone ' + ($index + 1)"
               />
               <button
                 type="button"
                 class="btn btn--ghost btn--sm"
                 (click)="removerTelefone($index)"
-                [attr.aria-label]="'Remover telefone adicional ' + ($index + 1)"
+                [attr.aria-label]="'Remover telefone ' + ($index + 1)"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M5 12h14" />
@@ -267,6 +286,9 @@
             </div>
           }
         </div>
+        @if (telefonesInvalido()) {
+          <span class="field-error" role="alert">Informe ao menos um telefone.</span>
+        }
         <button type="button" class="btn btn--ghost btn--sm tel-lista__add" (click)="adicionarTelefone()">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
@@ -275,7 +297,9 @@
         </button>
       </div>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'responsaveis') {
     <!-- Responsáveis (cadastro paralelo: nome + telefone) -->
     <fieldset class="form-field">
       <legend class="section-label">Responsáveis</legend>
@@ -309,6 +333,26 @@
                   <span class="field-error" role="alert">Informe o nome (mínimo 2 caracteres).</span>
                 }
               </div>
+              <div class="form-field">
+                <input
+                  class="input"
+                  formControlName="cpf"
+                  mask="000.000.000-00"
+                  placeholder="CPF (000.000.000-00)"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  aria-required="true"
+                  [attr.aria-label]="'CPF do responsável ' + ($index + 1)"
+                  [class.input--error]="responsavelCpfInvalido($index)"
+                  [attr.aria-invalid]="responsavelCpfInvalido($index)"
+                />
+                @if (responsavelCpfInvalido($index)) {
+                  <span class="field-error" role="alert">
+                    {{ responsaveis.at($index).controls.cpf.hasError('required') ? 'Informe o CPF.' : 'CPF incompleto.' }}
+                  </span>
+                }
+              </div>
+
               <input
                 class="input"
                 formControlName="telefone"
@@ -330,12 +374,15 @@
                   placeholder="Nascimento (dd/mm/aaaa)"
                   inputmode="numeric"
                   autocomplete="off"
+                  aria-required="true"
                   [attr.aria-label]="'Data de nascimento do responsável ' + ($index + 1)"
                   [class.input--error]="responsavelDataInvalida($index)"
                   [attr.aria-invalid]="responsavelDataInvalida($index)"
                 />
                 @if (responsavelDataInvalida($index)) {
-                  <span class="field-error" role="alert">Data inválida.</span>
+                  <span class="field-error" role="alert">
+                    {{ responsaveis.at($index).controls.dataNascimento.hasError('required') ? 'Informe a data de nascimento.' : 'Data inválida.' }}
+                  </span>
                 }
               </div>
 
@@ -415,7 +462,9 @@
         Adicionar responsável
       </button>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'unidades') {
     <!-- Unidades de acesso -->
     <fieldset class="form-field">
       <legend class="section-label">Unidades de acesso</legend>
@@ -436,7 +485,9 @@
         notFoundText="Nenhuma unidade"
       ></ng-select>
     </fieldset>
+    }
 
+    @if (abaAtiva() === 'endereco') {
     <!-- Endereço -->
     <fieldset class="form-field">
       <legend class="section-label">Endereço</legend>
@@ -489,6 +540,7 @@
         </div>
       </div>
     </fieldset>
+    }
 
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">{{ inativo() ? 'Voltar' : 'Cancelar' }}</button>
@@ -506,8 +558,8 @@
         <div>
           <h2 class="acesso-app__title">Acesso ao aplicativo</h2>
           <p class="acesso-app__sub">
-            O paciente ativa o app sozinho: no aplicativo ele informa o telefone principal e recebe um código
-            por WhatsApp ou SMS. Aqui você pode revogar o acesso (desloga o aparelho atual).
+            O paciente ativa o app sozinho: no aplicativo ele informa o telefone, o CPF e a data de nascimento
+            e recebe um código por WhatsApp ou SMS. Aqui você pode revogar o acesso (desloga o aparelho atual).
           </p>
         </div>
         <span class="sit" [class.sit--off]="!ativo()">{{ ativo() ? 'Aparelho conectado' : 'Sem aparelho' }}</span>

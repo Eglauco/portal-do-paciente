@@ -181,8 +181,7 @@ public class PacienteController {
                 ColunaExport.de("Nome do pai", p -> texto(p.getNomePai())),
                 ColunaExport.de("Cód. integração", p -> texto(p.getCodigoIntegracao())),
                 ColunaExport.de("Prontuário", p -> texto(p.getProntuario())),
-                ColunaExport.de("Telefone", p -> formatarTelefone(p.getTelefone())),
-                ColunaExport.de("Telefones adicionais", p -> p.getTelefonesAdicionais() == null ? ""
+                ColunaExport.de("Telefones", p -> p.getTelefonesAdicionais() == null ? ""
                         : p.getTelefonesAdicionais().stream().map(PacienteController::formatarTelefone)
                                 .collect(java.util.stream.Collectors.joining("; "))),
                 ColunaExport.de("E-mail", p -> texto(p.getEmail())),
@@ -328,7 +327,6 @@ public class PacienteController {
     /** Copia o request para a entidade, normalizando dígitos e validando CPF/CNS. */
     private void aplicar(Paciente p, PacienteRequest r) {
         p.setNome(r.nome().trim());
-        p.setTelefone(Documentos.somenteDigitos(r.telefone()));
         p.setCodigoIntegracao(limpar(r.codigoIntegracao()));
         p.setProntuario(limpar(r.prontuario()));
         p.setSexo(r.sexo());
@@ -350,6 +348,11 @@ public class PacienteController {
         aplicarResponsaveis(p, r.responsaveis());
         aplicarUnidades(p, r.unidadeIds());
 
+        // O telefone é o único canal de login/OTP do paciente: exige ao menos um.
+        if (p.getTelefonesAdicionais().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Informe pelo menos um telefone do paciente.");
+        }
         if (p.getCpf() != null && !Documentos.cpfValido(p.getCpf())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF inválido");
         }
@@ -361,9 +364,8 @@ public class PacienteController {
     /** Bloqueia duplicidade nos campos únicos (ignorando o próprio registro na edição). */
     private void validarUnicidade(Paciente p, Long idAtual) {
         Long id = (idAtual == null) ? -1L : idAtual;
-        if (p.getTelefone() != null && repository.existsByTelefoneAndIdNot(p.getTelefone(), id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este telefone");
-        }
+        // O telefone não é único: pai e filho podem compartilhar o mesmo número
+        // (a identidade é o CPF; o telefone é só o canal do OTP).
         if (p.getCpf() != null && repository.existsByCpfAndIdNot(p.getCpf(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este CPF");
         }
@@ -408,10 +410,21 @@ public class PacienteController {
      * paciente (principal ou adicional) — o responsável tem de ser outra pessoa.
      */
     private void validarTelefonesDosResponsaveis(Paciente p, List<PacienteRequest.ResponsavelRequest> entradas) {
-        Set<String> vistos = new HashSet<>();
+        Set<String> telefonesVistos = new HashSet<>();
+        Set<String> cpfsVistos = new HashSet<>();
         for (PacienteRequest.ResponsavelRequest entrada : entradas) {
             if (limpar(entrada.nome()) == null) {
                 continue; // linha em branco: não vira responsável
+            }
+            String cpf = Documentos.somenteDigitos(entrada.cpf());
+            if (cpf != null && !cpf.isBlank()) {
+                if (!Documentos.cpfValido(cpf)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF do responsável inválido.");
+                }
+                if (!cpfsVistos.add(cpf)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Há mais de um responsável com o mesmo CPF.");
+                }
             }
             String telefone = Documentos.somenteDigitos(entrada.telefone());
             if (telefone == null || telefone.isBlank()) {
@@ -421,7 +434,7 @@ public class PacienteController {
                 throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                         "O responsável precisa ter um telefone diferente do paciente.");
             }
-            if (!vistos.add(telefone)) {
+            if (!telefonesVistos.add(telefone)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Há mais de um responsável com o mesmo telefone.");
             }
@@ -446,9 +459,11 @@ public class PacienteController {
                 continue; // ignora linhas em branco
             }
             String telefone = Documentos.somenteDigitos(entrada.telefone());
+            String cpf = Documentos.somenteDigitos(entrada.cpf());
             Responsavel alvo = entrada.id() == null ? null : existentes.get(entrada.id());
             if (alvo != null) {
                 alvo.setNome(nome);
+                alvo.setCpf(cpf);
                 alvo.setTelefone(telefone);
                 alvo.setDataNascimento(entrada.dataNascimento());
                 alvo.setAtivo(entrada.ativoOuPadrao());
@@ -457,6 +472,7 @@ public class PacienteController {
             } else {
                 Responsavel novo = new Responsavel();
                 novo.setNome(nome);
+                novo.setCpf(cpf);
                 novo.setTelefone(telefone);
                 novo.setDataNascimento(entrada.dataNascimento());
                 novo.setAtivo(entrada.ativoOuPadrao());
@@ -591,7 +607,7 @@ public class PacienteController {
         } catch (DataIntegrityViolationException e) {
             // Rede de segurança para corridas: os campos únicos já são checados antes.
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Já existe um paciente com um dos dados únicos (telefone, CPF, CNS, código de integração ou prontuário)");
+                    "Já existe um paciente com um dos dados únicos (CPF, CNS, código de integração ou prontuário)");
         }
     }
 }

@@ -1,7 +1,11 @@
 package com.example.pop.paciente;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -35,12 +39,14 @@ public class MeuPerfilController {
     private final PacienteRepository repository;
     private final PacienteAcessoService acessoService;
     private final StorageService storageService;
+    private final PacienteLogService logService;
 
     public MeuPerfilController(PacienteRepository repository, PacienteAcessoService acessoService,
-            StorageService storageService) {
+            StorageService storageService, PacienteLogService logService) {
         this.repository = repository;
         this.acessoService = acessoService;
         this.storageService = storageService;
+        this.logService = logService;
     }
 
     /** Dados do paciente logado (somente leitura) + link temporário da foto. */
@@ -49,6 +55,25 @@ public class MeuPerfilController {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.MEU_PERFIL);
         Paciente paciente = acessoService.pacienteDoToken(jwt);
         return MeuPerfilResponse.from(paciente, storageService.urlVisualizacao(paciente.getFotoUrl(), VALIDADE_FOTO));
+    }
+
+    /**
+     * O paciente edita os PRÓPRIOS dados pessoais pelo app. Só campos pessoais/contato/
+     * endereço (ver {@link MeuPerfilRequest}); CPF, código de integração, prontuário e
+     * unidades NÃO mudam por aqui (identidade/administrativos, geridos pelo back-office).
+     * Exige "Ver e lançar" em Meu Perfil (perfil próprio sempre; responsável só com permissão).
+     * Auditado (LGPD) com autor PACIENTE ou RESPONSAVEL.
+     */
+    @PutMapping
+    public MeuPerfilResponse atualizar(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody MeuPerfilRequest req) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.MEU_PERFIL);
+        Paciente paciente = acessoService.pacienteDoToken(jwt);
+        PacienteLogService.SnapshotPaciente antes = logService.snapshot(paciente);
+        aplicar(paciente, req);
+        Paciente salvo = salvar(paciente);
+        // Auditoria: RESPONSAVEL se a sessão age por um dependente; senão o próprio paciente.
+        logService.registrarAlteracaoPeloApp(antes, salvo, acessoService.responsavelDaSessao(jwt).orElse(null));
+        return MeuPerfilResponse.from(salvo, storageService.urlVisualizacao(salvo.getFotoUrl(), VALIDADE_FOTO));
     }
 
     /** URL pré-assinada (PUT) para o app enviar a foto direto ao S3 (pasta fixa "foto-paciente"). */
@@ -104,6 +129,77 @@ public class MeuPerfilController {
             }
         }
         return MeuPerfilResponse.from(paciente, null);
+    }
+
+    /** Copia os campos editáveis do request para a entidade, normalizando dígitos e validando. */
+    private void aplicar(Paciente p, MeuPerfilRequest r) {
+        p.setNome(r.nome().trim());
+        p.setSexo(r.sexo());
+        p.setDataNascimento(r.dataNascimento());
+        p.setRg(limpar(r.rg()));
+        p.setCns(Documentos.somenteDigitos(r.cns()));
+        p.setNomeMae(limpar(r.nomeMae()));
+        p.setNomePai(limpar(r.nomePai()));
+        p.setEmail(limparEmail(r.email()));
+        p.setRua(limpar(r.rua()));
+        p.setNumero(limpar(r.numero()));
+        p.setComplemento(limpar(r.complemento()));
+        p.setBairro(limpar(r.bairro()));
+        p.setMunicipio(limpar(r.municipio()));
+        p.setUf(limparUf(r.uf()));
+        p.setCep(Documentos.somenteDigitos(r.cep()));
+        p.setTelefonesAdicionais(normalizarTelefones(r.telefonesAdicionais()));
+        // NÃO altera: cpf, codigoIntegracao, prontuario, unidades, responsaveis, fotoUrl, ativo, situacao, dispositivo.
+
+        if (p.getTelefonesAdicionais().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Informe pelo menos um telefone.");
+        }
+        if (p.getCns() != null && !Documentos.cnsValido(p.getCns())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CNS inválido");
+        }
+        if (p.getCns() != null && repository.existsByCnsAndIdNot(p.getCns(), p.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este CNS");
+        }
+    }
+
+    /** saveAndFlush: força a checagem de unicidade a virar 409 aqui (não 500 no commit). */
+    private Paciente salvar(Paciente paciente) {
+        try {
+            return repository.saveAndFlush(paciente);
+        } catch (DataIntegrityViolationException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um paciente com este CNS.");
+        }
+    }
+
+    /** Trim; null quando vazio (evita gravar "" e colidir no índice único do CNS). */
+    private static String limpar(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String t = valor.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String limparUf(String uf) {
+        String t = limpar(uf);
+        return t == null ? null : t.toUpperCase();
+    }
+
+    private static String limparEmail(String email) {
+        String t = limpar(email);
+        return t == null ? null : t.toLowerCase();
+    }
+
+    /** Telefones: só dígitos, sem vazios nem repetidos (mesma regra do back-office). */
+    private static List<String> normalizarTelefones(List<String> brutos) {
+        if (brutos == null) {
+            return new ArrayList<>();
+        }
+        return brutos.stream()
+                .map(Documentos::somenteDigitos)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     /** Nome do arquivo + tipo para assinar o upload (o app não escolhe a pasta). */

@@ -50,7 +50,15 @@ public class Responsavel {
     @Column(nullable = false, length = 120)
     private String nome;
 
-    /** Telefone (somente dígitos). Opcional. */
+    /**
+     * CPF (somente dígitos) do próprio responsável — a identidade de login dele no app.
+     * Nullable na Fase 1 (aditiva); vira obrigatório no corte. Não é único global (a mesma
+     * pessoa pode ser responsável de vários pacientes), mas não se repete no mesmo paciente.
+     */
+    @Column(length = 11)
+    private String cpf;
+
+    /** Telefone (somente dígitos) — canal do OTP quando este responsável faz login. Opcional. */
     @Column(length = 20)
     private String telefone;
 

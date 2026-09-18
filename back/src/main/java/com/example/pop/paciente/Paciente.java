@@ -47,10 +47,6 @@ public class Paciente {
     @Column(nullable = false, length = 120)
     private String nome;
 
-    /** Telefone (somente dígitos) — chave do login no app. Único quando preenchido. */
-    @Column(length = 20)
-    private String telefone;
-
     /** Código do paciente em um sistema externo (integração). Único quando preenchido. */
     @Column(name = "codigo_integracao", length = 60)
     private String codigoIntegracao;
@@ -155,4 +151,9 @@ public class Paciente {
     @JsonIgnore
     @Column(name = "dispositivo_ativo", length = 120)
     private String dispositivoAtivo;
+
+    /** Um telefone para exibição/snapshot (o primeiro da lista); {@code null} se não houver. */
+    public String primeiroTelefone() {
+        return telefonesAdicionais == null || telefonesAdicionais.isEmpty() ? null : telefonesAdicionais.get(0);
+    }
 }

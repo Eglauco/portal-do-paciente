@@ -278,7 +278,7 @@ public class AgendamentoEntregaService {
     private List<Destinatario> resolverDestinatarios(Paciente paciente) {
         List<Destinatario> destinatarios = new ArrayList<>();
         destinatarios.add(new Destinatario(TipoDestinatario.PACIENTE, null, paciente.getNome(),
-                paciente.getTelefone(), tokensDe(paciente.getTelefone(), paciente.getId())));
+                paciente.primeiroTelefone(), tokensDe(paciente.getCpf(), paciente.getId())));
         for (Responsavel r : responsavelRepository.findByPaciente_Id(paciente.getId())) {
             if (!r.isAtivo()) {
                 continue;
@@ -289,17 +289,17 @@ public class AgendamentoEntregaService {
                 continue;
             }
             destinatarios.add(new Destinatario(TipoDestinatario.RESPONSAVEL, r.getId(), r.getNome(),
-                    r.getTelefone(), tokensDe(r.getTelefone(), null)));
+                    r.getTelefone(), tokensDe(r.getCpf(), null)));
         }
         return destinatarios;
     }
 
-    /** Tokens de push da pessoa: pela conta (telefone) + legados por paciente (só para o próprio paciente). */
-    private List<String> tokensDe(String telefone, Long pacienteIdLegado) {
+    /** Tokens de push da pessoa: pela conta (CPF) + legados por paciente (só para o próprio paciente). */
+    private List<String> tokensDe(String cpf, Long pacienteIdLegado) {
         List<Dispositivo> aparelhos = new ArrayList<>();
-        String tel = Documentos.somenteDigitos(telefone);
-        if (tel != null && !tel.isBlank()) {
-            contaRepository.findByTelefone(tel)
+        String c = Documentos.somenteDigitos(cpf);
+        if (c != null && !c.isBlank()) {
+            contaRepository.findByCpf(c)
                     .ifPresent(conta -> aparelhos.addAll(dispositivoRepository.findByContaId(conta.getId())));
         }
         if (pacienteIdLegado != null) {

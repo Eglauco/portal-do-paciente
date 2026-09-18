@@ -5,18 +5,17 @@ import java.util.Set;
 
 /**
  * Regra compartilhada (app e back-office): um responsável tem de ser uma pessoa DIFERENTE
- * do paciente — logo o telefone dele não pode ser nenhum telefone do paciente (o principal,
- * chave de login, nem os adicionais). Compara sempre por dígitos normalizados.
+ * do paciente — logo o telefone dele não pode ser nenhum telefone da lista do paciente.
+ * Compara sempre por dígitos normalizados.
  */
 final class ResponsavelTelefones {
 
     private ResponsavelTelefones() {
     }
 
-    /** Telefones (dígitos) do paciente: o principal + os adicionais, sem nulos/vazios. */
+    /** Telefones (dígitos) do paciente: a lista de telefones, sem nulos/vazios. */
     static Set<String> doPaciente(Paciente p) {
         Set<String> tels = new LinkedHashSet<>();
-        adicionar(tels, p.getTelefone());
         if (p.getTelefonesAdicionais() != null) {
             for (String t : p.getTelefonesAdicionais()) {
                 adicionar(tels, t);

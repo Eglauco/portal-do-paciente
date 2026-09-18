@@ -1,7 +1,9 @@
 package com.example.pop.paciente;
 
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -71,10 +74,18 @@ public class MeuResponsavelController {
         if (telefone == null || telefone.length() < 10) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Informe um telefone válido com DDD.");
         }
-        // O responsável tem de ser outra pessoa: não pode ter nenhum telefone do paciente.
+        String cpf = Documentos.somenteDigitos(request.cpf());
+        if (cpf == null || !Documentos.cpfValido(cpf)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Informe um CPF válido.");
+        }
+        // O responsável tem de ser outra pessoa: nem o telefone nem o CPF podem ser os do paciente.
         if (ResponsavelTelefones.ehDoPaciente(paciente, telefone)) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "O responsável precisa ter um telefone diferente do seu.");
+        }
+        if (cpf.equals(paciente.getCpf())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O responsável precisa ser outra pessoa (CPF diferente do seu).");
         }
         // Sem telefone repetido na lista deste paciente (ativos ou inativos): evita duplicados.
         if (responsavelRepository.findFirstByPaciente_IdAndTelefoneOrderByIdAsc(paciente.getId(), telefone).isPresent()) {
@@ -83,14 +94,21 @@ public class MeuResponsavelController {
                     "Já existe um responsável com este telefone neste cadastro. "
                             + "Se ele não aparece na lista, fale com a sua unidade de saúde.");
         }
+        // Sem CPF repetido na lista deste paciente (uma pessoa não se autoriza duas vezes).
+        if (responsavelRepository.findFirstByPaciente_IdAndCpfOrderByIdAsc(paciente.getId(), cpf).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Já existe um responsável com este CPF neste cadastro.");
+        }
         Responsavel r = new Responsavel();
         r.setPaciente(paciente);
         r.setNome(nome);
+        r.setCpf(cpf);
+        r.setDataNascimento(request.dataNascimento());
         r.setTelefone(telefone);
         r.setAtivo(true);
         r.setOrigem(OrigemResponsavel.PACIENTE);
-        // Escopo TRAVADO no servidor: só AGENDAMENTOS, visualizar e lançar (o corpo não escolhe permissão).
-        r.getPermissoes().put(FuncionalidadeApp.AGENDAMENTOS, NivelAcessoResponsavel.VISUALIZAR_LANCAR);
+        // Permissões escolhidas pelo paciente (controle total; ausência/SEM_ACESSO = sem acesso).
+        aplicarPermissoes(r, request.permissoes());
         // Mantém o agregado consistente: o Paciente é o dono da coleção (cascade + orphanRemoval),
         // então o vínculo tem de passar pela coleção — senão o remover depois não apaga a linha.
         paciente.getResponsaveis().add(r);
@@ -113,6 +131,60 @@ public class MeuResponsavelController {
             pacienteLogService.registrarResponsavelSituacaoPeloPaciente(paciente, r, novoAtivo);
         }
         return paraResposta(r);
+    }
+
+    /**
+     * Edita uma pessoa autorizada: nome, data de nascimento, telefone e permissões por
+     * funcionalidade (o paciente tem controle total). O CPF (identidade de login) não muda.
+     */
+    @PutMapping("/{id}")
+    @Transactional
+    public MeuResponsavelResponse editar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+            @Valid @RequestBody MeuResponsavelEditarRequest request) {
+        Paciente paciente = perfilProprio(jwt);
+        Responsavel r = carregarDoPaciente(paciente, id);
+        String nome = request.nome().trim();
+        String telefone = Documentos.somenteDigitos(request.telefone());
+        if (telefone == null || telefone.length() < 10) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Informe um telefone válido com DDD.");
+        }
+        if (ResponsavelTelefones.ehDoPaciente(paciente, telefone)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O responsável precisa ter um telefone diferente do seu.");
+        }
+        // Telefone não pode colidir com OUTRO responsável deste paciente (o próprio é permitido).
+        responsavelRepository.findFirstByPaciente_IdAndTelefoneOrderByIdAsc(paciente.getId(), telefone)
+                .filter(outro -> !outro.getId().equals(id))
+                .ifPresent(outro -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Já existe um responsável com este telefone neste cadastro.");
+                });
+        // Estado ANTES (para a auditoria); copia o mapa de permissões (senão o clear() abaixo o esvazia).
+        String nomeAntes = r.getNome();
+        String telefoneAntes = r.getTelefone();
+        Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoesAntes = new EnumMap<>(r.getPermissoes());
+
+        r.setNome(nome);
+        r.setDataNascimento(request.dataNascimento());
+        r.setTelefone(telefone);
+        aplicarPermissoes(r, request.permissoes());
+
+        pacienteLogService.registrarResponsavelEditadoPeloPaciente(paciente, r, nomeAntes, telefoneAntes, permissoesAntes);
+        return paraResposta(r);
+    }
+
+    /** Aplica as permissões escolhidas: limpa e grava só os níveis diferentes de SEM_ACESSO. */
+    private static void aplicarPermissoes(Responsavel alvo,
+            Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes) {
+        Map<FuncionalidadeApp, NivelAcessoResponsavel> destino = alvo.getPermissoes();
+        destino.clear();
+        if (permissoes != null) {
+            permissoes.forEach((func, nivel) -> {
+                if (func != null && nivel != null && nivel != NivelAcessoResponsavel.SEM_ACESSO) {
+                    destino.put(func, nivel);
+                }
+            });
+        }
     }
 
     /** Exclui de vez uma pessoa autorizada SEM lançamentos; com lançamentos, bloqueia (409). */

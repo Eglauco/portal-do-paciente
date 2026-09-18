@@ -39,6 +39,7 @@ import jakarta.servlet.Filter;
 class PacienteAuthMvcTest {
 
     private static final String TEL = "11977776666";
+    private static final String CPF = "10000000010";
     private static final String ADMIN_EMAIL = "paci.mvc.admin@unidadesaude.com.br";
     private static final String ADMIN_SENHA = "Teste-Mvc-123";
 
@@ -68,8 +69,13 @@ class PacienteAuthMvcTest {
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
-        repository.findByTelefone(TEL).ifPresent(p -> repository.deleteById(p.getId()));
+        repository.buscarPorTelefoneNaLista(TEL).forEach(p -> repository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente MVC", TEL), null).getId();
+        repository.findById(pacienteId).ifPresent(p -> {
+            p.setCpf(CPF);
+            p.setDataNascimento(java.time.LocalDate.of(1990, 1, 1));
+            repository.save(p);
+        });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         // Admin de teste (para as chamadas /paciente/** que agora exigem role ADMIN).
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
@@ -87,7 +93,8 @@ class PacienteAuthMvcTest {
 
     @Test
     void ativarPublicoEMeProtegido() throws Exception {
-        String corpo = "{\"telefone\":\"" + TEL + "\",\"codigo\":\"000000\",\"dispositivoId\":\"dev-mvc\"}";
+        String corpo = "{\"cpf\":\"" + CPF + "\",\"dataNascimento\":\"1990-01-01\","
+                + "\"codigo\":\"000000\",\"dispositivoId\":\"dev-mvc\",\"telefone\":\"" + TEL + "\"}";
         MvcResult res = mvc.perform(post("/paciente-auth/ativar")
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isOk()).andReturn();
@@ -110,31 +117,32 @@ class PacienteAuthMvcTest {
     @Test
     void salvarComAtivoNuloNaoQuebra() throws Exception {
         String tel = "11966665555";
-        repository.findByTelefone(tel).ifPresent(p -> repository.deleteById(p.getId()));
+        repository.buscarPorTelefoneNaLista(tel).forEach(p -> repository.deleteById(p.getId()));
         try {
-            String corpo = "{\"nome\":\"Teste Ativo Nulo\",\"telefone\":\"" + tel + "\",\"ativo\":null}";
+            String corpo = "{\"nome\":\"Teste Ativo Nulo\",\"telefonesAdicionais\":[\"" + tel + "\"],\"ativo\":null}";
             mvc.perform(post("/paciente").header("Authorization", "Bearer " + adminToken)
                             .contentType(MediaType.APPLICATION_JSON).content(corpo))
                     .andExpect(status().isCreated());
         } finally {
-            repository.findByTelefone(tel).ifPresent(p -> repository.deleteById(p.getId()));
+            repository.buscarPorTelefoneNaLista(tel).forEach(p -> repository.deleteById(p.getId()));
         }
     }
 
     /**
      * O paciente pede o próprio código (self-service): endpoint PÚBLICO, sem admin.
-     * Telefone cadastrado → 204; telefone desconhecido → 404 com orientação.
+     * CPF+data conferem → 200 (com telefone mascarado); não conferem → 401 genérico
+     * (não revela se o CPF existe nem qual campo falhou).
      */
     @Test
     void solicitarCodigoEhPublico() throws Exception {
-        String corpo = "{\"telefone\":\"" + TEL + "\"}";
+        String corpo = "{\"cpf\":\"" + CPF + "\",\"dataNascimento\":\"1990-01-01\",\"telefone\":\"" + TEL + "\"}";
         mvc.perform(post("/paciente-auth/solicitar-codigo")
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isOk());
 
-        String desconhecido = "{\"telefone\":\"11900000000\"}";
+        String desconhecido = "{\"cpf\":\"19999999999\",\"dataNascimento\":\"1990-01-01\",\"telefone\":\"" + TEL + "\"}";
         mvc.perform(post("/paciente-auth/solicitar-codigo")
                         .contentType(MediaType.APPLICATION_JSON).content(desconhecido))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isUnauthorized());
     }
 }

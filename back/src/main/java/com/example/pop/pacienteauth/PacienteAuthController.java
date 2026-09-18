@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -51,27 +50,28 @@ public class PacienteAuthController {
         this.expiracaoDias = expiracaoDias;
     }
 
-    /** O usuário pede o código de ativação (SMS) para o seu telefone. */
+    /** O usuário pede o código (SMS) informando o CPF; devolve o telefone mascarado do envio. */
     @PostMapping("/solicitar-codigo")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request) {
-        acessoService.solicitarCodigo(request.telefone());
+    public SolicitarCodigoResponse solicitarCodigo(@Valid @RequestBody SolicitarCodigoRequest request) {
+        return new SolicitarCodigoResponse(
+                acessoService.solicitarCodigo(request.cpf(), request.dataNascimento(), request.telefone()));
     }
 
     /**
-     * Ativa o app: valida telefone + código, amarra o aparelho à conta e devolve um
-     * token para um perfil padrão (o próprio, ou o primeiro dependente) + a lista de
-     * perfis para o app abrir a tela "Selecionar Perfil".
+     * Ativa o app: valida CPF + código, amarra o aparelho à conta e devolve um token
+     * para um perfil padrão (o próprio, ou o primeiro dependente) + a lista de perfis
+     * para o app abrir a tela "Selecionar Perfil".
      */
     @PostMapping("/ativar")
     public AtivarResponse ativar(@Valid @RequestBody AtivarPacienteRequest request) {
         String dispositivoId = request.dispositivoId().trim();
-        ContaApp conta = acessoService.ativar(request.telefone(), request.codigo(), dispositivoId);
-        List<Perfil> perfis = acessoService.perfis(conta.getTelefone());
+        ContaApp conta = acessoService.ativar(request.cpf(), request.dataNascimento(), request.telefone(),
+                request.codigo(), dispositivoId);
+        List<Perfil> perfis = acessoService.perfis(conta.getCpf());
         Perfil padrao = perfis.stream().filter(Perfil::proprio).findFirst()
                 .orElse(perfis.isEmpty() ? null : perfis.get(0));
         if (padrao == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nenhum perfil disponível para este telefone");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nenhum perfil disponível para este CPF");
         }
         String token = gerarToken(conta, padrao.paciente(), dispositivoId);
         return new AtivarResponse(token, padrao.paciente().getId(), padrao.paciente().getNome(),
@@ -81,8 +81,8 @@ public class PacienteAuthController {
     /** Perfis que a sessão atual pode acessar (para a tela "Selecionar Perfil"). */
     @GetMapping("/perfis")
     public List<PerfilResponse> perfis(@AuthenticationPrincipal Jwt jwt) {
-        String telefone = acessoService.telefoneDaSessao(jwt);
-        return acessoService.perfis(telefone).stream().map(this::paraResposta).toList();
+        String cpf = acessoService.cpfDaSessao(jwt);
+        return acessoService.perfis(cpf).stream().map(this::paraResposta).toList();
     }
 
     /** Escolhe o perfil (paciente) a agir: valida o vínculo e reemite o token (mesmo aparelho). */
@@ -90,7 +90,7 @@ public class PacienteAuthController {
     public PacienteSessaoResponse trocarPerfil(@AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody TrocarPerfilRequest request) {
         ContaApp conta = acessoService.contaParaTroca(jwt);
-        Paciente perfil = acessoService.perfilDaConta(conta.getTelefone(), request.pacienteId());
+        Paciente perfil = acessoService.perfilDaConta(conta.getCpf(), request.pacienteId());
         String token = gerarToken(conta, perfil, jwt.getClaimAsString("dev"));
         return new PacienteSessaoResponse(token, perfil.getId(), perfil.getNome());
     }
@@ -112,7 +112,7 @@ public class PacienteAuthController {
     private String gerarToken(ContaApp conta, Paciente perfil, String dispositivoId) {
         Instant agora = Instant.now();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(conta.getTelefone())
+                .subject(conta.getCpf())
                 .issuedAt(agora)
                 .expiresAt(agora.plus(Duration.ofDays(expiracaoDias)))
                 .claim("cid", conta.getId())

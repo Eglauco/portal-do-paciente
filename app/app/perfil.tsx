@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import type { ImagePickerOptions } from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
@@ -66,7 +66,10 @@ function montarSecoes(p: MeuPerfil) {
   const ruaNumero = [p.rua, p.numero].filter(Boolean).join(', ');
   const logradouro = [ruaNumero, p.complemento].filter(Boolean).join(' — ');
   const cidadeUf = [p.municipio, p.uf].filter(Boolean).join(' / ');
-  const adicionais = p.telefonesAdicionais.map((t) => campo('call-outline', 'Outro telefone', fmtTelefone(t)));
+  // O perfil agora traz só a lista de telefones: o 1º vira "Telefone"; os demais, "Outro telefone".
+  const telefones = p.telefonesAdicionais.map((tel, i) =>
+    campo('call-outline', i === 0 ? 'Telefone' : 'Outro telefone', fmtTelefone(tel)),
+  );
 
   const secoes = [
     {
@@ -92,8 +95,7 @@ function montarSecoes(p: MeuPerfil) {
     {
       titulo: 'Contato',
       campos: [
-        campo('call-outline', 'Telefone', fmtTelefone(p.telefone)),
-        ...adicionais,
+        ...telefones,
         campo('mail-outline', 'E-mail', p.email),
       ],
     },
@@ -119,36 +121,47 @@ export default function PerfilScreen() {
   const router = useRouter();
   const { sessao } = useSessao();
   const { definirFoto } = usePerfilFoto();
-  // Travas do perfil dependente: ver os dados vs. alterar a foto ("lançamento").
+  // Travas do perfil dependente: ver os dados vs. lançar (alterar foto e editar dados).
+  // Editar e trocar foto exigem "Ver e lançar"; o perfil próprio sempre pode.
   const verPerfil = podeVer(sessao, 'MEU_PERFIL');
-  const podeTrocarFoto = podeLancar(sessao, 'MEU_PERFIL');
+  const podeEditar = podeLancar(sessao, 'MEU_PERFIL');
+  const podeTrocarFoto = podeEditar;
   const [perfil, setPerfil] = useState<MeuPerfil | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
 
-  const carregar = useCallback(async () => {
-    try {
-      setErro(false);
-      setCarregando(true);
-      const dados = await carregarPerfil();
-      setPerfil(dados);
-      definirFoto(dados.fotoUrl); // mantém o cabeçalho em sincronia
-    } catch {
-      setErro(true);
-    } finally {
-      setCarregando(false);
-    }
-  }, [definirFoto]);
+  const carregar = useCallback(
+    async (comSpinner = true) => {
+      try {
+        setErro(false);
+        if (comSpinner) setCarregando(true);
+        const dados = await carregarPerfil();
+        setPerfil(dados);
+        definirFoto(dados.fotoUrl); // mantém o cabeçalho em sincronia
+      } catch {
+        setErro(true);
+      } finally {
+        setCarregando(false);
+      }
+    },
+    [definirFoto],
+  );
 
-  useEffect(() => {
-    // Sem acesso ao perfil: não busca os dados (o backend responde 403); mostra o aviso.
-    if (!verPerfil) {
-      setCarregando(false);
-      return;
-    }
-    carregar();
-  }, [carregar, verPerfil]);
+  // Recarrega ao ganhar foco: assim, ao voltar da tela de edição, os dados já vêm atualizados.
+  // 1ª vez mostra o spinner; nas voltas seguintes recarrega em silêncio (sem piscar a tela).
+  const jaCarregou = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      // Sem acesso ao perfil: não busca os dados (o backend responde 403); mostra o aviso.
+      if (!verPerfil) {
+        setCarregando(false);
+        return;
+      }
+      carregar(!jaCarregou.current);
+      jaCarregou.current = true;
+    }, [carregar, verPerfil]),
+  );
 
   async function trocarFotoFluxo(origem: 'camera' | 'galeria') {
     try {
@@ -276,19 +289,38 @@ export default function PerfilScreen() {
             </View>
             <Text style={styles.estadoTitulo}>Não foi possível carregar</Text>
             <Text style={styles.estadoTxt}>Verifique sua conexão com o servidor e tente novamente.</Text>
-            <Pressable style={styles.estadoBtn} onPress={carregar}>
+            <Pressable style={styles.estadoBtn} onPress={() => carregar()}>
               <Ionicons name="refresh" size={16} color="#fff" />
               <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
             </Pressable>
           </View>
         ) : (
           <>
-            <View style={styles.aviso}>
-              <Ionicons name="lock-closed-outline" size={14} color={t.muted} />
-              <Text style={styles.avisoTxt}>
-                Seus dados são somente para consulta. Para corrigir algo, procure a sua unidade de saúde.
-              </Text>
-            </View>
+            {podeEditar ? (
+              <>
+                <View style={styles.aviso}>
+                  <Ionicons name="create-outline" size={14} color={t.muted} />
+                  <Text style={styles.avisoTxt}>
+                    Você pode editar seus dados pessoais. O CPF não pode ser alterado — é o seu login.
+                  </Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.editarBtn, pressed && styles.editarBtnPressed]}
+                  onPress={() => router.push('/perfil-editar')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar dados">
+                  <Ionicons name="create-outline" size={18} color={t.onBrand} />
+                  <Text style={styles.editarBtnTxt}>Editar dados</Text>
+                </Pressable>
+              </>
+            ) : (
+              <View style={styles.aviso}>
+                <Ionicons name="lock-closed-outline" size={14} color={t.muted} />
+                <Text style={styles.avisoTxt}>
+                  Seus dados são somente para consulta. Para corrigir algo, procure a sua unidade de saúde.
+                </Text>
+              </View>
+            )}
             {secoes.map((secao) => (
               <View key={secao.titulo} style={styles.secao}>
                 <Text style={styles.secaoTitulo}>{secao.titulo}</Text>
@@ -388,6 +420,18 @@ const criarEstilos = (t: Tema) =>
       marginBottom: 18,
     },
     avisoTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
+    editarBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: t.brand,
+      marginBottom: 18,
+    },
+    editarBtnPressed: { backgroundColor: t.brandDeep },
+    editarBtnTxt: { color: t.onBrand, fontSize: 15, fontWeight: '800' },
     secao: { marginBottom: 18 },
     secaoTitulo: {
       fontSize: 12,

@@ -18,7 +18,6 @@ import java.util.function.Function;
 public enum CampoPaciente {
 
     NOME("Nome", Paciente::getNome),
-    TELEFONE("Telefone", Paciente::getTelefone),
     CODIGO_INTEGRACAO("Código de integração", Paciente::getCodigoIntegracao),
     PRONTUARIO("Prontuário", Paciente::getProntuario),
     SEXO("Sexo", p -> sexoLabel(p.getSexo())),

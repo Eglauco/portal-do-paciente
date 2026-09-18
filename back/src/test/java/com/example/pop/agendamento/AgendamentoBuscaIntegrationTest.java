@@ -153,7 +153,7 @@ class AgendamentoBuscaIntegrationTest {
     }
 
     private Agendamento criar(String nomePaciente, Long especialidadeId, LocalDateTime dataHora) {
-        Paciente p = pacienteController.criar(new PacienteRequest(nomePaciente, null), null);
+        Paciente p = pacienteController.criar(new PacienteRequest(nomePaciente, "11900000000"), null);
         pacientes.add(p.getId());
         Agendamento a = new Agendamento();
         a.setDataHora(dataHora);

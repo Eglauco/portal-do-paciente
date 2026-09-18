@@ -4,6 +4,9 @@ import {
   ActivityIndicator,
   Alert,
   Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,17 +14,24 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { SemAcesso } from '@/components/sem-acesso';
-import { type Tema, useTema } from '@/hooks/use-tema';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import {
   adicionarResponsavel,
   definirSituacaoResponsavel,
+  editarResponsavel,
+  FUNCIONALIDADES,
   listarResponsaveis,
-  removerResponsavel,
+  type MapaPermissoes,
   type MeuResponsavel,
+  NIVEIS,
+  type NivelAcesso,
+  permissoesVazias,
+  removerResponsavel,
 } from '@/services/responsaveis';
 import { ehPerfilProprio } from '@/services/sessao';
 
@@ -37,9 +47,98 @@ function fmtTelefone(v: string): string {
   return v;
 }
 
+/** Máscara de CPF "000.000.000-00" enquanto o paciente digita. */
+function fmtCpf(v: string): string {
+  const d = soDigitos(v).slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+/** Máscara de data "00/00/0000" (dd/mm/aaaa) enquanto o paciente digita. */
+function fmtData(v: string): string {
+  const d = soDigitos(v).slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Converte a data digitada "dd/mm/aaaa" para o ISO "AAAA-MM-DD" esperado pelo backend. */
+function dataParaIso(v: string): string {
+  const d = soDigitos(v);
+  if (d.length !== 8) return '';
+  return `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}`;
+}
+
+/** Converte o ISO "AAAA-MM-DD" (vindo do backend) de volta para os dígitos "ddmmaaaa" da máscara. */
+function isoParaDigitos(iso: string): string {
+  const d = soDigitos(iso); // "AAAAMMDD"
+  if (d.length !== 8) return '';
+  return `${d.slice(6, 8)}${d.slice(4, 6)}${d.slice(0, 4)}`;
+}
+
+/** Normaliza um mapa parcial de permissões num mapa completo (chave ausente = SEM_ACESSO). */
+function normalizarPermissoes(p: MapaPermissoes | undefined): MapaPermissoes {
+  return { ...permissoesVazias(), ...(p ?? {}) };
+}
+
+/**
+ * Matriz de permissões: uma linha por funcionalidade com botões segmentados de nível
+ * (Sem acesso / Só visualizar / Ver e lançar). Reutilizada no adicionar e no editar.
+ * O botão selecionado fica destacado; Prontuário não oferece "Ver e lançar".
+ */
+function MatrizPermissoes({
+  permissoes,
+  onChange,
+  desabilitado,
+  styles,
+}: {
+  permissoes: MapaPermissoes;
+  onChange: (funcionalidade: string, nivel: NivelAcesso) => void;
+  desabilitado?: boolean;
+  styles: ReturnType<typeof criarEstilos>;
+}) {
+  return (
+    <View style={styles.matriz}>
+      {FUNCIONALIDADES.map((f, i) => {
+        const niveis = f.semLancamento ? NIVEIS.filter((n) => n.valor !== 'VISUALIZAR_LANCAR') : NIVEIS;
+        const atual = permissoes[f.valor] ?? 'SEM_ACESSO';
+        return (
+          <View key={f.valor} style={[styles.permLinha, i > 0 && styles.permLinhaBorda]}>
+            <Text style={styles.permRotulo}>{f.rotulo}</Text>
+            <View style={styles.seg}>
+              {niveis.map((n) => {
+                const sel = atual === n.valor;
+                return (
+                  <Pressable
+                    key={n.valor}
+                    style={({ pressed }) => [
+                      styles.segBtn,
+                      sel && styles.segBtnSel,
+                      pressed && !sel && styles.segBtnPressed,
+                    ]}
+                    onPress={() => onChange(f.valor, n.valor)}
+                    disabled={desabilitado}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: sel, disabled: desabilitado }}
+                    accessibilityLabel={`${f.rotulo}: ${n.rotulo}`}>
+                    <Text style={[styles.segBtnTxt, sel && styles.segBtnTxtSel]}>{n.rotulo}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export default function ResponsaveisScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
+  const insets = useSafeAreaInsets();
   const { sessao } = useSessao();
   const proprio = ehPerfilProprio(sessao);
 
@@ -47,11 +146,21 @@ export default function ResponsaveisScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
 
-  const [nome, setNome] = useState('');
-  const [telefone, setTelefone] = useState(''); // só dígitos
-  const [enviando, setEnviando] = useState(false);
   const [removendoId, setRemovendoId] = useState<number | null>(null);
   const [atualizandoId, setAtualizandoId] = useState<number | null>(null);
+
+  // Modal único de cadastro/edição, reaproveitado nos dois modos. No "adicionar" o CPF é editável
+  // (é a identidade de login da nova pessoa); no "editar" fica somente-leitura. Os campos são
+  // preenchidos ao abrir e NÃO são limpos ao fechar (evita ler nulo durante o fade de saída).
+  const [edVisivel, setEdVisivel] = useState(false);
+  const [edModo, setEdModo] = useState<'adicionar' | 'editar'>('adicionar');
+  const [edId, setEdId] = useState<number | null>(null);
+  const [edCpf, setEdCpf] = useState(''); // só dígitos
+  const [edNome, setEdNome] = useState('');
+  const [edData, setEdData] = useState(''); // só dígitos
+  const [edTelefone, setEdTelefone] = useState(''); // só dígitos
+  const [edPermissoes, setEdPermissoes] = useState<MapaPermissoes>(() => permissoesVazias());
+  const [edSalvando, setEdSalvando] = useState(false);
 
   const carregar = useCallback(async () => {
     try {
@@ -74,26 +183,8 @@ export default function ResponsaveisScreen() {
     carregar();
   }, [carregar, proprio]);
 
-  const podeAdicionar = nome.trim().length >= 2 && telefone.length >= 10 && !enviando;
-
-  async function adicionar() {
-    if (!podeAdicionar) return;
-    Keyboard.dismiss();
-    try {
-      setEnviando(true);
-      const novo = await adicionarResponsavel(nome.trim(), telefone);
-      setLista((atual) => [novo, ...atual]);
-      setNome('');
-      setTelefone('');
-    } catch (e) {
-      Alert.alert('Não foi possível adicionar', e instanceof Error ? e.message : 'Tente novamente.');
-    } finally {
-      setEnviando(false);
-    }
-  }
-
   function confirmarRemocao(r: MeuResponsavel) {
-    Alert.alert('Excluir pessoa autorizada', `Excluir ${r.nome}? Ela perderá o acesso para agendar por você.`, [
+    Alert.alert('Excluir pessoa autorizada', `Excluir ${r.nome}? Ela perderá o acesso ao seu perfil.`, [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Excluir', style: 'destructive', onPress: () => remover(r.id) },
     ]);
@@ -119,7 +210,7 @@ export default function ResponsaveisScreen() {
   function confirmarInativacao(r: MeuResponsavel) {
     Alert.alert(
       'Inativar pessoa autorizada',
-      `${r.nome} deixará de poder agendar por você. Você pode reativar quando quiser.`,
+      `${r.nome} deixará de acessar o seu perfil. Você pode reativar quando quiser.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Inativar', style: 'destructive', onPress: () => alternarSituacao(r) },
@@ -139,6 +230,70 @@ export default function ResponsaveisScreen() {
     }
   }
 
+  function abrirAdicao() {
+    setEdModo('adicionar');
+    setEdId(null);
+    setEdCpf('');
+    setEdNome('');
+    setEdData('');
+    setEdTelefone('');
+    setEdPermissoes(permissoesVazias());
+    setEdVisivel(true);
+  }
+
+  function abrirEdicao(r: MeuResponsavel) {
+    setEdModo('editar');
+    setEdId(r.id);
+    setEdCpf(soDigitos(r.cpf));
+    setEdNome(r.nome);
+    setEdData(isoParaDigitos(r.dataNascimento));
+    setEdTelefone(soDigitos(r.telefone));
+    setEdPermissoes(normalizarPermissoes(r.permissoes));
+    setEdVisivel(true);
+  }
+
+  function fecharEdicao() {
+    if (!edSalvando) setEdVisivel(false);
+  }
+
+  const adicionando = edModo === 'adicionar';
+
+  const podeSalvar =
+    edNome.trim().length >= 2 &&
+    edData.length === 8 &&
+    edTelefone.length >= 10 &&
+    (!adicionando || edCpf.length === 11) &&
+    !edSalvando;
+
+  /** Salva o modal conforme o modo: POST (adicionar) ou PUT (editar). */
+  async function salvar() {
+    if (!podeSalvar) return;
+    Keyboard.dismiss();
+    try {
+      setEdSalvando(true);
+      if (adicionando) {
+        const novo = await adicionarResponsavel(edNome.trim(), edCpf, dataParaIso(edData), edTelefone, edPermissoes);
+        setLista((atual) => [novo, ...atual]);
+      } else if (edId != null) {
+        const atualizado = await editarResponsavel(edId, {
+          nome: edNome.trim(),
+          dataNascimento: dataParaIso(edData),
+          telefone: edTelefone,
+          permissoes: edPermissoes,
+        });
+        setLista((atual) => atual.map((x) => (x.id === atualizado.id ? atualizado : x)));
+      }
+      setEdVisivel(false);
+    } catch (e) {
+      Alert.alert(
+        adicionando ? 'Não foi possível adicionar' : 'Não foi possível salvar',
+        e instanceof Error ? e.message : 'Tente novamente.',
+      );
+    } finally {
+      setEdSalvando(false);
+    }
+  }
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Pessoas autorizadas" />
@@ -146,73 +301,23 @@ export default function ResponsaveisScreen() {
       {!proprio ? (
         <SemAcesso mensagem="Apenas o próprio paciente pode gerenciar as pessoas autorizadas a agendar por ele." />
       ) : (
+        <>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag">
           {/* O que a pessoa poderá fazer */}
           <View style={styles.aviso}>
             <Ionicons name="shield-checkmark-outline" size={18} color={t.brandDeep} />
             <Text style={styles.avisoTxt}>
-              Quem você adicionar poderá <Text style={styles.avisoForte}>ver e agendar</Text> consultas por você — e
-              nada mais. Não terá acesso ao seu prontuário, chat, ou outros dados.
+              Você decide o que cada pessoa pode fazer em cada área — de{' '}
+              <Text style={styles.avisoForte}>só visualizar</Text> a <Text style={styles.avisoForte}>ver e lançar</Text>.
+              Quem você adiciona começa sem acesso a nada.
             </Text>
-          </View>
-
-          {/* Adicionar */}
-          <View style={styles.secao}>
-            <Text style={styles.secaoTitulo}>Adicionar pessoa</Text>
-            <View style={styles.card}>
-              <Text style={styles.label}>Nome</Text>
-              <TextInput
-                style={styles.input}
-                value={nome}
-                onChangeText={setNome}
-                placeholder="Nome da pessoa"
-                placeholderTextColor={t.muted}
-                autoCapitalize="words"
-                returnKeyType="next"
-                maxLength={120}
-              />
-              <Text style={[styles.label, styles.labelEspaco]}>Telefone (com DDD)</Text>
-              <TextInput
-                style={styles.input}
-                value={fmtTelefone(telefone)}
-                onChangeText={(v) => setTelefone(soDigitos(v).slice(0, 11))}
-                placeholder="(11) 98888-1111"
-                placeholderTextColor={t.muted}
-                keyboardType="phone-pad"
-                returnKeyType="done"
-                onSubmitEditing={adicionar}
-              />
-              <Text style={styles.dica}>
-                A pessoa entra no app com o próprio telefone (mesmo login por SMS) e passa a ver este perfil.
-              </Text>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.btnAdd,
-                  !podeAdicionar && styles.btnAddOff,
-                  pressed && podeAdicionar && styles.btnAddPressed,
-                ]}
-                onPress={adicionar}
-                disabled={!podeAdicionar}
-                accessibilityRole="button"
-                accessibilityLabel="Adicionar pessoa autorizada"
-                accessibilityState={{ disabled: !podeAdicionar, busy: enviando }}>
-                {enviando ? (
-                  <ActivityIndicator size="small" color={t.onBrand} />
-                ) : (
-                  <Ionicons name="person-add-outline" size={18} color={t.onBrand} />
-                )}
-                <Text style={styles.btnAddTxt}>{enviando ? 'Adicionando…' : 'Adicionar'}</Text>
-              </Pressable>
-            </View>
           </View>
 
           {/* Lista */}
           <View style={styles.secao}>
-            <Text style={styles.secaoTitulo}>Pessoas autorizadas</Text>
-
             {carregando ? (
               <View style={styles.estado}>
                 <ActivityIndicator color={t.brand} />
@@ -237,7 +342,7 @@ export default function ResponsaveisScreen() {
                 </View>
                 <Text style={styles.estadoTitulo}>Ninguém autorizado ainda</Text>
                 <Text style={styles.estadoTxt}>
-                  Adicione uma pessoa acima para que ela possa agendar consultas por você.
+                  Toque em “Adicionar novas pessoas” e escolha o que cada uma pode fazer por você.
                 </Text>
               </View>
             ) : (
@@ -261,36 +366,50 @@ export default function ResponsaveisScreen() {
 
                       {ocupado ? (
                         <ActivityIndicator size="small" color={t.brand} style={styles.acaoSpinner} />
-                      ) : !r.ativo ? (
-                        // Inativo → reativar (devolve o acesso).
-                        <Pressable
-                          style={({ pressed }) => [styles.pill, styles.pillBrand, pressed && styles.pillBrandPressed]}
-                          onPress={() => alternarSituacao(r)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Reativar ${r.nome}`}>
-                          <Ionicons name="refresh" size={15} color={t.brandDeep} />
-                          <Text style={styles.pillBrandTxt}>Reativar</Text>
-                        </Pressable>
-                      ) : r.podeExcluir ? (
-                        // Ativo e sem lançamentos → excluir de vez.
-                        <Pressable
-                          style={({ pressed }) => [styles.remover, pressed && styles.removerPressed]}
-                          onPress={() => confirmarRemocao(r)}
-                          hitSlop={8}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Excluir ${r.nome}`}>
-                          <Ionicons name="trash-outline" size={19} color={PERIGO} />
-                        </Pressable>
                       ) : (
-                        // Ativo com lançamentos → só inativar (preserva o histórico).
-                        <Pressable
-                          style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
-                          onPress={() => confirmarInativacao(r)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Inativar ${r.nome}`}>
-                          <Ionicons name="pause-circle-outline" size={15} color={t.muted} />
-                          <Text style={styles.pillTxt}>Inativar</Text>
-                        </Pressable>
+                        <View style={styles.acoes}>
+                          {/* Editar: nome, telefone, data e permissões (CPF fica fixo). */}
+                          <Pressable
+                            style={({ pressed }) => [styles.editar, pressed && styles.editarPressed]}
+                            onPress={() => abrirEdicao(r)}
+                            hitSlop={6}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Editar ${r.nome}`}>
+                            <Ionicons name="create-outline" size={19} color={t.brandDeep} />
+                          </Pressable>
+
+                          {!r.ativo ? (
+                            // Inativo → reativar (devolve o acesso).
+                            <Pressable
+                              style={({ pressed }) => [styles.pill, styles.pillBrand, pressed && styles.pillBrandPressed]}
+                              onPress={() => alternarSituacao(r)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Reativar ${r.nome}`}>
+                              <Ionicons name="refresh" size={15} color={t.brandDeep} />
+                              <Text style={styles.pillBrandTxt}>Reativar</Text>
+                            </Pressable>
+                          ) : r.podeExcluir ? (
+                            // Ativo e sem lançamentos → excluir de vez.
+                            <Pressable
+                              style={({ pressed }) => [styles.remover, pressed && styles.removerPressed]}
+                              onPress={() => confirmarRemocao(r)}
+                              hitSlop={8}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Excluir ${r.nome}`}>
+                              <Ionicons name="trash-outline" size={19} color={PERIGO} />
+                            </Pressable>
+                          ) : (
+                            // Ativo com lançamentos → só inativar (preserva o histórico).
+                            <Pressable
+                              style={({ pressed }) => [styles.pill, pressed && styles.pillPressed]}
+                              onPress={() => confirmarInativacao(r)}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Inativar ${r.nome}`}>
+                              <Ionicons name="pause-circle-outline" size={15} color={t.muted} />
+                              <Text style={styles.pillTxt}>Inativar</Text>
+                            </Pressable>
+                          )}
+                        </View>
                       )}
                     </View>
                   );
@@ -299,6 +418,150 @@ export default function ResponsaveisScreen() {
             )}
           </View>
         </ScrollView>
+
+        {/* Botão flutuante para cadastrar (abre o mesmo modal, em modo "adicionar"). */}
+        {!carregando && !erro && (
+          <Pressable
+            style={({ pressed }) => [styles.fab, { bottom: insets.bottom + 16 }, pressed && styles.fabPressed]}
+            onPress={abrirAdicao}
+            accessibilityRole="button"
+            accessibilityLabel="Adicionar novas pessoas">
+            <Ionicons name="person-add" size={20} color={t.onBrand} />
+            <Text style={styles.fabTxt}>Adicionar novas pessoas</Text>
+          </Pressable>
+        )}
+
+        {/* Cadastro/edição de pessoa. No adicionar o CPF é editável; no editar fica travado. */}
+        <Modal
+          visible={edVisivel}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={fecharEdicao}>
+          <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalCabecalho}>
+                <Text style={styles.modalTitulo}>{adicionando ? 'Adicionar pessoa' : 'Editar pessoa'}</Text>
+                <Pressable
+                  style={styles.modalFechar}
+                  onPress={fecharEdicao}
+                  disabled={edSalvando}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fechar">
+                  <Ionicons name="close" size={20} color={t.muted} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                contentContainerStyle={styles.modalScroll}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}>
+                <Text style={styles.label}>Nome</Text>
+                <TextInput
+                  style={styles.input}
+                  value={edNome}
+                  onChangeText={setEdNome}
+                  placeholder="Nome da pessoa"
+                  placeholderTextColor={t.muted}
+                  autoCapitalize="words"
+                  maxLength={120}
+                  editable={!edSalvando}
+                />
+
+                <Text style={[styles.label, styles.labelEspaco]}>CPF</Text>
+                {adicionando ? (
+                  <TextInput
+                    style={styles.input}
+                    value={fmtCpf(edCpf)}
+                    onChangeText={(v) => setEdCpf(soDigitos(v).slice(0, 11))}
+                    placeholder="000.000.000-00"
+                    placeholderTextColor={t.muted}
+                    keyboardType="number-pad"
+                    inputMode="numeric"
+                    maxLength={14}
+                    editable={!edSalvando}
+                  />
+                ) : (
+                  <>
+                    <View style={styles.inputTravado}>
+                      <Text style={styles.inputTravadoTxt}>{fmtCpf(edCpf)}</Text>
+                      <Ionicons name="lock-closed" size={15} color={t.muted} />
+                    </View>
+                    <Text style={styles.cpfNota}>O CPF não pode ser alterado.</Text>
+                  </>
+                )}
+
+                <Text style={[styles.label, styles.labelEspaco]}>Data de nascimento</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fmtData(edData)}
+                  onChangeText={(v) => setEdData(soDigitos(v).slice(0, 8))}
+                  placeholder="00/00/0000"
+                  placeholderTextColor={t.muted}
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={10}
+                  editable={!edSalvando}
+                />
+
+                <Text style={[styles.label, styles.labelEspaco]}>Telefone (com DDD)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={fmtTelefone(edTelefone)}
+                  onChangeText={(v) => setEdTelefone(soDigitos(v).slice(0, 11))}
+                  placeholder="(11) 98888-1111"
+                  placeholderTextColor={t.muted}
+                  keyboardType="phone-pad"
+                  editable={!edSalvando}
+                />
+
+                <Text style={[styles.label, styles.labelEspaco]}>O que esta pessoa pode fazer</Text>
+                {adicionando && (
+                  <Text style={styles.permAjuda}>
+                    Toque para escolher o acesso de cada área. Começa tudo em “Sem acesso”.
+                  </Text>
+                )}
+                <MatrizPermissoes
+                  permissoes={edPermissoes}
+                  onChange={(f, n) => setEdPermissoes((p) => ({ ...p, [f]: n }))}
+                  desabilitado={edSalvando}
+                  styles={styles}
+                />
+                {adicionando && (
+                  <Text style={styles.dica}>
+                    A pessoa entra no app com o próprio CPF (mesmo login por SMS) e passa a ver este perfil.
+                  </Text>
+                )}
+              </ScrollView>
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.btnAdd,
+                  !podeSalvar && styles.btnAddOff,
+                  pressed && podeSalvar && styles.btnAddPressed,
+                ]}
+                onPress={salvar}
+                disabled={!podeSalvar}
+                accessibilityRole="button"
+                accessibilityLabel={adicionando ? 'Adicionar pessoa' : 'Salvar alterações'}
+                accessibilityState={{ disabled: !podeSalvar, busy: edSalvando }}>
+                {edSalvando ? (
+                  <ActivityIndicator size="small" color={t.onBrand} />
+                ) : (
+                  <Ionicons
+                    name={adicionando ? 'person-add-outline' : 'checkmark-circle-outline'}
+                    size={18}
+                    color={t.onBrand}
+                  />
+                )}
+                <Text style={styles.btnAddTxt}>
+                  {edSalvando ? (adicionando ? 'Adicionando…' : 'Salvando…') : adicionando ? 'Adicionar' : 'Salvar'}
+                </Text>
+              </Pressable>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
+        </>
       )}
     </View>
   );
@@ -307,7 +570,7 @@ export default function ResponsaveisScreen() {
 const criarEstilos = (t: Tema) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: t.bg },
-    content: { padding: 20, paddingBottom: 48 },
+    content: { padding: 20, paddingBottom: 108 },
     aviso: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -321,15 +584,6 @@ const criarEstilos = (t: Tema) =>
     avisoTxt: { flex: 1, fontSize: 13, color: t.muted, lineHeight: 19 },
     avisoForte: { fontWeight: '800', color: t.brandDeep },
     secao: { marginBottom: 20 },
-    secaoTitulo: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: t.muted,
-      textTransform: 'uppercase',
-      letterSpacing: 0.6,
-      marginBottom: 10,
-      marginLeft: 4,
-    },
     card: {
       backgroundColor: t.surface,
       borderRadius: 18,
@@ -446,6 +700,104 @@ const criarEstilos = (t: Tema) =>
       backgroundColor: t.brand,
     },
     estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+    // Ações de cada pessoa na lista (Editar + situação).
+    acoes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editar: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.brandTint,
+    },
+    editarPressed: { backgroundColor: t.brandTintStrong },
+
+    // Matriz de permissões (uma linha por funcionalidade + botões segmentados de nível).
+    permAjuda: { fontSize: 12, color: t.muted, lineHeight: 17, marginTop: 2, marginBottom: 4 },
+    matriz: { marginTop: 6 },
+    permLinha: { paddingVertical: 12 },
+    permLinhaBorda: { borderTopWidth: 1, borderTopColor: t.line },
+    permRotulo: { fontSize: 14, fontWeight: '700', color: t.ink, marginBottom: 8 },
+    seg: { flexDirection: 'row', gap: 6 },
+    segBtn: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: t.line,
+      backgroundColor: t.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+      paddingVertical: 8,
+    },
+    segBtnSel: { borderColor: t.brand, backgroundColor: t.brand },
+    segBtnPressed: { backgroundColor: t.line },
+    segBtnTxt: { fontSize: 12.5, fontWeight: '700', color: t.muted, textAlign: 'center' },
+    segBtnTxtSel: { color: t.onBrand },
+
+    // Modal de edição.
+    backdrop: {
+      flex: 1,
+      backgroundColor: alpha(t.brandPine, 0.55),
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 420,
+      maxHeight: '88%',
+      backgroundColor: t.surface,
+      borderRadius: 24,
+      padding: 22,
+    },
+    modalCabecalho: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    modalTitulo: { fontSize: 18, fontWeight: '800', color: t.ink, letterSpacing: -0.3 },
+    modalFechar: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.bg,
+    },
+    modalScroll: { paddingTop: 12, paddingBottom: 4 },
+    inputTravado: {
+      height: 48,
+      borderWidth: 1,
+      borderColor: t.line,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      backgroundColor: t.bg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      opacity: 0.75,
+    },
+    inputTravadoTxt: { fontSize: 15, color: t.muted },
+    cpfNota: { fontSize: 11.5, color: t.muted, marginTop: 6 },
+
+    // Botão flutuante (FAB estendido) para abrir o modal de cadastro.
+    fab: {
+      position: 'absolute',
+      right: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      height: 54,
+      paddingHorizontal: 20,
+      borderRadius: 27,
+      backgroundColor: t.brand,
+      shadowColor: '#000',
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    fabPressed: { backgroundColor: t.brandDeep },
+    fabTxt: { color: t.onBrand, fontSize: 15, fontWeight: '800' },
   });
 
 /** Fundo bem suave do vermelho de remover (para o estado pressionado). */

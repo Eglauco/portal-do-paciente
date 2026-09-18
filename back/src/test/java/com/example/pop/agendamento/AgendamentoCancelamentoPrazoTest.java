@@ -32,6 +32,8 @@ class AgendamentoCancelamentoPrazoTest {
 
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
     private static final String TEL = "11955558888";
+    private static final String CPF = "10000000050";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
     private MeusAgendamentosController meuController;
@@ -58,13 +60,14 @@ class AgendamentoCancelamentoPrazoTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> {
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> {
             apagarAgendamentos(p.getId());
             pacienteRepository.deleteById(p.getId());
         });
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente Prazo", TEL), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-prazo")).token());
+        jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-prazo", TEL)).token());
         // Procedimento com prazo de 24h de antecedência.
         procedimentoId = procedimentoRepository.save(new Procedimento(null, "Proc Prazo Teste", null, 24, 0)).getId();
     }

@@ -69,13 +69,12 @@ class PacienteControllerTest {
     void criaCompletoNormalizaEValida() {
         limparResiduos("11988880001", "52998224725");
         Paciente p = controller.criar(new PacienteRequest(
-                "Paciente Completo", "(11) 98888-0001", "COD-INT-A", "PRONT-A",
+                "Paciente Completo", "COD-INT-A", "PRONT-A",
                 Sexo.FEMININO, LocalDate.of(1990, 5, 20), "12.345.678-9", CPF_A,
                 "Mãe Teste", "Pai Teste", "Rua A", "100", "Centro", "São Paulo", "sp",
                 "01001-000", "Apto 1", "Fulano@Email.com", CNS_OK,
                 List.of("(11) 90000-0002", "11900000002", "   "), List.of(), List.of()), null);
         try {
-            assertEquals("11988880001", p.getTelefone());
             assertEquals("52998224725", p.getCpf(), "CPF normalizado (só dígitos)");
             assertEquals("SP", p.getUf(), "UF em maiúsculas");
             assertEquals("fulano@email.com", p.getEmail(), "e-mail em minúsculas");
@@ -98,8 +97,9 @@ class PacienteControllerTest {
         limparResiduos("11955550001", null);
         // Cria com 2 responsáveis válidos + 1 linha em branco (deve ser ignorada).
         Paciente criado = controller.criar(new PacienteRequest(
-                "Paciente Resp", "11955550001", null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null,
+                "Paciente Resp", null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null,
+                List.of("11955550001"),
                 List.of(
                         new PacienteRequest.ResponsavelRequest(null, "Maria Mãe", "(11) 98888-1111"),
                         new PacienteRequest.ResponsavelRequest(null, "   ", "irrelevante"),
@@ -112,8 +112,9 @@ class PacienteControllerTest {
 
             // Atualiza: renomeia Maria (mesmo id), remove João, adiciona Ana.
             Paciente atualizado = controller.atualizar(criado.getId(), new PacienteRequest(
-                    "Paciente Resp", "11955550001", null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, null, null, null, null, null,
+                    "Paciente Resp", null, null, null, null, null, null, null, null,
+                    null, null, null, null, null, null, null, null, null,
+                    List.of("11955550001"),
                     List.of(
                             new PacienteRequest.ResponsavelRequest(maria.getId(), "Maria Silva", "11988881111"),
                             new PacienteRequest.ResponsavelRequest(null, "Ana Avó", "11977772222")), List.of()), null).getBody();
@@ -136,8 +137,9 @@ class PacienteControllerTest {
         // Dois responsáveis com o mesmo telefone (um mascarado) → 409.
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.criar(new PacienteRequest(
-                        "Paciente Dup", "11955550002", null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null, null,
+                        "Paciente Dup", null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null, null, null, null,
+                        List.of("11955550002"),
                         List.of(
                                 new PacienteRequest.ResponsavelRequest(null, "Ana", "11988887777"),
                                 new PacienteRequest.ResponsavelRequest(null, "Bia", "(11) 98888-7777")),
@@ -151,8 +153,9 @@ class PacienteControllerTest {
         // Responsável com o telefone do próprio paciente → 422 (tem de ser outra pessoa).
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
                 () -> controller.criar(new PacienteRequest(
-                        "Paciente Igual", "11955550003", null, null, null, null, null, null, null, null,
-                        null, null, null, null, null, null, null, null, null, null,
+                        "Paciente Igual", null, null, null, null, null, null, null, null,
+                        null, null, null, null, null, null, null, null, null,
+                        List.of("11955550003"),
                         List.of(new PacienteRequest.ResponsavelRequest(null, "Clone", "11955550003")),
                         List.of()), null));
         assertEquals(422, ex.getStatusCode().value(), "responsável com o telefone do próprio paciente");
@@ -187,13 +190,13 @@ class PacienteControllerTest {
 
     /** Request com nome + (opcional) cpf/cns e nada mais. */
     private static PacienteRequest minimo(String nome, String cpf, String cns) {
-        return new PacienteRequest(nome, null, null, null, null, null, null, cpf, null, null, null, null, null, null,
-                null, null, null, null, cns, null, null, null);
+        return new PacienteRequest(nome, null, null, null, null, null, cpf, null, null, null, null, null, null,
+                null, null, null, null, cns, List.of("11900000000"), null, null);
     }
 
     private void limparResiduos(String telefone, String cpf) {
         if (telefone != null) {
-            repository.findByTelefone(telefone).ifPresent(x -> controller.excluir(x.getId()));
+            repository.buscarPorTelefoneNaLista(telefone).forEach(x -> controller.excluir(x.getId()));
         }
         if (cpf != null) {
             controller.listar(null, null, cpf, null, "TODOS", null, 0, 100).content()

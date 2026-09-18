@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:564591688396:android:79aeb1319c523d4cce6069",
+        "android_client_info": {
+          "package_name": "br.com.eglauco.integrasaude"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSsK4qvUtmLScvpsqURmgX0OmPoXuC1AM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:564591688396:android:5db60819fd27e017ce6069",
         "android_client_info": {
           "package_name": "com.eglauco.portaldopaciente"

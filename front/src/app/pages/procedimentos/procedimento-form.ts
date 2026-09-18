@@ -7,10 +7,34 @@ import { Lembrete } from './lembrete.model';
 import { LembreteService } from './lembrete.service';
 import { ProcedimentoService } from './procedimento.service';
 
+/** Abas do procedimento (na edição): dados + lembretes. */
+type AbaId = 'dados' | 'lembretes';
+
 @Component({
   selector: 'app-procedimento-form',
   imports: [ReactiveFormsModule],
   templateUrl: './procedimento-form.html',
+  styles: [`
+    /* Abas do procedimento: separam Dados / Lembretes (uma visível por vez). */
+    .form-tabs {
+      display: flex; flex-wrap: wrap; gap: 0.35rem;
+      margin-bottom: 1.25rem; border-bottom: 1px solid var(--line);
+    }
+    .form-tab {
+      position: relative; display: inline-flex; align-items: center; gap: 0.4rem;
+      padding: 0.6rem 0.95rem; border: none; background: none; cursor: pointer;
+      font-size: 0.9rem; font-weight: 600; color: var(--muted);
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+      border-radius: 0.4rem 0.4rem 0 0;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .form-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--brand) 8%, transparent); }
+    .form-tab--ativa { color: var(--brand-deep); border-bottom-color: var(--brand); }
+    @media (max-width: 640px) {
+      .form-tabs { gap: 0; }
+      .form-tab { flex: 1 1 auto; justify-content: center; padding: 0.55rem 0.5rem; font-size: 0.82rem; }
+    }
+  `],
 })
 export class ProcedimentoForm implements PodeSair {
   private readonly service = inject(ProcedimentoService);
@@ -38,6 +62,12 @@ export class ProcedimentoForm implements PodeSair {
   protected readonly salvando = signal(false);
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
+
+  /** Aba ativa (só aparece na edição): dados do procedimento ou lembretes. */
+  protected readonly abaAtiva = signal<AbaId>('dados');
+  protected selecionarAba(id: AbaId): void {
+    this.abaAtiva.set(id);
+  }
 
   protected readonly confirmacao = signal<string | null>(null);
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;

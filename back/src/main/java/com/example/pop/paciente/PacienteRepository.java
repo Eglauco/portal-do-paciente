@@ -10,13 +10,14 @@ import org.springframework.data.repository.query.Param;
 
 public interface PacienteRepository extends JpaRepository<Paciente, Long> {
 
-    Optional<Paciente> findByTelefone(String telefone);
+    /** Paciente pelo CPF (dígitos) — a chave de identidade do login. */
+    Optional<Paciente> findByCpf(String cpf);
 
-    boolean existsByTelefone(String telefone);
+    /** Pacientes cujo número está na lista de telefones — usado na limpeza de testes (telefone não é chave). */
+    @Query("select p from Paciente p join p.telefonesAdicionais t where t = :numero")
+    java.util.List<Paciente> buscarPorTelefoneNaLista(@Param("numero") String numero);
 
     // Checagens de unicidade (ignoram o próprio registro na edição, via id != :id).
-    boolean existsByTelefoneAndIdNot(String telefone, Long id);
-
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
     boolean existsByCnsAndIdNot(String cns, Long id);

@@ -41,6 +41,8 @@ import jakarta.servlet.Filter;
 class MeusEndpointsMvcTest {
 
     private static final String TEL = "11955554444";
+    private static final String CPF = "10000000040";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
     private WebApplicationContext context;
@@ -70,10 +72,15 @@ class MeusEndpointsMvcTest {
     @BeforeEach
     void setup() {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente Meu", TEL), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> {
+            p.setCpf(CPF);
+            p.setDataNascimento(DOB);
+            pacienteRepository.save(p);
+        });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-meu")).token();
+        token = authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-meu", TEL)).token();
     }
 
     @AfterEach

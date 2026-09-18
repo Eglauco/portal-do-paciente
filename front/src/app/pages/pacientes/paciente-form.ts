@@ -39,6 +39,8 @@ type PermissoesForm = FormGroup<Record<FuncionalidadeApp, FormControl<NivelAcess
 type ResponsavelForm = FormGroup<{
   id: FormControl<number | null>;
   nome: FormControl<string>;
+  /** CPF (só dígitos); obrigatório. */
+  cpf: FormControl<string>;
   telefone: FormControl<string>;
   /** Data de nascimento (DD/MM/AAAA); valida a idade mínima p/ comentar na rede social. */
   dataNascimento: FormControl<string>;
@@ -48,6 +50,9 @@ type ResponsavelForm = FormGroup<{
   /** Metadado (não editável): tem lançamentos → não pode remover, só inativar. */
   temLancamentos: FormControl<boolean>;
 }>;
+
+/** Abas do cadastro (dividem o formulário longo em seções). */
+type AbaId = 'pessoais' | 'contato' | 'endereco' | 'responsaveis' | 'unidades';
 
 const SEXOS = [
   { value: 'MASCULINO', label: 'Masculino' },
@@ -60,6 +65,13 @@ const UFS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA',
   'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
 ];
+
+/** Exige ao menos um telefone preenchido na lista (strings vazias/whitespace não contam). */
+function aoMenosUmTelefoneValidator(control: AbstractControl): ValidationErrors | null {
+  const array = control as FormArray<FormControl<string>>;
+  const algumPreenchido = array.controls.some((c) => ((c.value ?? '') as string).trim().length > 0);
+  return algumPreenchido ? null : { telefoneObrigatorio: true };
+}
 
 /** Data no formato dd/mm/aaaa: opcional, mas se preenchida precisa ser válida e não futura. */
 function dataNascimentoValidator(control: AbstractControl): ValidationErrors | null {
@@ -93,6 +105,44 @@ export class PacienteForm implements PodeSair {
   protected readonly sexos = SEXOS;
   protected readonly ufs = UFS;
 
+  /** Abas do formulário (na ordem exibida). */
+  protected readonly abas: { id: AbaId; label: string }[] = [
+    { id: 'pessoais', label: 'Dados pessoais' },
+    { id: 'contato', label: 'Contato' },
+    { id: 'endereco', label: 'Endereço' },
+    { id: 'responsaveis', label: 'Responsáveis' },
+    { id: 'unidades', label: 'Unidades de acesso' },
+  ];
+  protected readonly abaAtiva = signal<AbaId>('pessoais');
+
+  protected selecionarAba(id: AbaId): void {
+    this.abaAtiva.set(id);
+  }
+
+  /** Controles (com validação) de cada aba — para sinalizar erro e pular até a aba certa. */
+  private controlesDaAba(aba: AbaId): AbstractControl[] {
+    switch (aba) {
+      case 'pessoais':
+        return [
+          this.form.controls.nome,
+          this.form.controls.dataNascimento,
+          this.form.controls.cpf,
+          this.form.controls.cns,
+        ];
+      case 'contato':
+        return [this.form.controls.email, this.form.controls.telefonesAdicionais];
+      case 'responsaveis':
+        return [this.form.controls.responsaveis];
+      default:
+        return []; // Endereço e Unidades não têm campos obrigatórios
+    }
+  }
+
+  /** A aba tem algum campo inválido já tocado/editado? (mostra o ponto de alerta na aba). */
+  protected abaComErro(aba: AbaId): boolean {
+    return this.controlesDaAba(aba).some((c) => c.invalid && (c.touched || c.dirty));
+  }
+
   protected readonly form = new FormGroup({
     codigoIntegracao: new FormControl('', { nonNullable: true }),
     prontuario: new FormControl('', { nonNullable: true }),
@@ -101,15 +151,17 @@ export class PacienteForm implements PodeSair {
       validators: [Validators.required, Validators.minLength(3)],
     }),
     sexo: new FormControl<string | null>(null),
-    dataNascimento: new FormControl('', { nonNullable: true, validators: [dataNascimentoValidator] }),
+    dataNascimento: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, dataNascimentoValidator],
+    }),
     rg: new FormControl('', { nonNullable: true }),
-    cpf: new FormControl('', { nonNullable: true }),
+    cpf: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     cns: new FormControl('', { nonNullable: true }),
     nomeMae: new FormControl('', { nonNullable: true }),
     nomePai: new FormControl('', { nonNullable: true }),
     email: new FormControl('', { nonNullable: true, validators: [Validators.email] }),
-    telefone: new FormControl('', { nonNullable: true }),
-    telefonesAdicionais: new FormArray<FormControl<string>>([]),
+    telefonesAdicionais: new FormArray<FormControl<string>>([], aoMenosUmTelefoneValidator),
     responsaveis: new FormArray<ResponsavelForm>([]),
     cep: new FormControl('', { nonNullable: true }),
     rua: new FormControl('', { nonNullable: true }),
@@ -162,6 +214,9 @@ export class PacienteForm implements PodeSair {
     if (idParam) {
       this.editando.set(true);
       this.codigo.set(Number(idParam));
+    } else {
+      // Novo paciente: começa com um campo de telefone em branco (a lista exige ≥1).
+      this.setTelefonesAdicionais([]);
     }
     // Só carrega no navegador (evita chamada sem token no SSR/prerender).
     afterNextRender(() => {
@@ -194,6 +249,17 @@ export class PacienteForm implements PodeSair {
   private setTelefonesAdicionais(numeros: string[]): void {
     this.telefonesAdicionais.clear();
     numeros.forEach((n) => this.telefonesAdicionais.push(new FormControl(n, { nonNullable: true })));
+    // A regra exige ≥1 telefone: garante um campo em branco quando a lista fica vazia
+    // (novo cadastro ou cadastro legado sem telefones).
+    if (this.telefonesAdicionais.length === 0) {
+      this.telefonesAdicionais.push(new FormControl('', { nonNullable: true }));
+    }
+  }
+
+  /** Erro "informe ao menos um telefone" (após toque/edição), no padrão dos demais campos. */
+  protected telefonesInvalido(): boolean {
+    const array = this.telefonesAdicionais;
+    return array.hasError('telefoneObrigatorio') && (array.touched || array.dirty);
   }
 
   protected get responsaveis(): FormArray<ResponsavelForm> {
@@ -224,10 +290,14 @@ export class PacienteForm implements PodeSair {
         nonNullable: true,
         validators: [Validators.required, Validators.minLength(2)],
       }),
+      cpf: new FormControl(r.cpf ?? '', {
+        nonNullable: true,
+        validators: [Validators.required],
+      }),
       telefone: new FormControl(r.telefone ?? '', { nonNullable: true }),
       dataNascimento: new FormControl(this.isoParaData(r.dataNascimento ?? null), {
         nonNullable: true,
-        validators: [dataNascimentoValidator],
+        validators: [Validators.required, dataNascimentoValidator],
       }),
       permissoes: new FormGroup(controlesPermissoes),
       ativo: new FormControl(r.ativo ?? true, { nonNullable: true }),
@@ -291,6 +361,12 @@ export class PacienteForm implements PodeSair {
     return c.invalid && (c.touched || c.dirty);
   }
 
+  /** Erro de "CPF obrigatório" de uma linha de responsável (após toque/edição). */
+  protected responsavelCpfInvalido(indice: number): boolean {
+    const c = this.responsaveis.at(indice).controls.cpf;
+    return c.invalid && (c.touched || c.dirty);
+  }
+
   /** Erro de data de nascimento inválida de uma linha de responsável (após toque/edição). */
   protected responsavelDataInvalida(indice: number): boolean {
     const c = this.responsaveis.at(indice).controls.dataNascimento;
@@ -313,7 +389,6 @@ export class PacienteForm implements PodeSair {
           nomeMae: p.nomeMae ?? '',
           nomePai: p.nomePai ?? '',
           email: p.email ?? '',
-          telefone: p.telefone ?? '',
           cep: p.cep ?? '',
           rua: p.rua ?? '',
           numero: p.numero ?? '',
@@ -394,7 +469,6 @@ export class PacienteForm implements PodeSair {
     const texto = (v: string) => (v.trim() ? v.trim() : null);
     return {
       nome: f.nome.trim(),
-      telefone: texto(f.telefone),
       codigoIntegracao: texto(f.codigoIntegracao),
       prontuario: texto(f.prontuario),
       sexo: (f.sexo as PacienteEntrada['sexo']) ?? null,
@@ -419,6 +493,7 @@ export class PacienteForm implements PodeSair {
         .map((g) => ({
           id: g.controls.id.value ?? null,
           nome: (g.controls.nome.value ?? '').trim(),
+          cpf: (g.controls.cpf.value ?? '').trim(),
           telefone: (g.controls.telefone.value ?? '').trim() || null,
           dataNascimento: this.dataParaIso(g.controls.dataNascimento.value),
           permissoes: this.permissoesDoGrupo(g.controls.permissoes),
@@ -433,6 +508,9 @@ export class PacienteForm implements PodeSair {
     event.preventDefault();
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      // Leva o usuário até a primeira aba que tem pendência (o erro pode estar numa aba oculta).
+      const abaComPendencia = this.abas.find((a) => this.abaComErro(a.id));
+      if (abaComPendencia) this.selecionarAba(abaComPendencia.id);
       return;
     }
     this.salvando.set(true);

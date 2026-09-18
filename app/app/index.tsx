@@ -17,7 +17,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 
-/** Máscara de telefone BR "(00) 00000-0000" enquanto o paciente digita. */
+/** Máscara de CPF "000.000.000-00" enquanto o paciente digita. */
+function mascararCpf(valor: string): string {
+  const d = valor.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+/** Máscara de data "00/00/0000" (dd/mm/aaaa) enquanto o paciente digita. */
+function mascararData(valor: string): string {
+  const d = valor.replace(/\D/g, '').slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+}
+
+/** Máscara progressiva de telefone rumo a "(XX) XXXXX-XXXX" enquanto o paciente digita. */
 function mascararTelefone(valor: string): string {
   const d = valor.replace(/\D/g, '').slice(0, 11);
   if (d.length === 0) return '';
@@ -27,27 +44,41 @@ function mascararTelefone(valor: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
+/** Converte a data digitada "dd/mm/aaaa" para o ISO "AAAA-MM-DD" esperado pelo backend. */
+function dataParaIso(valor: string): string {
+  const d = valor.replace(/\D/g, '');
+  if (d.length !== 8) return '';
+  return `${d.slice(4, 8)}-${d.slice(2, 4)}-${d.slice(0, 2)}`;
+}
+
 export default function LoginScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const { solicitarCodigo, ativar } = useSessao();
 
-  const [etapa, setEtapa] = useState<'telefone' | 'codigo'>('telefone');
+  const [etapa, setEtapa] = useState<'cpf' | 'codigo'>('cpf');
   const [telefone, setTelefone] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [dataNascimento, setDataNascimento] = useState('');
+  const [telefoneMascarado, setTelefoneMascarado] = useState('');
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [entrando, setEntrando] = useState(false);
 
-  const telefoneValido = telefone.replace(/\D/g, '').length >= 10;
+  const cpfValido = cpf.replace(/\D/g, '').length === 11;
+  const dataValida = dataNascimento.replace(/\D/g, '').length === 8;
+  const telefoneValido = [10, 11].includes(telefone.replace(/\D/g, '').length);
+  const podeSolicitar = cpfValido && dataValida && telefoneValido && !enviando;
   const podeEntrar = codigo.length === 6 && !entrando;
 
   async function pedirCodigo() {
-    if (enviando || !telefoneValido) return;
+    if (enviando || !cpfValido || !dataValida || !telefoneValido) return;
     setErro(null);
     setEnviando(true);
     try {
-      await solicitarCodigo(telefone);
+      const mascarado = await solicitarCodigo(cpf, dataParaIso(dataNascimento), telefone);
+      setTelefoneMascarado(mascarado);
       setCodigo('');
       setEtapa('codigo');
     } catch (e) {
@@ -62,7 +93,7 @@ export default function LoginScreen() {
     setErro(null);
     setEntrando(true);
     try {
-      await ativar(telefone, codigo);
+      await ativar(cpf, dataParaIso(dataNascimento), codigo, telefone);
       // A navegação para "Selecionar Perfil" é feita pelo Navegacao (perfilSelecionado=false).
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
@@ -70,8 +101,8 @@ export default function LoginScreen() {
     }
   }
 
-  function voltarParaTelefone() {
-    setEtapa('telefone');
+  function voltarParaCpf() {
+    setEtapa('cpf');
     setCodigo('');
     setErro(null);
   }
@@ -109,14 +140,15 @@ export default function LoginScreen() {
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {etapa === 'telefone' ? (
+          {etapa === 'cpf' ? (
             <>
               <Text style={styles.title}>Entrar no aplicativo</Text>
               <Text style={styles.subtitle}>
-                Informe o telefone do seu cadastro. Enviaremos um código de acesso por SMS para confirmar que é você.
+                Informe seu telefone, CPF e a data de nascimento. Enviaremos um código de acesso por SMS para o
+                telefone do seu cadastro para confirmar que é você.
               </Text>
 
-              {/* Telefone */}
+              {/* Telefone (1ª trava de identidade) */}
               <Text style={styles.label}>Telefone</Text>
               <View style={styles.inputWrap}>
                 <Ionicons name="call-outline" size={20} color={t.muted} style={styles.inputIcon} />
@@ -127,15 +159,53 @@ export default function LoginScreen() {
                     setTelefone(mascararTelefone(valor));
                     if (erro) setErro(null);
                   }}
-                  placeholder="(11) 99999-0000"
+                  placeholder="(00) 00000-0000"
                   placeholderTextColor="#9AAAA5"
                   keyboardType="phone-pad"
-                  autoComplete="tel"
-                  inputMode="tel"
                   maxLength={15}
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* CPF (2ª trava de identidade) */}
+              <Text style={[styles.label, styles.labelEspaco]}>CPF</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="card-outline" size={20} color={t.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={cpf}
+                  onChangeText={(valor) => {
+                    setCpf(mascararCpf(valor));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="000.000.000-00"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={14}
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* Data de nascimento (3ª trava de identidade) */}
+              <Text style={[styles.label, styles.labelEspaco]}>Data de nascimento</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="calendar-outline" size={20} color={t.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={dataNascimento}
+                  onChangeText={(valor) => {
+                    setDataNascimento(mascararData(valor));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="00/00/0000"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={10}
                   returnKeyType="done"
                   onSubmitEditing={() => {
-                    if (telefoneValido) pedirCodigo();
+                    if (podeSolicitar) pedirCodigo();
                   }}
                 />
               </View>
@@ -151,13 +221,13 @@ export default function LoginScreen() {
                 style={({ pressed }) => [
                   styles.primaryBtn,
                   pressed && styles.primaryBtnPressed,
-                  (!telefoneValido || enviando) && styles.primaryBtnOff,
+                  !podeSolicitar && styles.primaryBtnOff,
                 ]}
                 onPress={pedirCodigo}
-                disabled={!telefoneValido || enviando}
+                disabled={!podeSolicitar}
                 accessibilityRole="button"
                 accessibilityLabel="Receber código"
-                accessibilityState={{ busy: enviando, disabled: !telefoneValido || enviando }}>
+                accessibilityState={{ busy: enviando, disabled: !podeSolicitar }}>
                 {enviando ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
@@ -168,20 +238,20 @@ export default function LoginScreen() {
               <View style={styles.foot}>
                 <Ionicons name="information-circle-outline" size={18} color={t.muted} />
                 <Text style={styles.footText}>
-                  Telefone não cadastrado? Procure a recepção da sua unidade de saúde.
+                  CPF não cadastrado? Procure a recepção da sua unidade de saúde.
                 </Text>
               </View>
             </>
           ) : (
             <>
-              <Pressable style={styles.backRow} onPress={voltarParaTelefone} accessibilityRole="button">
+              <Pressable style={styles.backRow} onPress={voltarParaCpf} accessibilityRole="button">
                 <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
-                <Text style={styles.backTxt}>Trocar telefone</Text>
+                <Text style={styles.backTxt}>Trocar CPF</Text>
               </Pressable>
 
               <Text style={styles.title}>Digite o código</Text>
               <Text style={styles.subtitle}>
-                Enviamos um código por SMS para {telefone}.
+                Enviamos um código por SMS para {telefoneMascarado || 'o telefone do seu cadastro'}.
               </Text>
 
               <Text style={styles.label}>Código de acesso</Text>
@@ -336,6 +406,9 @@ const criarEstilos = (t: Tema) =>
     fontWeight: '600',
     color: t.ink,
     marginBottom: 8,
+  },
+  labelEspaco: {
+    marginTop: 6,
   },
   inputWrap: {
     flexDirection: 'row',

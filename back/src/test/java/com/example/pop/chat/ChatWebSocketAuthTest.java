@@ -38,6 +38,8 @@ import com.example.pop.verificacao.VerificacaoService;
 class ChatWebSocketAuthTest {
 
     private static final String TEL = "11944443333";
+    private static final String CPF = "10000000060";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
     private ChatChannelInterceptor interceptor;
@@ -60,13 +62,14 @@ class ChatWebSocketAuthTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Paciente WS", TEL), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-ws")).token();
+        token = authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-ws", TEL)).token();
         // Conta do app criada pela ativação (o token novo carrega o cid): usada para
         // montar o principal como o interceptor faz, exercitando a revalidação por conta.
-        contaId = contaRepository.findByTelefone(TEL).orElseThrow().getId();
+        contaId = contaRepository.findByCpf(CPF).orElseThrow().getId();
     }
 
     @AfterEach

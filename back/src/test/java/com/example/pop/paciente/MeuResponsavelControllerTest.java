@@ -3,12 +3,14 @@ package com.example.pop.paciente;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +31,12 @@ import com.example.pop.verificacao.VerificacaoService;
 class MeuResponsavelControllerTest {
 
     private static final String TEL = "11955557777";
+    private static final String CPF = "10000000030";
+    // CPFs válidos (dígito verificador) para os responsáveis do teste.
+    private static final String CPF_RESP_A = "52998224725";
+    private static final String CPF_RESP_B = "11144477735";
+    private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
+    private static final java.time.LocalDate DOB_RESP = java.time.LocalDate.of(1980, 5, 10);
 
     @Autowired
     private MeuResponsavelController controller;
@@ -55,10 +63,15 @@ class MeuResponsavelControllerTest {
 
     @BeforeEach
     void setup() {
-        pacienteRepository.findByTelefone(TEL).ifPresent(p -> pacienteRepository.deleteById(p.getId()));
+        pacienteRepository.buscarPorTelefoneNaLista(TEL).forEach(p -> pacienteRepository.deleteById(p.getId()));
         pacienteId = pacienteController.criar(new PacienteRequest("Ana Titular", TEL), null).getId();
+        pacienteRepository.findById(pacienteId).ifPresent(p -> {
+            p.setCpf(CPF);
+            p.setDataNascimento(DOB);
+            pacienteRepository.save(p);
+        });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
-        String token = authController.ativar(new AtivarPacienteRequest(TEL, "000000", "dev-resp")).token();
+        String token = authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-resp", TEL)).token();
         jwt = jwtDecoder.decode(token);
     }
 
@@ -70,15 +83,19 @@ class MeuResponsavelControllerTest {
     @Test
     void adicionaComEscopoDeAgendamentoListaERemove() {
         MeuResponsavelResponse criado = controller
-                .adicionar(jwt, new MeuResponsavelRequest("Maria Ajuda", "(11) 98888-1111")).getBody();
+                .adicionar(jwt, new MeuResponsavelRequest("Maria Ajuda", CPF_RESP_A, DOB_RESP, "(11) 98888-1111",
+                        Map.of(FuncionalidadeApp.AGENDAMENTOS, NivelAcessoResponsavel.VISUALIZAR_LANCAR,
+                                FuncionalidadeApp.CHAT, NivelAcessoResponsavel.VISUALIZAR)))
+                .getBody();
         assertNotNull(criado);
         assertEquals("11988881111", criado.telefone(), "telefone normalizado (só dígitos)");
 
-        // Escopo TRAVADO no servidor: só AGENDAMENTOS = VISUALIZAR_LANCAR, e origem PACIENTE.
+        // As permissões escolhidas pelo paciente são aplicadas (origem PACIENTE), sem trava fixa em Agendamentos.
         Responsavel r = responsavelRepository.findById(criado.id()).orElseThrow();
         assertEquals(OrigemResponsavel.PACIENTE, r.getOrigem());
-        assertEquals(1, r.getPermissoes().size(), "somente uma funcionalidade liberada");
+        assertEquals(2, r.getPermissoes().size(), "as duas funcionalidades escolhidas");
         assertEquals(NivelAcessoResponsavel.VISUALIZAR_LANCAR, r.getPermissoes().get(FuncionalidadeApp.AGENDAMENTOS));
+        assertEquals(NivelAcessoResponsavel.VISUALIZAR, r.getPermissoes().get(FuncionalidadeApp.CHAT));
 
         assertTrue(controller.listar(jwt).stream().anyMatch(x -> x.id().equals(criado.id())));
 
@@ -96,7 +113,7 @@ class MeuResponsavelControllerTest {
 
         // Dedup: mesmo telefone → 409.
         assertEquals(409, assertThrows(ResponseStatusException.class,
-                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Outro", "11988881111")))
+                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Outro", CPF_RESP_B, DOB_RESP, "11988881111", Map.of())))
                 .getStatusCode().value());
 
         // Sem lançamentos → remove de fato; some da lista.
@@ -116,7 +133,7 @@ class MeuResponsavelControllerTest {
     @Test
     void comLancamentosBloqueiaExclusaoEInativaReativaComAuditoria() {
         MeuResponsavelResponse criado = controller
-                .adicionar(jwt, new MeuResponsavelRequest("Bia Ajuda", "(11) 97777-2222")).getBody();
+                .adicionar(jwt, new MeuResponsavelRequest("Bia Ajuda", CPF_RESP_A, DOB_RESP, "(11) 97777-2222", Map.of(FuncionalidadeApp.AGENDAMENTOS, NivelAcessoResponsavel.VISUALIZAR_LANCAR))).getBody();
         assertNotNull(criado);
         assertTrue(criado.ativo());
         assertTrue(criado.podeExcluir(), "recém-criado, sem lançamentos → pode excluir");
@@ -169,14 +186,46 @@ class MeuResponsavelControllerTest {
     @Test
     void naoPermiteAdicionarOProprioTelefone() {
         assertEquals(422, assertThrows(ResponseStatusException.class,
-                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Eu mesmo", TEL)))
+                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Eu mesmo", CPF_RESP_A, DOB_RESP, TEL, Map.of())))
                 .getStatusCode().value());
     }
 
     @Test
     void telefoneInvalidoEhRejeitado() {
         assertEquals(422, assertThrows(ResponseStatusException.class,
-                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Curto", "123")))
+                () -> controller.adicionar(jwt, new MeuResponsavelRequest("Curto", CPF_RESP_A, DOB_RESP, "123", Map.of())))
                 .getStatusCode().value());
+    }
+
+    @Test
+    void editarAlteraDadosEPermissoesComAuditoria() {
+        MeuResponsavelResponse criado = controller.adicionar(jwt,
+                new MeuResponsavelRequest("Carlos", CPF_RESP_A, DOB_RESP, "(11) 96666-1111",
+                        Map.of(FuncionalidadeApp.AGENDAMENTOS, NivelAcessoResponsavel.VISUALIZAR))).getBody();
+        assertNotNull(criado);
+
+        MeuResponsavelResponse editado = controller.editar(jwt, criado.id(),
+                new MeuResponsavelEditarRequest("Carlos Alberto", DOB_RESP, "(11) 95555-2222",
+                        Map.of(FuncionalidadeApp.CHAT, NivelAcessoResponsavel.VISUALIZAR_LANCAR,
+                                FuncionalidadeApp.PRONTUARIO, NivelAcessoResponsavel.VISUALIZAR)));
+        assertEquals("Carlos Alberto", editado.nome());
+        assertEquals("11955552222", editado.telefone(), "telefone atualizado e normalizado");
+        assertEquals(2, editado.permissoes().size(), "novas permissões substituem as anteriores");
+        assertEquals(NivelAcessoResponsavel.VISUALIZAR_LANCAR, editado.permissoes().get(FuncionalidadeApp.CHAT));
+        assertEquals(NivelAcessoResponsavel.VISUALIZAR, editado.permissoes().get(FuncionalidadeApp.PRONTUARIO));
+        assertNull(editado.permissoes().get(FuncionalidadeApp.AGENDAMENTOS), "Agendamentos foi retirado");
+
+        // Persistiu na entidade.
+        Responsavel r = responsavelRepository.findById(criado.id()).orElseThrow();
+        assertEquals("Carlos Alberto", r.getNome());
+        assertEquals(NivelAcessoResponsavel.VISUALIZAR_LANCAR, r.getPermissoes().get(FuncionalidadeApp.CHAT));
+
+        // Auditoria (LGPD): a edição vira um evento de ALTERAÇÃO do app (autor PACIENTE).
+        var logs = pacienteLogService.listar(pacienteId).stream()
+                .filter(l -> l.autor() == AutorLogPaciente.PACIENTE).toList();
+        assertTrue(logs.stream().anyMatch(l -> l.alteracoes().stream().anyMatch(
+                a -> "RESPONSAVEL".equals(a.campo()) && a.valorDepois() != null
+                        && a.valorDepois().contains("Carlos Alberto"))),
+                "linha 'Responsável alterado' auditada");
     }
 }

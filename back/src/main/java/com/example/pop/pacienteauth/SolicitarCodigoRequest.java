@@ -1,7 +1,13 @@
 package com.example.pop.pacienteauth;
 
-import jakarta.validation.constraints.NotBlank;
+import java.time.LocalDate;
 
-/** Pedido do paciente para receber o código de ativação por SMS. */
-public record SolicitarCodigoRequest(@NotBlank String telefone) {
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+/** Pedido do código por SMS: telefone + CPF + data de nascimento (travas de identidade). */
+public record SolicitarCodigoRequest(
+        @NotBlank String cpf,
+        @NotNull LocalDate dataNascimento,
+        @NotBlank String telefone) {
 }

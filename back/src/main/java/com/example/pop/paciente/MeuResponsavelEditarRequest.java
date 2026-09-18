@@ -8,13 +8,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Corpo para o paciente adicionar um responsável pelo app: nome + CPF (identidade de login) +
- * data de nascimento (2ª trava do login) + telefone (canal do OTP) + as permissões por
- * funcionalidade (o paciente tem controle total; ausência/SEM_ACESSO = sem acesso).
+ * Edição de uma pessoa autorizada pelo app: nome, data de nascimento, telefone e as permissões
+ * por funcionalidade. O CPF (identidade de login) NÃO é editável aqui.
  */
-public record MeuResponsavelRequest(
+public record MeuResponsavelEditarRequest(
         @NotBlank @Size(min = 2, max = 120) String nome,
-        @NotBlank @Size(max = 14) String cpf,
         @NotNull LocalDate dataNascimento,
         @NotBlank @Size(max = 20) String telefone,
         Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes) {

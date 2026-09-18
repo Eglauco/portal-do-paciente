@@ -16,7 +16,6 @@ import jakarta.validation.constraints.Size;
  */
 public record PacienteRequest(
         @NotBlank @Size(min = 3, max = 120) String nome,
-        @Size(max = 20) String telefone,
         @Size(max = 60) String codigoIntegracao,
         @Size(max = 60) String prontuario,
         Sexo sexo,
@@ -39,16 +38,17 @@ public record PacienteRequest(
         /** Ids das unidades de saúde que o paciente pode acessar (feed/chat/SAU). */
         List<Long> unidadeIds) {
 
-    /** Atalho (nome + telefone) usado em testes e cadastros mínimos. */
+    /** Atalho (nome + telefone) usado em testes e cadastros mínimos: o telefone entra na lista. */
     public PacienteRequest(String nome, String telefone) {
-        this(nome, telefone, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null);
+        // 17 nulos = codigoIntegracao..cns (posições 2-18); depois telefonesAdicionais, responsaveis, unidadeIds.
+        this(nome, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                telefone == null ? List.of() : List.of(telefone), null, null);
     }
 
-    /** Atalho (nome + telefone + unidades de acesso) usado em testes. */
+    /** Atalho (nome + telefone + unidades de acesso) usado em testes: o telefone entra na lista. */
     public PacienteRequest(String nome, String telefone, List<Long> unidadeIds) {
-        this(nome, telefone, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, unidadeIds);
+        this(nome, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                telefone == null ? List.of() : List.of(telefone), null, unidadeIds);
     }
 
     /**
@@ -60,6 +60,8 @@ public record PacienteRequest(
     public record ResponsavelRequest(
             Long id,
             @NotBlank @Size(min = 2, max = 120) String nome,
+            /** CPF do responsável (identidade de login dele). Obrigatório na UI; validado se preenchido. */
+            @Size(max = 14) String cpf,
             @Size(max = 20) String telefone,
             /** Data de nascimento (opcional); valida a idade mínima p/ comentar na rede social. */
             LocalDate dataNascimento,
@@ -67,9 +69,9 @@ public record PacienteRequest(
             /** Situação do responsável: ausente (null) = ativo. Inativo perde acesso ao app. */
             Boolean ativo) {
 
-        /** Compat (testes/cadastros mínimos): sem permissões nem situação explícitas → SEM_ACESSO e ativo. */
+        /** Compat (testes/cadastros mínimos): sem CPF/permissões/situação explícitos → ativo e SEM_ACESSO. */
         public ResponsavelRequest(Long id, String nome, String telefone) {
-            this(id, nome, telefone, null, null, null);
+            this(id, nome, null, telefone, null, null, null);
         }
 
         /** Situação efetiva: ausente (null) = ativo (true). */
