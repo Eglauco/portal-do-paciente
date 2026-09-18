@@ -244,12 +244,25 @@ public class PushService {
             List<Map<String, Object>> tickets = resposta == null ? null
                     : (List<Map<String, Object>>) resposta.get("data");
             List<ResultadoEnvio> out = new ArrayList<>();
+            int aceitos = 0;
             for (int i = 0; i < tokens.size(); i++) {
+                String token = tokens.get(i);
                 Map<String, Object> ticket = (tickets != null && i < tickets.size()) ? tickets.get(i) : null;
                 boolean aceito = ticket != null && "ok".equals(String.valueOf(ticket.get("status")));
                 String receiptId = aceito && ticket.get("id") != null ? String.valueOf(ticket.get("id")) : null;
-                out.add(new ResultadoEnvio(tokens.get(i), aceito, receiptId));
+                if (aceito) {
+                    aceitos++;
+                } else {
+                    String erro = ticket == null ? "sem ticket da Expo" : erroDoTicket(ticket);
+                    log.warn("Push NÃO aceito pela Expo (token {}): {}", resumoToken(token), erro);
+                    if ("DeviceNotRegistered".equals(erro)) {
+                        removerTokenMorto(token); // token/instalação inválida: limpa a base
+                    }
+                }
+                out.add(new ResultadoEnvio(token, aceito, receiptId));
             }
+            log.info("Push enviado à Expo: {} token(s), {} aceito(s), {} recusado(s)",
+                    tokens.size(), aceitos, tokens.size() - aceitos);
             return out;
         } catch (RuntimeException e) {
             log.warn("Falha ao enviar notificação push (com resultado): {}", e.getMessage());
@@ -280,7 +293,11 @@ public class PushService {
                 if (data instanceof Map<?, ?> mapa) {
                     mapa.forEach((id, valor) -> {
                         if (valor instanceof Map<?, ?> receipt) {
-                            resultado.put(String.valueOf(id), "ok".equals(String.valueOf(receipt.get("status"))));
+                            boolean ok = "ok".equals(String.valueOf(receipt.get("status")));
+                            resultado.put(String.valueOf(id), ok);
+                            if (!ok) {
+                                log.warn("Receipt de push com erro (id {}): {}", id, erroDoTicket((Map<String, Object>) receipt));
+                            }
                         }
                     });
                 }
@@ -289,5 +306,35 @@ public class PushService {
             }
         }
         return resultado;
+    }
+
+    /** Erro legível de um ticket/receipt da Expo: details.error (ex.: DeviceNotRegistered) ou message. */
+    private static String erroDoTicket(Map<String, Object> ticket) {
+        Object details = ticket.get("details");
+        if (details instanceof Map<?, ?> d && d.get("error") != null) {
+            return String.valueOf(d.get("error"));
+        }
+        Object msg = ticket.get("message");
+        return msg != null ? String.valueOf(msg) : "erro desconhecido";
+    }
+
+    /** Prefixo do token para log (não expõe o token inteiro). */
+    private static String resumoToken(String token) {
+        if (token == null) {
+            return "null";
+        }
+        return token.length() <= 24 ? token : token.substring(0, 24) + "…";
+    }
+
+    /** Remove um Expo Push Token inválido (DeviceNotRegistered) — mantém a base de dispositivos limpa. */
+    private void removerTokenMorto(String token) {
+        try {
+            repository.findFirstByToken(token).ifPresent(d -> {
+                repository.delete(d);
+                log.info("Token de push removido (DeviceNotRegistered): dispositivo id {}", d.getId());
+            });
+        } catch (RuntimeException e) {
+            log.warn("Falha ao remover token morto: {}", e.getMessage());
+        }
     }
 }
