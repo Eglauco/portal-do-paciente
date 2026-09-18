@@ -47,17 +47,19 @@ public class PacienteAcessoService {
     private final ResponsavelRepository responsavelRepository;
     private final DispositivoRepository dispositivoRepository;
     private final VerificacaoService verificacao;
+    private final TelasAppService telasAppService;
     /** Rate-limit por CPF (em memória) para evitar SMS bombing e abuso de custo. */
     private final Map<String, Deque<Long>> enviosPorCpf = new ConcurrentHashMap<>();
 
     public PacienteAcessoService(PacienteRepository repository, ContaAppRepository contaRepository,
             ResponsavelRepository responsavelRepository, DispositivoRepository dispositivoRepository,
-            VerificacaoService verificacao) {
+            VerificacaoService verificacao, TelasAppService telasAppService) {
         this.repository = repository;
         this.contaRepository = contaRepository;
         this.responsavelRepository = responsavelRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.verificacao = verificacao;
+        this.telasAppService = telasAppService;
     }
 
     /** Normaliza o telefone para apenas dígitos. */
@@ -100,6 +102,10 @@ public class PacienteAcessoService {
      */
     @Transactional(readOnly = true)
     public DestinoPush destinoPush(Long pacienteId, FuncionalidadeApp funcionalidade) {
+        // Kill switch global: tela desligada → ninguém recebe push dela.
+        if (funcionalidade != null && !telasAppService.habilitada(funcionalidade)) {
+            return new DestinoPush(pacienteId, null, List.of());
+        }
         Paciente p = pacienteId == null ? null : repository.findById(pacienteId).orElse(null);
         if (p == null) {
             return new DestinoPush(pacienteId, null, List.of());
@@ -389,6 +395,10 @@ public class PacienteAcessoService {
      * do responsável, com ausência = SEM_ACESSO (padrão).
      */
     public NivelAcessoResponsavel nivelDaSessao(Jwt jwt, FuncionalidadeApp funcionalidade) {
+        // Kill switch global: tela desligada → SEM_ACESSO para TODOS (inclusive o perfil próprio).
+        if (!telasAppService.habilitada(funcionalidade)) {
+            return NivelAcessoResponsavel.SEM_ACESSO;
+        }
         Responsavel responsavel = responsavelDaSessao(jwt).orElse(null);
         if (responsavel == null) {
             return NivelAcessoResponsavel.VISUALIZAR_LANCAR; // perfil próprio: sem trava
@@ -437,6 +447,10 @@ public class PacienteAcessoService {
      * (sem conta/perfil) → SEM_ACESSO.
      */
     public NivelAcessoResponsavel nivelPorContaEPerfil(Long contaId, Long pacienteId, FuncionalidadeApp funcionalidade) {
+        // Kill switch global: tela desligada → SEM_ACESSO para todos (cobre o WebSocket do chat).
+        if (!telasAppService.habilitada(funcionalidade)) {
+            return NivelAcessoResponsavel.SEM_ACESSO;
+        }
         ContaApp conta = contaId == null ? null : contaRepository.findById(contaId).orElse(null);
         Paciente perfil = pacienteId == null ? null : repository.findById(pacienteId).orElse(null);
         if (conta == null || perfil == null) {

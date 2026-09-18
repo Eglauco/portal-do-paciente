@@ -62,4 +62,35 @@ public final class ChaveConfiguracao {
      * Fica atrás do azul (que cobre em opacidade alta), como textura sutil.
      */
     public static final String LOGIN_FUNDO = "LOGIN_FUNDO";
+
+    // ---------- Habilitação global de telas do app (kill switch por tela; BOOLEANO, TRUE = visível) ----------
+    // Quando DESLIGADA, a tela some para TODOS os pacientes/responsáveis e a liberação dela some da matriz
+    // (os vínculos são preservados: religar a tela restaura tudo). Uma chave por FuncionalidadeApp togglável.
+
+    /** Tela de Agendamentos do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_AGENDAMENTOS_HABILITADA = "APP_TELA_AGENDAMENTOS_HABILITADA";
+
+    /** Tela de Chat ao vivo do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_CHAT_HABILITADA = "APP_TELA_CHAT_HABILITADA";
+
+    /** Tela de SAU (Manifestações) do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_SAU_HABILITADA = "APP_TELA_SAU_HABILITADA";
+
+    /** Tela de Rede Social (Novidades) do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_REDE_SOCIAL_HABILITADA = "APP_TELA_REDE_SOCIAL_HABILITADA";
+
+    /** Tela de Prontuário do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_PRONTUARIO_HABILITADA = "APP_TELA_PRONTUARIO_HABILITADA";
+
+    /** Tela de NPS do app habilitada globalmente (BOOLEANO). */
+    public static final String APP_TELA_NPS_HABILITADA = "APP_TELA_NPS_HABILITADA";
+
+    // ---------- Chat ao vivo com IA ----------
+
+    /**
+     * Liga/desliga GLOBAL do primeiro atendimento por IA no chat ao vivo (BOOLEANO). Ligada = a
+     * assistente virtual responde o paciente até um humano assumir; desligada = chat vai direto
+     * para a fila humana. Começa desligada (semeada em V94).
+     */
+    public static final String APP_CHAT_IA_HABILITADO = "APP_CHAT_IA_HABILITADO";
 }

@@ -71,4 +71,11 @@ public class Mensagem {
     /** Id gerado pelo cliente (idempotência): evita duplicar em reenvios. */
     @Column(name = "cliente_id", length = 60)
     private String clienteId;
+
+    /**
+     * Mensagem da unidade gerada pela assistente virtual (IA), não por um atendente humano.
+     * Só é true em mensagens com remetente = UNIDADE; sempre false nas do paciente.
+     */
+    @Column(name = "gerada_por_ia", nullable = false)
+    private boolean geradaPorIa;
 }

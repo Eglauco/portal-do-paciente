@@ -79,8 +79,15 @@ type RotaAba =
  * (Agenda por padrão para quem tem acesso). Se o perfil dependente não pode ver NENHUMA
  * aba (todas SEM_ACESSO), cai em "/perfil", que sempre mantém o botão "Selecionar perfil".
  * Evita aterrissar numa aba escondida (tela "Sem acesso").
+ *
+ * `telaHabilitada` (opcional) é o kill switch global: telas desligadas pelo admin são puladas,
+ * mesmo com permissão. Ausente = tudo habilitado (compatível com chamadas antigas).
  */
-export function abaInicial(sessao: SessaoPaciente | null): RotaAba | '/perfil' {
+export function abaInicial(
+  sessao: SessaoPaciente | null,
+  telaHabilitada?: (f: FuncionalidadeApp) => boolean,
+): RotaAba | '/perfil' {
+  const ligada = telaHabilitada ?? (() => true);
   const ordem: [FuncionalidadeApp, RotaAba][] = [
     ['AGENDAMENTOS', '/(tabs)/agendamentos'],
     ['CHAT', '/(tabs)/chat'],
@@ -90,7 +97,7 @@ export function abaInicial(sessao: SessaoPaciente | null): RotaAba | '/perfil' {
     ['NPS', '/(tabs)/nps'],
   ];
   for (const [funcionalidade, rota] of ordem) {
-    if (podeVer(sessao, funcionalidade)) return rota;
+    if (ligada(funcionalidade) && podeVer(sessao, funcionalidade)) return rota;
   }
   return '/perfil'; // nenhuma aba acessível: cai no perfil (sempre tem "Selecionar perfil")
 }

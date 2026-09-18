@@ -3,6 +3,7 @@ package com.example.pop.chat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -110,6 +111,21 @@ class ChatControllerTest {
         // do paciente) e trazer ao menos as mensagens semeadas.
         assertTrue(detalhe.mensagens().size() >= 3, "esperado ao menos as mensagens semeadas");
         assertEquals(RemetenteMensagem.PACIENTE, detalhe.mensagens().get(0).remetente());
+    }
+
+    @Test
+    void resolverDesvinculaOAtendente() {
+        Long chatId = novaConversaComAppAtivo();
+        Usuario atendente = usuarioSalvo("Atendente Resolve");
+        Jwt jwt = adminJwt(atendente);
+        controller.assumir(chatId, jwt);
+        assertEquals(atendente.getId(), controller.buscar(chatId).getBody().responsavelId());
+
+        ChatDetalheResponse aposResolver = controller.resolver(chatId, jwt).getBody();
+        assertNotNull(aposResolver);
+        assertEquals(StatusChat.RESOLVIDO, aposResolver.status());
+        assertNull(aposResolver.responsavelId(), "resolver deve desvincular o atendente (conversa liberada)");
+        assertNull(aposResolver.responsavelNome());
     }
 
     @Test

@@ -208,6 +208,7 @@ public class ChatController {
         if (chat.getStatus() == StatusChat.NAO_LIDA) {
             chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
             repository.save(chat);
+            chatService.publicarStatus(chat);
         }
         chatLogService.registrar(chat, TipoLogChat.VISUALIZOU, uidDoToken(jwt), null, antes, chat.getStatus());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
@@ -267,12 +268,7 @@ public class ChatController {
     @PostMapping("/{id}/resolver")
     @Transactional
     public ResponseEntity<ChatDetalheResponse> resolver(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
-        Chat chat = obter(id);
-        StatusChat antes = chat.getStatus();
-        chat.setStatus(StatusChat.RESOLVIDO);
-        chat.setAtualizadoEm(LocalDateTime.now());
-        repository.save(chat);
-        chatLogService.registrar(chat, TipoLogChat.RESOLVEU, uidDoToken(jwt), null, antes, StatusChat.RESOLVIDO);
+        Chat chat = chatService.resolver(obter(id), uidDoToken(jwt));
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
@@ -284,6 +280,7 @@ public class ChatController {
         chat.setStatus(StatusChat.AGUARDANDO_RESPOSTA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
+        chatService.publicarStatus(chat);
         chatLogService.registrar(chat, TipoLogChat.REABRIU, uidDoToken(jwt), null, antes, StatusChat.AGUARDANDO_RESPOSTA);
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }

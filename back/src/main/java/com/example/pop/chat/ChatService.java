@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -47,12 +48,15 @@ public class ChatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final PushService pushService;
     private final StorageService storageService;
+    /** @Lazy: quebra o ciclo ChatService ↔ ChatIaOrchestrator (o orquestrador usa este serviço). */
+    private final ChatIaOrchestrator iaOrchestrator;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
             UsuarioRepository usuarioRepository, ResponsavelRepository responsavelRepository,
             PacienteAcessoService acessoService, ChatLogService chatLogService,
-            SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService) {
+            SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService,
+            @Lazy ChatIaOrchestrator iaOrchestrator) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
@@ -64,6 +68,7 @@ public class ChatService {
         this.messagingTemplate = messagingTemplate;
         this.pushService = pushService;
         this.storageService = storageService;
+        this.iaOrchestrator = iaOrchestrator;
     }
 
     /**
@@ -137,7 +142,7 @@ public class ChatService {
             return chat; // idempotente: reenvio da mesma mensagem não duplica
         }
         Long responsavelId = responsavel != null ? responsavel.getId() : null;
-        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null, responsavelId);
+        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null, responsavelId, false);
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
@@ -145,6 +150,88 @@ public class ChatService {
         repository.save(chat);
 
         publicar(chat.getId(), salva, responsavel != null ? responsavel.getNome() : null);
+        publicarStatus(chat);
+
+        // Após o COMMIT da mensagem do paciente, aciona a assistente virtual (assíncrona) para o
+        // primeiro atendimento. Roda em background (não trava a resposta ao paciente) e o
+        // orquestrador revalida todas as condições (config ligada, sem responsável, IA não encerrada).
+        Long chatId = chat.getId();
+        aposCommit(() -> iaOrchestrator.processarSePreciso(chatId));
+        return chat;
+    }
+
+    /**
+     * Registra uma resposta da assistente virtual (IA) e a entrega ao paciente (tempo-real + push).
+     * NÃO exige responsável — a IA atua enquanto ninguém humano assumiu. A mensagem fica marcada
+     * como {@code geradaPorIa} (sem atendente). Status vai a ATENDIMENTO_IA (distingue do humano).
+     */
+    public Chat enviarComoIa(Chat chat, String texto) {
+        marcarMensagensDoPacienteComoLidas(chat.getId());
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, null, true, null, null, true);
+        chat.setStatus(StatusChat.ATENDIMENTO_IA);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        repository.save(chat);
+        chatLogService.registrar(chat, TipoLogChat.RESPONDEU_IA, null, null, null, null);
+        publicar(chat.getId(), salva, null);
+        publicarStatus(chat);
+        pushService.notificarNovaMensagem(chat);
+        return chat;
+    }
+
+    /**
+     * A assistente virtual encerra a atuação e a conversa vai para a fila humana: marca
+     * {@code iaEncerrada} (a IA não responde mais), envia (se houver) uma mensagem de encaminhamento
+     * ao paciente e deixa a conversa como NÃO LIDA — pede um atendente. NÃO marca as mensagens do
+     * paciente como lidas de propósito: assim o atendente vê o pendente em vermelho. Responsável
+     * segue nulo (ninguém assumiu ainda).
+     */
+    public Chat escalarParaHumano(Chat chat, String mensagemEncaminhamento) {
+        chat.setIaEncerrada(true);
+        Mensagem encaminhamento = null;
+        if (mensagemEncaminhamento != null && !mensagemEncaminhamento.isBlank()) {
+            encaminhamento = criar(chat, RemetenteMensagem.UNIDADE, mensagemEncaminhamento, null, true, null, null, true);
+        }
+        chat.setStatus(StatusChat.NAO_LIDA);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        repository.save(chat);
+        chatLogService.registrar(chat, TipoLogChat.ESCALOU_IA, null, null, null, null);
+        if (encaminhamento != null) {
+            publicar(chat.getId(), encaminhamento, null);
+            pushService.notificarNovaMensagem(chat);
+        } else {
+            Long chatId = chat.getId();
+            aposCommit(() -> messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId)));
+        }
+        publicarStatus(chat);
+        return chat;
+    }
+
+    /**
+     * A assistente virtual RESOLVE a conversa quando o paciente não tem mais dúvidas: envia (se
+     * houver) uma despedida cordial, marca RESOLVIDO e LIBERA a conversa (responsável nulo e IA
+     * reabilitada) — se o paciente voltar a escrever, ela reabre e a IA atende de novo.
+     */
+    public Chat resolverPelaIa(Chat chat, String despedida) {
+        StatusChat antes = chat.getStatus();
+        marcarMensagensDoPacienteComoLidas(chat.getId());
+        Mensagem msg = null;
+        if (despedida != null && !despedida.isBlank()) {
+            msg = criar(chat, RemetenteMensagem.UNIDADE, despedida, null, true, null, null, true);
+        }
+        chat.setStatus(StatusChat.RESOLVIDO);
+        chat.setResponsavel(null);
+        chat.setIaEncerrada(false);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        repository.save(chat);
+        chatLogService.registrar(chat, TipoLogChat.RESOLVEU_IA, null, null, antes, StatusChat.RESOLVIDO);
+        if (msg != null) {
+            publicar(chat.getId(), msg, null);
+            pushService.notificarNovaMensagem(chat);
+        } else {
+            Long chatId = chat.getId();
+            aposCommit(() -> messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId)));
+        }
+        publicarStatus(chat);
         return chat;
     }
 
@@ -173,7 +260,7 @@ public class ChatService {
         }
         marcarMensagensDoPacienteComoLidas(chat.getId());
         // O remetente é o próprio atendente (garantido pelo guard acima); sem responsável do paciente.
-        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel, null);
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel, null, false);
 
         StatusChat statusAntes = chat.getStatus();
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
@@ -188,6 +275,7 @@ public class ChatService {
         }
 
         publicar(chat.getId(), salva, null);
+        publicarStatus(chat);
         // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
         pushService.notificarNovaMensagem(chat);
         return chat;
@@ -210,6 +298,32 @@ public class ChatService {
             messagingTemplate.convertAndSend("/topic/chat/" + salvo.getId() + "/responsavel", evento);
             messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(salvo.getId()));
         });
+        publicarStatus(salvo);
+        return salvo;
+    }
+
+    /**
+     * Resolve a conversa e a LIBERA: além de marcar RESOLVIDO, desvincula o atendente
+     * ({@code responsavel = null}) e reabilita a IA ({@code iaEncerrada = false}). Assim, se a
+     * conversa voltar a ser reaberta/receber mensagem, ela entra sem atendente (e a assistente
+     * virtual pode fazer o primeiro atendimento de novo, se estiver ligada). Publica a troca de
+     * responsável (para "sem atendente") e o sinal de lista em tempo real.
+     */
+    public Chat resolver(Chat chat, Long usuarioId) {
+        StatusChat antes = chat.getStatus();
+        chat.setStatus(StatusChat.RESOLVIDO);
+        chat.setResponsavel(null);
+        chat.setIaEncerrada(false);
+        chat.setAtualizadoEm(LocalDateTime.now());
+        Chat salvo = repository.save(chat);
+        chatLogService.registrar(salvo, TipoLogChat.RESOLVEU, usuarioId, null, antes, StatusChat.RESOLVIDO);
+        Long chatId = salvo.getId();
+        aposCommit(() -> {
+            messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/responsavel",
+                    new ResponsavelEvento(chatId, null, null));
+            messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
+        });
+        publicarStatus(salvo);
         return salvo;
     }
 
@@ -220,7 +334,7 @@ public class ChatService {
     }
 
     private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida,
-            Usuario usuario, Long responsavelId) {
+            Usuario usuario, Long responsavelId, boolean geradaPorIa) {
         Mensagem mensagem = new Mensagem();
         mensagem.setChat(chat);
         mensagem.setRemetente(remetente);
@@ -230,6 +344,7 @@ public class ChatService {
         mensagem.setEnviadaEm(LocalDateTime.now());
         mensagem.setLida(lida);
         mensagem.setClienteId(clienteId != null && !clienteId.isBlank() ? clienteId.trim() : null);
+        mensagem.setGeradaPorIa(geradaPorIa);
         return mensagemRepository.save(mensagem);
     }
 
@@ -244,6 +359,19 @@ public class ChatService {
             messagingTemplate.convertAndSend("/topic/chat/" + chatId, payload);
             messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chatId));
         });
+    }
+
+    /**
+     * Publica o STATUS atual da conversa em tempo real (após o commit), para os clientes atualizarem
+     * o cabeçalho e ações que dependem do status (ex.: o botão "Falar com humano" no app, habilitado
+     * só em ATENDIMENTO_IA) sem precisar recarregar a conversa. Chamado a cada mudança de status.
+     */
+    public void publicarStatus(Chat chat) {
+        Long chatId = chat.getId();
+        StatusChat status = chat.getStatus();
+        String descricao = status.getDescricao();
+        aposCommit(() -> messagingTemplate.convertAndSend(
+                "/topic/chat/" + chatId + "/status", new StatusEvento(chatId, status, descricao)));
     }
 
     /** Executa a ação após o commit da transação atual (ou imediatamente, se não houver). */
@@ -395,5 +523,9 @@ public class ChatService {
 
     /** Evento de troca de responsável (bloqueia o atendente anterior em tempo real). */
     public record ResponsavelEvento(Long chatId, Long responsavelId, String responsavelNome) {
+    }
+
+    /** Evento de mudança de status da conversa (atualiza cabeçalho/ações no cliente em tempo real). */
+    public record StatusEvento(Long chatId, StatusChat status, String statusDescricao) {
     }
 }

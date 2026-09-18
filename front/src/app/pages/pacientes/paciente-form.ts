@@ -13,6 +13,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { NgxMaskDirective } from 'ngx-mask';
 import { ToastrService } from 'ngx-toastr';
+import { FuncionalidadeAppService } from '../../core/funcionalidade-app.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { CepService } from '../../shared/cep.service';
 import { TelefoneBrDirective } from '../../shared/telefone-br.directive';
@@ -96,6 +97,7 @@ function dataNascimentoValidator(control: AbstractControl): ValidationErrors | n
 })
 export class PacienteForm implements PodeSair {
   private readonly service = inject(PacienteService);
+  private readonly funcionalidadeAppService = inject(FuncionalidadeAppService);
   private readonly cepService = inject(CepService);
   private readonly unidadeService = inject(UnidadeService);
   private readonly router = inject(Router);
@@ -220,8 +222,17 @@ export class PacienteForm implements PodeSair {
     }
     // Só carrega no navegador (evita chamada sem token no SSR/prerender).
     afterNextRender(() => {
+      this.carregarTelasHabilitadas();
       this.carregarUnidades();
       if (this.editando() && this.codigo() != null) this.carregar(this.codigo()!);
+    });
+  }
+
+  /** Carrega o kill-switch global; falha mantém {} = tudo visível (não esconde por engano). */
+  private carregarTelasHabilitadas(): void {
+    this.funcionalidadeAppService.carregar().subscribe({
+      next: (telas) => this.telasHabilitadas.set(telas),
+      error: () => {},
     });
   }
 
@@ -269,6 +280,22 @@ export class PacienteForm implements PodeSair {
   /** Funcionalidades e níveis para a matriz de permissões (template). */
   protected readonly funcionalidades = FUNCIONALIDADES_APP;
   protected readonly niveis = NIVEIS_ACESSO;
+
+  /**
+   * Kill-switch global das telas do app (GET /funcionalidades). {} = ainda não carregou →
+   * trata tudo como habilitado (não esconde nada por engano). false = tela desligada.
+   */
+  protected readonly telasHabilitadas = signal<Record<string, boolean>>({});
+
+  /**
+   * Funcionalidades EXIBIDAS na matriz: esconde as telas desligadas globalmente (default:
+   * visível). IMPORTANTE: filtra SOMENTE a exibição — grupoResponsavel() e permissoesDoGrupo()
+   * seguem iterando FUNCIONALIDADES_APP completo, para o nível salvo de uma tela oculta ser
+   * reenviado no PUT (que faz substituição total do mapa) e o vínculo sobreviver.
+   */
+  protected readonly funcionalidadesVisiveis = computed(() =>
+    FUNCIONALIDADES_APP.filter((f) => this.telasHabilitadas()[f.value] !== false),
+  );
 
   /** Níveis oferecidos para uma funcionalidade (Prontuário não tem "Visualizar e lançar"). */
   protected niveisPara(funcionalidade: { semLancamento?: boolean }): { value: NivelAcesso; label: string }[] {

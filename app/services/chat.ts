@@ -1,6 +1,11 @@
 import { fetchMeu } from '@/services/sessao';
 
-export type StatusChat = 'NAO_LIDA' | 'AGUARDANDO_RESPOSTA' | 'EM_ATENDIMENTO' | 'RESOLVIDO';
+export type StatusChat =
+  | 'NAO_LIDA'
+  | 'AGUARDANDO_RESPOSTA'
+  | 'EM_ATENDIMENTO'
+  | 'ATENDIMENTO_IA'
+  | 'RESOLVIDO';
 export type Remetente = 'PACIENTE' | 'UNIDADE';
 
 interface Ref {
@@ -33,6 +38,8 @@ export interface Mensagem {
   entregue: boolean;
   /** Nome do atendente que enviou (só nas mensagens da unidade). */
   atendenteNome?: string | null;
+  /** A mensagem da unidade foi gerada pela IA (assistente virtual), não por um atendente humano. */
+  geradaPorIa?: boolean;
   /** Nome do responsável que enviou em nome do paciente (perfil dependente); nulo se foi o próprio. */
   responsavelNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
@@ -124,6 +131,16 @@ export async function enviarMensagemPaciente(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto, clienteId }),
   });
+  return comoJson<ChatDetalhe>(resposta);
+}
+
+/**
+ * Pede para falar com um atendente humano (tira a conversa do modo assistente virtual).
+ * Idempotente: tocar de novo não duplica o pedido. O backend devolve o detalhe atualizado
+ * e emite a mensagem de confirmação na conversa (que também chega via tempo real).
+ */
+export async function falarComHumano(id: number | string): Promise<ChatDetalhe> {
+  const resposta = await fetchMeu(`/meu/chats/${id}/falar-humano`, { method: 'POST' });
   return comoJson<ChatDetalhe>(resposta);
 }
 

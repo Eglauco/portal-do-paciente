@@ -1,11 +1,18 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { API_URL } from '@/constants/api';
-import { Mensagem, Remetente } from './chat';
+import { Mensagem, Remetente, StatusChat } from './chat';
 import { authHeaders } from './sessao';
 
 export interface DigitandoEvento {
   de: Remetente;
+}
+
+/** Evento de mudança de status da conversa (mantém cabeçalho/ações em sincronia ao vivo). */
+export interface StatusEvento {
+  chatId: number;
+  status: StatusChat;
+  statusDescricao: string;
 }
 
 interface Assinatura {
@@ -128,6 +135,14 @@ export function observarResponsavel(
   return inscrever(`/topic/chat/${chatId}/responsavel`, (msg) =>
     callback(JSON.parse(msg.body) as { responsavelId: number | null; responsavelNome: string | null }),
   );
+}
+
+/** Observa a mudança de status da conversa (atualiza cabeçalho e ações no app ao vivo). */
+export function observarStatus(
+  chatId: number | string,
+  callback: (evento: StatusEvento) => void,
+): () => void {
+  return inscrever(`/topic/chat/${chatId}/status`, (msg) => callback(JSON.parse(msg.body) as StatusEvento));
 }
 
 /** Sinaliza que este lado está digitando (efêmero; ignora se não conectado). */

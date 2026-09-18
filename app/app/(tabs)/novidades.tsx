@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ComentariosSheet } from '@/components/comentarios-sheet';
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
@@ -46,9 +47,11 @@ export default function NovidadesScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
-  // Novidades = Rede Social. Sem acesso (perfil dependente): a aba some e, se cair
-  // aqui por ser a rota inicial, manda para o Prontuário (aba sempre disponível).
-  const verFeed = podeVer(sessao, 'REDE_SOCIAL');
+  const { telaHabilitada } = useFuncionalidades();
+  // Novidades = Rede Social. Desligada globalmente (kill switch) ou sem acesso (perfil
+  // dependente): a aba some e, se cair aqui por ser a rota inicial, redireciona para a
+  // primeira aba acessível E ligada (respeitando o kill switch).
+  const verFeed = telaHabilitada('REDE_SOCIAL') && podeVer(sessao, 'REDE_SOCIAL');
   const [posts, setPosts] = useState<Postagem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -117,7 +120,7 @@ export default function NovidadesScreen() {
   };
 
   if (!verFeed) {
-    return <Redirect href={abaInicial(sessao)} />;
+    return <Redirect href={abaInicial(sessao, telaHabilitada)} />;
   }
 
   const renderPost = ({ item: post }: { item: Postagem }) => (

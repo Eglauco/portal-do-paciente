@@ -42,8 +42,17 @@
           }
           <div class="wa__bolha-wrap" [class.wa--dir]="m.remetente === 'UNIDADE'" [class.wa--esq]="m.remetente === 'PACIENTE'">
             <div class="wa__bolha" [class.wa__bolha--unidade]="m.remetente === 'UNIDADE'">
-              @if (m.remetente === 'UNIDADE' && m.atendenteNome) {
-                <span class="wa__atendente">{{ m.atendenteNome }}</span>
+              @if (m.remetente === 'UNIDADE') {
+                @if (m.geradaPorIa) {
+                  <span class="wa__ia">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="4" y="8" width="16" height="12" rx="2" /><path d="M12 4v4M9 14h.01M15 14h.01M2 13v2M22 13v2" />
+                    </svg>
+                    Assistente virtual
+                  </span>
+                } @else if (m.atendenteNome) {
+                  <span class="wa__atendente">{{ m.atendenteNome }}</span>
+                }
               }
               @if (m.remetente === 'PACIENTE' && m.responsavelNome) {
                 <span class="wa__via-resp">

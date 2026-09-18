@@ -41,13 +41,15 @@ public class MeuChatController {
 
     private final ChatRepository repository;
     private final ChatService chatService;
+    private final ChatIaService chatIaService;
     private final PacienteAcessoService acessoService;
     private final UnidadeRepository unidadeRepository;
 
-    public MeuChatController(ChatRepository repository, ChatService chatService,
+    public MeuChatController(ChatRepository repository, ChatService chatService, ChatIaService chatIaService,
             PacienteAcessoService acessoService, UnidadeRepository unidadeRepository) {
         this.repository = repository;
         this.chatService = chatService;
+        this.chatIaService = chatIaService;
         this.acessoService = acessoService;
         this.unidadeRepository = unidadeRepository;
     }
@@ -115,6 +117,20 @@ public class MeuChatController {
         Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId(),
                 responsavel);
         return semResponsavelId(chatService.toDetalhe(chat));
+    }
+
+    /**
+     * O paciente pede para falar com um atendente humano (botão sempre visível no chat): encerra o
+     * atendimento por IA, se estava atuando, e coloca a conversa na fila humana. É idempotente —
+     * se já há atendente humano ou a IA já saiu, não faz nada.
+     */
+    @PostMapping("/{id}/falar-humano")
+    @Transactional
+    public ChatDetalheResponse falarComHumano(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        acessoService.exigirLancar(jwt, FuncionalidadeApp.CHAT);
+        Chat chat = minhaConversa(jwt, id); // 404 se não for do paciente logado
+        chatIaService.pacientePedeHumano(chat.getId());
+        return semResponsavelId(chatService.toDetalhe(minhaConversa(jwt, id)));
     }
 
     /** Confirma que as mensagens da unidade chegaram no aparelho do paciente (2º "check"). */

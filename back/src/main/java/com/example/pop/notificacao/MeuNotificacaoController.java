@@ -18,6 +18,7 @@ import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.NivelAcessoResponsavel;
 import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.Responsavel;
+import com.example.pop.paciente.TelasAppService;
 
 /** Notificações do paciente logado (app). Sob /meu/** → papel PACIENTE. */
 @RestController
@@ -26,10 +27,13 @@ public class MeuNotificacaoController {
 
     private final NotificacaoService service;
     private final PacienteAcessoService acessoService;
+    private final TelasAppService telasAppService;
 
-    public MeuNotificacaoController(NotificacaoService service, PacienteAcessoService acessoService) {
+    public MeuNotificacaoController(NotificacaoService service, PacienteAcessoService acessoService,
+            TelasAppService telasAppService) {
         this.service = service;
         this.acessoService = acessoService;
+        this.telasAppService = telasAppService;
     }
 
     /** Lista as notificações do paciente (mais recentes primeiro), sem os tipos bloqueados por permissão. */
@@ -56,16 +60,21 @@ public class MeuNotificacaoController {
      */
     private List<TipoNotificacao> tiposBloqueados(Jwt jwt) {
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
-        if (responsavel == null) {
-            return List.of(); // perfil próprio: vê tudo
-        }
-        Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes = responsavel.getPermissoes();
+        Map<FuncionalidadeApp, NivelAcessoResponsavel> permissoes =
+                responsavel == null ? null : responsavel.getPermissoes();
         List<TipoNotificacao> bloqueados = new ArrayList<>();
         for (TipoNotificacao tipo : TipoNotificacao.values()) {
             FuncionalidadeApp funcionalidade = funcionalidadeDe(tipo);
-            if (funcionalidade != null
+            if (funcionalidade == null) {
+                continue; // tipo sem funcionalidade: sempre visível
+            }
+            // Kill switch global: tela desligada bloqueia para TODOS (inclusive perfil próprio).
+            boolean bloqueadoGlobal = !telasAppService.habilitada(funcionalidade);
+            // Responsável sem acesso à funcionalidade: bloqueia só para ele.
+            boolean bloqueadoResponsavel = permissoes != null
                     && permissoes.getOrDefault(funcionalidade, NivelAcessoResponsavel.SEM_ACESSO)
-                            == NivelAcessoResponsavel.SEM_ACESSO) {
+                            == NivelAcessoResponsavel.SEM_ACESSO;
+            if (bloqueadoGlobal || bloqueadoResponsavel) {
                 bloqueados.add(tipo);
             }
         }

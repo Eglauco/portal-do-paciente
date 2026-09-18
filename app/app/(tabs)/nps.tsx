@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleS
 
 import { NpsModal, NpsModalDados } from '@/components/nps-modal';
 import { SemAcesso } from '@/components/sem-acesso';
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
@@ -30,8 +31,11 @@ export default function NpsScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const { sessao } = useSessao();
-  const verNps = podeVer(sessao, 'NPS');
-  const podeAvaliar = podeLancar(sessao, 'NPS');
+  const { telaHabilitada } = useFuncionalidades();
+  // Kill switch global desliga a tela (e o prompt "Avaliações pendentes" + a modal de avaliar)
+  // para todos, inclusive o perfil próprio; ainda cai no <SemAcesso /> se reaberta por notificação.
+  const verNps = telaHabilitada('NPS') && podeVer(sessao, 'NPS');
+  const podeAvaliar = telaHabilitada('NPS') && podeLancar(sessao, 'NPS');
   const [lista, setLista] = useState<NpsItem[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);

@@ -67,6 +67,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/tema").permitAll()
                         // Marca (white-label: nome + textos do login): leitura pública p/ o login pintar.
                         .requestMatchers(HttpMethod.GET, "/marca").permitAll()
+                        // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
+                        .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).

@@ -10,6 +10,7 @@ import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { LembretePopup } from '@/components/lembrete-popup';
+import { FuncionalidadesProvider, useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PerfilFotoProvider } from '@/hooks/use-perfil-foto';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
@@ -90,6 +91,7 @@ async function tratarToque(resposta: Notifications.NotificationResponse) {
  */
 function Navegacao() {
   const { sessao, carregando } = useSessao();
+  const { telaHabilitada } = useFuncionalidades();
   const segments = useSegments();
   const roteador = useRouter();
 
@@ -108,9 +110,9 @@ function Navegacao() {
       return;
     }
     // Perfil escolhido: se ainda está no login, entra no app na primeira aba acessível
-    // do perfil ativo (evita cair numa aba escondida por permissão).
-    if (naRaiz) roteador.replace(abaInicial(sessao));
-  }, [sessao, carregando, segments, roteador]);
+    // do perfil ativo E ligada no kill switch (evita cair numa aba escondida/desligada).
+    if (naRaiz) roteador.replace(abaInicial(sessao, telaHabilitada));
+  }, [sessao, carregando, segments, roteador, telaHabilitada]);
 
   return (
     <>
@@ -173,14 +175,16 @@ export default function RootLayout() {
 
   return (
     <TemaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <SessaoProvider>
-          <PerfilFotoProvider>
-            <Navegacao />
-          </PerfilFotoProvider>
-        </SessaoProvider>
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <FuncionalidadesProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <SessaoProvider>
+            <PerfilFotoProvider>
+              <Navegacao />
+            </PerfilFotoProvider>
+          </SessaoProvider>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </FuncionalidadesProvider>
     </TemaProvider>
   );
 }

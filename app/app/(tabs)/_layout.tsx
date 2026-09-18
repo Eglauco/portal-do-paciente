@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { TopBar } from '@/components/top-bar';
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { useSessao } from '@/hooks/use-sessao';
 import { useTema } from '@/hooks/use-tema';
 import { podeVer } from '@/services/sessao';
@@ -13,9 +14,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const t = useTema();
   const { sessao } = useSessao();
-  // Perfil dependente sem acesso a uma funcionalidade → a aba some (href: null).
-  // Prontuário e NPS não são controlados: sempre visíveis.
-  const abaOculta = (func: Parameters<typeof podeVer>[1]) => (podeVer(sessao, func) ? undefined : null);
+  const { telaHabilitada } = useFuncionalidades();
+  // A aba some (href: null) se a tela estiver desligada globalmente pelo admin (kill switch,
+  // vale inclusive para o perfil próprio) OU se o perfil ativo não tem acesso a ela.
+  const abaOculta = (func: Parameters<typeof podeVer>[1]) =>
+    telaHabilitada(func) && podeVer(sessao, func) ? undefined : null;
 
   return (
     <Tabs

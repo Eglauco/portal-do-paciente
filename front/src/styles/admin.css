@@ -2245,6 +2245,7 @@
 .status-pill[data-st='NAO_LIDA'] { color: #b23b4e; background: #fbe4e7; }
 .status-pill[data-st='AGUARDANDO_RESPOSTA'] { color: #a5741a; background: #fbf0d6; }
 .status-pill[data-st='EM_ATENDIMENTO'] { color: #2f6df6; background: #e9f0fe; }
+.status-pill[data-st='ATENDIMENTO_IA'] { color: var(--brand-deep); background: color-mix(in srgb, var(--brand) 14%, white); }
 .status-pill[data-st='RESOLVIDO'] { color: #0a7d5a; background: #e3f6ec; }
 
 /* Filtros do chat */
@@ -2376,6 +2377,9 @@
 
 /* Nome do atendente que enviou a mensagem (bolha da unidade). */
 .wa__atendente { display: block; font-size: 11px; font-weight: 700; color: var(--brand-deep); margin-bottom: 2px; }
+/* Selo "assistente virtual": mensagem gerada pela IA em vez de um atendente humano. */
+.wa__ia { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--brand-deep); margin-bottom: 2px; padding: 1px 7px 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); }
+.wa__ia svg { width: 12px; height: 12px; flex: 0 0 auto; }
 /* Marcador "via {responsável}": mensagem enviada pelo responsável em nome do paciente. */
 .wa__via-resp { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #8a5a00; margin-bottom: 2px; }
 .wa__via-resp svg { width: 12px; height: 12px; flex: 0 0 auto; }

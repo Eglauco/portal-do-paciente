@@ -1,4 +1,9 @@
-export type StatusChat = 'NAO_LIDA' | 'AGUARDANDO_RESPOSTA' | 'EM_ATENDIMENTO' | 'RESOLVIDO';
+export type StatusChat =
+  | 'NAO_LIDA'
+  | 'AGUARDANDO_RESPOSTA'
+  | 'EM_ATENDIMENTO'
+  | 'ATENDIMENTO_IA'
+  | 'RESOLVIDO';
 export type Remetente = 'PACIENTE' | 'UNIDADE';
 
 export interface Ref {
@@ -33,6 +38,8 @@ export interface Mensagem {
   entregue: boolean;
   /** Nome do atendente que enviou (só nas mensagens da unidade). */
   atendenteNome?: string | null;
+  /** Mensagem gerada pela assistente virtual (IA), não por um atendente humano. */
+  geradaPorIa?: boolean;
   /** Nome do responsável que enviou em nome do paciente (perfil dependente); nulo se foi o próprio. */
   responsavelNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */
@@ -92,6 +99,7 @@ export const STATUS_OPTIONS: { value: StatusChat; label: string }[] = [
   { value: 'NAO_LIDA', label: 'Não lida' },
   { value: 'AGUARDANDO_RESPOSTA', label: 'Aguardando resposta' },
   { value: 'EM_ATENDIMENTO', label: 'Em atendimento' },
+  { value: 'ATENDIMENTO_IA', label: 'Atendimento com IA' },
   { value: 'RESOLVIDO', label: 'Resolvido' },
 ];
 

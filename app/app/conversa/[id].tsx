@@ -23,6 +23,7 @@ import {
   ChatDetalhe,
   confirmarEntrega,
   enviarMensagemPaciente,
+  falarComHumano,
   marcarLido,
   Mensagem,
   novoClienteId,
@@ -34,6 +35,7 @@ import {
   observarDigitando,
   observarMensagens,
   observarResponsavel,
+  observarStatus,
   sinalizarDigitando,
 } from '@/services/chat-realtime';
 
@@ -78,6 +80,9 @@ export default function ConversaScreen() {
   const [digitando, setDigitando] = useState(false);
   const [conexao, setConexao] = useState<EstadoConexao>('offline');
   const [conexaoDetalhe, setConexaoDetalhe] = useState('');
+  // Pedido "Falar com humano": enviando (trava o duplo toque). O botão fica desabilitado depois,
+  // porque o status deixa de ser ATENDIMENTO_IA (a ação já foi feita).
+  const [pedindoHumano, setPedindoHumano] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const jaCarregou = useRef(false);
   const ultimoSinalDigitando = useRef(0);
@@ -132,7 +137,12 @@ export default function ConversaScreen() {
   useEffect(() => {
     if (!id) return;
     const cancelarMsg = observarMensagens(id, (m) => {
-      setDigitando(false); // chegou mensagem: parou de digitar
+      // Chegou mensagem da unidade: some com "digitando…" na hora e cancela o auto-ocultar.
+      if (timerDigitando.current) {
+        clearTimeout(timerDigitando.current);
+        timerDigitando.current = null;
+      }
+      setDigitando(false);
       setDetalhe((d) => {
         if (!d) return d;
         if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
@@ -154,7 +164,9 @@ export default function ConversaScreen() {
       if (e.de !== 'UNIDADE') return; // só mostra quando o outro lado digita
       setDigitando(true);
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
-      timerDigitando.current = setTimeout(() => setDigitando(false), 3000);
+      // A IA pode levar até ~20s pensando; mantém "digitando…" visível com folga
+      // (a chegada da mensagem já limpa o indicador antes disso).
+      timerDigitando.current = setTimeout(() => setDigitando(false), 25000);
     });
     const cancelarConexao = observarConexao((e, d) => {
       setConexao(e);
@@ -165,11 +177,17 @@ export default function ConversaScreen() {
     const cancelarResp = observarResponsavel(id, (ev) => {
       setDetalhe((d) => (d ? { ...d, responsavelNome: ev.responsavelNome } : d));
     });
+    // Mudança de status ao vivo: mantém o cabeçalho e o botão "Falar com humano" em sincronia
+    // (habilitado só em ATENDIMENTO_IA) sem precisar sair e voltar na conversa.
+    const cancelarStatus = observarStatus(id, (ev) => {
+      setDetalhe((d) => (d ? { ...d, status: ev.status, statusDescricao: ev.statusDescricao } : d));
+    });
     return () => {
       cancelarMsg();
       cancelarDig();
       cancelarConexao();
       cancelarResp();
+      cancelarStatus();
       if (timerDigitando.current) clearTimeout(timerDigitando.current);
     };
   }, [id]);
@@ -266,6 +284,32 @@ export default function ConversaScreen() {
     if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto);
   };
 
+  // "Falar com humano": tira a conversa do modo assistente virtual. Idempotente e travado
+  // contra duplo toque; a mensagem de confirmação chega na conversa (retorno + tempo real).
+  const pedirHumano = useCallback(async () => {
+    if (!id || pedindoHumano) return;
+    setPedindoHumano(true);
+    try {
+      const atualizado = await falarComHumano(id);
+      // Mescla o estado do servidor preservando mensagens otimistas em voo (mesmo padrão do carregar).
+      setDetalhe((prev) => {
+        if (!prev || prev.id !== atualizado.id) return atualizado;
+        const noServidor = new Set(atualizado.mensagens.map((mm) => mm.clienteId).filter(Boolean));
+        const otimistas = prev.mensagens.filter(
+          (mm) => mm.id < 0 && (mm.pendente || mm.falha) && (!mm.clienteId || !noServidor.has(mm.clienteId)),
+        );
+        return { ...atualizado, mensagens: [...atualizado.mensagens, ...otimistas] };
+      });
+      rolarParaFim();
+    } catch {
+      // best-effort; o paciente pode tocar de novo (é idempotente no backend)
+    } finally {
+      setPedindoHumano(false);
+    }
+  }, [id, pedindoHumano]);
+
+  // A IA está atendendo agora? (habilita o botão "Falar com humano"; ao acionar, o status muda e some.)
+  const iaAtendendo = detalhe?.status === 'ATENDIMENTO_IA';
   const mensagens = detalhe?.mensagens ?? [];
 
   return (
@@ -294,7 +338,7 @@ export default function ConversaScreen() {
           </Text>
           {digitando ? (
             <Text style={styles.digitando} numberOfLines={1}>
-              digitando…
+              escrevendo…
             </Text>
           ) : conexao === 'conectado' ? (
             <Text style={styles.contatoStatus} numberOfLines={1}>
@@ -310,6 +354,33 @@ export default function ConversaScreen() {
             </Text>
           )}
         </View>
+        {/* Falar com humano: no topo, à direita. Só habilitado enquanto a IA está atendendo;
+            depois de acionado (o status muda) fica desabilitado — a ação já foi feita. */}
+        {detalhe && podeEnviar ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.humanoHeader,
+              pressed && iaAtendendo && styles.humanoHeaderPressed,
+              (!iaAtendendo || pedindoHumano) && styles.humanoHeaderOff,
+            ]}
+            onPress={pedirHumano}
+            disabled={!iaAtendendo || pedindoHumano}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !iaAtendendo || pedindoHumano }}
+            accessibilityLabel="Falar com um atendente humano">
+            {pedindoHumano ? (
+              <ActivityIndicator size="small" color={t.brandDeep} />
+            ) : (
+              <Ionicons name="person-outline" size={15} color={iaAtendendo ? t.brandDeep : t.muted} />
+            )}
+            <Text
+              style={[styles.humanoHeaderTxt, !iaAtendendo && styles.humanoHeaderTxtOff]}
+              numberOfLines={1}>
+              Falar com humano
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {carregando ? (
@@ -348,8 +419,15 @@ export default function ConversaScreen() {
                     </View>
                   )}
                   <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
-                    <View style={[styles.bolha, daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente]}>
-                      {daUnidade && m.atendenteNome ? (
+                    <View
+                      style={[
+                        styles.bolha,
+                        daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente,
+                        daUnidade && m.geradaPorIa && styles.bolhaIa,
+                      ]}>
+                      {daUnidade && m.geradaPorIa ? (
+                        <Text style={styles.assistenteIa}>🤖 Assistente virtual</Text>
+                      ) : daUnidade && m.atendenteNome ? (
                         <Text style={styles.atendente}>{m.atendenteNome}</Text>
                       ) : null}
                       {!daUnidade && m.responsavelNome ? (
@@ -483,6 +561,9 @@ const criarEstilos = (t: Tema) =>
     borderColor: t.line,
   },
   bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
+  // Bolha da IA: fundo branco como as demais + borda na cor da marca para sinalizar que é IA.
+  bolhaIa: { backgroundColor: t.surface, borderColor: t.brand, borderWidth: 1.5 },
+  assistenteIa: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
   atendente: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
   viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
   viaRespTxt: { fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
@@ -491,6 +572,26 @@ const criarEstilos = (t: Tema) =>
   hora: { fontSize: 10.5, color: '#7C8C87' },
   reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
   reenviarTxt: { fontSize: 11, color: '#E0524D', fontWeight: '600' },
+
+  // Botão "Falar com humano" no cabeçalho (à direita do nome da unidade).
+  humanoHeader: {
+    flexShrink: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: t.brand,
+    backgroundColor: t.surface,
+  },
+  humanoHeaderPressed: { opacity: 0.6 },
+  // Desabilitado (ação já feita, ou sem IA atendendo): esmaecido e borda neutra.
+  humanoHeaderOff: { borderColor: t.line, opacity: 0.55 },
+  humanoHeaderTxt: { fontSize: 12, fontWeight: '700', color: t.brandDeep },
+  humanoHeaderTxtOff: { color: t.muted },
 
   inputBar: {
     flexDirection: 'row',

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { abaInicial, listarPerfis, type Perfil } from '@/services/sessao';
@@ -24,6 +25,7 @@ export default function SelecionarPerfilScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { sessao, trocarPerfil, sair } = useSessao();
+  const { telaHabilitada } = useFuncionalidades();
 
   const [perfis, setPerfis] = useState<Perfil[]>(sessao?.perfis ?? []);
   const [carregando, setCarregando] = useState((sessao?.perfis?.length ?? 0) === 0);
@@ -63,7 +65,7 @@ export default function SelecionarPerfilScreen() {
       if (router.canDismiss()) router.dismissAll();
       // Aterrissa na primeira aba acessível do perfil ESCOLHIDO (o estado da sessão ainda
       // não reflete a troca aqui, então compõe o alvo com o pacienteId selecionado).
-      router.replace(abaInicial(sessao ? { ...sessao, pacienteId } : null));
+      router.replace(abaInicial(sessao ? { ...sessao, pacienteId } : null, telaHabilitada));
     } catch (e) {
       setSelecionandoId(null);
       Alert.alert('Não foi possível selecionar', e instanceof Error ? e.message : 'Tente novamente.');

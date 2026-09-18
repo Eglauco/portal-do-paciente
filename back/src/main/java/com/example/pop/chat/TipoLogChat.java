@@ -8,7 +8,10 @@ public enum TipoLogChat {
     TRANSFERIU("Transferiu a conversa"),
     RESOLVEU("Resolveu a conversa"),
     REABRIU("Reabriu a conversa"),
-    STATUS_ALTERADO("Mudança de status");
+    STATUS_ALTERADO("Mudança de status"),
+    RESPONDEU_IA("Assistente virtual respondeu"),
+    ESCALOU_IA("Assistente virtual encaminhou para atendente"),
+    RESOLVEU_IA("Assistente virtual resolveu a conversa");
 
     private final String descricao;
 

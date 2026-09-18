@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -129,27 +130,63 @@ public class UnidadeController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Unidade> buscar(@PathVariable Long id) {
+    @Transactional(readOnly = true)
+    public ResponseEntity<UnidadeResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
+                .map(UnidadeResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Unidade criar(@RequestBody Unidade unidade) {
-        unidade.setId(null);
-        return repository.save(unidade);
+    @Transactional
+    public UnidadeResponse criar(@RequestBody UnidadeRequest req) {
+        Unidade unidade = new Unidade();
+        unidade.setNome(req.nome());
+        aplicarFaq(unidade, req);
+        return UnidadeResponse.from(repository.save(unidade));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Unidade> atualizar(@PathVariable Long id, @RequestBody Unidade unidade) {
+    @Transactional
+    public ResponseEntity<UnidadeResponse> atualizar(@PathVariable Long id, @RequestBody UnidadeRequest req) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(unidade.getNome());
-                    return ResponseEntity.ok(repository.save(existente));
+                    existente.setNome(req.nome());
+                    aplicarFaq(existente, req);
+                    return ResponseEntity.ok(UnidadeResponse.from(repository.save(existente)));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Reconstrói o FAQ da unidade pela PRÓPRIA coleção (orphanRemoval): limpa e re-adiciona na ordem
+     * enviada. Nunca troca a referência da coleção (senão o Hibernate perde o rastreio dos órfãos).
+     * Linhas sem pergunta ou sem resposta são ignoradas.
+     */
+    private static void aplicarFaq(Unidade unidade, UnidadeRequest req) {
+        unidade.getFaq().clear();
+        if (req.faq() == null) {
+            return;
+        }
+        int ordem = 0;
+        for (UnidadeRequest.FaqItem item : req.faq()) {
+            if (item == null) {
+                continue;
+            }
+            String pergunta = item.pergunta() == null ? "" : item.pergunta().trim();
+            String resposta = item.resposta() == null ? "" : item.resposta().trim();
+            if (pergunta.isBlank() || resposta.isBlank()) {
+                continue;
+            }
+            UnidadeFaq faq = new UnidadeFaq();
+            faq.setUnidade(unidade);
+            faq.setPergunta(pergunta);
+            faq.setResposta(resposta);
+            faq.setOrdem(ordem++);
+            unidade.getFaq().add(faq);
+        }
     }
 
     @DeleteMapping("/{id}")

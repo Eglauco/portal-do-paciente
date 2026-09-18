@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { SemAcesso } from '@/components/sem-acesso';
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import {
@@ -33,7 +34,7 @@ import {
   permissoesVazias,
   removerResponsavel,
 } from '@/services/responsaveis';
-import { ehPerfilProprio } from '@/services/sessao';
+import { ehPerfilProprio, type FuncionalidadeApp } from '@/services/sessao';
 
 /** Vermelho de "remover" (mesmo tom do status "cancelado"). */
 const PERIGO = '#B23B4E';
@@ -87,21 +88,27 @@ function normalizarPermissoes(p: MapaPermissoes | undefined): MapaPermissoes {
  * Matriz de permissões: uma linha por funcionalidade com botões segmentados de nível
  * (Sem acesso / Só visualizar / Ver e lançar). Reutilizada no adicionar e no editar.
  * O botão selecionado fica destacado; Prontuário não oferece "Ver e lançar".
+ *
+ * `telaHabilitada` filtra da EXIBIÇÃO as telas desligadas globalmente (kill switch). O
+ * payload NÃO é filtrado aqui: `edPermissoes` continua carregando/reenviando o nível salvo
+ * da tela oculta (ver `salvar`), então o vínculo não se perde no PUT (substituição total).
  */
 function MatrizPermissoes({
   permissoes,
   onChange,
   desabilitado,
+  telaHabilitada,
   styles,
 }: {
   permissoes: MapaPermissoes;
   onChange: (funcionalidade: string, nivel: NivelAcesso) => void;
   desabilitado?: boolean;
+  telaHabilitada: (func: FuncionalidadeApp) => boolean;
   styles: ReturnType<typeof criarEstilos>;
 }) {
   return (
     <View style={styles.matriz}>
-      {FUNCIONALIDADES.map((f, i) => {
+      {FUNCIONALIDADES.filter((f) => telaHabilitada(f.valor)).map((f, i) => {
         const niveis = f.semLancamento ? NIVEIS.filter((n) => n.valor !== 'VISUALIZAR_LANCAR') : NIVEIS;
         const atual = permissoes[f.valor] ?? 'SEM_ACESSO';
         return (
@@ -140,6 +147,7 @@ export default function ResponsaveisScreen() {
   const styles = useMemo(() => criarEstilos(t), [t]);
   const insets = useSafeAreaInsets();
   const { sessao } = useSessao();
+  const { telaHabilitada } = useFuncionalidades();
   const proprio = ehPerfilProprio(sessao);
 
   const [lista, setLista] = useState<MeuResponsavel[]>([]);
@@ -525,6 +533,7 @@ export default function ResponsaveisScreen() {
                   permissoes={edPermissoes}
                   onChange={(f, n) => setEdPermissoes((p) => ({ ...p, [f]: n }))}
                   desabilitado={edSalvando}
+                  telaHabilitada={telaHabilitada}
                   styles={styles}
                 />
                 {adicionando && (

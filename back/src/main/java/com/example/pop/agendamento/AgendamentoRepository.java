@@ -22,6 +22,13 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, Long> 
     Page<Agendamento> findByPaciente_Id(Long pacienteId, Pageable pageable);
 
     /**
+     * Próximos agendamentos do paciente NA UNIDADE informada (a partir de :agora), do mais próximo
+     * ao mais distante. Escopado por unidade para não misturar dados de unidades diferentes.
+     */
+    List<Agendamento> findByPaciente_IdAndUnidadeSaude_IdAndDataHoraGreaterThanEqualOrderByDataHoraAsc(
+            Long pacienteId, Long unidadeId, LocalDateTime agora);
+
+    /**
      * Agendamentos de um procedimento que estão na janela de disparo de um lembrete:
      * status ativo (informado), ainda por acontecer (dataHora >= agora) e já dentro
      * da antecedência (dataHora <= limite = agora + horas). O job filtra os que ainda

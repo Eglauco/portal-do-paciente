@@ -389,7 +389,7 @@
               <div class="resp-perms" formGroupName="permissoes">
                 <p class="resp-perms__titulo">Permissões no aplicativo</p>
                 <p class="resp-perms__hint">O que este responsável pode acessar ao entrar como este paciente.</p>
-                @for (f of funcionalidades; track f.value) {
+                @for (f of funcionalidadesVisiveis(); track f.value) {
                   <div class="resp-perms__linha">
                     <span class="resp-perms__func">{{ f.label }}</span>
                     <span class="select resp-perms__select">

@@ -26,6 +26,26 @@
       </div>
     }
 
+    <!-- Abas: dividem o cadastro em seções (Dados / FAQ). -->
+    <div class="form-tabs" role="tablist" aria-label="Seções do cadastro">
+      @for (aba of abas; track aba.id) {
+        <button
+          type="button"
+          role="tab"
+          class="form-tab"
+          [class.form-tab--ativa]="abaAtiva() === aba.id"
+          [attr.aria-selected]="abaAtiva() === aba.id"
+          (click)="selecionarAba(aba.id)"
+        >
+          {{ aba.label }}
+          @if (abaComErro(aba.id)) {
+            <span class="form-tab__erro" aria-hidden="true" title="Há campos pendentes nesta aba"></span>
+          }
+        </button>
+      }
+    </div>
+
+    @if (abaAtiva() === 'dados') {
     <div class="form-grid">
       <div class="form-field">
         <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
@@ -42,6 +62,65 @@
         }
       </div>
     </div>
+    }
+
+    @if (abaAtiva() === 'faq') {
+    <fieldset class="form-field">
+      <legend class="section-label">FAQ da assistente virtual</legend>
+      <p class="field-hint">
+        Perguntas e respostas que a assistente virtual usa para atender o paciente no chat desta unidade.
+      </p>
+
+      <div class="faq-lista" formArrayName="faq">
+        @for (grupo of faqItens.controls; track grupo; let i = $index) {
+          <div class="faq-item" [formGroupName]="i">
+            <div class="faq-item__campos">
+              <div class="form-field">
+                <label class="label" [attr.for]="'faq-pergunta-' + i">Pergunta</label>
+                <input
+                  [id]="'faq-pergunta-' + i"
+                  class="input"
+                  formControlName="pergunta"
+                  placeholder="Ex.: Qual o horário de funcionamento?"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="form-field">
+                <label class="label" [attr.for]="'faq-resposta-' + i">Resposta</label>
+                <textarea
+                  [id]="'faq-resposta-' + i"
+                  class="input input--area"
+                  formControlName="resposta"
+                  rows="3"
+                  placeholder="Ex.: De segunda a sexta, das 7h às 19h."
+                ></textarea>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn btn--ghost btn--sm faq-item__rm"
+              (click)="removerFaq(i)"
+              [attr.aria-label]="'Remover item ' + (i + 1)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14" />
+              </svg>
+              Remover
+            </button>
+          </div>
+        } @empty {
+          <p class="faq-vazio">Nenhum item cadastrado ainda.</p>
+        }
+      </div>
+
+      <button type="button" class="btn btn--ghost btn--sm faq-add" (click)="adicionarFaq()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Adicionar item
+      </button>
+    </fieldset>
+    }
 
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>

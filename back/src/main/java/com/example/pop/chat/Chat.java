@@ -74,4 +74,13 @@ public class Chat {
      */
     @Column(name = "paciente_leu_em")
     private LocalDateTime pacienteLeuEm;
+
+    /**
+     * A assistente virtual (IA) já encerrou a atuação nesta conversa: escalou para humano, o
+     * paciente pediu atendimento humano, ou houve erro. Enquanto false E {@code responsavel} nulo E
+     * a config global ligada, a IA faz o primeiro atendimento; depois disto ela não responde mais
+     * (a conversa espera um atendente assumir). Não confundir com {@code responsavel} (humano).
+     */
+    @Column(name = "ia_encerrada", nullable = false)
+    private boolean iaEncerrada;
 }
