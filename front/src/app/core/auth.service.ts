@@ -60,6 +60,7 @@ const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
   ['CATEGORIAS_NPS', '/categorias-nps'],
   ['PACIENTES', '/pacientes'],
   ['PRONTUARIOS', '/prontuarios'],
+  ['PRONTUARIO_MEDICO', '/prontuario-medico'],
   ['POSTAGENS', '/postagens'],
   ['ESPECIALIDADES', '/especialidades'],
   ['PROFISSIONAIS', '/profissionais'],

@@ -48,6 +48,18 @@
         <label class="label" for="f-especialidade">Especialidade</label>
         <input id="f-especialidade" type="text" class="input" formControlName="especialidade" placeholder="Nome da especialidade" />
       </div>
+      <div class="form-field">
+        <label class="label" for="f-status">Status</label>
+        <span class="select">
+          <select id="f-status" formControlName="status" aria-label="Status da análise">
+            <option value="">Todos</option>
+            <option value="SEM_ALTERACOES">Sem alterações</option>
+            <option value="AGUARDANDO_VALIDACAO">Aguardando validação</option>
+            <option value="VALIDADO">Validado</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </div>
     </div>
     <div class="filters__actions">
       <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
@@ -113,6 +125,7 @@
               <th appOrdenavel="unidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Unidade</th>
               <th appOrdenavel="dataHora" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Atendimento</th>
               <th>Documentos</th>
+              <th>Status</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
             </tr>
           </thead>
@@ -137,6 +150,9 @@
                     </svg>
                     {{ p.documentos }}
                   </span>
+                </td>
+                <td>
+                  <span class="status-pill" [attr.data-st]="p.statusAlerta">{{ p.statusAlertaDescricao }}</span>
                 </td>
                 <td class="col-act">
                   <span class="row-go" aria-hidden="true">

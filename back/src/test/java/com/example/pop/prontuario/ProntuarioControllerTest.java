@@ -32,7 +32,7 @@ class ProntuarioControllerTest {
 
     @Test
     void listaProntuariosSemeados() {
-        Pagina<ProntuarioResponse> pagina = controller.listar(null, null, null, null, null, 0, 10);
+        Pagina<ProntuarioAdminResponse> pagina = controller.listar(null, null, null, null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 3, "esperado ao menos os prontuários semeados");
         assertNotNull(pagina.content().get(0).paciente());
         assertNotNull(pagina.content().get(0).numeroAtendimento());
@@ -40,7 +40,7 @@ class ProntuarioControllerTest {
 
     @Test
     void filtraPorNumero() {
-        Pagina<ProntuarioResponse> pagina = controller.listar("ATD-2026-0001", null, null, null, null, 0, 10);
+        Pagina<ProntuarioAdminResponse> pagina = controller.listar("ATD-2026-0001", null, null, null, null, null, 0, 10);
         assertTrue(pagina.totalElements() >= 1);
         assertTrue(pagina.content().stream().anyMatch(p -> p.numeroAtendimento().equals("ATD-2026-0001")));
     }
@@ -50,8 +50,8 @@ class ProntuarioControllerTest {
         limparResiduosDeTeste();
         ProntuarioRequest novo = new ProntuarioRequest(
                 101L, "ATD-TESTE-9001",
-                List.of(new DocumentoRequest("Documento A", null), new DocumentoRequest("Documento B", null)));
-        ProntuarioDetalheResponse criado = controller.criar(novo);
+                List.of(new DocumentoRequest("Documento A", null, null), new DocumentoRequest("Documento B", null, null)));
+        ProntuarioAdminDetalheResponse criado = controller.criar(novo);
         assertNotNull(criado.id());
         assertEquals(2, criado.documentos().size());
         assertEquals("ATD-TESTE-9001", criado.numeroAtendimento());
@@ -59,8 +59,8 @@ class ProntuarioControllerTest {
         // Atualiza: troca a lista de documentos e o número.
         ProntuarioRequest edicao = new ProntuarioRequest(
                 101L, "ATD-TESTE-9002",
-                List.of(new DocumentoRequest("Único documento", null)));
-        ProntuarioDetalheResponse atualizado = controller.atualizar(criado.id(), edicao).getBody();
+                List.of(new DocumentoRequest("Único documento", null, null)));
+        ProntuarioAdminDetalheResponse atualizado = controller.atualizar(criado.id(), edicao).getBody();
         assertNotNull(atualizado);
         assertEquals(1, atualizado.documentos().size());
         assertEquals("ATD-TESTE-9002", atualizado.numeroAtendimento());

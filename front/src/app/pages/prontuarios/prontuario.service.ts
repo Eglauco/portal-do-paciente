@@ -30,6 +30,7 @@ export class ProntuarioService {
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.especialidade?.trim()) params = params.set('especialidade', filtro.especialidade.trim());
+    if (filtro.status) params = params.set('status', filtro.status);
     for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get<Pagina<Prontuario>>(this.base, { params });
   }
@@ -46,6 +47,7 @@ export class ProntuarioService {
     if (filtro.pacienteId) params = params.set('pacienteId', filtro.pacienteId);
     if (filtro.unidadeId != null) params = params.set('unidadeId', filtro.unidadeId);
     if (filtro.especialidade?.trim()) params = params.set('especialidade', filtro.especialidade.trim());
+    if (filtro.status) params = params.set('status', filtro.status);
     for (const c of colunas) params = params.append('colunas', c);
     for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
@@ -65,5 +67,15 @@ export class ProntuarioService {
 
   excluir(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
+  }
+
+  /** Confirma o alerta de um documento (aguardando validação). Devolve o prontuário atualizado. */
+  validarDocumento(documentoId: number): Observable<ProntuarioDetalhe> {
+    return this.http.post<ProntuarioDetalhe>(`${this.base}/documento/${documentoId}/validar`, {});
+  }
+
+  /** Reprocessa a análise por IA de um documento (assíncrono, sem corpo de resposta). */
+  reanalisarDocumento(documentoId: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/documento/${documentoId}/reanalisar`, {});
   }
 }

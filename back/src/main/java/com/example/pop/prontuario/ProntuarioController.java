@@ -2,10 +2,14 @@ package com.example.pop.prontuario;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.data.domain.Page;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -63,10 +67,15 @@ public class ProntuarioController {
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final ExportacaoService exportacaoService;
+    private final TipoDocumentoProntuarioRepository tipoRepository;
+    private final ProntuarioIaService iaService;
+    private final ProntuarioIaOrchestrator iaOrchestrator;
 
     public ProntuarioController(ProntuarioRepository repository, AgendamentoRepository agendamentoRepository,
             StorageService storageService, PushService pushService, PacienteRepository pacienteRepository,
-            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService) {
+            UnidadeRepository unidadeRepository, ExportacaoService exportacaoService,
+            TipoDocumentoProntuarioRepository tipoRepository, ProntuarioIaService iaService,
+            ProntuarioIaOrchestrator iaOrchestrator) {
         this.repository = repository;
         this.agendamentoRepository = agendamentoRepository;
         this.storageService = storageService;
@@ -74,14 +83,18 @@ public class ProntuarioController {
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.exportacaoService = exportacaoService;
+        this.tipoRepository = tipoRepository;
+        this.iaService = iaService;
+        this.iaOrchestrator = iaOrchestrator;
     }
 
     @GetMapping
-    public Pagina<ProntuarioResponse> listar(
+    public Pagina<ProntuarioAdminResponse> listar(
             @RequestParam(required = false) String numero,
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) String especialidade,
+            @RequestParam(required = false) StatusAlertaProntuario status,
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -90,8 +103,8 @@ public class ProntuarioController {
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
         Page<Prontuario> resultado = repository.search(numero == null ? "" : numero, pacienteId, unidadeId,
-                especialidade == null ? "" : especialidade.trim(), pageable);
-        List<ProntuarioResponse> content = resultado.getContent().stream().map(ProntuarioResponse::from).toList();
+                especialidade == null ? "" : especialidade.trim(), status, pageable);
+        List<ProntuarioAdminResponse> content = resultado.getContent().stream().map(ProntuarioAdminResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -110,10 +123,11 @@ public class ProntuarioController {
             @RequestParam(required = false) Long pacienteId,
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) String especialidade,
+            @RequestParam(required = false) StatusAlertaProntuario status,
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         List<Prontuario> dados = repository.search(numero == null ? "" : numero, pacienteId, unidadeId,
-                especialidade == null ? "" : especialidade.trim(),
+                especialidade == null ? "" : especialidade.trim(), status,
                 Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<Prontuario>> cols = ExportacaoService.filtrar(colunasProntuario(), colunas);
 
@@ -171,6 +185,7 @@ public class ProntuarioController {
                 ColunaExport.de("Motivos da falta", p -> p.getAgendamento().getMotivosFalta() == null ? ""
                         : p.getAgendamento().getMotivosFalta().stream().map(MotivoFalta::getMotivo)
                                 .collect(java.util.stream.Collectors.joining("; "))),
+                ColunaExport.de("Status da análise", p -> p.getStatusAlerta() == null ? "" : p.getStatusAlerta().getDescricao()),
                 ColunaExport.de("Documentos", p -> String.valueOf(p.getDocumentos().size())),
                 ColunaExport.de("Nomes dos documentos", p -> p.getDocumentos() == null ? ""
                         : p.getDocumentos().stream().map(Documento::getNome)
@@ -205,46 +220,78 @@ public class ProntuarioController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProntuarioDetalheResponse> buscar(@PathVariable Long id) {
+    public ResponseEntity<ProntuarioAdminDetalheResponse> buscar(@PathVariable Long id) {
         return repository.findById(id)
-                .map(p -> ResponseEntity.ok(ProntuarioDetalheResponse.from(p)))
+                .map(p -> ResponseEntity.ok(ProntuarioAdminDetalheResponse.from(p)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ProntuarioDetalheResponse criar(@Valid @RequestBody ProntuarioRequest request) {
+    public ProntuarioAdminDetalheResponse criar(@Valid @RequestBody ProntuarioRequest request) {
         if (repository.existsByNumeroAtendimento(request.numeroAtendimento().trim())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Número do atendimento já cadastrado");
         }
         Prontuario prontuario = new Prontuario();
-        aplicar(prontuario, request);
+        List<Documento> novos = aplicar(prontuario, request);
         Prontuario salvo = repository.save(prontuario);
-        ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(salvo);
+        ProntuarioAdminDetalheResponse resposta = ProntuarioAdminDetalheResponse.from(salvo);
         // Notifica o paciente dono sobre o novo prontuário.
         pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), true);
+        dispararAnalise(novos);
         return resposta;
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProntuarioDetalheResponse> atualizar(@PathVariable Long id,
+    public ResponseEntity<ProntuarioAdminDetalheResponse> atualizar(@PathVariable Long id,
             @Valid @RequestBody ProntuarioRequest request) {
         return repository.findById(id)
                 .map(prontuario -> {
                     if (repository.existsByNumeroAtendimentoAndIdNot(request.numeroAtendimento().trim(), id)) {
                         throw new ResponseStatusException(HttpStatus.CONFLICT, "Número do atendimento já cadastrado");
                     }
-                    int documentosAntes = prontuario.getDocumentos().size();
-                    aplicar(prontuario, request);
+                    List<Documento> novos = aplicar(prontuario, request);
                     Prontuario salvo = repository.save(prontuario);
-                    ProntuarioDetalheResponse resposta = ProntuarioDetalheResponse.from(salvo);
+                    ProntuarioAdminDetalheResponse resposta = ProntuarioAdminDetalheResponse.from(salvo);
                     // Notifica o paciente dono se novos documentos foram adicionados.
-                    if (request.documentos().size() > documentosAntes) {
+                    if (!novos.isEmpty()) {
                         pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), false);
                     }
+                    dispararAnalise(novos);
                     return ResponseEntity.ok(resposta);
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Valida um documento marcado pela IA como "Aguardando validação": registra quem validou e
+     * quando, e recalcula o status do prontuário.
+     */
+    @PostMapping("/documento/{documentoId}/validar")
+    public ResponseEntity<ProntuarioAdminDetalheResponse> validar(@PathVariable Long documentoId,
+            @AuthenticationPrincipal Jwt jwt) {
+        Prontuario p = iaService.validar(documentoId, uidDoToken(jwt));
+        return ResponseEntity.ok(ProntuarioAdminDetalheResponse.from(p));
+    }
+
+    /** Reprocessa a análise de um documento por IA (após ajustar o prompt do tipo, ou se falhou). */
+    @PostMapping("/documento/{documentoId}/reanalisar")
+    public ResponseEntity<Void> reanalisar(@PathVariable Long documentoId) {
+        iaOrchestrator.analisar(documentoId, true); // gate revalidado no orquestrador
+        return ResponseEntity.accepted().build();
+    }
+
+    private static Long uidDoToken(Jwt jwt) {
+        return jwt != null && jwt.getClaim("uid") instanceof Number n ? n.longValue() : null;
+    }
+
+    /** Dispara a análise por IA (assíncrona) dos documentos novos que têm tipo definido. */
+    private void dispararAnalise(List<Documento> novos) {
+        for (Documento d : novos) {
+            if (d.getId() != null && d.getTipo() != null) {
+                iaOrchestrator.analisar(d.getId(), false);
+            }
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -265,18 +312,51 @@ public class ProntuarioController {
         return ResponseEntity.noContent().build();
     }
 
-    private void aplicar(Prontuario prontuario, ProntuarioRequest request) {
+    /**
+     * Aplica o request ao prontuário fazendo MERGE dos documentos por URL: mantém os documentos que
+     * continuam (preservando a análise por IA já feita), remove os que saíram (orphanRemoval) e cria
+     * os novos. Devolve a lista dos documentos NOVOS (para disparar a análise por IA só neles).
+     */
+    private List<Documento> aplicar(Prontuario prontuario, ProntuarioRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Agendamento não encontrado"));
         prontuario.setAgendamento(agendamento);
         prontuario.setNumeroAtendimento(request.numeroAtendimento().trim());
 
-        List<Documento> documentos = request.documentos().stream().map(dr -> {
-            Documento d = new Documento();
-            d.setNome(dr.nome().trim());
-            d.setUrl(dr.url());
-            return d;
-        }).toList();
-        prontuario.substituirDocumentos(documentos);
+        List<Documento> atuais = prontuario.getDocumentos();
+        java.util.Set<String> urlsRequest = new java.util.HashSet<>();
+        for (DocumentoRequest dr : request.documentos()) {
+            if (dr.url() != null) {
+                urlsRequest.add(dr.url());
+            }
+        }
+        // Remove os documentos que saíram (orphanRemoval apaga a linha e o resto).
+        atuais.removeIf(d -> d.getUrl() == null || !urlsRequest.contains(d.getUrl()));
+        Map<String, Documento> porUrl = new HashMap<>();
+        for (Documento d : atuais) {
+            if (d.getUrl() != null) {
+                porUrl.put(d.getUrl(), d);
+            }
+        }
+
+        List<Documento> novos = new ArrayList<>();
+        for (DocumentoRequest dr : request.documentos()) {
+            TipoDocumentoProntuario tipo = dr.tipoId() == null ? null
+                    : tipoRepository.findById(dr.tipoId()).orElse(null);
+            Documento existente = dr.url() == null ? null : porUrl.get(dr.url());
+            if (existente != null) {
+                existente.setNome(dr.nome().trim());
+                existente.setTipo(tipo); // mantém a análise já feita
+            } else {
+                Documento d = new Documento();
+                d.setNome(dr.nome().trim());
+                d.setUrl(dr.url());
+                d.setTipo(tipo);
+                d.setProntuario(prontuario);
+                atuais.add(d);
+                novos.add(d);
+            }
+        }
+        return novos;
     }
 }

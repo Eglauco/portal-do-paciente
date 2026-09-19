@@ -3,7 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { environment } from '../../environments/environment';
 
 /** Tipo do evento (espelha TipoNotificacaoAdmin no back) — define o ícone no sino. */
-export type TipoNotificacaoAdmin = 'SAU' | 'MODERACAO' | 'NPS';
+export type TipoNotificacaoAdmin = 'SAU' | 'MODERACAO' | 'NPS' | 'PRONTUARIO_VALIDACAO';
 
 export interface NotificacaoAdmin {
   id: number;

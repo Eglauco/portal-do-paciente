@@ -41,6 +41,8 @@ const ICONE = {
   procedimento: svg('<path d="M9 3h6v4H9z"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M12 11v6M9 14h6"/>'),
   alerta: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'),
   prontuario: svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9z"/><path d="M12 10v5M9.5 12.5h5"/>'),
+  prontuarioMedico: svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9z"/><path d="M8 13h2l1.2-2.5L13 15l1-2h2"/>'),
+  tipoDoc: svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/>'),
   social: svg('<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="12" cy="12" r="3.2"/><circle cx="17" cy="7" r="1"/>'),
   engrenagem: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 2.6 15H2.5a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9 4.6h.1A2 2 0 0 1 11 2.5"/>'),
   perfis: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16a3.2 3.2 0 0 1 6 0"/><path d="M14 10h4M14 13h3"/>'),
@@ -67,6 +69,8 @@ export const FUNCIONALIDADES: readonly Funcionalidade[] = [
   // Pacientes.
   { tela: 'PACIENTES', rotulo: 'Pacientes', rota: '/pacientes', grupo: 'Pacientes', icone: ICONE.paciente, palavras: ['cadastro', 'pessoas', 'cpf', 'prontuário'] },
   { tela: 'PRONTUARIOS', rotulo: 'Prontuários', rota: '/prontuarios', grupo: 'Pacientes', icone: ICONE.prontuario, palavras: ['histórico', 'atendimentos', 'evolução'] },
+  { tela: 'PRONTUARIO_MEDICO', rotulo: 'Prontuário Médico', rota: '/prontuario-medico', grupo: 'Pacientes', icone: ICONE.prontuarioMedico, palavras: ['histórico', 'linha do tempo', 'médico', 'resumo', 'ia', 'timeline', 'atendimentos'] },
+  { tela: 'PRONTUARIOS', rotulo: 'Tipos de Documento', rota: '/tipos-documento-prontuario', grupo: 'Pacientes', icone: ICONE.tipoDoc, palavras: ['prontuário', 'documento', 'ia', 'análise', 'resumo', 'prompt'] },
 
   // Cadastros.
   { tela: 'ESPECIALIDADES', rotulo: 'Especialidades', rota: '/especialidades', grupo: 'Cadastros', icone: ICONE.especialidade, palavras: ['cadastro', 'áreas', 'cardiologia'] },

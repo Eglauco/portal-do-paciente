@@ -8,6 +8,8 @@ import com.example.pop.agendamento.Agendamento;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -41,6 +43,11 @@ public class Prontuario {
 
     @OneToMany(mappedBy = "prontuario", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Documento> documentos = new ArrayList<>();
+
+    /** Status de alerta (rollup dos documentos), para busca/filtro no back-office. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_alerta", nullable = false, length = 30)
+    private StatusAlertaProntuario statusAlerta = StatusAlertaProntuario.SEM_ALTERACOES;
 
     /** Substitui a lista de documentos, mantendo o vínculo bidirecional. */
     public void substituirDocumentos(List<Documento> novos) {

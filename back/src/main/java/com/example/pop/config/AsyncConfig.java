@@ -27,4 +27,16 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /** Pool da análise de documentos do prontuário (Opus + PDF é lento; pool pequeno e enfileirado). */
+    @Bean(name = "prontuarioIaExecutor")
+    public Executor prontuarioIaExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("prontuario-ia-");
+        executor.initialize();
+        return executor;
+    }
 }

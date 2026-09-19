@@ -63,7 +63,7 @@ public class FichaPacienteService {
         }
 
         boolean docDisponivel = prontuarioRepository
-                .search("", pacienteId, unidadeId, "", PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id")))
+                .search("", pacienteId, unidadeId, "", null, PageRequest.of(0, 1, Sort.by(Sort.Direction.DESC, "id")))
                 .getContent().stream().findFirst()
                 .map(p -> !p.getDocumentos().isEmpty())
                 .orElse(false);

@@ -13,7 +13,9 @@ public enum TipoNotificacaoAdmin {
     /** Comentário da rede social retido para moderação (aguardando aprovar/rejeitar). */
     MODERACAO(Tela.POSTAGENS),
     /** Resposta de NPS com nota baixa (detrator). */
-    NPS(Tela.NPS);
+    NPS(Tela.NPS),
+    /** Documento do prontuário marcado pela IA como "Aguardando validação" (alerta). */
+    PRONTUARIO_VALIDACAO(Tela.PRONTUARIOS);
 
     private final Tela telaExigida;
 

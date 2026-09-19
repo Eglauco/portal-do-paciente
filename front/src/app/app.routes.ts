@@ -343,6 +343,49 @@ export const routes: Routes = [
         title: 'Editar prontuário',
       },
       {
+        path: 'tipos-documento-prontuario',
+        loadComponent: () =>
+          import('./pages/tipos-documento-prontuario/tipos-documento-prontuario-list').then(
+            (m) => m.TiposDocumentoProntuarioList,
+          ),
+        canActivate: [telaGuard('PRONTUARIOS')],
+        title: 'Tipos de Documento',
+      },
+      {
+        path: 'tipos-documento-prontuario/novo',
+        loadComponent: () =>
+          import('./pages/tipos-documento-prontuario/tipo-documento-prontuario-form').then(
+            (m) => m.TipoDocumentoProntuarioForm,
+          ),
+        canActivate: [telaGuard('PRONTUARIOS')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Novo tipo de documento',
+      },
+      {
+        path: 'tipos-documento-prontuario/:id',
+        loadComponent: () =>
+          import('./pages/tipos-documento-prontuario/tipo-documento-prontuario-form').then(
+            (m) => m.TipoDocumentoProntuarioForm,
+          ),
+        canActivate: [telaGuard('PRONTUARIOS')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar tipo de documento',
+      },
+      {
+        path: 'prontuario-medico',
+        loadComponent: () =>
+          import('./pages/prontuario-medico/prontuario-medico-busca').then((m) => m.ProntuarioMedicoBusca),
+        canActivate: [telaGuard('PRONTUARIO_MEDICO')],
+        title: 'Prontuário Médico',
+      },
+      {
+        path: 'prontuario-medico/:pacienteId',
+        loadComponent: () =>
+          import('./pages/prontuario-medico/prontuario-medico-historico').then((m) => m.ProntuarioMedicoHistorico),
+        canActivate: [telaGuard('PRONTUARIO_MEDICO')],
+        title: 'Prontuário Médico',
+      },
+      {
         path: 'postagens',
         loadComponent: () => import('./pages/postagens/postagens-list').then((m) => m.PostagensList),
         canActivate: [telaGuard('POSTAGENS')],

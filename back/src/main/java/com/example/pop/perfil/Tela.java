@@ -22,6 +22,7 @@ public enum Tela {
     CATEGORIAS_NPS("Categorias de NPS"),
     PACIENTES("Pacientes"),
     PRONTUARIOS("Prontuários"),
+    PRONTUARIO_MEDICO("Prontuário médico"),
     POSTAGENS("Rede Social"),
     ESPECIALIDADES("Especialidades"),
     PROFISSIONAIS("Profissionais"),

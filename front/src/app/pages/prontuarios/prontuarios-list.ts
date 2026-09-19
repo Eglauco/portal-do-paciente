@@ -10,7 +10,7 @@ import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { AuthService } from '../../core/auth.service';
 import { Paciente } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
-import { Prontuario } from './prontuario.model';
+import { Prontuario, StatusAlertaProntuario } from './prontuario.model';
 import { ProntuarioBuscaStore } from './prontuario-busca.store';
 import { ProntuarioService } from './prontuario.service';
 
@@ -41,6 +41,7 @@ export class ProntuariosList {
     numero: new FormControl<string>(this.store.numero, { nonNullable: true }),
     pacienteId: new FormControl<number | null>(this.store.pacienteId),
     especialidade: new FormControl<string>(this.store.especialidade, { nonNullable: true }),
+    status: new FormControl<string>(this.store.status ?? '', { nonNullable: true }),
   });
 
   protected readonly size = signal(this.store.size);
@@ -89,7 +90,7 @@ export class ProntuariosList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ numero: '', pacienteId: null, especialidade: '' });
+    this.filtro.reset({ numero: '', pacienteId: null, especialidade: '', status: '' });
     this.store.limpar();
     this.page.set(0);
     this.carregar();
@@ -117,9 +118,11 @@ export class ProntuariosList {
 
   private carregar(): void {
     const f = this.filtro.getRawValue();
+    const status = (f.status || null) as StatusAlertaProntuario | null;
     this.store.numero = f.numero;
     this.store.pacienteId = f.pacienteId;
     this.store.especialidade = f.especialidade;
+    this.store.status = status;
     this.store.ordenacoes = this.ordenacoes();
     this.store.size = this.size();
     this.store.page = this.page();
@@ -132,6 +135,7 @@ export class ProntuariosList {
           numero: f.numero,
           pacienteId: f.pacienteId,
           especialidade: f.especialidade,
+          status,
           unidadeId: this.auth.unidadeId(),
         },
         this.page(),
@@ -197,6 +201,7 @@ export class ProntuariosList {
           numero: f.numero,
           pacienteId: f.pacienteId,
           especialidade: f.especialidade,
+          status: (f.status || null) as StatusAlertaProntuario | null,
           unidadeId: this.auth.unidadeId(),
         },
         colunas,

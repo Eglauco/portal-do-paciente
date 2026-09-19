@@ -57,7 +57,7 @@ public class MeusProntuariosController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "id"));
-        Page<Prontuario> resultado = repository.search("", pacienteId, null, "", pageable);
+        Page<Prontuario> resultado = repository.search("", pacienteId, null, "", null, pageable);
         List<ProntuarioResponse> content = resultado.getContent().stream().map(ProntuarioResponse::from).toList();
 
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),

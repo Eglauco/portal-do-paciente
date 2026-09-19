@@ -63,6 +63,14 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'prontuario-medico/:pacienteId',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'tipos-documento-prontuario/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'postagens/:id',
     renderMode: RenderMode.Server,
   },

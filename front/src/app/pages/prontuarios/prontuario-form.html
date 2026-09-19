@@ -57,9 +57,9 @@
       <div class="doc-section__head">
         <div>
           <p class="section-label">Documentos</p>
-          <p class="doc-section__hint">Anexe os documentos deste atendimento.</p>
+          <p class="doc-section__hint">Anexe os documentos deste atendimento. Clique num item para editar.</p>
         </div>
-        <button type="button" class="btn btn--ghost" (click)="adicionarDocumento()">
+        <button type="button" class="btn btn--ghost" (click)="novoDocumento()">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -67,42 +67,102 @@
         </button>
       </div>
 
-      @if (documentos.length === 0) {
-        <p class="doc-empty">Nenhum documento adicionado.</p>
-      } @else {
-        <div class="doc-list" formArrayName="documentos">
-          @for (doc of documentos.controls; track $index) {
-            <div class="doc-row" [formGroupName]="$index">
-              <span class="doc-row__num">{{ $index + 1 }}</span>
-              <div class="doc-row__field">
+      <div class="doc-list">
+        @for (doc of documentos.controls; track $index) {
+          <button
+            type="button"
+            class="doc-item"
+            [class.doc-item--alerta]="statusAnalise($index) === 'AGUARDANDO_VALIDACAO'"
+            (click)="abrirDocumento($index)"
+          >
+            <span class="doc-item__tipo">{{ tipoRotulo($index) }}</span>
+            <span class="doc-item__sep" aria-hidden="true">·</span>
+            <span class="doc-item__nome">{{ nomeRotulo($index) }}</span>
+            @if (docId($index) == null) {
+              <span class="status-pill status-pill--novo">Novo</span>
+            } @else {
+              <span class="status-pill" [attr.data-st]="statusAnalise($index)">{{ statusAnaliseDescricao($index) }}</span>
+            }
+            <svg class="doc-item__chevron" viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        } @empty {
+          <p class="doc-empty">Nenhum documento.</p>
+        }
+      </div>
+    </div>
+
+    <!-- Detalhe do documento (modal). As alterações vão pro FormArray; o Salvar do prontuário grava tudo. -->
+    @if (documentoAberto() !== null) {
+      <div class="modal-backdrop" (click)="fecharDocumento()">
+        <div
+          class="modal modal--doc"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="doc-modal-titulo"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="modal__head">
+            <h2 id="doc-modal-titulo" class="modal__titulo">
+              {{ docId(docAbertoIdx) != null ? 'Documento' : 'Novo documento' }}
+            </h2>
+            <button type="button" class="modal__close" (click)="fecharDocumento()" aria-label="Fechar">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="modal__body" formArrayName="documentos">
+            <ng-container [formGroupName]="docAbertoIdx">
+              <div class="form-field">
+                <label class="label" for="doc-nome">Nome <span class="req" aria-hidden="true">*</span></label>
                 <input
+                  id="doc-nome"
                   type="text"
                   class="input"
                   formControlName="nome"
                   placeholder="Nome do documento"
-                  [attr.aria-label]="'Nome do documento ' + ($index + 1)"
-                  [class.input--error]="documentoInvalido($index)"
+                  (keydown.enter)="$event.preventDefault()"
+                  [class.input--error]="documentoInvalido(docAbertoIdx)"
                 />
-                @if (documentoInvalido($index)) {
+                @if (documentoInvalido(docAbertoIdx)) {
                   <span class="field-error">Informe o nome do documento.</span>
                 }
+              </div>
 
+              <div class="form-field">
+                <label class="label" for="doc-tipo">Tipo de documento</label>
+                <ng-select
+                  labelForId="doc-tipo"
+                  formControlName="tipoId"
+                  [items]="tiposDocumento()"
+                  bindLabel="nome"
+                  bindValue="id"
+                  placeholder="Tipo de documento (opcional)"
+                  notFoundText="Nenhum tipo encontrado"
+                ></ng-select>
+              </div>
+
+              <div class="form-field">
+                <span class="label">Arquivo</span>
                 <!-- Upload: fica em memória e só vai ao S3 ao salvar -->
                 <div class="doc-file">
-                  @if (arquivoPendente($index); as arq) {
+                  @if (arquivoPendente(docAbertoIdx); as arq) {
                     <span class="doc-file__pend">
                       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
                       </svg>
                       {{ arq.name }} · pendente de envio
                     </span>
-                    <button type="button" class="doc-file__link" (click)="verArquivo($index)">Pré-visualizar</button>
+                    <button type="button" class="doc-file__link" (click)="verArquivo(docAbertoIdx)">Pré-visualizar</button>
                     <label class="doc-file__btn">
                       Trocar
-                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                      <input type="file" hidden (change)="aoSelecionarArquivo(docAbertoIdx, $event)" />
                     </label>
-                  } @else if (temUrlSalva($index)) {
-                    <button type="button" class="doc-file__link" (click)="verArquivo($index)">
+                  } @else if (temUrlSalva(docAbertoIdx)) {
+                    <button type="button" class="doc-file__link" (click)="verArquivo(docAbertoIdx)">
                       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
                       </svg>
@@ -110,7 +170,7 @@
                     </button>
                     <label class="doc-file__btn">
                       Trocar
-                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                      <input type="file" hidden (change)="aoSelecionarArquivo(docAbertoIdx, $event)" />
                     </label>
                   } @else {
                     <label class="doc-file__btn">
@@ -118,26 +178,66 @@
                         <path d="M12 15V3M7 8l5-5 5 5M5 21h14" />
                       </svg>
                       Anexar arquivo
-                      <input type="file" hidden (change)="aoSelecionarArquivo($index, $event)" />
+                      <input type="file" hidden (change)="aoSelecionarArquivo(docAbertoIdx, $event)" />
                     </label>
                   }
                 </div>
               </div>
-              <button
-                type="button"
-                class="doc-row__remove"
-                (click)="removerDocumento($index)"
-                [attr.aria-label]="'Remover documento ' + ($index + 1)"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
-                </svg>
-              </button>
+
+              <!-- Análise por IA (documentos já salvos) -->
+              @if (statusAnalise(docAbertoIdx); as st) {
+                <div class="doc-analise">
+                  <div class="doc-analise__head">
+                    <span class="status-pill" [attr.data-st]="st">{{ statusAnaliseDescricao(docAbertoIdx) }}</span>
+                  </div>
+
+                  @if (estaReanalisando(docId(docAbertoIdx))) {
+                    <p class="doc-analise__reproc">Análise reprocessando… o resultado aparece ao recarregar.</p>
+                  }
+
+                  @if (resumoClinico(docAbertoIdx); as resumo) {
+                    <div class="doc-resumo">{{ resumo }}</div>
+                  }
+
+                  @if (st === 'VALIDADO' && validadoPorNome(docAbertoIdx); as autor) {
+                    <p class="doc-analise__validado">
+                      Validado por {{ autor }}@if (validadoEm(docAbertoIdx); as data) { em {{ data | date: 'dd/MM/yyyy HH:mm' }}}
+                    </p>
+                  }
+                </div>
+              }
+            </ng-container>
+          </div>
+
+          <div class="modal__actions modal__actions--doc">
+            <button type="button" class="btn btn--danger" (click)="removerDocumento(docAbertoIdx)">Remover documento</button>
+            <div class="modal__actions-right">
+              @if (docId(docAbertoIdx) != null && temTipo(docAbertoIdx)) {
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  (click)="reanalisar(docAbertoIdx)"
+                  [disabled]="estaReanalisando(docId(docAbertoIdx))"
+                >
+                  Reanalisar
+                </button>
+              }
+              @if (statusAnalise(docAbertoIdx) === 'AGUARDANDO_VALIDACAO') {
+                <button
+                  type="button"
+                  class="btn btn--solid"
+                  (click)="validar(docAbertoIdx)"
+                  [disabled]="estaValidando(docId(docAbertoIdx))"
+                >
+                  {{ estaValidando(docId(docAbertoIdx)) ? 'Validando…' : 'Validar' }}
+                </button>
+              }
+              <button type="button" class="btn btn--ghost" (click)="fecharDocumento()">Concluir</button>
             </div>
-          }
+          </div>
         </div>
-      }
-    </div>
+      </div>
+    }
 
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>

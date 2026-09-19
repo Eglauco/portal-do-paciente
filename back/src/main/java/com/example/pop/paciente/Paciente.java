@@ -152,6 +152,19 @@ public class Paciente {
     @Column(name = "dispositivo_ativo", length = 120)
     private String dispositivoAtivo;
 
+    /**
+     * Resumo clínico do histórico completo do paciente, gerado por IA sob demanda (tela Prontuário
+     * Médico). {@code @JsonIgnore}: dado clínico — nunca sai na listagem/cadastro de paciente; é
+     * exposto apenas pelo endpoint do Prontuário Médico.
+     */
+    @JsonIgnore
+    @Column(name = "resumo_historico_ia", columnDefinition = "TEXT")
+    private String resumoHistoricoIa;
+
+    @JsonIgnore
+    @Column(name = "resumo_historico_gerado_em")
+    private java.time.LocalDateTime resumoHistoricoGeradoEm;
+
     /** Um telefone para exibição/snapshot (o primeiro da lista); {@code null} se não houver. */
     public String primeiroTelefone() {
         return telefonesAdicionais == null || telefonesAdicionais.isEmpty() ? null : telefonesAdicionais.get(0);

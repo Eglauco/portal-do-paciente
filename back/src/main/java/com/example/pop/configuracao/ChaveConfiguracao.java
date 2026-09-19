@@ -93,4 +93,20 @@ public final class ChaveConfiguracao {
      * para a fila humana. Começa desligada (semeada em V94).
      */
     public static final String APP_CHAT_IA_HABILITADO = "APP_CHAT_IA_HABILITADO";
+
+    // ---------- Análise de documentos do prontuário por IA ----------
+
+    /**
+     * Liga/desliga GLOBAL da análise de documentos do prontuário por IA (BOOLEANO). Ligada = ao
+     * subir um documento a IA gera resumo clínico e pode marcar "Aguardando validação" conforme o
+     * Tipo de Documento; desligada = nada é analisado. Começa desligada (semeada em V96).
+     */
+    public static final String APP_PRONTUARIO_IA_HABILITADO = "APP_PRONTUARIO_IA_HABILITADO";
+
+    /**
+     * Liga/desliga o RESUMO do histórico por IA (tela Prontuário Médico), gerado automaticamente ao
+     * analisar um documento novo (BOOLEANO). Desligar economiza tokens mantendo a análise por
+     * documento. Só atua com {@link #APP_PRONTUARIO_IA_HABILITADO} ligado. Começa ligada (V98).
+     */
+    public static final String APP_PRONTUARIO_RESUMO_IA_HABILITADO = "APP_PRONTUARIO_RESUMO_IA_HABILITADO";
 }

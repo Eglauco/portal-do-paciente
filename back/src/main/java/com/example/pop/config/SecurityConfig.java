@@ -87,6 +87,7 @@ public class SecurityConfig {
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
+                                "/tipo-documento-prontuario/**",
                                 "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).

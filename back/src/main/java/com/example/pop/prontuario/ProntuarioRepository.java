@@ -23,11 +23,13 @@ public interface ProntuarioRepository extends JpaRepository<Prontuario, Long> {
               and (:pacienteId is null or p.agendamento.paciente.id = :pacienteId)
               and (:unidadeId is null or p.agendamento.unidadeSaude.id = :unidadeId)
               and (:especialidade = '' or lower(p.agendamento.especialidade.nome) like lower(concat('%', :especialidade, '%')))
+              and (:status is null or p.statusAlerta = :status)
             """)
     Page<Prontuario> search(
             @Param("numero") String numero,
             @Param("pacienteId") Long pacienteId,
             @Param("unidadeId") Long unidadeId,
             @Param("especialidade") String especialidade,
+            @Param("status") StatusAlertaProntuario status,
             Pageable pageable);
 }
