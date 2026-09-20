@@ -1,9 +1,10 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { DocumentoAdmin, ProntuarioDetalhe } from '../prontuarios/prontuario.model';
+import { DecisaoValidacao, DocumentoAdmin, ProntuarioDetalhe } from '../prontuarios/prontuario.model';
+import { ProntuarioService } from '../prontuarios/prontuario.service';
 import { StorageService } from '../prontuarios/storage.service';
 import { DocumentoAberto, HistoricoMedico, TipoArquivo } from './prontuario-medico.model';
 import { ProntuarioMedicoService } from './prontuario-medico.service';
@@ -29,7 +30,7 @@ interface MarcoTimeline {
  */
 @Component({
   selector: 'app-prontuario-medico-historico',
-  imports: [DatePipe],
+  imports: [DatePipe, DecimalPipe],
   templateUrl: './prontuario-medico-historico.html',
   host: {
     '(document:keydown.escape)': 'aoEscape()',
@@ -40,6 +41,7 @@ interface MarcoTimeline {
 })
 export class ProntuarioMedicoHistorico {
   private readonly service = inject(ProntuarioMedicoService);
+  private readonly prontuarioService = inject(ProntuarioService);
   private readonly storage = inject(StorageService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -75,10 +77,26 @@ export class ProntuarioMedicoHistorico {
   protected readonly infoMinimizada = signal(this.lerInfoMin());
   /** Visor em tela cheia (ocupa toda a janela). */
   protected readonly visorFullscreen = signal(false);
-  /** O documento aberto está com alerta (destaque âmbar no cabeçalho do visor). */
+  /** O documento aberto aguarda validação (destaque âmbar no cabeçalho do visor). */
   protected readonly docAlerta = computed(
     () => this.docAberto()?.documento.statusAnalise === 'AGUARDANDO_VALIDACAO',
   );
+  /** O documento aberto teve alteração confirmada (destaque vermelho — atenção do médico). */
+  protected readonly docConfirmado = computed(
+    () => this.docAberto()?.documento.statusAnalise === 'ALTERACAO_CONFIRMADA',
+  );
+
+  // Validação do documento no próprio visor (o médico pode validar durante o atendimento).
+  /** Observação (opcional) da decisão, editável no visor; pré-preenchida ao abrir o documento. */
+  protected readonly observacaoValidacao = signal('');
+  /** Decisão de validação em andamento (evita duplo clique). */
+  protected readonly validando = signal(false);
+  /** Pode decidir quando o documento aguarda validação OU já foi decidido por um humano (correção). */
+  protected readonly podeDecidir = computed(() => {
+    const d = this.docAberto()?.documento;
+    if (!d) return false;
+    return d.statusAnalise === 'AGUARDANDO_VALIDACAO' || d.validadoPorNome != null;
+  });
 
   protected readonly skeletons = Array.from({ length: 4 });
 
@@ -255,6 +273,10 @@ export class ProntuarioMedicoHistorico {
     return p.statusAlerta === 'AGUARDANDO_VALIDACAO';
   }
 
+  protected ehConfirmada(p: ProntuarioDetalhe): boolean {
+    return p.statusAlerta === 'ALTERACAO_CONFIRMADA';
+  }
+
   // --- Navegação entre documentos dentro do visor (setas ◀ ▶ / teclado) ---
 
   /** Todos os documentos visíveis (após filtros), achatados na ordem da linha do tempo. */
@@ -309,6 +331,7 @@ export class ProntuarioMedicoHistorico {
   /** Abre o visor embutido para um documento (busca a URL assinada). */
   protected async abrirDocumento(documento: DocumentoAdmin, prontuario: ProntuarioDetalhe): Promise<void> {
     this.docAberto.set({ documento, prontuario });
+    this.observacaoValidacao.set(documento.observacaoValidacao ?? '');
     this.visorErro.set(false);
     this.urlSegura.set(null);
     this.urlAssinada.set(null);
@@ -341,6 +364,54 @@ export class ProntuarioMedicoHistorico {
     this.urlAssinada.set(null);
     this.visorErro.set(false);
     this.visorFullscreen.set(false);
+  }
+
+  protected aoMudarObservacao(event: Event): void {
+    this.observacaoValidacao.set((event.target as HTMLTextAreaElement).value);
+  }
+
+  /**
+   * Registra a decisão humana do alerta do documento aberto (confirmar alteração ou marcar sem
+   * alteração), direto no visor. Atualiza o estado local em tempo real e mantém o visor aberto.
+   */
+  protected decidir(decisao: DecisaoValidacao): void {
+    const aberto = this.docAberto();
+    if (!aberto || this.validando()) return;
+    this.validando.set(true);
+    this.prontuarioService.validarDocumento(aberto.documento.id, decisao, this.observacaoValidacao()).subscribe({
+      next: (detalhe) => {
+        this.aplicarProntuarioAtualizado(detalhe);
+        this.validando.set(false);
+        this.toastr.success(
+          decisao === 'ALTERACAO_CONFIRMADA' ? 'Alteração confirmada' : 'Documento marcado sem alteração',
+        );
+      },
+      error: () => {
+        this.validando.set(false);
+        this.toastr.error('Não foi possível registrar a validação.');
+      },
+    });
+  }
+
+  /**
+   * Substitui o prontuário atualizado no histórico, recalcula o contador de alertas do cabeçalho e
+   * refaz o documento aberto (para o painel refletir o novo status na hora) — sem recarregar a tela.
+   */
+  private aplicarProntuarioAtualizado(detalhe: ProntuarioDetalhe): void {
+    const h = this.historico();
+    if (!h) return;
+    const prontuarios = h.prontuarios.map((p) => (p.id === detalhe.id ? detalhe : p));
+    const alertasPendentes = prontuarios.filter((p) => p.statusAlerta === 'AGUARDANDO_VALIDACAO').length;
+    this.historico.set({ ...h, prontuarios, paciente: { ...h.paciente, alertasPendentes } });
+
+    const aberto = this.docAberto();
+    if (aberto) {
+      const atual = detalhe.documentos.find((d) => d.id === aberto.documento.id);
+      if (atual) {
+        this.docAberto.set({ documento: atual, prontuario: detalhe });
+        this.observacaoValidacao.set(atual.observacaoValidacao ?? '');
+      }
+    }
   }
 
   protected aoEscape(): void {

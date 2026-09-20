@@ -48,12 +48,14 @@ public class ProntuarioIaService {
     }
 
     /**
-     * Carrega o contexto se — e só se — a IA deve analisar: recurso ligado globalmente, documento
-     * existe com URL, tipo definido com promptResumo, e (salvo {@code forcar}=reanalisar) ainda não
-     * analisado. Caso contrário, vazio.
+     * Inicia a análise se — e só se — a IA deve rodar: recurso ligado globalmente, documento existe
+     * com URL, tipo definido com promptResumo, e (salvo {@code forcar}=reanalisar) ainda não analisado.
+     * Quando decide rodar, marca o documento como {@link StatusAnaliseDocumento#EM_ANALISE} (para a UI
+     * mostrar "Análise em andamento" enquanto o Claude, lento, processa) e devolve o contexto. Caso
+     * contrário, vazio.
      */
-    @Transactional(readOnly = true)
-    public Optional<ContextoAnalise> carregarContexto(Long documentoId, boolean forcar) {
+    @Transactional
+    public Optional<ContextoAnalise> iniciarAnalise(Long documentoId, boolean forcar) {
         if (!iaHabilitada()) {
             return Optional.empty();
         }
@@ -62,13 +64,25 @@ public class ProntuarioIaService {
             return Optional.empty();
         }
         if (!forcar && d.getStatusAnalise() != StatusAnaliseDocumento.NAO_ANALISADO) {
-            return Optional.empty(); // já analisado (não reanalisa em toda edição do prontuário)
+            return Optional.empty(); // já analisado / em análise (não reprocessa em toda edição)
         }
         TipoDocumentoProntuario tipo = d.getTipo();
         if (tipo == null || tipo.getPromptResumo() == null || tipo.getPromptResumo().isBlank()) {
             return Optional.empty(); // sem direção → IA não roda
         }
+        d.setStatusAnalise(StatusAnaliseDocumento.EM_ANALISE);
+        documentoRepository.save(d);
         return Optional.of(new ContextoAnalise(d.getUrl(), d.getNome(), tipo.getPromptResumo(), tipo.getPromptValidacao()));
+    }
+
+    /** Reverte um documento preso em "em análise" (ex.: falha inesperada) para NAO_ANALISADO (reanalisável). */
+    @Transactional
+    public void reverterEmAnalise(Long documentoId) {
+        Documento d = documentoRepository.findById(documentoId).orElse(null);
+        if (d != null && d.getStatusAnalise() == StatusAnaliseDocumento.EM_ANALISE) {
+            d.setStatusAnalise(StatusAnaliseDocumento.NAO_ANALISADO);
+            documentoRepository.save(d);
+        }
     }
 
     /**
@@ -85,10 +99,13 @@ public class ProntuarioIaService {
         if (resultado.resumo() != null) {
             d.setResumoClinico(resultado.resumo());
         }
+        d.setTokensEntrada(resultado.tokensEntrada());
+        d.setTokensSaida(resultado.tokensSaida());
         d.setAnalisadoEm(LocalDateTime.now());
-        // Uma (re)análise invalida qualquer validação humana anterior.
+        // Uma (re)análise invalida qualquer decisão humana anterior.
         d.setValidadoPor(null);
         d.setValidadoEm(null);
+        d.setObservacaoValidacao(null);
         documentoRepository.save(d);
 
         Prontuario p = d.getProntuario();
@@ -101,18 +118,29 @@ public class ProntuarioIaService {
         return p.getAgendamento().getPaciente().getId();
     }
 
-    /** Validação humana do alerta: registra quem validou e quando; recalcula o prontuário. */
+    /**
+     * Decisão humana sobre o alerta de um documento: confirmar a alteração
+     * ({@link StatusAnaliseDocumento#ALTERACAO_CONFIRMADA}) ou marcar sem alteração
+     * ({@link StatusAnaliseDocumento#SEM_ALTERACOES}). Registra quem decidiu, quando e a observação
+     * opcional; permite corrigir uma decisão anterior; e recalcula o status do prontuário.
+     */
     @Transactional
-    public Prontuario validar(Long documentoId, Long usuarioId) {
+    public Prontuario decidir(Long documentoId, StatusAnaliseDocumento decisao, String observacao, Long usuarioId) {
+        if (decisao != StatusAnaliseDocumento.ALTERACAO_CONFIRMADA && decisao != StatusAnaliseDocumento.SEM_ALTERACOES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Decisão inválida.");
+        }
         Documento d = documentoRepository.findById(documentoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento não encontrado"));
-        if (d.getStatusAnalise() != StatusAnaliseDocumento.AGUARDANDO_VALIDACAO) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este documento não está aguardando validação.");
+        // Só pode decidir um documento aguardando validação ou já decidido por um humano (correção).
+        boolean jaDecididoPorHumano = d.getValidadoPor() != null;
+        if (d.getStatusAnalise() != StatusAnaliseDocumento.AGUARDANDO_VALIDACAO && !jaDecididoPorHumano) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este documento não está disponível para validação.");
         }
         Usuario u = usuarioId == null ? null : usuarioRepository.findById(usuarioId).orElse(null);
-        d.setStatusAnalise(StatusAnaliseDocumento.VALIDADO);
+        d.setStatusAnalise(decisao);
         d.setValidadoPor(u);
         d.setValidadoEm(LocalDateTime.now());
+        d.setObservacaoValidacao(observacao == null || observacao.isBlank() ? null : observacao.trim());
         documentoRepository.save(d);
 
         Prontuario p = d.getProntuario();
@@ -120,19 +148,23 @@ public class ProntuarioIaService {
         return prontuarioRepository.save(p);
     }
 
-    /** Rollup do status de alerta do prontuário a partir dos status dos documentos. */
+    /**
+     * Rollup do status de alerta do prontuário a partir dos documentos.
+     * Precedência: Aguardando validação > Alteração confirmada > Sem alterações — enquanto houver
+     * pendência ela aparece; só vira "Alteração confirmada" quando não há mais nada aguardando.
+     */
     private void recomputarStatus(Prontuario p) {
         boolean aguardando = false;
-        boolean validado = false;
+        boolean confirmada = false;
         for (Documento d : p.getDocumentos()) {
             if (d.getStatusAnalise() == StatusAnaliseDocumento.AGUARDANDO_VALIDACAO) {
                 aguardando = true;
-            } else if (d.getStatusAnalise() == StatusAnaliseDocumento.VALIDADO) {
-                validado = true;
+            } else if (d.getStatusAnalise() == StatusAnaliseDocumento.ALTERACAO_CONFIRMADA) {
+                confirmada = true;
             }
         }
         p.setStatusAlerta(aguardando ? StatusAlertaProntuario.AGUARDANDO_VALIDACAO
-                : validado ? StatusAlertaProntuario.VALIDADO : StatusAlertaProntuario.SEM_ALTERACOES);
+                : confirmada ? StatusAlertaProntuario.ALTERACAO_CONFIRMADA : StatusAlertaProntuario.SEM_ALTERACOES);
     }
 
     /** Notifica os admins da unidade (sino) sobre o documento aguardando validação — após o commit. */

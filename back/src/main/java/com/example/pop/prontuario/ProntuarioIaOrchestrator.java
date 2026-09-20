@@ -32,7 +32,7 @@ public class ProntuarioIaOrchestrator {
     public void analisar(Long documentoId, boolean forcar) {
         try {
             Optional<ProntuarioIaService.ContextoAnalise> ctxOpt =
-                    prontuarioIaService.carregarContexto(documentoId, forcar);
+                    prontuarioIaService.iniciarAnalise(documentoId, forcar);
             if (ctxOpt.isEmpty()) {
                 return;
             }
@@ -45,6 +45,8 @@ public class ProntuarioIaOrchestrator {
                 prontuarioMedicoService.regenerarResumo(pacienteId);
             }
         } catch (RuntimeException e) {
+            // Não deixa o documento preso em "em análise" se algo inesperado estourar.
+            prontuarioIaService.reverterEmAnalise(documentoId);
             log.warn("Falha ao analisar o documento {} por IA: {}", documentoId, e.toString());
         }
     }

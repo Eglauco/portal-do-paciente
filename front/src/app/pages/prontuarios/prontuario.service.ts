@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
 import {
+  DecisaoValidacao,
   Pagina,
   Prontuario,
   ProntuarioDetalhe,
@@ -69,9 +70,20 @@ export class ProntuarioService {
     return this.http.delete<void>(`${this.base}/${id}`);
   }
 
-  /** Confirma o alerta de um documento (aguardando validação). Devolve o prontuário atualizado. */
-  validarDocumento(documentoId: number): Observable<ProntuarioDetalhe> {
-    return this.http.post<ProntuarioDetalhe>(`${this.base}/documento/${documentoId}/validar`, {});
+  /**
+   * Registra a decisão humana sobre o alerta de um documento: confirmar a alteração
+   * (ALTERACAO_CONFIRMADA) ou marcar sem alteração (SEM_ALTERACOES), com observação opcional.
+   * Devolve o prontuário atualizado.
+   */
+  validarDocumento(
+    documentoId: number,
+    decisao: DecisaoValidacao,
+    observacao?: string | null,
+  ): Observable<ProntuarioDetalhe> {
+    return this.http.post<ProntuarioDetalhe>(`${this.base}/documento/${documentoId}/validar`, {
+      decisao,
+      observacao: observacao ?? null,
+    });
   }
 
   /** Reprocessa a análise por IA de um documento (assíncrono, sem corpo de resposta). */

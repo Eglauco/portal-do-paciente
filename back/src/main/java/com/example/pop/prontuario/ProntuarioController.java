@@ -233,12 +233,12 @@ public class ProntuarioController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Número do atendimento já cadastrado");
         }
         Prontuario prontuario = new Prontuario();
-        List<Documento> novos = aplicar(prontuario, request);
+        aplicar(prontuario, request);
         Prontuario salvo = repository.save(prontuario);
         ProntuarioAdminDetalheResponse resposta = ProntuarioAdminDetalheResponse.from(salvo);
         // Notifica o paciente dono sobre o novo prontuário.
         pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), true);
-        dispararAnalise(novos);
+        dispararAnalise(salvo);
         return resposta;
     }
 
@@ -257,20 +257,21 @@ public class ProntuarioController {
                     if (!novos.isEmpty()) {
                         pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), false);
                     }
-                    dispararAnalise(novos);
+                    dispararAnalise(salvo);
                     return ResponseEntity.ok(resposta);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     /**
-     * Valida um documento marcado pela IA como "Aguardando validação": registra quem validou e
-     * quando, e recalcula o status do prontuário.
+     * Registra a decisão humana sobre um documento marcado pela IA ("Aguardando validação"):
+     * confirmar a alteração ou marcar como sem alteração, com observação opcional. Guarda quem
+     * decidiu e quando, permite corrigir a decisão depois, e recalcula o status do prontuário.
      */
     @PostMapping("/documento/{documentoId}/validar")
     public ResponseEntity<ProntuarioAdminDetalheResponse> validar(@PathVariable Long documentoId,
-            @AuthenticationPrincipal Jwt jwt) {
-        Prontuario p = iaService.validar(documentoId, uidDoToken(jwt));
+            @Valid @RequestBody ValidacaoDocumentoRequest request, @AuthenticationPrincipal Jwt jwt) {
+        Prontuario p = iaService.decidir(documentoId, request.decisao(), request.observacao(), uidDoToken(jwt));
         return ResponseEntity.ok(ProntuarioAdminDetalheResponse.from(p));
     }
 
@@ -285,10 +286,18 @@ public class ProntuarioController {
         return jwt != null && jwt.getClaim("uid") instanceof Number n ? n.longValue() : null;
     }
 
-    /** Dispara a análise por IA (assíncrona) dos documentos novos que têm tipo definido. */
-    private void dispararAnalise(List<Documento> novos) {
-        for (Documento d : novos) {
-            if (d.getId() != null && d.getTipo() != null) {
+    /**
+     * Dispara a análise por IA (assíncrona) dos documentos que ainda precisam: com tipo, com arquivo e
+     * ainda não analisados. Percorre a entidade SALVA (gerenciada) — nunca a lista desanexada devolvida
+     * por {@code aplicar}, cujos ids ficam nulos após o {@code merge} da edição (era por isso que a
+     * análise não disparava ao ADICIONAR documento em prontuário já existente). É idempotente: um
+     * documento já analisado (status ≠ NAO_ANALISADO) é ignorado, então salvar de novo não reprocessa.
+     */
+    private void dispararAnalise(Prontuario salvo) {
+        for (Documento d : salvo.getDocumentos()) {
+            if (d.getId() != null && d.getTipo() != null
+                    && d.getUrl() != null && !d.getUrl().isBlank()
+                    && d.getStatusAnalise() == StatusAnaliseDocumento.NAO_ANALISADO) {
                 iaOrchestrator.analisar(d.getId(), false);
             }
         }

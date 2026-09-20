@@ -78,8 +78,11 @@ public class AnaliseDocumentoService {
         this.timeoutSegundos = timeoutSegundos;
     }
 
-    /** Resultado da análise: status a gravar no documento + resumo clínico (ou null). */
-    public record AnaliseResultado(StatusAnaliseDocumento status, String resumo) {
+    /**
+     * Resultado da análise: status a gravar no documento + resumo clínico (ou null) + tokens gastos
+     * pela IA (entrada/saída; nulos quando não houve chamada à IA — sem chave, formato inválido, etc.).
+     */
+    public record AnaliseResultado(StatusAnaliseDocumento status, String resumo, Long tokensEntrada, Long tokensSaida) {
     }
 
     private enum TipoArquivo {
@@ -94,17 +97,17 @@ public class AnaliseDocumentoService {
         Base64ImageSource.MediaType mediaImagem = mediaTypeImagem(nomeArquivo, url);
         TipoArquivo tipo = tipoDe(nomeArquivo, url, mediaImagem);
         if (tipo == TipoArquivo.NAO_SUPORTADO) {
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISAVEL, null);
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISAVEL, null, null, null);
         }
         AnthropicClient c = client();
         if (c == null) {
             log.warn("Análise de documento sem chave de IA configurada; fica não analisado.");
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null);
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null);
         }
         byte[] bytes = storageService.baixarBytes(url);
         if (bytes == null || bytes.length == 0) {
             log.warn("Não foi possível baixar o documento do S3 (url={}); fica não analisado.", url);
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null);
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null);
         }
         try {
             String base64 = Base64.getEncoder().encodeToString(bytes);
@@ -128,15 +131,18 @@ public class AnaliseDocumentoService {
                     .build();
 
             Message resposta = c.messages().create(params);
+            long tokensEntrada = resposta.usage().inputTokens();
+            long tokensSaida = resposta.usage().outputTokens();
             String saida = resposta.content().stream()
                     .flatMap(b -> b.text().stream())
                     .map(t -> t.text())
                     .collect(Collectors.joining("\n"))
                     .trim();
-            return interpretar(saida, temValidacao);
+            AnaliseResultado base = interpretar(saida, temValidacao);
+            return new AnaliseResultado(base.status(), base.resumo(), tokensEntrada, tokensSaida);
         } catch (RuntimeException e) {
             log.warn("Análise de documento por IA falhou (url={}); fica não analisado: {}", url, e.toString());
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null);
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null);
         }
     }
 
@@ -152,7 +158,7 @@ public class AnaliseDocumentoService {
     AnaliseResultado interpretar(String saida, boolean temValidacao) {
         String s = saida == null ? "" : saida.trim();
         if (s.isEmpty()) {
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null); // vazio = falha
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null); // vazio = falha
         }
         boolean alerta = temValidacao && s.toUpperCase(Locale.ROOT).contains(MARCA_ALERTA);
         String resumo = s.replaceAll("(?i)" + MARCA_ALERTA, "")
@@ -163,7 +169,8 @@ public class AnaliseDocumentoService {
         StatusAnaliseDocumento status = alerta
                 ? StatusAnaliseDocumento.AGUARDANDO_VALIDACAO
                 : StatusAnaliseDocumento.SEM_ALTERACOES;
-        return new AnaliseResultado(status, resumo.isBlank() ? null : resumo);
+        // Tokens ficam por conta de quem chamou a IA (analisar); aqui é só parsing do texto.
+        return new AnaliseResultado(status, resumo.isBlank() ? null : resumo, null, null);
     }
 
     /** Neutraliza os delimitadores dentro do prompt/texto (defesa de bloco de dados). */

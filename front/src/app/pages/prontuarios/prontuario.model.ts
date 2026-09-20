@@ -6,13 +6,17 @@ export interface Ref {
 /** Situação da análise por IA de um documento. */
 export type StatusAnaliseDocumento =
   | 'NAO_ANALISADO'
+  | 'EM_ANALISE'
   | 'SEM_ALTERACOES'
   | 'AGUARDANDO_VALIDACAO'
-  | 'VALIDADO'
+  | 'ALTERACAO_CONFIRMADA'
   | 'NAO_ANALISAVEL';
 
+/** Decisão humana possível sobre um documento aguardando validação. */
+export type DecisaoValidacao = 'ALTERACAO_CONFIRMADA' | 'SEM_ALTERACOES';
+
 /** Situação consolidada do alerta do prontuário (pior status entre os documentos). */
-export type StatusAlertaProntuario = 'SEM_ALTERACOES' | 'AGUARDANDO_VALIDACAO' | 'VALIDADO';
+export type StatusAlertaProntuario = 'SEM_ALTERACOES' | 'AGUARDANDO_VALIDACAO' | 'ALTERACAO_CONFIRMADA';
 
 /** Documento com os dados da análise por IA (retorno do detalhe do prontuário). */
 export interface DocumentoAdmin {
@@ -26,7 +30,11 @@ export interface DocumentoAdmin {
   statusAnaliseDescricao: string;
   validadoPorNome?: string | null;
   validadoEm?: string | null;
+  observacaoValidacao?: string | null;
   analisadoEm?: string | null;
+  /** Tokens gastos pela IA na última análise (entrada/saída); null se nunca analisado. */
+  tokensEntrada?: number | null;
+  tokensSaida?: number | null;
 }
 
 /** Item da listagem de prontuários. */

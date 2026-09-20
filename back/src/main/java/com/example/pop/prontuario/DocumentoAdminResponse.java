@@ -17,7 +17,10 @@ public record DocumentoAdminResponse(
         String statusAnaliseDescricao,
         String validadoPorNome,
         LocalDateTime validadoEm,
-        LocalDateTime analisadoEm) {
+        String observacaoValidacao,
+        LocalDateTime analisadoEm,
+        Long tokensEntrada,
+        Long tokensSaida) {
 
     public static DocumentoAdminResponse from(Documento d) {
         return new DocumentoAdminResponse(
@@ -31,6 +34,9 @@ public record DocumentoAdminResponse(
                 d.getStatusAnalise() == null ? null : d.getStatusAnalise().getDescricao(),
                 d.getValidadoPor() == null ? null : d.getValidadoPor().getNome(),
                 d.getValidadoEm(),
-                d.getAnalisadoEm());
+                d.getObservacaoValidacao(),
+                d.getAnalisadoEm(),
+                d.getTokensEntrada(),
+                d.getTokensSaida());
     }
 }

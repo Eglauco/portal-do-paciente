@@ -56,7 +56,7 @@ public class Documento {
     @Column(name = "status_analise", nullable = false, length = 30)
     private StatusAnaliseDocumento statusAnalise = StatusAnaliseDocumento.NAO_ANALISADO;
 
-    /** Usuário (atendente) que validou o alerta; nulo enquanto não validado. */
+    /** Usuário que decidiu o alerta (confirmou a alteração ou marcou sem alteração); nulo enquanto não decidido. */
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "validado_por")
     private Usuario validadoPor;
@@ -64,7 +64,18 @@ public class Documento {
     @Column(name = "validado_em")
     private LocalDateTime validadoEm;
 
+    /** Motivo/observação opcional que o humano registrou ao decidir (auditoria/LGPD). */
+    @Column(name = "observacao_validacao", columnDefinition = "TEXT")
+    private String observacaoValidacao;
+
     /** Quando a IA analisou o documento (nulo = ainda não analisado). */
     @Column(name = "analisado_em")
     private LocalDateTime analisadoEm;
+
+    /** Tokens consumidos pela IA na última análise: entrada (documento + prompts) e saída (resumo). */
+    @Column(name = "tokens_entrada")
+    private Long tokensEntrada;
+
+    @Column(name = "tokens_saida")
+    private Long tokensSaida;
 }

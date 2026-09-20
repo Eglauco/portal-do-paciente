@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,7 +10,13 @@ import { Agendamento, filtroVazio } from '../agendamentos/agendamento.model';
 import { AgendamentoService } from '../agendamentos/agendamento.service';
 import { TipoDocumentoProntuarioAtivo } from '../tipos-documento-prontuario/tipo-documento-prontuario.model';
 import { TipoDocumentoProntuarioService } from '../tipos-documento-prontuario/tipo-documento-prontuario.service';
-import { DocumentoAdmin, ProntuarioDetalhe, ProntuarioRequest, StatusAnaliseDocumento } from './prontuario.model';
+import {
+  DecisaoValidacao,
+  DocumentoAdmin,
+  ProntuarioDetalhe,
+  ProntuarioRequest,
+  StatusAnaliseDocumento,
+} from './prontuario.model';
 import { ProntuarioService } from './prontuario.service';
 import { StorageService } from './storage.service';
 
@@ -33,11 +39,16 @@ type DocumentoGroup = FormGroup<{
   tipoNome: FormControl<string | null>;
   validadoPorNome: FormControl<string | null>;
   validadoEm: FormControl<string | null>;
+  /** Observação da decisão humana (editável na rotina de validação). */
+  observacaoValidacao: FormControl<string | null>;
+  /** Tokens gastos pela IA (somente exibição). */
+  tokensEntrada: FormControl<number | null>;
+  tokensSaida: FormControl<number | null>;
 }>;
 
 @Component({
   selector: 'app-prontuario-form',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe],
   templateUrl: './prontuario-form.html',
 })
 export class ProntuarioForm implements PodeSair {
@@ -66,7 +77,7 @@ export class ProntuarioForm implements PodeSair {
 
   /** Índice do documento aberto no modal de detalhe (null = modal fechado). */
   protected readonly documentoAberto = signal<number | null>(null);
-  /** Ids dos documentos com o "Validar" em andamento. */
+  /** Ids dos documentos com a decisão de validação em andamento. */
   protected readonly validando = signal<Set<number>>(new Set());
   /** Ids dos documentos em reprocessamento (assíncrono; o resultado aparece ao recarregar). */
   protected readonly reanalisando = signal<Set<number>>(new Set());
@@ -176,6 +187,14 @@ export class ProntuarioForm implements PodeSair {
     return this.documentos.at(indice).controls.validadoEm.value;
   }
 
+  protected tokensEntrada(indice: number): number | null {
+    return this.documentos.at(indice).controls.tokensEntrada.value;
+  }
+
+  protected tokensSaida(indice: number): number | null {
+    return this.documentos.at(indice).controls.tokensSaida.value;
+  }
+
   protected temTipo(indice: number): boolean {
     return this.documentos.at(indice).controls.tipoId.value != null;
   }
@@ -223,6 +242,9 @@ export class ProntuarioForm implements PodeSair {
         tipoNome: new FormControl<string | null>(doc?.tipoNome ?? null),
         validadoPorNome: new FormControl<string | null>(doc?.validadoPorNome ?? null),
         validadoEm: new FormControl<string | null>(doc?.validadoEm ?? null),
+        observacaoValidacao: new FormControl<string | null>(doc?.observacaoValidacao ?? null),
+        tokensEntrada: new FormControl<number | null>(doc?.tokensEntrada ?? null),
+        tokensSaida: new FormControl<number | null>(doc?.tokensSaida ?? null),
       }),
     );
     this.form.markAsDirty();
@@ -271,12 +293,21 @@ export class ProntuarioForm implements PodeSair {
     this.form.markAsDirty();
   }
 
-  /** Confirma o alerta de um documento (Aguardando validação). */
-  protected validar(indice: number): void {
+  /**
+   * Pode decidir (confirmar/negar) quando o documento está aguardando validação OU quando já foi
+   * decidido por um humano (permite corrigir a decisão).
+   */
+  protected podeDecidir(indice: number): boolean {
+    return this.statusAnalise(indice) === 'AGUARDANDO_VALIDACAO' || this.validadoPorNome(indice) != null;
+  }
+
+  /** Registra a decisão humana do alerta: confirmar a alteração ou marcar sem alteração. */
+  protected decidir(indice: number, decisao: DecisaoValidacao): void {
     const id = this.docId(indice);
     if (id == null || this.estaValidando(id)) return;
+    const observacao = this.documentos.at(indice).controls.observacaoValidacao.value;
     this.validando.update((set) => new Set(set).add(id));
-    this.service.validarDocumento(id).subscribe({
+    this.service.validarDocumento(id, decisao, observacao).subscribe({
       next: (detalhe) => {
         this.aplicarAnalise(detalhe);
         this.validando.update((set) => {
@@ -284,7 +315,11 @@ export class ProntuarioForm implements PodeSair {
           novo.delete(id);
           return novo;
         });
-        this.toastr.success('Documento validado');
+        // Decisão registrada → fecha o modal do documento.
+        this.documentoAberto.set(null);
+        this.toastr.success(
+          decisao === 'ALTERACAO_CONFIRMADA' ? 'Alteração confirmada' : 'Documento marcado sem alteração',
+        );
       },
       error: () => {
         this.validando.update((set) => {
@@ -292,7 +327,7 @@ export class ProntuarioForm implements PodeSair {
           novo.delete(id);
           return novo;
         });
-        this.toastr.error('Não foi possível validar o documento.');
+        this.toastr.error('Não foi possível registrar a validação.');
       },
     });
   }
@@ -323,6 +358,9 @@ export class ProntuarioForm implements PodeSair {
           tipoNome: d.tipoNome ?? null,
           validadoPorNome: d.validadoPorNome ?? null,
           validadoEm: d.validadoEm ?? null,
+          observacaoValidacao: d.observacaoValidacao ?? null,
+          tokensEntrada: d.tokensEntrada ?? null,
+          tokensSaida: d.tokensSaida ?? null,
         },
         { emitEvent: false },
       );

@@ -247,9 +247,13 @@
     } @else {
       <ol class="pm-tl">
         @for (m of marcos(); track m.prontuario.id) {
-          <li class="pm-tl__item" [class.pm-tl__item--alerta]="ehAlerta(m.prontuario)">
+          <li
+            class="pm-tl__item"
+            [class.pm-tl__item--alerta]="ehAlerta(m.prontuario)"
+            [class.pm-tl__item--confirmada]="ehConfirmada(m.prontuario)"
+          >
             <span class="pm-tl__dot" [attr.data-st]="m.prontuario.statusAlerta" aria-hidden="true">
-              @if (ehAlerta(m.prontuario)) {
+              @if (ehAlerta(m.prontuario) || ehConfirmada(m.prontuario)) {
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4M12 16h.01" /></svg>
               } @else {
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg>
@@ -280,6 +284,7 @@
                       type="button"
                       class="pm-doc"
                       [class.pm-doc--alerta]="d.statusAnalise === 'AGUARDANDO_VALIDACAO'"
+                      [class.pm-doc--confirmada]="d.statusAnalise === 'ALTERACAO_CONFIRMADA'"
                       (click)="abrirDocumento(d, m.prontuario)"
                       [attr.aria-label]="'Abrir documento ' + d.nome"
                     >
@@ -347,6 +352,7 @@
       class="modal modal--visor"
       [class.modal--visor-full]="visorFullscreen()"
       [class.modal--visor-alerta]="docAlerta()"
+      [class.modal--visor-confirmada]="docConfirmado()"
       role="dialog"
       aria-modal="true"
       aria-labelledby="visor-titulo"
@@ -364,6 +370,13 @@
               <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" />
             </svg>
             Alerta — requer validação
+          </span>
+        } @else if (docConfirmado()) {
+          <span class="pm-visor__alerta-tag pm-visor__alerta-tag--confirmada" role="status">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" />
+            </svg>
+            Alteração confirmada
           </span>
         }
 
@@ -464,11 +477,40 @@
               </div>
             }
 
-            @if (aberto.documento.statusAnalise === 'VALIDADO' && aberto.documento.validadoPorNome) {
+            @if (aberto.documento.validadoPorNome; as autor) {
               <p class="pm-visor__validado">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7" /></svg>
-                Validado por {{ aberto.documento.validadoPorNome }}@if (aberto.documento.validadoEm; as v) { em {{ v | date: 'dd/MM/yyyy HH:mm' }} }
+                {{ aberto.documento.statusAnalise === 'ALTERACAO_CONFIRMADA' ? 'Alteração confirmada' : 'Verificado (sem alteração)' }}
+                por {{ autor }}@if (aberto.documento.validadoEm; as v) { em {{ v | date: 'dd/MM/yyyy HH:mm' }} }
               </p>
+            }
+
+            <!-- Validação: o médico pode confirmar/negar o alerta durante o atendimento -->
+            @if (podeDecidir()) {
+              <div class="pm-visor__bloco pm-visor__validar">
+                <p class="pm-visor__k">Validação</p>
+                <textarea
+                  class="input pm-visor__obs"
+                  rows="2"
+                  [value]="observacaoValidacao()"
+                  (input)="aoMudarObservacao($event)"
+                  placeholder="Observação (opcional): por que confirmou / por que não é alteração"
+                  aria-label="Observação da validação"
+                ></textarea>
+                <div class="pm-visor__acoes">
+                  <button type="button" class="btn btn--ghost btn--sm" (click)="decidir('SEM_ALTERACOES')" [disabled]="validando()">
+                    Sem alteração
+                  </button>
+                  <button type="button" class="btn btn--solid btn--sm" (click)="decidir('ALTERACAO_CONFIRMADA')" [disabled]="validando()">
+                    {{ validando() ? 'Salvando…' : 'Confirmar alteração' }}
+                  </button>
+                </div>
+              </div>
+            } @else if (aberto.documento.observacaoValidacao; as obs) {
+              <div class="pm-visor__bloco">
+                <p class="pm-visor__k">Observação da validação</p>
+                <p class="pm-visor__resumo">{{ obs }}</p>
+              </div>
             }
 
             <div class="pm-visor__bloco pm-visor__contexto">
@@ -478,7 +520,14 @@
               <p class="pm-visor__ctx">{{ aberto.prontuario.unidadeSaude.nome }}</p>
             </div>
 
-            <p class="pm-visor__disc">Somente leitura — a validação é feita na tela de Prontuários.</p>
+            @if (aberto.documento.tokensEntrada != null) {
+              <p class="pm-visor__tokens">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /><circle cx="12" cy="12" r="3" /></svg>
+                IA: {{ aberto.documento.tokensEntrada | number }} tokens entrada · {{ aberto.documento.tokensSaida | number }} saída
+              </p>
+            }
+
+            <p class="pm-visor__disc">Edição e anexos de documentos são feitos na tela de Prontuários.</p>
           }
         </aside>
       </div>

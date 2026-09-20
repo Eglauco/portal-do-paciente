@@ -199,10 +199,32 @@
                     <div class="doc-resumo">{{ resumo }}</div>
                   }
 
-                  @if (st === 'VALIDADO' && validadoPorNome(docAbertoIdx); as autor) {
-                    <p class="doc-analise__validado">
-                      Validado por {{ autor }}@if (validadoEm(docAbertoIdx); as data) { em {{ data | date: 'dd/MM/yyyy HH:mm' }}}
+                  @if (tokensEntrada(docAbertoIdx) != null) {
+                    <p class="doc-analise__tokens">
+                      IA: {{ tokensEntrada(docAbertoIdx) | number }} tokens entrada · {{ tokensSaida(docAbertoIdx) | number }} saída
                     </p>
+                  }
+
+                  <!-- Quem decidiu (confirmou a alteração ou verificou que não há) -->
+                  @if (validadoPorNome(docAbertoIdx); as autor) {
+                    <p class="doc-analise__validado">
+                      {{ st === 'ALTERACAO_CONFIRMADA' ? 'Alteração confirmada' : 'Verificado (sem alteração)' }} por
+                      {{ autor }}@if (validadoEm(docAbertoIdx); as data) { em {{ data | date: 'dd/MM/yyyy HH:mm' }}}
+                    </p>
+                  }
+
+                  <!-- Rotina de validação: observação opcional (some quando não há o que decidir) -->
+                  @if (podeDecidir(docAbertoIdx)) {
+                    <div class="form-field">
+                      <label class="label" for="doc-obs">Observação da validação (opcional)</label>
+                      <textarea
+                        id="doc-obs"
+                        class="input"
+                        rows="2"
+                        formControlName="observacaoValidacao"
+                        placeholder="Ex.: por que confirmou a alteração / por que não é alteração"
+                      ></textarea>
+                    </div>
                   }
                 </div>
               }
@@ -222,14 +244,22 @@
                   Reanalisar
                 </button>
               }
-              @if (statusAnalise(docAbertoIdx) === 'AGUARDANDO_VALIDACAO') {
+              @if (podeDecidir(docAbertoIdx)) {
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  (click)="decidir(docAbertoIdx, 'SEM_ALTERACOES')"
+                  [disabled]="estaValidando(docId(docAbertoIdx))"
+                >
+                  Sem alteração
+                </button>
                 <button
                   type="button"
                   class="btn btn--solid"
-                  (click)="validar(docAbertoIdx)"
+                  (click)="decidir(docAbertoIdx, 'ALTERACAO_CONFIRMADA')"
                   [disabled]="estaValidando(docId(docAbertoIdx))"
                 >
-                  {{ estaValidando(docId(docAbertoIdx)) ? 'Validando…' : 'Validar' }}
+                  {{ estaValidando(docId(docAbertoIdx)) ? 'Salvando…' : 'Confirmar alteração' }}
                 </button>
               }
               <button type="button" class="btn btn--ghost" (click)="fecharDocumento()">Concluir</button>

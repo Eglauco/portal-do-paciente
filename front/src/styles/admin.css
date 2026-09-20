@@ -2212,10 +2212,12 @@
 
 /* Status da análise por IA do prontuário/documento */
 .status-pill[data-st='SEM_ALTERACOES'] { color: #6b7280; background: #eceef1; }
+.status-pill[data-st='EM_ANALISE'] { color: #6d28d9; background: #efe7fd; animation: pill-pulse 1.4s ease-in-out infinite; }
 .status-pill[data-st='AGUARDANDO_VALIDACAO'] { color: #a5741a; background: #fbf0d6; }
-.status-pill[data-st='VALIDADO'] { color: #0a7d5a; background: #e3f6ec; }
+.status-pill[data-st='ALTERACAO_CONFIRMADA'] { color: #b42318; background: #fde7e6; }
 .status-pill[data-st='NAO_ANALISADO'] { color: #6b7280; background: #eceef1; }
 .status-pill[data-st='NAO_ANALISAVEL'] { color: #8a5a00; background: #fbe9cf; }
+@keyframes pill-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 /* Documento novo, ainda não salvo (sem análise). */
 .status-pill--novo { color: #6b7280; background: #eceef1; }
 
@@ -2713,6 +2715,7 @@
 .doc-analise__head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .doc-analise__reproc { margin: 0; font-size: 0.82rem; font-weight: 600; color: #8a5a00; }
 .doc-analise__validado { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.doc-analise__tokens { margin: 0; font-size: 0.75rem; color: var(--muted); }
 .doc-resumo {
   padding: 0.7rem 0.85rem;
   font-size: 0.86rem;
@@ -3680,7 +3683,8 @@
   z-index: 1;
 }
 .pm-tl__dot svg { width: 1rem; height: 1rem; stroke: currentColor; }
-.pm-tl__dot[data-st='VALIDADO'] { background: #1e874b; }
+.pm-tl__dot[data-st='ALTERACAO_CONFIRMADA'] { background: #dc2626; }
+.pm-tl__dot[data-st='EM_ANALISE'] { background: #7c3aed; }
 .pm-tl__dot[data-st='SEM_ALTERACOES'] { background: color-mix(in srgb, var(--brand) 70%, #6b7280); }
 .pm-tl__dot[data-st='AGUARDANDO_VALIDACAO'] { background: #d99a1c; }
 
@@ -3697,6 +3701,12 @@
   border-color: color-mix(in srgb, #f2b705 45%, var(--line));
   box-shadow: 0 10px 26px -22px rgba(217, 154, 28, 0.55);
   background: linear-gradient(180deg, color-mix(in srgb, #f2b705 6%, var(--surface)), var(--surface) 60%);
+}
+/* Atendimento com alteração confirmada: card em vermelho, para o médico notar de imediato. */
+.pm-tl__item--confirmada .pm-tl__card {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--line));
+  box-shadow: 0 10px 26px -22px rgba(220, 38, 38, 0.55);
+  background: linear-gradient(180deg, color-mix(in srgb, #dc2626 6%, var(--surface)), var(--surface) 60%);
 }
 .pm-tl__head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
 .pm-tl__quando { display: flex; align-items: baseline; gap: 0.5rem; }
@@ -3737,6 +3747,7 @@
 .pm-doc:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); background: color-mix(in srgb, var(--brand) 4%, white); }
 .pm-doc:active { transform: translateY(1px); }
 .pm-doc--alerta { border-color: color-mix(in srgb, #f2b705 45%, var(--line)); }
+.pm-doc--confirmada { border-color: color-mix(in srgb, #dc2626 45%, var(--line)); }
 .pm-doc__icon {
   display: grid;
   place-items: center;
@@ -3842,6 +3853,14 @@
 .pm-visor__validado svg { width: 1rem; height: 1rem; stroke: currentColor; flex-shrink: 0; }
 .pm-visor__contexto .pm-visor__ctx { margin: 0.15rem 0 0; font-size: 0.85rem; color: #40514c; }
 .pm-visor__disc { margin: auto 0 0; font-size: 0.76rem; color: var(--muted); font-style: italic; }
+.pm-visor__tokens { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.75rem; color: var(--muted); }
+.pm-visor__tokens svg { width: 0.9rem; height: 0.9rem; stroke: currentColor; flex-shrink: 0; }
+
+/* Validação do documento dentro do visor (médico valida no atendimento) */
+.pm-visor__validar { border-color: color-mix(in srgb, var(--brand) 28%, var(--line)); }
+.pm-visor__obs { width: 100%; resize: vertical; min-height: 3rem; margin-bottom: 0.6rem; }
+.pm-visor__acoes { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.pm-visor__acoes .btn { flex: 1 1 auto; justify-content: center; }
 
 /* ---- Responsivo ---- */
 @media (max-width: 860px) {
@@ -3859,6 +3878,7 @@
 @media (prefers-reduced-motion: reduce) {
   .pm-card:hover { transform: none; }
   .pm-skel-block::after, .pm-skel-line::after { animation: none; }
+  .status-pill[data-st='EM_ANALISE'] { animation: none; }
 }
 
 /* Visor de documento — navegação entre documentos (setas FORA do modal + contador) */
@@ -3993,19 +4013,39 @@
 }
 .pm-visor__alerta-tag svg { width: 0.95rem; height: 0.95rem; stroke: currentColor; flex-shrink: 0; }
 
-/* Cabeçalho inteiro fica âmbar quando o documento aberto tem alerta. */
-.modal--visor-alerta .modal__head {
+/* Cabeçalho de atenção: âmbar = aguardando validação; vermelho = alteração confirmada.
+   O médico precisa notar de imediato os exames com alteração. Layout compartilhado; só muda a cor. */
+.modal--visor-alerta .modal__head,
+.modal--visor-confirmada .modal__head {
   margin: -1rem -1.25rem 1rem;
   padding: 0.85rem 1.25rem;
+  border-radius: 0.7rem 0.7rem 0 0;
+}
+.modal--visor-alerta .modal__head {
   background: linear-gradient(
     to right,
     color-mix(in srgb, #f59e0b 15%, var(--surface)),
     color-mix(in srgb, #f59e0b 6%, var(--surface))
   );
   border-bottom: 2px solid color-mix(in srgb, #f59e0b 55%, transparent);
-  border-radius: 0.7rem 0.7rem 0 0;
 }
 .modal--visor-alerta .modal__titulo { color: #7c4708; }
+.modal--visor-confirmada .modal__head {
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, #dc2626 16%, var(--surface)),
+    color-mix(in srgb, #dc2626 6%, var(--surface))
+  );
+  border-bottom: 2px solid color-mix(in srgb, #dc2626 58%, transparent);
+}
+.modal--visor-confirmada .modal__titulo { color: #991b1b; }
+
+/* Tag vermelha para alteração confirmada (contraponto à tag âmbar de validação). */
+.pm-visor__alerta-tag--confirmada {
+  background: color-mix(in srgb, #dc2626 15%, var(--surface));
+  color: #991b1b;
+  border-color: color-mix(in srgb, #dc2626 45%, transparent);
+}
 
 /* Botão de tela cheia (mesma linguagem que o fechar). */
 .pm-visor__tool {
@@ -4041,8 +4081,9 @@
   padding: 0.85rem 1.1rem 1rem;
 }
 .modal--visor-full .pm-visor__file { min-height: 0; }
-/* Cabeçalho âmbar em tela cheia acompanha o padding menor (evita overflow lateral). */
-.modal--visor-full.modal--visor-alerta .modal__head { margin: -0.85rem -1.1rem 0.85rem; }
+/* Cabeçalho de atenção em tela cheia acompanha o padding menor (evita overflow lateral). */
+.modal--visor-full.modal--visor-alerta .modal__head,
+.modal--visor-full.modal--visor-confirmada .modal__head { margin: -0.85rem -1.1rem 0.85rem; }
 /* Em tela cheia as setas flutuantes atrapalham → escondê-las (usar teclado/atalhos). */
 .modal-backdrop--full .pm-visor__nav { display: none; }
 
