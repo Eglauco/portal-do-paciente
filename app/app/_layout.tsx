@@ -104,6 +104,11 @@ function Navegacao() {
       if (!naRaiz) roteador.replace('/');
       return;
     }
+    // Pós-OTP: precisa DEFINIR uma senha (PIN) antes de qualquer outra tela (obrigatório).
+    if (sessao.precisaDefinirSenha) {
+      if (rota !== 'definir-senha') roteador.replace('/definir-senha');
+      return;
+    }
     // Autenticou mas ainda não escolheu o perfil → tela "Selecionar Perfil".
     if (!sessao.perfilSelecionado) {
       if (rota !== 'selecionar-perfil') roteador.replace('/selecionar-perfil');
@@ -119,10 +124,12 @@ function Navegacao() {
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="definir-senha" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="selecionar-perfil" options={{ headerShown: false }} />
         <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
         <Stack.Screen name="perfil-editar" options={{ headerShown: false }} />
+        <Stack.Screen name="alterar-senha" options={{ headerShown: false }} />
         <Stack.Screen name="responsaveis" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />

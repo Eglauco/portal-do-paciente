@@ -74,4 +74,19 @@ public class Comentario {
     /** Motivo da IA quando ficou pendente (auditoria; exibido ao admin). */
     @Column(name = "motivo_moderacao", columnDefinition = "TEXT")
     private String motivoModeracao;
+
+    /** Tokens gastos pela IA na última moderação deste comentário; nulos se não foi moderado por IA. */
+    @Column(name = "tokens_entrada")
+    private Long tokensEntrada;
+
+    @Column(name = "tokens_saida")
+    private Long tokensSaida;
+
+    /** Modelo de IA usado na última moderação (ex.: claude-haiku-4-5); para cálculo de custo. */
+    @Column(name = "modelo_ia", length = 60)
+    private String modeloIa;
+
+    /** Custo (US$) da última moderação, congelado no momento do uso; nulo se não calculável. */
+    @Column(name = "custo_usd", precision = 12, scale = 6)
+    private java.math.BigDecimal custoUsd;
 }

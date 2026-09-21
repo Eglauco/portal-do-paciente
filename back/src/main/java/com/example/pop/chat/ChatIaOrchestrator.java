@@ -50,16 +50,19 @@ public class ChatIaOrchestrator {
             AssistenteChatIaService.RespostaIa resposta =
                     assistente.responder(ctx.nomeUnidade(), ctx.faq(), ctx.ficha(), ctx.historico());
 
+            Long tEntrada = resposta.tokensEntrada();
+            Long tSaida = resposta.tokensSaida();
+            String modelo = resposta.modelo();
             switch (resposta.acao()) {
-                case RESPONDER -> chatIaService.aplicarResposta(chatId, resposta.texto());
-                case RESOLVER -> chatIaService.aplicarResolucao(chatId, resposta.texto());
-                case ESCALAR -> chatIaService.aplicarEscalonamento(chatId, resposta.texto());
+                case RESPONDER -> chatIaService.aplicarResposta(chatId, resposta.texto(), tEntrada, tSaida, modelo);
+                case RESOLVER -> chatIaService.aplicarResolucao(chatId, resposta.texto(), tEntrada, tSaida, modelo);
+                case ESCALAR -> chatIaService.aplicarEscalonamento(chatId, resposta.texto(), tEntrada, tSaida, modelo);
             }
         } catch (RuntimeException e) {
             log.warn("Falha no atendimento por IA do chat {}; escalando para humano (fail-open): {}",
                     chatId, e.toString());
             try {
-                chatIaService.aplicarEscalonamento(chatId, null);
+                chatIaService.aplicarEscalonamento(chatId, null, null, null, null);
             } catch (RuntimeException ex) {
                 log.warn("Falha ao escalar o chat {} após erro da IA: {}", chatId, ex.toString());
             }

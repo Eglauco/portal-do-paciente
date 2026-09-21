@@ -78,4 +78,19 @@ public class Mensagem {
      */
     @Column(name = "gerada_por_ia", nullable = false)
     private boolean geradaPorIa;
+
+    /** Tokens gastos pela IA neste turno (só em mensagens geradaPorIa; nulos caso contrário). */
+    @Column(name = "tokens_entrada")
+    private Long tokensEntrada;
+
+    @Column(name = "tokens_saida")
+    private Long tokensSaida;
+
+    /** Modelo de IA usado neste turno (ex.: claude-haiku-4-5); para cálculo de custo. */
+    @Column(name = "modelo_ia", length = 60)
+    private String modeloIa;
+
+    /** Custo (US$) deste turno da IA, congelado no momento do uso; nulo se não calculável. */
+    @Column(name = "custo_usd", precision = 12, scale = 6)
+    private java.math.BigDecimal custoUsd;
 }

@@ -54,35 +54,99 @@ function dataParaIso(valor: string): string {
 export default function LoginScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
-  const { solicitarCodigo, ativar } = useSessao();
+  const { iniciarLogin, loginPorSenha, solicitarCodigo, ativar } = useSessao();
 
-  const [etapa, setEtapa] = useState<'cpf' | 'codigo'>('cpf');
+  const [etapa, setEtapa] = useState<'identidade' | 'senha' | 'codigo'>('identidade');
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
   const [telefoneMascarado, setTelefoneMascarado] = useState('');
+  const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [verificando, setVerificando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [entrandoSenha, setEntrandoSenha] = useState(false);
   const [entrando, setEntrando] = useState(false);
 
   const cpfValido = cpf.replace(/\D/g, '').length === 11;
   const dataValida = dataNascimento.replace(/\D/g, '').length === 8;
   const telefoneValido = [10, 11].includes(telefone.replace(/\D/g, '').length);
-  const podeSolicitar = cpfValido && dataValida && telefoneValido && !enviando;
+  const podeContinuar = cpfValido && dataValida && telefoneValido && !verificando;
+  const podeEntrarSenha = senha.length === 6 && !entrandoSenha;
   const podeEntrar = codigo.length === 6 && !entrando;
 
-  async function pedirCodigo() {
-    if (enviando || !cpfValido || !dataValida || !telefoneValido) return;
+  /** Envia o código por SMS e vai para a etapa "codigo". Reutilizado por "Esqueci a senha" e reenvio. */
+  async function pedirCodigoSms() {
+    const mascarado = await solicitarCodigo(cpf, dataParaIso(dataNascimento), telefone);
+    setTelefoneMascarado(mascarado);
+    setCodigo('');
+  }
+
+  /**
+   * Passo 1: confere a identidade (sem SMS). Se a conta já tem senha e não está bloqueada, mostra
+   * o campo de senha (entra sem SMS, sem custo). Senão (1º acesso ou bloqueada) envia o código.
+   */
+  async function continuar() {
+    if (verificando || !cpfValido || !dataValida || !telefoneValido) return;
+    setErro(null);
+    setVerificando(true);
+    try {
+      const { temSenha, bloqueada } = await iniciarLogin(cpf, dataParaIso(dataNascimento), telefone);
+      if (temSenha && !bloqueada) {
+        setSenha('');
+        setMostrarSenha(false);
+        setEtapa('senha');
+      } else {
+        await pedirCodigoSms();
+        setEtapa('codigo');
+      }
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível continuar. Tente novamente.');
+    } finally {
+      setVerificando(false);
+    }
+  }
+
+  /** Passo 2 (com senha): entra sem SMS. */
+  async function entrarComSenha() {
+    if (entrandoSenha || senha.length !== 6) return;
+    setErro(null);
+    setEntrandoSenha(true);
+    try {
+      await loginPorSenha(cpf, dataParaIso(dataNascimento), telefone, senha);
+      // A navegação para "Selecionar Perfil" é feita pelo Navegacao (perfilSelecionado=false).
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
+      setEntrandoSenha(false);
+    }
+  }
+
+  /** Da etapa "senha": não lembra a senha → cai no SMS (que zera a senha e pede uma nova). */
+  async function esqueciSenha() {
+    if (enviando) return;
     setErro(null);
     setEnviando(true);
     try {
-      const mascarado = await solicitarCodigo(cpf, dataParaIso(dataNascimento), telefone);
-      setTelefoneMascarado(mascarado);
-      setCodigo('');
+      await pedirCodigoSms();
       setEtapa('codigo');
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível enviar o código. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  /** Reenvia o código na etapa "codigo". */
+  async function reenviarCodigo() {
+    if (enviando) return;
+    setErro(null);
+    setEnviando(true);
+    try {
+      await pedirCodigoSms();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível reenviar o código. Tente novamente.');
     } finally {
       setEnviando(false);
     }
@@ -94,16 +158,18 @@ export default function LoginScreen() {
     setEntrando(true);
     try {
       await ativar(cpf, dataParaIso(dataNascimento), codigo, telefone);
-      // A navegação para "Selecionar Perfil" é feita pelo Navegacao (perfilSelecionado=false).
+      // A navegação para "Definir senha" / "Selecionar Perfil" é feita pelo Navegacao.
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
       setEntrando(false);
     }
   }
 
-  function voltarParaCpf() {
-    setEtapa('cpf');
+  function voltarParaIdentidade() {
+    setEtapa('identidade');
     setCodigo('');
+    setSenha('');
+    setMostrarSenha(false);
     setErro(null);
   }
 
@@ -140,12 +206,12 @@ export default function LoginScreen() {
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {etapa === 'cpf' ? (
+          {etapa === 'identidade' ? (
             <>
               <Text style={styles.title}>Entrar no aplicativo</Text>
               <Text style={styles.subtitle}>
-                Informe seu telefone, CPF e a data de nascimento. Enviaremos um código de acesso por SMS para o
-                telefone do seu cadastro para confirmar que é você.
+                Informe seu telefone, CPF e a data de nascimento. Se você já tem uma senha, entra na hora; senão,
+                enviaremos um código por SMS para confirmar que é você.
               </Text>
 
               {/* Telefone (1ª trava de identidade) */}
@@ -205,7 +271,7 @@ export default function LoginScreen() {
                   maxLength={10}
                   returnKeyType="done"
                   onSubmitEditing={() => {
-                    if (podeSolicitar) pedirCodigo();
+                    if (podeContinuar) continuar();
                   }}
                 />
               </View>
@@ -221,17 +287,17 @@ export default function LoginScreen() {
                 style={({ pressed }) => [
                   styles.primaryBtn,
                   pressed && styles.primaryBtnPressed,
-                  !podeSolicitar && styles.primaryBtnOff,
+                  !podeContinuar && styles.primaryBtnOff,
                 ]}
-                onPress={pedirCodigo}
-                disabled={!podeSolicitar}
+                onPress={continuar}
+                disabled={!podeContinuar}
                 accessibilityRole="button"
-                accessibilityLabel="Receber código"
-                accessibilityState={{ busy: enviando, disabled: !podeSolicitar }}>
-                {enviando ? (
+                accessibilityLabel="Continuar"
+                accessibilityState={{ busy: verificando, disabled: !podeContinuar }}>
+                {verificando ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.primaryBtnText}>Receber código</Text>
+                  <Text style={styles.primaryBtnText}>Continuar</Text>
                 )}
               </Pressable>
 
@@ -242,9 +308,88 @@ export default function LoginScreen() {
                 </Text>
               </View>
             </>
+          ) : etapa === 'senha' ? (
+            <>
+              <Pressable style={styles.backRow} onPress={voltarParaIdentidade} accessibilityRole="button">
+                <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
+                <Text style={styles.backTxt}>Trocar CPF</Text>
+              </Pressable>
+
+              <Text style={styles.title}>Digite sua senha</Text>
+              <Text style={styles.subtitle}>
+                Use a senha de 6 dígitos que você cadastrou. Assim você entra sem esperar o SMS.
+              </Text>
+
+              <Text style={styles.label}>Senha</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.codeInput]}
+                  value={senha}
+                  onChangeText={(valor) => {
+                    setSenha(valor.replace(/\D/g, '').slice(0, 6));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="••••••"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={6}
+                  secureTextEntry={!mostrarSenha}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (podeEntrarSenha) entrarComSenha();
+                  }}
+                />
+                <Pressable
+                  onPress={() => setMostrarSenha((v) => !v)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}>
+                  <Ionicons name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'} size={20} color={t.muted} />
+                </Pressable>
+              </View>
+              <Text style={styles.hint}>São 6 números.</Text>
+
+              {erro && (
+                <View style={styles.erroBox}>
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                  !podeEntrarSenha && styles.primaryBtnOff,
+                ]}
+                onPress={entrarComSenha}
+                disabled={!podeEntrarSenha}
+                accessibilityRole="button"
+                accessibilityLabel="Entrar"
+                accessibilityState={{ busy: entrandoSenha, disabled: !podeEntrarSenha }}>
+                {entrandoSenha ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Entrar</Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                style={styles.linkBtn}
+                onPress={esqueciSenha}
+                disabled={enviando}
+                accessibilityRole="button">
+                <Text style={styles.linkTxt}>
+                  {enviando ? 'Enviando código…' : 'Esqueci a senha — entrar por SMS'}
+                </Text>
+              </Pressable>
+            </>
           ) : (
             <>
-              <Pressable style={styles.backRow} onPress={voltarParaCpf} accessibilityRole="button">
+              <Pressable style={styles.backRow} onPress={voltarParaIdentidade} accessibilityRole="button">
                 <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
                 <Text style={styles.backTxt}>Trocar CPF</Text>
               </Pressable>
@@ -301,7 +446,7 @@ export default function LoginScreen() {
 
               <Pressable
                 style={styles.linkBtn}
-                onPress={pedirCodigo}
+                onPress={reenviarCodigo}
                 disabled={enviando}
                 accessibilityRole="button">
                 <Text style={styles.linkTxt}>

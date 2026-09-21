@@ -8,5 +8,6 @@ import java.util.List;
  * tela "Selecionar Perfil". Os campos token/pacienteId/nome espelham a sessão
  * do perfil padrão.
  */
-public record AtivarResponse(String token, Long pacienteId, String nome, List<PerfilResponse> perfis) {
+public record AtivarResponse(String token, Long pacienteId, String nome, List<PerfilResponse> perfis,
+        boolean precisaDefinirSenha) {
 }

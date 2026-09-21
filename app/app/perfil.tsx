@@ -354,6 +354,16 @@ export default function PerfilScreen() {
           </Pressable>
         )}
 
+        {/* Senha de acesso da CONTA (login sem SMS): vale para o próprio e para o responsável. */}
+        <Pressable
+          style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
+          onPress={() => router.push('/alterar-senha')}
+          accessibilityRole="button"
+          accessibilityLabel="Alterar senha">
+          <Ionicons name="lock-closed-outline" size={20} color={t.brandDeep} />
+          <Text style={styles.selecionarTxt}>Alterar senha</Text>
+        </Pressable>
+
         <Pressable
           style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
           onPress={() => router.push('/selecionar-perfil')}

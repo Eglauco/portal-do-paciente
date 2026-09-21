@@ -1,4 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { MarkdownPipe } from '../../shared/markdown.pipe';
 import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -44,11 +45,17 @@ type DocumentoGroup = FormGroup<{
   /** Tokens gastos pela IA (somente exibição). */
   tokensEntrada: FormControl<number | null>;
   tokensSaida: FormControl<number | null>;
+  /** Modelo de IA usado (somente exibição). */
+  modeloIa: FormControl<string | null>;
+  /** Custo (US$) do uso da IA (somente exibição). */
+  custoUsd: FormControl<number | null>;
+  /** Nº de gerações da IA (somente exibição). */
+  geracoesIa: FormControl<number | null>;
 }>;
 
 @Component({
   selector: 'app-prontuario-form',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, MarkdownPipe],
   templateUrl: './prontuario-form.html',
 })
 export class ProntuarioForm implements PodeSair {
@@ -195,6 +202,18 @@ export class ProntuarioForm implements PodeSair {
     return this.documentos.at(indice).controls.tokensSaida.value;
   }
 
+  protected modeloIa(indice: number): string | null {
+    return this.documentos.at(indice).controls.modeloIa.value;
+  }
+
+  protected custoUsd(indice: number): number | null {
+    return this.documentos.at(indice).controls.custoUsd.value;
+  }
+
+  protected geracoesIa(indice: number): number | null {
+    return this.documentos.at(indice).controls.geracoesIa.value;
+  }
+
   protected temTipo(indice: number): boolean {
     return this.documentos.at(indice).controls.tipoId.value != null;
   }
@@ -245,6 +264,9 @@ export class ProntuarioForm implements PodeSair {
         observacaoValidacao: new FormControl<string | null>(doc?.observacaoValidacao ?? null),
         tokensEntrada: new FormControl<number | null>(doc?.tokensEntrada ?? null),
         tokensSaida: new FormControl<number | null>(doc?.tokensSaida ?? null),
+        modeloIa: new FormControl<string | null>(doc?.modeloIa ?? null),
+        custoUsd: new FormControl<number | null>(doc?.custoUsd ?? null),
+        geracoesIa: new FormControl<number | null>(doc?.geracoesIa ?? null),
       }),
     );
     this.form.markAsDirty();
@@ -339,6 +361,8 @@ export class ProntuarioForm implements PodeSair {
     this.service.reanalisarDocumento(id).subscribe({
       next: () => {
         this.reanalisando.update((set) => new Set(set).add(id));
+        // Reanálise solicitada → fecha o modal do documento.
+        this.documentoAberto.set(null);
         this.toastr.info('Análise em reprocessamento. O resultado aparece ao recarregar.');
       },
       error: () => this.toastr.error('Não foi possível solicitar a reanálise.'),
@@ -361,6 +385,9 @@ export class ProntuarioForm implements PodeSair {
           observacaoValidacao: d.observacaoValidacao ?? null,
           tokensEntrada: d.tokensEntrada ?? null,
           tokensSaida: d.tokensSaida ?? null,
+          modeloIa: d.modeloIa ?? null,
+          custoUsd: d.custoUsd ?? null,
+          geracoesIa: d.geracoesIa ?? null,
         },
         { emitEvent: false },
       );

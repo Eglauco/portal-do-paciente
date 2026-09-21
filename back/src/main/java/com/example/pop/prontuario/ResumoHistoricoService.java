@@ -53,8 +53,12 @@ public class ResumoHistoricoService {
         this.timeoutSegundos = timeoutSegundos;
     }
 
-    /** Gera o panorama a partir do texto do histórico; null em falha/sem chave (o chamador trata). */
-    public String gerar(String historicoTexto) {
+    /** Resultado da geração do resumo: texto + tokens gastos + modelo usado. */
+    public record ResumoIa(String texto, long tokensEntrada, long tokensSaida, String modelo) {
+    }
+
+    /** Gera o panorama a partir do texto do histórico; null em falha/sem chave/vazio (o chamador trata). */
+    public ResumoIa gerar(String historicoTexto) {
         AnthropicClient c = client();
         if (c == null) {
             return null;
@@ -67,12 +71,14 @@ public class ResumoHistoricoService {
                     .addUserMessage("<<<HISTORICO>>>\n" + sanitizar(historicoTexto) + "\n<<<FIM_HISTORICO>>>")
                     .build();
             Message resposta = c.messages().create(params);
+            long tokensEntrada = resposta.usage().inputTokens();
+            long tokensSaida = resposta.usage().outputTokens();
             String saida = resposta.content().stream()
                     .flatMap(b -> b.text().stream())
                     .map(t -> t.text())
                     .collect(Collectors.joining("\n"))
                     .trim();
-            return saida.isBlank() ? null : saida;
+            return saida.isBlank() ? null : new ResumoIa(saida, tokensEntrada, tokensSaida, modelo);
         } catch (RuntimeException e) {
             log.warn("Falha ao gerar resumo do histórico por IA: {}", e.toString());
             return null;

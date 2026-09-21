@@ -4,11 +4,15 @@ import { registrarParaPush } from '@/services/notificacoes';
 import {
   ativar as ativarServico,
   carregarSessao,
+  definirSenha as definirSenhaServico,
+  iniciarLogin as iniciarLoginServico,
+  loginPorSenha as loginPorSenhaServico,
   registrarInvalidacao,
   registrarTrocaPerfil,
   sair as sairServico,
   solicitarCodigo as solicitarCodigoServico,
   trocarPerfil as trocarPerfilServico,
+  type InicioLogin,
   type SessaoPaciente,
 } from '@/services/sessao';
 
@@ -18,11 +22,20 @@ interface SessaoContexto {
   /** Enquanto lê a sessão guardada no aparelho (evita piscar a tela de login). */
   carregando: boolean;
   /**
+   * Pré-checagem do login (sem SMS): confere a identidade e diz se a conta já tem senha
+   * (para entrar sem SMS) e se o login por senha está bloqueado por tentativas.
+   */
+  iniciarLogin: (cpf: string, dataNascimento: string, telefone: string) => Promise<InicioLogin>;
+  /** Login por senha (PIN), sem SMS. Guarda a sessão (leva à tela de perfis). */
+  loginPorSenha: (cpf: string, dataNascimento: string, telefone: string, senha: string) => Promise<void>;
+  /**
    * Pede o código de ativação por SMS a partir do telefone + CPF + data de nascimento
    * (ISO "AAAA-MM-DD"); devolve o telefone mascarado do dono.
    */
   solicitarCodigo: (cpf: string, dataNascimento: string, telefone: string) => Promise<string>;
   ativar: (cpf: string, dataNascimento: string, codigo: string, telefone: string) => Promise<void>;
+  /** Define a senha (PIN) inicial após o OTP (obrigatório antes de escolher o perfil). */
+  definirSenha: (senha: string) => Promise<void>;
   /** Escolhe o perfil ativo (tela "Selecionar Perfil"). Nunca refaz OTP. */
   trocarPerfil: (pacienteId: number) => Promise<void>;
   sair: () => Promise<void>;
@@ -59,12 +72,25 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     if (sessao) registrarParaPush().catch(() => {});
   }, [sessao?.pacienteId]);
 
+  async function iniciarLogin(cpf: string, dataNascimento: string, telefone: string) {
+    return iniciarLoginServico(cpf, dataNascimento, telefone);
+  }
+
+  async function loginPorSenha(cpf: string, dataNascimento: string, telefone: string, senha: string) {
+    setSessao(await loginPorSenhaServico(cpf, dataNascimento, telefone, senha));
+  }
+
   async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string) {
     return solicitarCodigoServico(cpf, dataNascimento, telefone);
   }
 
   async function ativar(cpf: string, dataNascimento: string, codigo: string, telefone: string) {
     setSessao(await ativarServico(cpf, dataNascimento, codigo, telefone));
+  }
+
+  async function definirSenha(senha: string) {
+    const atualizada = await definirSenhaServico(senha);
+    if (atualizada) setSessao({ ...atualizada });
   }
 
   async function trocarPerfil(pacienteId: number) {
@@ -77,7 +103,18 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <Contexto.Provider value={{ sessao, carregando, solicitarCodigo, ativar, trocarPerfil, sair }}>
+    <Contexto.Provider
+      value={{
+        sessao,
+        carregando,
+        iniciarLogin,
+        loginPorSenha,
+        solicitarCodigo,
+        ativar,
+        definirSenha,
+        trocarPerfil,
+        sair,
+      }}>
       {children}
     </Contexto.Provider>
   );

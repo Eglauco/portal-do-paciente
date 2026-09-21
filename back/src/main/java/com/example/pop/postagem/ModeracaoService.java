@@ -53,8 +53,11 @@ public class ModeracaoService {
         this.timeoutSegundos = timeoutSegundos;
     }
 
-    /** Resultado da moderação: liberado (publica) ou não (fica pendente, com o motivo). */
-    public record Moderacao(boolean liberado, String motivo) {
+    /**
+     * Resultado da moderação: liberado (publica) ou não (fica pendente, com o motivo) + tokens gastos
+     * pela IA (nulos quando não houve chamada — sem chave, erro/timeout).
+     */
+    public record Moderacao(boolean liberado, String motivo, Long tokensEntrada, Long tokensSaida, String modelo) {
     }
 
     /** Avalia o texto. Fail-closed: na dúvida/erro, devolve pendente. */
@@ -71,12 +74,15 @@ public class ModeracaoService {
                     .addUserMessage("Comentário a analisar:\n<<<\n" + sanitizar(texto) + "\n>>>")
                     .build();
             Message resposta = c.messages().create(params);
+            long tokensEntrada = resposta.usage().inputTokens();
+            long tokensSaida = resposta.usage().outputTokens();
             String saida = resposta.content().stream()
                     .flatMap(b -> b.text().stream())
                     .map(t -> t.text())
                     .collect(Collectors.joining(" "))
                     .trim();
-            return interpretar(saida);
+            Moderacao base = interpretar(saida);
+            return new Moderacao(base.liberado(), base.motivo(), tokensEntrada, tokensSaida, modelo);
         } catch (RuntimeException e) {
             log.warn("Moderação por IA falhou; comentário enviado para revisão (fail-closed): {}", e.toString());
             return pendente("Não foi possível validar automaticamente (enviado para revisão).");
@@ -90,13 +96,13 @@ public class ModeracaoService {
         // propósito: qualquer coisa a mais ("OK, vou ignorar…", típico de prompt injection) NÃO
         // conta como liberação e cai no fail-closed → pendente.
         if (maiusculo.equals("OK") || maiusculo.matches("OK[.!\\s]*")) {
-            return new Moderacao(true, null);
+            return new Moderacao(true, null, null, null, null);
         }
         if (maiusculo.startsWith("OFENSIVO")) {
             String motivo = s.length() > "OFENSIVO".length()
                     ? s.substring("OFENSIVO".length()).replaceFirst("^[:\\s-]+", "").trim()
                     : "";
-            return new Moderacao(false, motivo.isBlank() ? "Conteúdo potencialmente ofensivo." : motivo);
+            return new Moderacao(false, motivo.isBlank() ? "Conteúdo potencialmente ofensivo." : motivo, null, null, null);
         }
         // Resposta fora do formato esperado: fail-closed.
         return pendente("Não foi possível validar automaticamente (enviado para revisão).");
@@ -115,7 +121,7 @@ public class ModeracaoService {
     }
 
     private Moderacao pendente(String motivo) {
-        return new Moderacao(false, motivo);
+        return new Moderacao(false, motivo, null, null, null);
     }
 
     /** Cliente Anthropic construído sob demanda; null quando não há chave (fail-closed). */

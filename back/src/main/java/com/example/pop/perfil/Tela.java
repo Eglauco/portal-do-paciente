@@ -32,7 +32,8 @@ public enum Tela {
     UNIDADES("Unidades"),
     USUARIOS("Usuários"),
     PERFIS("Perfis"),
-    CONFIGURACOES("Configurações");
+    CONFIGURACOES("Configurações"),
+    USO_IA("Uso de IA");
 
     private final String descricao;
 

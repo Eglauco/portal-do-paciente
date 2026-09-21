@@ -2425,6 +2425,8 @@
 /* Selo "assistente virtual": mensagem gerada pela IA em vez de um atendente humano. */
 .wa__ia { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--brand-deep); margin-bottom: 2px; padding: 1px 7px 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); }
 .wa__ia svg { width: 12px; height: 12px; flex: 0 0 auto; }
+/* Tokens gastos pela IA na mensagem (só back-office; discreto). */
+.wa__tokens { display: block; margin-top: 3px; font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Marcador "via {responsável}": mensagem enviada pelo responsável em nome do paciente. */
 .wa__via-resp { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: #8a5a00; margin-bottom: 2px; }
 .wa__via-resp svg { width: 12px; height: 12px; flex: 0 0 auto; }
@@ -2829,6 +2831,8 @@
 .coment__meta { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.3rem; }
 .coment__data { font-size: 0.75rem; color: var(--muted); }
 .coment__editado { font-style: italic; color: var(--muted); }
+/* Tokens gastos pela IA ao moderar o comentário (só back-office; discreto). */
+.coment__tokens { margin: 0.25rem 0 0; font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .coment__responder {
   padding: 0;
   border: 0;
@@ -3596,6 +3600,46 @@
 .pm-ia__actions { margin-left: auto; }
 .pm-ia__body { min-height: 1.5rem; }
 .pm-ia__texto { margin: 0; font-size: 0.95rem; line-height: 1.6; color: var(--ink); white-space: pre-line; }
+/* Markdown renderizado (resumo por IA): remove o pre-line e estiliza títulos, listas e tabelas. */
+.pm-md { white-space: normal; }
+.pm-md > :first-child { margin-top: 0; }
+.pm-md > :last-child { margin-bottom: 0; }
+.pm-md p { margin: 0 0 0.6rem; }
+.pm-md h1, .pm-md h2, .pm-md h3, .pm-md h4 {
+  margin: 1rem 0 0.5rem;
+  line-height: 1.3;
+  color: var(--brand-deep);
+  font-weight: 700;
+}
+.pm-md h1 { font-size: 1.15rem; }
+.pm-md h2 { font-size: 1.05rem; }
+.pm-md h3 { font-size: 0.98rem; }
+.pm-md h4 { font-size: 0.92rem; }
+.pm-md ul, .pm-md ol { margin: 0 0 0.6rem; padding-left: 1.3rem; }
+.pm-md li { margin: 0.15rem 0; }
+.pm-md strong { font-weight: 700; color: var(--ink); }
+.pm-md hr { border: 0; border-top: 1px solid var(--line); margin: 0.9rem 0; }
+.pm-md a { color: var(--brand-deep); text-decoration: underline; }
+.pm-md code {
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.35rem;
+}
+.pm-md table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.4rem 0 0.8rem;
+  font-size: 0.88rem;
+}
+.pm-md th, .pm-md td {
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.pm-md thead th { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); font-weight: 700; }
+.pm-md tbody tr:nth-child(even) { background: color-mix(in srgb, var(--muted) 5%, transparent); }
 .pm-ia__quando { margin: 0.75rem 0 0; font-size: 0.78rem; color: var(--muted); }
 .pm-ia__vazio, .pm-ia__aviso { margin: 0; font-size: 0.92rem; color: var(--muted); line-height: 1.55; }
 .pm-ia__loading { display: flex; align-items: center; gap: 0.6rem; font-size: 0.92rem; color: var(--muted); }
@@ -3610,6 +3654,17 @@
   color: var(--muted);
 }
 .pm-ia__disc svg { width: 0.95rem; height: 0.95rem; stroke: var(--brand-deep); flex-shrink: 0; }
+/* Consumo acumulado de IA do resumo (modelo · gerações · tokens · custo total). */
+.pm-ia__consumo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pm-ia__consumo svg { width: 0.95rem; height: 0.95rem; stroke: currentColor; flex-shrink: 0; }
 
 /* ---- Filtros rápidos ---- */
 .pm-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; margin-bottom: 1.4rem; }
@@ -3853,8 +3908,6 @@
 .pm-visor__validado svg { width: 1rem; height: 1rem; stroke: currentColor; flex-shrink: 0; }
 .pm-visor__contexto .pm-visor__ctx { margin: 0.15rem 0 0; font-size: 0.85rem; color: #40514c; }
 .pm-visor__disc { margin: auto 0 0; font-size: 0.76rem; color: var(--muted); font-style: italic; }
-.pm-visor__tokens { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.75rem; color: var(--muted); }
-.pm-visor__tokens svg { width: 0.9rem; height: 0.9rem; stroke: currentColor; flex-shrink: 0; }
 
 /* Validação do documento dentro do visor (médico valida no atendimento) */
 .pm-visor__validar { border-color: color-mix(in srgb, var(--brand) 28%, var(--line)); }
@@ -3995,6 +4048,17 @@
 .modal--visor .modal__head { align-items: center; gap: 0.75rem; }
 .modal__head-id { min-width: 0; flex: 1; }
 .modal__head-id .modal__titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Atendimento a que o documento se refere — fixo no cabeçalho do visor (sempre visível). */
+.pm-visor__cab-atend {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.3rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pm-visor__cab-atend svg { width: 0.9rem; height: 0.9rem; stroke: currentColor; flex-shrink: 0; }
 .pm-visor__tools { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 
 /* Tag de alerta no cabeçalho do visor. */
@@ -4115,13 +4179,31 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 .pm-visor__tira:hover { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); color: var(--ink); }
+/* Selecionado: borda mais grossa via anel interno (não desloca o layout), mantendo a cor do status. */
 .pm-visor__tira.is-ativo {
   border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
   background: color-mix(in srgb, var(--brand) 12%, var(--surface));
   color: var(--brand-deep);
 }
-.pm-visor__tira--alerta { border-color: color-mix(in srgb, #d97706 45%, var(--line)); color: #92500a; }
-.pm-visor__tira--alerta.is-ativo { border-color: #d97706; background: color-mix(in srgb, #f59e0b 14%, var(--surface)); }
+/* Aguardando validação → âmbar (segue o cabeçalho). */
+.pm-visor__tira--alerta { border-color: color-mix(in srgb, #d97706 55%, var(--line)); color: #92500a; }
+.pm-visor__tira--alerta:hover { border-color: #d97706; color: #92500a; }
+.pm-visor__tira--alerta.is-ativo {
+  border-color: #d97706;
+  box-shadow: inset 0 0 0 1px #d97706;
+  background: color-mix(in srgb, #f59e0b 14%, var(--surface));
+  color: #92500a;
+}
+/* Alteração confirmada → vermelho (segue o cabeçalho). */
+.pm-visor__tira--confirmada { border-color: color-mix(in srgb, #dc2626 55%, var(--line)); color: #b42318; }
+.pm-visor__tira--confirmada:hover { border-color: #dc2626; color: #b42318; }
+.pm-visor__tira--confirmada.is-ativo {
+  border-color: #dc2626;
+  box-shadow: inset 0 0 0 1px #dc2626;
+  background: color-mix(in srgb, #dc2626 12%, var(--surface));
+  color: #b42318;
+}
 .pm-visor__tira-ico { display: grid; place-items: center; flex-shrink: 0; }
 .pm-visor__tira-ico svg { width: 1rem; height: 1rem; stroke: currentColor; }
 .pm-visor__tira-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4129,3 +4211,28 @@
 @media (max-width: 720px) {
   .pm-visor__tira { max-width: 9rem; }
 }
+
+/* ===== Uso de IA (auditoria/ledger) ===== */
+.uso-totais { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-bottom: 1.2rem; }
+.uso-totais__item {
+  flex: 1 1 10rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.8rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  box-shadow: 0 10px 26px -24px rgba(var(--brand-pine-rgb), 0.5);
+}
+.uso-totais__rot { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.uso-totais__val { font-size: 1.1rem; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.uso-totais__val--forte { color: var(--brand-deep); }
+/* "Busca" ocupa a linha inteira dos filtros (completa o layout do grid de 3 colunas). */
+.uso-busca { grid-column: 1 / -1; }
+
+/* Pill por frente (tipo) do uso de IA */
+.status-pill[data-st='PRONTUARIO_DOCUMENTO'] { color: #1d4ed8; background: #e6ecfe; }
+.status-pill[data-st='PRONTUARIO_RESUMO'] { color: #6d28d9; background: #efe7fd; }
+.status-pill[data-st='CHAT_MENSAGEM'] { color: #0a7d5a; background: #e3f6ec; }
+.status-pill[data-st='MODERACAO_COMENTARIO'] { color: #a5741a; background: #fbf0d6; }

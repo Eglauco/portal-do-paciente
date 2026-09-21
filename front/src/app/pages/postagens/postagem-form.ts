@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -47,7 +47,7 @@ async function recortar45(arquivo: File): Promise<Blob> {
 
 @Component({
   selector: 'app-postagem-form',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, Imagem45],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, Imagem45],
   templateUrl: './postagem-form.html',
 })
 export class PostagemForm implements PodeSair {

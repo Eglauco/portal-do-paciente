@@ -1,4 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { MarkdownPipe } from '../../shared/markdown.pipe';
 import { afterNextRender, Component, computed, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -30,7 +31,7 @@ interface MarcoTimeline {
  */
 @Component({
   selector: 'app-prontuario-medico-historico',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, MarkdownPipe],
   templateUrl: './prontuario-medico-historico.html',
   host: {
     '(document:keydown.escape)': 'aoEscape()',
@@ -113,6 +114,19 @@ export class ProntuarioMedicoHistorico {
   protected readonly mostrarNotaResumo = computed(
     () => !this.resumoIa() && this.iaHabilitada() && this.resumoIaHabilitado(),
   );
+
+  // Consumo ACUMULADO de IA do resumo do histórico (exibido no card do resumo, na tela do médico).
+  protected readonly resumoConsumo = computed(() => {
+    const h = this.historico();
+    if (!h || !h.resumoHistoricoGeracoes) return null;
+    return {
+      modelo: h.resumoHistoricoModeloIa ?? null,
+      geracoes: h.resumoHistoricoGeracoes,
+      tokensEntrada: h.resumoHistoricoTokensEntrada ?? 0,
+      tokensSaida: h.resumoHistoricoTokensSaida ?? 0,
+      custoUsd: h.resumoHistoricoCustoUsd ?? null,
+    };
+  });
 
   /** Atendimentos ordenados do mais recente ao mais antigo (defensivo). */
   protected readonly prontuarios = computed<ProntuarioDetalhe[]>(() =>

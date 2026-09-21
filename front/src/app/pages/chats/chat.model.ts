@@ -40,6 +40,13 @@ export interface Mensagem {
   atendenteNome?: string | null;
   /** Mensagem gerada pela assistente virtual (IA), não por um atendente humano. */
   geradaPorIa?: boolean;
+  /** Tokens gastos pela IA neste turno (só nas mensagens da IA); exibido só no back-office. */
+  tokensEntrada?: number | null;
+  tokensSaida?: number | null;
+  /** Modelo de IA usado neste turno (ex.: claude-haiku-4-5); exibido só no back-office. */
+  modeloIa?: string | null;
+  /** Custo (US$) do turno da IA; exibido só no back-office. */
+  custoUsd?: number | null;
   /** Nome do responsável que enviou em nome do paciente (perfil dependente); nulo se foi o próprio. */
   responsavelNome?: string | null;
   /** Só no cliente: mensagem otimista ainda não confirmada pelo servidor (mostra o relógio). */

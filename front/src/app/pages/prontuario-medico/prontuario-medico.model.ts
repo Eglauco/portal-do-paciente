@@ -35,6 +35,12 @@ export interface HistoricoMedico {
   resumoIaHabilitado: boolean;
   /** Atendimentos (prontuários) do mais recente ao mais antigo. */
   prontuarios: ProntuarioDetalhe[];
+  // Consumo ACUMULADO de IA do resumo do histórico (soma a cada geração).
+  resumoHistoricoModeloIa?: string | null;
+  resumoHistoricoTokensEntrada?: number | null;
+  resumoHistoricoTokensSaida?: number | null;
+  resumoHistoricoCustoUsd?: number | null;
+  resumoHistoricoGeracoes?: number | null;
 }
 
 /** Tipo de arquivo detectado para o visor embutido. */

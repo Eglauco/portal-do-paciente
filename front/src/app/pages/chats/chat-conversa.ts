@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -13,7 +13,7 @@ import { ChatService } from './chat.service';
 
 @Component({
   selector: 'app-chat-conversa',
-  imports: [DatePipe],
+  imports: [DatePipe, DecimalPipe],
   templateUrl: './chat-conversa.html',
 })
 export class ChatConversa {

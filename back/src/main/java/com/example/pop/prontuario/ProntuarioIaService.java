@@ -1,5 +1,6 @@
 package com.example.pop.prontuario;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -13,6 +14,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.configuracao.CustoIaService;
+import com.example.pop.usoia.UsoIaService;
+import com.example.pop.usoia.UsoIaTipo;
 import com.example.pop.notificacaoadmin.NotificacaoAdminService;
 import com.example.pop.notificacaoadmin.TipoNotificacaoAdmin;
 import com.example.pop.prontuario.AnaliseDocumentoService.AnaliseResultado;
@@ -32,15 +36,20 @@ public class ProntuarioIaService {
     private final UsuarioRepository usuarioRepository;
     private final ConfiguracaoService configuracaoService;
     private final NotificacaoAdminService notificacaoAdminService;
+    private final CustoIaService custoIaService;
+    private final UsoIaService usoIaService;
 
     public ProntuarioIaService(DocumentoRepository documentoRepository, ProntuarioRepository prontuarioRepository,
             UsuarioRepository usuarioRepository, ConfiguracaoService configuracaoService,
-            NotificacaoAdminService notificacaoAdminService) {
+            NotificacaoAdminService notificacaoAdminService, CustoIaService custoIaService,
+            UsoIaService usoIaService) {
         this.documentoRepository = documentoRepository;
         this.prontuarioRepository = prontuarioRepository;
         this.usuarioRepository = usuarioRepository;
         this.configuracaoService = configuracaoService;
         this.notificacaoAdminService = notificacaoAdminService;
+        this.custoIaService = custoIaService;
+        this.usoIaService = usoIaService;
     }
 
     /** Contexto para a IA analisar um documento (dados desanexados). */
@@ -99,8 +108,21 @@ public class ProntuarioIaService {
         if (resultado.resumo() != null) {
             d.setResumoClinico(resultado.resumo());
         }
-        d.setTokensEntrada(resultado.tokensEntrada());
-        d.setTokensSaida(resultado.tokensSaida());
+        // Acumula o consumo de IA (soma a cada análise/reanálise bem-sucedida) e conta as gerações.
+        // Falha/sem chamada (tokens nulos) NÃO soma nem conta — preserva o total já acumulado.
+        if (resultado.tokensEntrada() != null) {
+            d.setModeloIa(resultado.modelo());
+            d.setTokensEntrada(zero(d.getTokensEntrada()) + resultado.tokensEntrada());
+            d.setTokensSaida(zero(d.getTokensSaida()) + zero(resultado.tokensSaida()));
+            BigDecimal custo = custoIaService.custoUsd(resultado.modelo(), resultado.tokensEntrada(), resultado.tokensSaida());
+            d.setCustoUsd(zero(d.getCustoUsd()).add(custo == null ? BigDecimal.ZERO : custo));
+            d.setGeracoesIa(zero(d.getGeracoesIa()) + 1);
+            // Ledger de auditoria: uma linha por análise/reanálise.
+            Long prontuarioId = d.getProntuario() == null ? null : d.getProntuario().getId();
+            usoIaService.registrar(UsoIaTipo.PRONTUARIO_DOCUMENTO, "Documento: " + d.getNome(),
+                    resultado.modelo(), resultado.tokensEntrada(), resultado.tokensSaida(), custo,
+                    prontuarioId == null ? null : "/prontuarios/" + prontuarioId);
+        }
         d.setAnalisadoEm(LocalDateTime.now());
         // Uma (re)análise invalida qualquer decisão humana anterior.
         d.setValidadoPor(null);
@@ -180,6 +202,18 @@ public class ProntuarioIaService {
                 "Documento aguardando validação",
                 "O documento \"" + nomeDoc + "\" de " + paciente + " precisa de validação (alerta da IA).",
                 documentoId, "/prontuarios/" + prontuarioId));
+    }
+
+    private static long zero(Long v) {
+        return v == null ? 0L : v;
+    }
+
+    private static int zero(Integer v) {
+        return v == null ? 0 : v;
+    }
+
+    private static BigDecimal zero(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 
     private boolean iaHabilitada() {

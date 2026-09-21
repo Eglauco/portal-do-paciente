@@ -68,13 +68,16 @@ public class FeedController {
     private final ModeracaoService moderacaoService;
     private final NotificacaoAdminService notificacaoAdminService;
     private final ConfiguracaoService configuracaoService;
+    private final com.example.pop.configuracao.CustoIaService custoIaService;
+    private final com.example.pop.usoia.UsoIaService usoIaService;
     private final AutorComentarioService autorService;
 
     public FeedController(PostagemRepository repository, CurtidaRepository curtidaRepository,
             ComentarioRepository comentarioRepository, StorageService storageService,
             PacienteAcessoService acessoService, PacienteRepository pacienteRepository,
             ModeracaoService moderacaoService, NotificacaoAdminService notificacaoAdminService,
-            ConfiguracaoService configuracaoService, AutorComentarioService autorService) {
+            ConfiguracaoService configuracaoService, com.example.pop.configuracao.CustoIaService custoIaService,
+            com.example.pop.usoia.UsoIaService usoIaService, AutorComentarioService autorService) {
         this.repository = repository;
         this.curtidaRepository = curtidaRepository;
         this.comentarioRepository = comentarioRepository;
@@ -84,6 +87,8 @@ public class FeedController {
         this.moderacaoService = moderacaoService;
         this.notificacaoAdminService = notificacaoAdminService;
         this.configuracaoService = configuracaoService;
+        this.custoIaService = custoIaService;
+        this.usoIaService = usoIaService;
         this.autorService = autorService;
     }
 
@@ -408,6 +413,12 @@ public class FeedController {
             return;
         }
         ModeracaoService.Moderacao m = moderacaoService.avaliar(comentario.getTexto());
+        BigDecimal custo = custoIaService.custoUsd(m.modelo(), m.tokensEntrada(), m.tokensSaida());
+        comentario.setTokensEntrada(m.tokensEntrada());
+        comentario.setTokensSaida(m.tokensSaida());
+        comentario.setModeloIa(m.modelo());
+        comentario.setCustoUsd(custo);
+        registrarUsoModeracao(m, custo, postagem.getId());
         if (!m.liberado()) {
             comentario.setStatusModeracao(StatusModeracao.PENDENTE);
             comentario.setMotivoModeracao(m.motivo());
@@ -425,6 +436,12 @@ public class FeedController {
         }
         boolean eraRejeitado = c.getStatusModeracao() == StatusModeracao.REJEITADO;
         ModeracaoService.Moderacao m = moderacaoService.avaliar(c.getTexto());
+        BigDecimal custo = custoIaService.custoUsd(m.modelo(), m.tokensEntrada(), m.tokensSaida());
+        c.setTokensEntrada(m.tokensEntrada());
+        c.setTokensSaida(m.tokensSaida());
+        c.setModeloIa(m.modelo());
+        c.setCustoUsd(custo);
+        registrarUsoModeracao(m, custo, c.getPostagem() == null ? null : c.getPostagem().getId());
         if (m.liberado() && !eraRejeitado) {
             c.setStatusModeracao(StatusModeracao.PUBLICADO);
             c.setMotivoModeracao(null);
@@ -434,6 +451,16 @@ public class FeedController {
                     ? "Comentário reprovado foi editado; aguardando nova revisão."
                     : m.motivo());
         }
+    }
+
+    /** Registra no ledger o uso de IA da moderação (só quando a IA rodou de fato: tokens != null). */
+    private void registrarUsoModeracao(ModeracaoService.Moderacao m, BigDecimal custo, Long postagemId) {
+        if (m.tokensEntrada() == null) {
+            return;
+        }
+        usoIaService.registrar(com.example.pop.usoia.UsoIaTipo.MODERACAO_COMENTARIO,
+                "Validação de comentário — rede social", m.modelo(), m.tokensEntrada(), m.tokensSaida(), custo,
+                postagemId == null ? null : "/postagens/" + postagemId);
     }
 
     /**

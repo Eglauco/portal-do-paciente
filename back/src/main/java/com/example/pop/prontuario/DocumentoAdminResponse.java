@@ -1,5 +1,6 @@
 package com.example.pop.prontuario;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -20,7 +21,10 @@ public record DocumentoAdminResponse(
         String observacaoValidacao,
         LocalDateTime analisadoEm,
         Long tokensEntrada,
-        Long tokensSaida) {
+        Long tokensSaida,
+        String modeloIa,
+        BigDecimal custoUsd,
+        Integer geracoesIa) {
 
     public static DocumentoAdminResponse from(Documento d) {
         return new DocumentoAdminResponse(
@@ -37,6 +41,9 @@ public record DocumentoAdminResponse(
                 d.getObservacaoValidacao(),
                 d.getAnalisadoEm(),
                 d.getTokensEntrada(),
-                d.getTokensSaida());
+                d.getTokensSaida(),
+                d.getModeloIa(),
+                d.getCustoUsd(),
+                d.getGeracoesIa());
     }
 }

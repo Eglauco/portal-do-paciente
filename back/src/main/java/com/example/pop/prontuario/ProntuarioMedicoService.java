@@ -11,12 +11,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+
 import com.example.pop.agendamento.Agendamento;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.configuracao.CustoIaService;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.storage.StorageService;
+import com.example.pop.usoia.UsoIaService;
+import com.example.pop.usoia.UsoIaTipo;
 
 /** Monta o histórico do paciente (linha do tempo) e cuida do resumo do histórico por IA. */
 @Service
@@ -31,15 +36,20 @@ public class ProntuarioMedicoService {
     private final StorageService storageService;
     private final ConfiguracaoService configuracaoService;
     private final ResumoHistoricoService resumoHistoricoService;
+    private final CustoIaService custoIaService;
+    private final UsoIaService usoIaService;
 
     public ProntuarioMedicoService(ProntuarioRepository prontuarioRepository, PacienteRepository pacienteRepository,
             StorageService storageService, ConfiguracaoService configuracaoService,
-            ResumoHistoricoService resumoHistoricoService) {
+            ResumoHistoricoService resumoHistoricoService, CustoIaService custoIaService,
+            UsoIaService usoIaService) {
         this.prontuarioRepository = prontuarioRepository;
         this.pacienteRepository = pacienteRepository;
         this.storageService = storageService;
         this.configuracaoService = configuracaoService;
         this.resumoHistoricoService = resumoHistoricoService;
+        this.custoIaService = custoIaService;
+        this.usoIaService = usoIaService;
     }
 
     /** Cabeçalho do paciente + resumo do histórico + linha do tempo (prontuários, mais recente primeiro). */
@@ -67,7 +77,9 @@ public class ProntuarioMedicoService {
                 .map(ProntuarioAdminDetalheResponse::from).toList();
 
         return new HistoricoMedicoResponse(cab, p.getResumoHistoricoIa(), p.getResumoHistoricoGeradoEm(),
-                iaHabilitada(), resumoIaHabilitado(), timeline);
+                iaHabilitada(), resumoIaHabilitado(), timeline,
+                p.getResumoHistoricoModeloIa(), p.getResumoHistoricoTokensEntrada(), p.getResumoHistoricoTokensSaida(),
+                p.getResumoHistoricoCustoUsd(), p.getResumoHistoricoGeracoes());
     }
 
     /**
@@ -83,9 +95,9 @@ public class ProntuarioMedicoService {
         if (!dados.temHistorico()) {
             return;
         }
-        String resumo = resumoHistoricoService.gerar(dados.historicoTexto());
+        ResumoHistoricoService.ResumoIa resumo = resumoHistoricoService.gerar(dados.historicoTexto());
         if (resumo == null) {
-            return; // falha na IA: preserva o resumo anterior
+            return; // falha na IA: preserva o resumo anterior (não soma nada)
         }
         salvarResumo(pacienteId, resumo);
     }
@@ -100,16 +112,36 @@ public class ProntuarioMedicoService {
         return new DadosResumo(montarHistoricoTexto(prontuarios), iaHabilitada(), !prontuarios.isEmpty());
     }
 
-    /** Grava o resumo gerado e devolve o instante da geração. */
+    /** Grava o resumo gerado e ACUMULA o consumo de IA (tokens + custo + nº de gerações + modelo). */
     @Transactional
-    public LocalDateTime salvarResumo(Long pacienteId, String resumo) {
+    public void salvarResumo(Long pacienteId, ResumoHistoricoService.ResumoIa resumo) {
         Paciente p = pacienteRepository.findById(pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente não encontrado"));
-        LocalDateTime agora = LocalDateTime.now();
-        p.setResumoHistoricoIa(resumo);
-        p.setResumoHistoricoGeradoEm(agora);
+        p.setResumoHistoricoIa(resumo.texto());
+        p.setResumoHistoricoGeradoEm(LocalDateTime.now());
+        p.setResumoHistoricoModeloIa(resumo.modelo());
+        p.setResumoHistoricoTokensEntrada(zero(p.getResumoHistoricoTokensEntrada()) + resumo.tokensEntrada());
+        p.setResumoHistoricoTokensSaida(zero(p.getResumoHistoricoTokensSaida()) + resumo.tokensSaida());
+        BigDecimal custo = custoIaService.custoUsd(resumo.modelo(), resumo.tokensEntrada(), resumo.tokensSaida());
+        p.setResumoHistoricoCustoUsd(zero(p.getResumoHistoricoCustoUsd()).add(custo == null ? BigDecimal.ZERO : custo));
+        p.setResumoHistoricoGeracoes(zero(p.getResumoHistoricoGeracoes()) + 1);
         pacienteRepository.save(p);
-        return agora;
+        // Ledger de auditoria: uma linha por geração do resumo do histórico.
+        usoIaService.registrar(UsoIaTipo.PRONTUARIO_RESUMO, "Resumo do histórico — " + p.getNome(),
+                resumo.modelo(), resumo.tokensEntrada(), resumo.tokensSaida(), custo,
+                "/prontuario-medico/" + p.getId());
+    }
+
+    private static long zero(Long v) {
+        return v == null ? 0L : v;
+    }
+
+    private static int zero(Integer v) {
+        return v == null ? 0 : v;
+    }
+
+    private static BigDecimal zero(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 
     public boolean iaHabilitada() {

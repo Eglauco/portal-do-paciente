@@ -446,6 +446,12 @@ export const routes: Routes = [
         canDeactivate: [pendingChangesGuard],
         title: 'Editar configuração',
       },
+      {
+        path: 'uso-ia',
+        loadComponent: () => import('./pages/uso-ia/uso-ia-list').then((m) => m.UsoIaList),
+        canActivate: [telaGuard('USO_IA')],
+        title: 'Uso de IA',
+      },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],
   },

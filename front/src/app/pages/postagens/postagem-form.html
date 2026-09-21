@@ -201,6 +201,9 @@
                         <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(c)">Editar</button>
                       }
                     </div>
+                    @if (c.tokensEntrada != null) {
+                      <p class="coment__tokens">IA moderou@if (c.modeloIa; as mod) { ({{ mod }})}: {{ c.tokensEntrada | number }} tokens entrada · {{ c.tokensSaida | number }} saída@if (c.custoUsd != null) { · US$ {{ c.custoUsd | number: '1.2-6' }}}</p>
+                    }
                     @if (c.statusModeracao !== 'PUBLICADO') {
                       <div class="coment-mod" [class.coment-mod--rejeitado]="c.statusModeracao === 'REJEITADO'">
                         <p class="coment-mod__cab">
@@ -290,6 +293,9 @@
                                 <button type="button" class="coment__responder" (click)="iniciarEdicaoComentario(r)">Editar</button>
                               }
                             </div>
+                            @if (r.tokensEntrada != null) {
+                              <p class="coment__tokens">IA moderou@if (r.modeloIa; as mod) { ({{ mod }})}: {{ r.tokensEntrada | number }} tokens entrada · {{ r.tokensSaida | number }} saída@if (r.custoUsd != null) { · US$ {{ r.custoUsd | number: '1.2-6' }}}</p>
+                            }
                             @if (r.statusModeracao !== 'PUBLICADO') {
                               <div class="coment-mod" [class.coment-mod--rejeitado]="r.statusModeracao === 'REJEITADO'">
                                 <p class="coment-mod__cab">

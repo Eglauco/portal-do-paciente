@@ -42,24 +42,129 @@ public class PacienteAcessoService {
     private static final int MAX_POR_JANELA = 5;
     private static final long JANELA_MS = 3_600_000L; // 1 hora
 
+    /** Após este nº de PINs errados, o login por senha é bloqueado até um novo OTP (SMS). */
+    private static final int MAX_TENTATIVAS_SENHA = 5;
+
     private final PacienteRepository repository;
     private final ContaAppRepository contaRepository;
     private final ResponsavelRepository responsavelRepository;
     private final DispositivoRepository dispositivoRepository;
     private final VerificacaoService verificacao;
     private final TelasAppService telasAppService;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     /** Rate-limit por CPF (em memória) para evitar SMS bombing e abuso de custo. */
     private final Map<String, Deque<Long>> enviosPorCpf = new ConcurrentHashMap<>();
 
     public PacienteAcessoService(PacienteRepository repository, ContaAppRepository contaRepository,
             ResponsavelRepository responsavelRepository, DispositivoRepository dispositivoRepository,
-            VerificacaoService verificacao, TelasAppService telasAppService) {
+            VerificacaoService verificacao, TelasAppService telasAppService,
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.contaRepository = contaRepository;
         this.responsavelRepository = responsavelRepository;
         this.dispositivoRepository = dispositivoRepository;
         this.verificacao = verificacao;
         this.telasAppService = telasAppService;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    /** Resultado do início do login: se a conta já tem senha e se o login por senha está bloqueado. */
+    public record InicioLogin(boolean temSenha, boolean bloqueada) {
+    }
+
+    /**
+     * Início do login: confere a identidade (telefone+CPF+data) e informa se a conta já tem senha
+     * (para o app mostrar o campo de senha) e se está bloqueada por tentativas. NÃO envia SMS. 401
+     * genérico se a identidade não confere (sem enumeração de CPF).
+     */
+    @Transactional(readOnly = true)
+    public InicioLogin iniciar(String cpfBruto, LocalDate dataNascimento, String telefoneBruto) {
+        String cpf = normalizarCpf(cpfBruto);
+        conferirIdentidade(cpf, dataNascimento, telefoneBruto);
+        ContaApp conta = contaRepository.findByCpf(cpf).orElse(null);
+        boolean temSenha = conta != null && conta.getSenhaHash() != null;
+        boolean bloqueada = conta != null && conta.getSenhaTentativas() >= MAX_TENTATIVAS_SENHA;
+        return new InicioLogin(temSenha, bloqueada);
+    }
+
+    /**
+     * Login por SENHA (sem SMS): confere a identidade + o PIN e amarra o aparelho. Bloqueia após
+     * {@link #MAX_TENTATIVAS_SENHA} erros (aí só por OTP). 401 genérico na identidade.
+     */
+    @Transactional
+    public ContaApp loginPorSenha(String cpfBruto, LocalDate dataNascimento, String telefoneBruto, String pin,
+            String dispositivoId) {
+        String cpf = normalizarCpf(cpfBruto);
+        conferirIdentidade(cpf, dataNascimento, telefoneBruto);
+        ContaApp conta = contaRepository.findByCpf(cpf).orElse(null);
+        if (conta == null || conta.getSenhaHash() == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Você ainda não cadastrou uma senha. Entre com o código por SMS.");
+        }
+        if (conta.getSenhaTentativas() >= MAX_TENTATIVAS_SENHA) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Muitas tentativas. Entre com o código por SMS para redefinir a senha.");
+        }
+        if (pin == null || !passwordEncoder.matches(pin, conta.getSenhaHash())) {
+            conta.setSenhaTentativas(conta.getSenhaTentativas() + 1);
+            conta.setAtualizadoEm(LocalDateTime.now());
+            contaRepository.save(conta);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Senha incorreta.");
+        }
+        conta.setSenhaTentativas(0);
+        conta.setDispositivoAtivo(dispositivoId);
+        conta.setAtualizadoEm(LocalDateTime.now());
+        contaRepository.save(conta);
+        // Compat: espelha ativo/dispositivo no paciente próprio (chat/WebSocket/dashboard leem isso).
+        repository.findByCpf(cpf).ifPresent(p -> {
+            p.setAtivo(true);
+            p.setDispositivoAtivo(dispositivoId);
+            repository.save(p);
+        });
+        return conta;
+    }
+
+    /** Define a senha inicial (pós-OTP, PIN de 6 dígitos). Exige que a conta ainda NÃO tenha senha. */
+    @Transactional
+    public void definirSenhaInicial(Long contaId, String dispositivoId, String pin) {
+        ContaApp conta = contaValidaPorId(contaId, dispositivoId);
+        if (conta.getSenhaHash() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Você já tem uma senha. Use 'Alterar senha' no seu perfil.");
+        }
+        validarPin(pin);
+        conta.setSenhaHash(passwordEncoder.encode(pin));
+        conta.setSenhaTentativas(0);
+        conta.setAtualizadoEm(LocalDateTime.now());
+        contaRepository.save(conta);
+    }
+
+    /** Altera a senha logado (Meu Perfil): exige a senha atual quando já existe uma. */
+    @Transactional
+    public void alterarSenha(Long contaId, String dispositivoId, String pinAtual, String pinNovo) {
+        ContaApp conta = contaValidaPorId(contaId, dispositivoId);
+        validarPin(pinNovo);
+        if (conta.getSenhaHash() != null
+                && (pinAtual == null || !passwordEncoder.matches(pinAtual, conta.getSenhaHash()))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Senha atual incorreta.");
+        }
+        conta.setSenhaHash(passwordEncoder.encode(pinNovo));
+        conta.setSenhaTentativas(0);
+        conta.setAtualizadoEm(LocalDateTime.now());
+        contaRepository.save(conta);
+    }
+
+    /** A conta do CPF já tem senha definida? (para o app mostrar "Definir" ou "Alterar" no perfil). */
+    @Transactional(readOnly = true)
+    public boolean contaTemSenha(String cpf) {
+        return contaRepository.findByCpf(normalizarCpf(cpf)).map(c -> c.getSenhaHash() != null).orElse(false);
+    }
+
+    /** PIN de acesso: exatamente 6 dígitos numéricos. */
+    private static void validarPin(String pin) {
+        if (pin == null || !pin.matches("\\d{6}")) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "A senha deve ter 6 dígitos numéricos.");
+        }
     }
 
     /** Normaliza o telefone para apenas dígitos. */
@@ -293,6 +398,11 @@ public class PacienteAcessoService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "CPF ou código inválido");
         }
         ContaApp conta = upsertConta(cpf, dispositivoId);
+        // O OTP redefine a senha: limpa o PIN e as tentativas — o app pede um novo PIN em seguida.
+        // Cobre tanto o 1º acesso quanto o "esqueci a senha" de forma uniforme.
+        conta.setSenhaHash(null);
+        conta.setSenhaTentativas(0);
+        contaRepository.save(conta);
         repository.findByCpf(cpf).ifPresent(p -> {
             p.setAtivo(true);
             p.setDispositivoAtivo(dispositivoId);

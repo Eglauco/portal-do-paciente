@@ -112,6 +112,11 @@ export interface SessaoPaciente {
   perfis: Perfil[];
   /** false logo após o OTP (precisa escolher na tela); true após escolher. */
   perfilSelecionado: boolean;
+  /**
+   * true logo após o OTP: a conta precisa DEFINIR uma senha (PIN) obrigatoriamente antes de
+   * escolher o perfil (o OTP zera a senha). O login por senha e a troca de perfil devolvem false.
+   */
+  precisaDefinirSenha: boolean;
 }
 
 /** Cache em memória para leitura síncrona do token (cabeçalhos das requisições). */
@@ -172,6 +177,8 @@ export async function carregarSessao(): Promise<SessaoPaciente | null> {
         perfis: Array.isArray(obj.perfis) ? obj.perfis : [],
         // Sessão antiga (sem o campo): a pessoa já estava no app — não força a tela.
         perfilSelecionado: obj.perfilSelecionado ?? true,
+        // Sessão antiga (sem o campo): não força definir senha (já estava logada antes do recurso).
+        precisaDefinirSenha: obj.precisaDefinirSenha ?? false,
       };
     }
   } catch {
@@ -257,6 +264,7 @@ export async function ativar(
     pacienteId: number;
     nome: string;
     perfis?: Perfil[];
+    precisaDefinirSenha?: boolean;
   };
   cache = {
     token: dados.token,
@@ -264,9 +272,141 @@ export async function ativar(
     nome: dados.nome,
     perfis: dados.perfis ?? [],
     perfilSelecionado: false,
+    // Após o OTP a senha foi zerada: o app pede um novo PIN antes de escolher o perfil.
+    precisaDefinirSenha: dados.precisaDefinirSenha ?? true,
   };
   await persistir();
   return cache;
+}
+
+/** Resultado da pré-checagem do login: a conta já tem senha (mostrar o campo) e se está bloqueada. */
+export interface InicioLogin {
+  temSenha: boolean;
+  bloqueada: boolean;
+}
+
+/**
+ * Pré-checagem do login (sem SMS): confere a identidade (telefone + CPF + data de nascimento) e
+ * diz se a conta já tem senha (o app mostra o campo de senha, entra sem SMS) e se o login por senha
+ * está bloqueado por tentativas (aí só por SMS). 401 genérico se a identidade não confere.
+ */
+export async function iniciarLogin(cpf: string, dataNascimento: string, telefone: string): Promise<InicioLogin> {
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  const telLimpo = telefone.replace(/\D/g, '');
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/iniciar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (resposta.status === 401) {
+    throw new Error('Telefone, CPF ou data de nascimento não confere. Verifique os dados ou procure a recepção.');
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível continuar agora. Tente novamente.');
+  }
+  const dados = (await resposta.json()) as { temSenha?: boolean; bloqueada?: boolean };
+  return { temSenha: dados.temSenha ?? false, bloqueada: dados.bloqueada ?? false };
+}
+
+/**
+ * Login por SENHA (sem SMS): telefone + CPF + data de nascimento + PIN + id do aparelho. Guarda a
+ * sessão (mesmo formato do OTP) já sem precisar definir senha. Erros do backend sobem com a mensagem
+ * exata (senha incorreta, muitas tentativas, sem senha cadastrada) para a tela orientar o usuário.
+ */
+export async function loginPorSenha(
+  cpf: string,
+  dataNascimento: string,
+  telefone: string,
+  senha: string,
+): Promise<SessaoPaciente> {
+  const dispositivoId = await obterDispositivoId();
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  const telLimpo = telefone.replace(/\D/g, '');
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/login-senha`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo, senha, dispositivoId }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (!resposta.ok) {
+    // O backend distingue: 401 identidade/senha incorreta/sem senha, 429 bloqueada por tentativas.
+    throw new Error(await mensagemLogin(resposta));
+  }
+  const dados = (await resposta.json()) as {
+    token: string;
+    pacienteId: number;
+    nome: string;
+    perfis?: Perfil[];
+    precisaDefinirSenha?: boolean;
+  };
+  cache = {
+    token: dados.token,
+    pacienteId: dados.pacienteId,
+    nome: dados.nome,
+    perfis: dados.perfis ?? [],
+    perfilSelecionado: false,
+    precisaDefinirSenha: dados.precisaDefinirSenha ?? false,
+  };
+  await persistir();
+  return cache;
+}
+
+/**
+ * Define a senha (PIN) inicial após o OTP (obrigatório antes de escolher o perfil). Usa o token
+ * atual (a sessão já existe). Ao concluir, marca a sessão como "senha definida" (o app segue para
+ * a tela de perfis). Mensagem do backend em caso de erro (ex.: 422 PIN inválido).
+ */
+export async function definirSenha(senha: string): Promise<SessaoPaciente | null> {
+  const resposta = await fetchMeu('/paciente-auth/definir-senha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ senha }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await mensagemLogin(resposta));
+  }
+  if (cache) {
+    cache = { ...cache, precisaDefinirSenha: false };
+    await persistir();
+  }
+  return cache;
+}
+
+/**
+ * Altera o PIN de acesso da conta logada (Meu Perfil). Exige a senha atual. Usa o token atual.
+ * Mensagem do backend em caso de erro (ex.: 401 senha atual incorreta, 422 PIN inválido).
+ */
+export async function alterarSenha(senhaAtual: string, senhaNova: string): Promise<void> {
+  const resposta = await fetchMeu('/meu/perfil/senha', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ senhaAtual, senhaNova }),
+  });
+  if (!resposta.ok) {
+    throw new Error(await mensagemLogin(resposta));
+  }
+}
+
+/** Extrai a mensagem do backend ({message}) para os fluxos de senha; cai num padrão claro. */
+async function mensagemLogin(resposta: Response): Promise<string> {
+  try {
+    const corpo = (await resposta.json()) as { message?: string };
+    if (corpo && typeof corpo.message === 'string' && corpo.message.trim()) {
+      return corpo.message;
+    }
+  } catch {
+    // corpo vazio/não-JSON
+  }
+  return 'Não foi possível concluir. Tente novamente.';
 }
 
 /** Perfis acessíveis pela conta (atualiza a sessão). Usa o token atual. */
@@ -324,6 +464,8 @@ export async function trocarPerfil(pacienteId: number): Promise<SessaoPaciente> 
     nome: dados.nome,
     perfis: cache?.perfis ?? [],
     perfilSelecionado: true,
+    // Só se chega à troca de perfil depois de definir a senha: nunca reabre a tela de senha.
+    precisaDefinirSenha: false,
   };
   await persistir();
   return cache;

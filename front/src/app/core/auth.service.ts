@@ -71,6 +71,7 @@ const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
   ['USUARIOS', '/usuarios'],
   ['PERFIS', '/perfis'],
   ['CONFIGURACOES', '/configuracoes'],
+  ['USO_IA', '/uso-ia'],
 ];
 
 const CHAVE_TOKEN = 'pop.token';

@@ -109,4 +109,16 @@ public final class ChaveConfiguracao {
      * documento. Só atua com {@link #APP_PRONTUARIO_IA_HABILITADO} ligado. Começa ligada (V98).
      */
     public static final String APP_PRONTUARIO_RESUMO_IA_HABILITADO = "APP_PRONTUARIO_RESUMO_IA_HABILITADO";
+
+    // ---------- Custo dos modelos de IA (NUMERICO, US$ por milhão de tokens / MTok) ----------
+    // Usados para calcular e gravar o custo de cada uso de IA (prontuário, chat, moderação).
+
+    /** Preço dos tokens de ENTRADA do Claude Opus 5, em US$ por MTok (NUMERICO). */
+    public static final String CUSTO_IA_OPUS_5_ENTRADA_USD_MTOK = "CUSTO_IA_OPUS_5_ENTRADA_USD_MTOK";
+    /** Preço dos tokens de SAÍDA do Claude Opus 5, em US$ por MTok (NUMERICO). */
+    public static final String CUSTO_IA_OPUS_5_SAIDA_USD_MTOK = "CUSTO_IA_OPUS_5_SAIDA_USD_MTOK";
+    /** Preço dos tokens de ENTRADA do Claude Haiku 4.5, em US$ por MTok (NUMERICO). */
+    public static final String CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK = "CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK";
+    /** Preço dos tokens de SAÍDA do Claude Haiku 4.5, em US$ por MTok (NUMERICO). */
+    public static final String CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK = "CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK";
 }

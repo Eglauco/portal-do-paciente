@@ -196,12 +196,12 @@
                   }
 
                   @if (resumoClinico(docAbertoIdx); as resumo) {
-                    <div class="doc-resumo">{{ resumo }}</div>
+                    <div class="doc-resumo pm-md" [innerHTML]="resumo | markdown"></div>
                   }
 
                   @if (tokensEntrada(docAbertoIdx) != null) {
                     <p class="doc-analise__tokens">
-                      IA: {{ tokensEntrada(docAbertoIdx) | number }} tokens entrada · {{ tokensSaida(docAbertoIdx) | number }} saída
+                      IA@if (modeloIa(docAbertoIdx); as mod) { ({{ mod }})}@if (geracoesIa(docAbertoIdx); as g) { · {{ g }} {{ g === 1 ? 'geração' : 'gerações' }}}: {{ tokensEntrada(docAbertoIdx) | number }} tokens entrada · {{ tokensSaida(docAbertoIdx) | number }} saída@if (custoUsd(docAbertoIdx) != null) { · US$ {{ custoUsd(docAbertoIdx) | number: '1.2-6' }} no total}
                     </p>
                   }
 

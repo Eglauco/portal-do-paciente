@@ -76,6 +76,17 @@ public class MeuPerfilController {
         return MeuPerfilResponse.from(salvo, storageService.urlVisualizacao(salvo.getFotoUrl(), VALIDADE_FOTO));
     }
 
+    /**
+     * Altera/define o PIN de acesso da CONTA logada (para entrar sem SMS). É credencial da conta
+     * (não dado do perfil), então não passa pela trava de MEU_PERFIL — vale para paciente e
+     * responsável. Quando já existe senha, exige a senha atual.
+     */
+    @PostMapping("/senha")
+    public void alterarSenha(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AlterarSenhaRequest req) {
+        ContaApp conta = acessoService.contaParaTroca(jwt); // valida a conta (cid) + aparelho
+        acessoService.alterarSenha(conta.getId(), jwt.getClaimAsString("dev"), req.senhaAtual(), req.senhaNova());
+    }
+
     /** URL pré-assinada (PUT) para o app enviar a foto direto ao S3 (pasta fixa "foto-paciente"). */
     @PostMapping("/foto/upload-url")
     public UploadUrlResponse gerarUploadFoto(@AuthenticationPrincipal Jwt jwt,
@@ -208,5 +219,9 @@ public class MeuPerfilController {
 
     /** URL pública do objeto recém-enviado ao S3 (retornada pelo /foto/upload-url). */
     public record SalvarFotoRequest(@NotBlank String url) {
+    }
+
+    /** Troca do PIN: senha atual (quando já existe) + nova senha (6 dígitos). */
+    public record AlterarSenhaRequest(String senhaAtual, @NotBlank String senhaNova) {
     }
 }

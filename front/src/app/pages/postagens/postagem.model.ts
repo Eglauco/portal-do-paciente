@@ -59,6 +59,13 @@ export interface Comentario {
   statusModeracao: StatusModeracao;
   /** Motivo da IA quando pendente/rejeitado (só o admin recebe). */
   motivoModeracao: string | null;
+  /** Tokens gastos pela IA ao moderar (só o admin recebe); null se não moderado por IA. */
+  tokensEntrada?: number | null;
+  tokensSaida?: number | null;
+  /** Modelo de IA usado na moderação (só o admin recebe); null se não moderado por IA. */
+  modeloIa?: string | null;
+  /** Custo (US$) da moderação (só o admin recebe); null se não moderado por IA. */
+  custoUsd?: number | null;
   respostas: Comentario[];
 }
 

@@ -61,7 +61,8 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Públicos (sem token).
-                        .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo").permitAll()
+                        .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo",
+                                "/paciente-auth/iniciar", "/paciente-auth/login-senha").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
                         // Tema (cor da plataforma): leitura pública p/ o front e o app aplicarem no boot.
                         .requestMatchers(HttpMethod.GET, "/tema").permitAll()
@@ -87,7 +88,7 @@ public class SecurityConfig {
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
-                                "/tipo-documento-prontuario/**",
+                                "/tipo-documento-prontuario/**", "/uso-ia/**",
                                 "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).

@@ -1,5 +1,6 @@
 package com.example.pop.postagem;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.Function;
@@ -19,6 +20,13 @@ public record ComentarioResponse(
         StatusModeracao statusModeracao,
         /** Motivo da IA quando pendente — só preenchido para o admin. */
         String motivoModeracao,
+        /** Tokens gastos pela IA ao moderar — só preenchidos para o admin. */
+        Long tokensEntrada,
+        Long tokensSaida,
+        /** Modelo de IA usado na moderação — só preenchido para o admin. */
+        String modeloIa,
+        /** Custo (US$) da moderação — só preenchido para o admin. */
+        BigDecimal custoUsd,
         List<ComentarioResponse> respostas) {
 
     /**
@@ -53,6 +61,10 @@ public record ComentarioResponse(
                 dono && dentroDaJanela(c, janelaMinutos),
                 c.getStatusModeracao(),
                 adminAtual != null ? c.getMotivoModeracao() : null,
+                adminAtual != null ? c.getTokensEntrada() : null,
+                adminAtual != null ? c.getTokensSaida() : null,
+                adminAtual != null ? c.getModeloIa() : null,
+                adminAtual != null ? c.getCustoUsd() : null,
                 List.of());
     }
 
@@ -77,6 +89,10 @@ public record ComentarioResponse(
                 dono && dentroDaJanela(c, janelaMinutos),
                 c.getStatusModeracao(),
                 adminAtual != null ? c.getMotivoModeracao() : null,
+                adminAtual != null ? c.getTokensEntrada() : null,
+                adminAtual != null ? c.getTokensSaida() : null,
+                adminAtual != null ? c.getModeloIa() : null,
+                adminAtual != null ? c.getCustoUsd() : null,
                 filhos);
     }
 

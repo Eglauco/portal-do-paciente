@@ -86,36 +86,40 @@ public class ChatIaService {
 
     /** Persiste a resposta da IA (revalidando que ela ainda está no comando). */
     @Transactional
-    public void aplicarResposta(Long chatId, String texto) {
+    public void aplicarResposta(Long chatId, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
         Chat chat = chatRepository.findById(chatId).orElse(null);
         if (!iaNoComando(chat)) {
             return; // um humano assumiu, ou a IA foi encerrada, durante a chamada
         }
         if (texto == null || texto.isBlank()) {
-            chatService.escalarParaHumano(chat, MENSAGEM_PADRAO_ESCALONAMENTO);
+            chatService.escalarParaHumano(chat, MENSAGEM_PADRAO_ESCALONAMENTO, tokensEntrada, tokensSaida, modelo);
         } else {
-            chatService.enviarComoIa(chat, texto);
+            chatService.enviarComoIa(chat, texto, tokensEntrada, tokensSaida, modelo);
         }
     }
 
     /** Escala para humano (revalidando). {@code texto} é a frase de encaminhamento (ou nula = padrão). */
     @Transactional
-    public void aplicarEscalonamento(Long chatId, String texto) {
+    public void aplicarEscalonamento(Long chatId, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
         Chat chat = chatRepository.findById(chatId).orElse(null);
         if (!iaNoComando(chat)) {
             return;
         }
-        chatService.escalarParaHumano(chat, (texto == null || texto.isBlank()) ? MENSAGEM_PADRAO_ESCALONAMENTO : texto);
+        chatService.escalarParaHumano(chat,
+                (texto == null || texto.isBlank()) ? MENSAGEM_PADRAO_ESCALONAMENTO : texto,
+                tokensEntrada, tokensSaida, modelo);
     }
 
     /** Resolve a conversa quando o paciente não tem mais dúvidas (revalidando). {@code texto} = despedida. */
     @Transactional
-    public void aplicarResolucao(Long chatId, String texto) {
+    public void aplicarResolucao(Long chatId, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
         Chat chat = chatRepository.findById(chatId).orElse(null);
         if (!iaNoComando(chat)) {
             return;
         }
-        chatService.resolverPelaIa(chat, (texto == null || texto.isBlank()) ? MENSAGEM_PADRAO_RESOLUCAO : texto);
+        chatService.resolverPelaIa(chat,
+                (texto == null || texto.isBlank()) ? MENSAGEM_PADRAO_RESOLUCAO : texto,
+                tokensEntrada, tokensSaida, modelo);
     }
 
     /** O paciente tocou em "Falar com humano": encerra a IA e manda para a fila (se a IA estava atuando). */

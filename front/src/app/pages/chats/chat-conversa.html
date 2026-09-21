@@ -63,6 +63,9 @@
                 </span>
               }
               <span class="wa__texto">{{ m.texto }}</span>
+              @if (m.geradaPorIa && m.tokensEntrada != null) {
+                <span class="wa__tokens">@if (m.modeloIa; as mod) {{{ mod }} · }{{ m.tokensEntrada | number }} tokens entrada · {{ m.tokensSaida | number }} saída@if (m.custoUsd != null) { · US$ {{ m.custoUsd | number: '1.2-6' }}}</span>
+              }
               <span class="wa__rodape">
                 {{ m.enviadaEm | date: 'HH:mm' }}
                 @if (m.remetente === 'UNIDADE') {

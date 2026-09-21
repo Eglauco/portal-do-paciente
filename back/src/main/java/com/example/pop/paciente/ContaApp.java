@@ -37,6 +37,18 @@ public class ContaApp {
     @Column(name = "dispositivo_ativo", length = 120)
     private String dispositivoAtivo;
 
+    /**
+     * Hash (BCrypt) do PIN de acesso definido pelo paciente/responsável — permite entrar sem SMS.
+     * Nulo = ainda não definiu (ou foi resetado por um novo OTP). Login por senha exige a identidade
+     * (telefone+CPF+data) + este PIN.
+     */
+    @Column(name = "senha_hash", length = 100)
+    private String senhaHash;
+
+    /** Tentativas consecutivas de PIN erradas; ao atingir o limite, o login por senha é bloqueado (usa SMS). */
+    @Column(name = "senha_tentativas", nullable = false)
+    private int senhaTentativas;
+
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 

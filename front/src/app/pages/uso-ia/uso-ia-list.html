@@ -1,0 +1,206 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Uso de IA</h1>
+      <p class="page-sub">Auditoria de cada chamada de IA (tokens, modelo e custo) para conferir com a fatura.</p>
+    </div>
+    <div class="page-head__actions">
+      <button type="button" class="btn btn--ghost" (click)="exportar('xlsx')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'xlsx' ? 'Exportando…' : 'Excel' }}
+      </button>
+      <button type="button" class="btn btn--ghost" (click)="exportar('pdf')" [disabled]="exportando() !== null">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+        </svg>
+        {{ exportando() === 'pdf' ? 'Exportando…' : 'PDF' }}
+      </button>
+    </div>
+  </header>
+
+  <!-- Filtros -->
+  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+    <p class="section-label">Filtros</p>
+    <div class="filters__chat">
+      <div class="form-field">
+        <label class="label" for="f-tipo">Frente</label>
+        <span class="select">
+          <select id="f-tipo" formControlName="tipo" aria-label="Frente">
+            <option value="">Todas</option>
+            @for (t of tipos; track t.valor) {
+              <option [value]="t.valor">{{ t.rotulo }}</option>
+            }
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-de">De</label>
+        <input id="f-de" type="date" class="input" formControlName="de" />
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-ate">Até</label>
+        <input id="f-ate" type="date" class="input" formControlName="ate" />
+      </div>
+      <div class="form-field uso-busca">
+        <label class="label" for="f-busca">Busca</label>
+        <input id="f-busca" type="text" class="input" formControlName="busca" placeholder="Descrição (ex.: nome do documento)" />
+      </div>
+    </div>
+    <div class="filters__actions">
+      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+      <button type="submit" class="btn btn--solid">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <!-- Totais do filtro -->
+  @if (totais(); as t) {
+    <div class="uso-totais" role="status">
+      <div class="uso-totais__item">
+        <span class="uso-totais__rot">Custo total (US$)</span>
+        <span class="uso-totais__val uso-totais__val--forte">US$ {{ t.custoUsd | number: '1.2-6' }}</span>
+      </div>
+      <div class="uso-totais__item">
+        <span class="uso-totais__rot">Tokens entrada</span>
+        <span class="uso-totais__val">{{ t.tokensEntrada | number }}</span>
+      </div>
+      <div class="uso-totais__item">
+        <span class="uso-totais__rot">Tokens saída</span>
+        <span class="uso-totais__val">{{ t.tokensSaida | number }}</span>
+      </div>
+      <div class="uso-totais__item">
+        <span class="uso-totais__rot">Chamadas</span>
+        <span class="uso-totais__val">{{ t.registros | number }}</span>
+      </div>
+    </div>
+  }
+
+  <!-- Dados -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Registros</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} registro(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Carregando registros…</p>
+      </div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (registros().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /><circle cx="12" cy="12" r="3" />
+          </svg>
+        </span>
+        <h3>Nenhum uso de IA encontrado</h3>
+        <p>Ajuste os filtros. Os registros aparecem conforme a IA é usada.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Frente</th>
+              <th>Descrição</th>
+              <th>Modelo</th>
+              <th>Tokens</th>
+              <th>Custo (US$)</th>
+              <th class="col-act"><span class="sr-only">Acessar</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of registros(); track u.id) {
+              <tr>
+                <td class="cell-data">{{ u.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td><span class="status-pill" [attr.data-st]="u.tipo">{{ u.tipoDescricao }}</span></td>
+                <td>{{ u.descricao }}</td>
+                <td class="muted-cell">{{ u.modeloIa || '—' }}</td>
+                <td class="muted-cell">
+                  {{ u.tokensEntrada | number }} entrada · {{ u.tokensSaida | number }} saída
+                </td>
+                <td><b>US$ {{ u.custoUsd == null ? '—' : (u.custoUsd | number: '1.2-6') }}</b></td>
+                <td class="col-act">
+                  @if (u.rota) {
+                    <a class="btn btn--ghost btn--sm" [routerLink]="u.rota">Acessar</a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação -->
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Registros por página">
+                @for (t of tamanhos; track t) {
+                  <option [value]="t" [selected]="t === size()">{{ t }}</option>
+                }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">
+            Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}
+          </span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 6-6 6 6 6" />
+              </svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') {
+                <span class="pager__ellipsis" aria-hidden="true">…</span>
+              } @else {
+                <button
+                  type="button"
+                  class="pager__btn"
+                  [class.is-active]="item === page()"
+                  [attr.aria-current]="item === page() ? 'page' : null"
+                  (click)="irParaPagina(item)"
+                >
+                  {{ item + 1 }}
+                </button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+</section>

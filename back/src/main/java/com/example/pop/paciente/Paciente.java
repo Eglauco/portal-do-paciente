@@ -165,6 +165,33 @@ public class Paciente {
     @Column(name = "resumo_historico_gerado_em")
     private java.time.LocalDateTime resumoHistoricoGeradoEm;
 
+    // --- Consumo ACUMULADO de IA do resumo do histórico (soma a cada regeração; exibido ao médico) ---
+
+    /** Modelo de IA usado na última geração do resumo (ex.: claude-opus-5). */
+    @JsonIgnore
+    @Column(name = "resumo_historico_modelo_ia", length = 60)
+    private String resumoHistoricoModeloIa;
+
+    /** Soma dos tokens de entrada de TODAS as gerações do resumo. */
+    @JsonIgnore
+    @Column(name = "resumo_historico_tokens_entrada")
+    private Long resumoHistoricoTokensEntrada;
+
+    /** Soma dos tokens de saída de TODAS as gerações do resumo. */
+    @JsonIgnore
+    @Column(name = "resumo_historico_tokens_saida")
+    private Long resumoHistoricoTokensSaida;
+
+    /** Custo (US$) TOTAL acumulado de todas as gerações do resumo (snapshot de preço por geração). */
+    @JsonIgnore
+    @Column(name = "resumo_historico_custo_usd", precision = 12, scale = 6)
+    private java.math.BigDecimal resumoHistoricoCustoUsd;
+
+    /** Quantas vezes o resumo já foi gerado por IA. */
+    @JsonIgnore
+    @Column(name = "resumo_historico_geracoes")
+    private Integer resumoHistoricoGeracoes;
+
     /** Um telefone para exibição/snapshot (o primeiro da lista); {@code null} se não houver. */
     public String primeiroTelefone() {
         return telefonesAdicionais == null || telefonesAdicionais.isEmpty() ? null : telefonesAdicionais.get(0);

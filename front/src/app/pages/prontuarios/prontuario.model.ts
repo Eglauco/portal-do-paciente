@@ -35,6 +35,12 @@ export interface DocumentoAdmin {
   /** Tokens gastos pela IA na última análise (entrada/saída); null se nunca analisado. */
   tokensEntrada?: number | null;
   tokensSaida?: number | null;
+  /** Modelo de IA usado na última análise (ex.: claude-opus-5); null se nunca analisado. */
+  modeloIa?: string | null;
+  /** Custo (US$) TOTAL acumulado das análises/reanálises; null se não calculável. */
+  custoUsd?: number | null;
+  /** Nº de gerações da IA (análise inicial + reanálises); null se nunca analisado. */
+  geracoesIa?: number | null;
 }
 
 /** Item da listagem de prontuários. */

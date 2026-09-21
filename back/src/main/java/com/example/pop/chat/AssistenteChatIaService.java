@@ -110,9 +110,11 @@ public class AssistenteChatIaService {
 
     /**
      * Resultado do turno da IA. {@code texto}: em RESPONDER é a resposta; em ESCALAR é a mensagem
-     * de encaminhamento (ou null); em RESOLVER é a despedida cordial (ou null).
+     * de encaminhamento (ou null); em RESOLVER é a despedida cordial (ou null). {@code tokensEntrada}/
+     * {@code tokensSaida}: tokens gastos pela IA neste turno (nulos quando não houve chamada — sem
+     * chave, erro/timeout).
      */
-    public record RespostaIa(Acao acao, String texto) {
+    public record RespostaIa(Acao acao, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
     }
 
     /**
@@ -124,7 +126,7 @@ public class AssistenteChatIaService {
         AnthropicClient c = client();
         if (c == null) {
             log.warn("IA do chat sem chave configurada; escalando para humano (fail-open).");
-            return new RespostaIa(Acao.ESCALAR, null);
+            return new RespostaIa(Acao.ESCALAR, null, null, null, null);
         }
         try {
             String system = INSTRUCOES
@@ -141,15 +143,18 @@ public class AssistenteChatIaService {
             adicionarHistorico(builder, historico);
 
             Message resposta = c.messages().create(builder.build());
+            long tokensEntrada = resposta.usage().inputTokens();
+            long tokensSaida = resposta.usage().outputTokens();
             String saida = resposta.content().stream()
                     .flatMap(b -> b.text().stream())
                     .map(t -> t.text())
                     .collect(Collectors.joining(" "))
                     .trim();
-            return interpretar(saida);
+            RespostaIa base = interpretar(saida);
+            return new RespostaIa(base.acao(), base.texto(), tokensEntrada, tokensSaida, modelo);
         } catch (RuntimeException e) {
             log.warn("IA do chat falhou; escalando para humano (fail-open): {}", e.toString());
-            return new RespostaIa(Acao.ESCALAR, null);
+            return new RespostaIa(Acao.ESCALAR, null, null, null, null);
         }
     }
 
@@ -202,7 +207,7 @@ public class AssistenteChatIaService {
     RespostaIa interpretar(String saida) {
         String s = saida == null ? "" : saida.trim();
         if (s.isEmpty()) {
-            return new RespostaIa(Acao.ESCALAR, null); // resposta vazia → escala
+            return new RespostaIa(Acao.ESCALAR, null, null, null, null); // resposta vazia → escala
         }
         // Os marcadores podem vir em QUALQUER linha — o modelo costuma escrever um preâmbulo antes
         // (ex.: "Infelizmente não tenho... ESCALAR_HUMANO ..."). Detecta em qualquer posição e remove
@@ -210,12 +215,13 @@ public class AssistenteChatIaService {
         // ESCALAR tem prioridade sobre RESOLVER (na dúvida, encaminha em vez de encerrar).
         String maiusculo = s.toUpperCase(Locale.ROOT);
         if (maiusculo.contains(MARCA_ESCALAR)) {
-            return new RespostaIa(Acao.ESCALAR, semToken(s, MARCA_ESCALAR));
+            return new RespostaIa(Acao.ESCALAR, semToken(s, MARCA_ESCALAR), null, null, null);
         }
         if (maiusculo.contains(MARCA_RESOLVER)) {
-            return new RespostaIa(Acao.RESOLVER, semToken(s, MARCA_RESOLVER));
+            return new RespostaIa(Acao.RESOLVER, semToken(s, MARCA_RESOLVER), null, null, null);
         }
-        return new RespostaIa(Acao.RESPONDER, s);
+        // Tokens/modelo ficam por conta de quem chamou a IA (responder); aqui é só parsing do texto.
+        return new RespostaIa(Acao.RESPONDER, s, null, null, null);
     }
 
     /** Remove o token de controle do texto e normaliza espaços/quebras; null se sobrar vazio. */

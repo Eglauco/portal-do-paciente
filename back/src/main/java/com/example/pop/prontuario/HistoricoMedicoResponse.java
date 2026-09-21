@@ -1,5 +1,6 @@
 package com.example.pop.prontuario;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,7 +12,13 @@ public record HistoricoMedicoResponse(
         LocalDateTime resumoHistoricoGeradoEm,
         boolean iaHabilitada,
         boolean resumoIaHabilitado,
-        List<ProntuarioAdminDetalheResponse> prontuarios) {
+        List<ProntuarioAdminDetalheResponse> prontuarios,
+        // Consumo ACUMULADO de IA do resumo do histórico (exibido ao médico no card do resumo).
+        String resumoHistoricoModeloIa,
+        Long resumoHistoricoTokensEntrada,
+        Long resumoHistoricoTokensSaida,
+        BigDecimal resumoHistoricoCustoUsd,
+        Integer resumoHistoricoGeracoes) {
 
     /** Dados do paciente para o cabeçalho clínico da tela. */
     public record PacienteCabecalho(

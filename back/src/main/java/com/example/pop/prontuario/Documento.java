@@ -72,10 +72,23 @@ public class Documento {
     @Column(name = "analisado_em")
     private LocalDateTime analisadoEm;
 
-    /** Tokens consumidos pela IA na última análise: entrada (documento + prompts) e saída (resumo). */
+    /** Tokens de entrada consumidos pela IA — SOMA de todas as análises/reanálises deste documento. */
     @Column(name = "tokens_entrada")
     private Long tokensEntrada;
 
+    /** Tokens de saída consumidos pela IA — SOMA de todas as análises/reanálises deste documento. */
     @Column(name = "tokens_saida")
     private Long tokensSaida;
+
+    /** Modelo de IA usado na última análise (ex.: claude-opus-5); para cálculo de custo. */
+    @Column(name = "modelo_ia", length = 60)
+    private String modeloIa;
+
+    /** Custo (US$) TOTAL acumulado de todas as análises/reanálises (snapshot de preço por geração). */
+    @Column(name = "custo_usd", precision = 12, scale = 6)
+    private java.math.BigDecimal custoUsd;
+
+    /** Quantas vezes a IA analisou este documento (análise inicial + reanálises bem-sucedidas). */
+    @Column(name = "geracoes_ia")
+    private Integer geracoesIa;
 }

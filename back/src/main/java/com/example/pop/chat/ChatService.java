@@ -1,5 +1,6 @@
 package com.example.pop.chat;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -50,13 +51,17 @@ public class ChatService {
     private final StorageService storageService;
     /** @Lazy: quebra o ciclo ChatService ↔ ChatIaOrchestrator (o orquestrador usa este serviço). */
     private final ChatIaOrchestrator iaOrchestrator;
+    private final com.example.pop.configuracao.CustoIaService custoIaService;
+    private final com.example.pop.usoia.UsoIaService usoIaService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
             UsuarioRepository usuarioRepository, ResponsavelRepository responsavelRepository,
             PacienteAcessoService acessoService, ChatLogService chatLogService,
             SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService,
-            @Lazy ChatIaOrchestrator iaOrchestrator) {
+            @Lazy ChatIaOrchestrator iaOrchestrator,
+            com.example.pop.configuracao.CustoIaService custoIaService,
+            com.example.pop.usoia.UsoIaService usoIaService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
@@ -69,6 +74,19 @@ public class ChatService {
         this.pushService = pushService;
         this.storageService = storageService;
         this.iaOrchestrator = iaOrchestrator;
+        this.custoIaService = custoIaService;
+        this.usoIaService = usoIaService;
+    }
+
+    /** Registra no ledger o uso de IA de uma mensagem (só quando a IA rodou de fato: modelo != null). */
+    private void registrarUsoIa(Chat chat, Long tokensEntrada, Long tokensSaida, String modelo, BigDecimal custo) {
+        if (modelo == null) {
+            return;
+        }
+        String paciente = chat.getPaciente() == null ? "" : chat.getPaciente().getNome();
+        usoIaService.registrar(com.example.pop.usoia.UsoIaTipo.CHAT_MENSAGEM,
+                "Mensagem do chat — " + paciente, modelo, tokensEntrada, tokensSaida, custo,
+                "/chats/" + chat.getId());
     }
 
     /**
@@ -165,9 +183,15 @@ public class ChatService {
      * NÃO exige responsável — a IA atua enquanto ninguém humano assumiu. A mensagem fica marcada
      * como {@code geradaPorIa} (sem atendente). Status vai a ATENDIMENTO_IA (distingue do humano).
      */
-    public Chat enviarComoIa(Chat chat, String texto) {
+    public Chat enviarComoIa(Chat chat, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
         marcarMensagensDoPacienteComoLidas(chat.getId());
         Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, null, true, null, null, true);
+        salva.setTokensEntrada(tokensEntrada);
+        salva.setTokensSaida(tokensSaida);
+        salva.setModeloIa(modelo);
+        BigDecimal custo = custoIaService.custoUsd(modelo, tokensEntrada, tokensSaida);
+        salva.setCustoUsd(custo);
+        registrarUsoIa(chat, tokensEntrada, tokensSaida, modelo, custo);
         chat.setStatus(StatusChat.ATENDIMENTO_IA);
         chat.setAtualizadoEm(LocalDateTime.now());
         repository.save(chat);
@@ -186,10 +210,22 @@ public class ChatService {
      * segue nulo (ninguém assumiu ainda).
      */
     public Chat escalarParaHumano(Chat chat, String mensagemEncaminhamento) {
+        return escalarParaHumano(chat, mensagemEncaminhamento, null, null, null);
+    }
+
+    /** Igual, registrando tokens e modelo da IA na mensagem de encaminhamento (quando houver). */
+    public Chat escalarParaHumano(Chat chat, String mensagemEncaminhamento, Long tokensEntrada, Long tokensSaida,
+            String modelo) {
         chat.setIaEncerrada(true);
         Mensagem encaminhamento = null;
         if (mensagemEncaminhamento != null && !mensagemEncaminhamento.isBlank()) {
             encaminhamento = criar(chat, RemetenteMensagem.UNIDADE, mensagemEncaminhamento, null, true, null, null, true);
+            encaminhamento.setTokensEntrada(tokensEntrada);
+            encaminhamento.setTokensSaida(tokensSaida);
+            encaminhamento.setModeloIa(modelo);
+            BigDecimal custo = custoIaService.custoUsd(modelo, tokensEntrada, tokensSaida);
+            encaminhamento.setCustoUsd(custo);
+            registrarUsoIa(chat, tokensEntrada, tokensSaida, modelo, custo);
         }
         chat.setStatus(StatusChat.NAO_LIDA);
         chat.setAtualizadoEm(LocalDateTime.now());
@@ -211,12 +247,18 @@ public class ChatService {
      * houver) uma despedida cordial, marca RESOLVIDO e LIBERA a conversa (responsável nulo e IA
      * reabilitada) — se o paciente voltar a escrever, ela reabre e a IA atende de novo.
      */
-    public Chat resolverPelaIa(Chat chat, String despedida) {
+    public Chat resolverPelaIa(Chat chat, String despedida, Long tokensEntrada, Long tokensSaida, String modelo) {
         StatusChat antes = chat.getStatus();
         marcarMensagensDoPacienteComoLidas(chat.getId());
         Mensagem msg = null;
         if (despedida != null && !despedida.isBlank()) {
             msg = criar(chat, RemetenteMensagem.UNIDADE, despedida, null, true, null, null, true);
+            msg.setTokensEntrada(tokensEntrada);
+            msg.setTokensSaida(tokensSaida);
+            msg.setModeloIa(modelo);
+            BigDecimal custo = custoIaService.custoUsd(modelo, tokensEntrada, tokensSaida);
+            msg.setCustoUsd(custo);
+            registrarUsoIa(chat, tokensEntrada, tokensSaida, modelo, custo);
         }
         chat.setStatus(StatusChat.RESOLVIDO);
         chat.setResponsavel(null);

@@ -146,13 +146,20 @@
         @if (!resumoMinimizado()) {
           <div class="pm-ia__body">
             @if (resumoIa(); as r) {
-              <p class="pm-ia__texto">{{ r }}</p>
+              <div class="pm-ia__texto pm-md" [innerHTML]="r | markdown"></div>
             } @else {
               <p class="pm-ia__vazio">
                 O resumo do histórico é gerado automaticamente pela IA quando um documento novo é analisado.
               </p>
             }
           </div>
+
+          @if (resumoConsumo(); as rc) {
+            <p class="pm-ia__consumo">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /><circle cx="12" cy="12" r="3" /></svg>
+              IA@if (rc.modelo; as mod) { ({{ mod }})} · {{ rc.geracoes }} {{ rc.geracoes === 1 ? 'geração' : 'gerações' }} · {{ rc.tokensEntrada | number }} tokens entrada · {{ rc.tokensSaida | number }} saída@if (rc.custoUsd != null) { · US$ {{ rc.custoUsd | number: '1.2-6' }} no total}
+            </p>
+          }
 
           <p class="pm-ia__disc">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -362,6 +369,13 @@
         <div class="modal__head-id">
           <h2 id="visor-titulo" class="modal__titulo">{{ aberto.documento.nome }}</h2>
           <p class="modal__sub">{{ aberto.documento.tipoNome || 'Sem tipo' }} · {{ aberto.prontuario.especialidade.nome }}</p>
+          <p class="pm-visor__cab-atend">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M8 3v4M16 3v4" />
+            </svg>
+            <span class="sr-only">Atendimento: </span>{{ aberto.prontuario.dataHora | date: 'dd/MM/yyyy HH:mm' }} ·
+            {{ aberto.prontuario.profissionalSaude.nome }} · {{ aberto.prontuario.unidadeSaude.nome }}
+          </p>
         </div>
 
         @if (docAlerta()) {
@@ -473,7 +487,7 @@
             @if (aberto.documento.resumoClinico) {
               <div class="pm-visor__bloco">
                 <p class="pm-visor__k">Resumo clínico (IA)</p>
-                <p class="pm-visor__resumo">{{ aberto.documento.resumoClinico }}</p>
+                <div class="pm-visor__resumo pm-md" [innerHTML]="aberto.documento.resumoClinico | markdown"></div>
               </div>
             }
 
@@ -513,20 +527,6 @@
               </div>
             }
 
-            <div class="pm-visor__bloco pm-visor__contexto">
-              <p class="pm-visor__k">Atendimento</p>
-              <p class="pm-visor__ctx">{{ aberto.prontuario.dataHora | date: 'dd/MM/yyyy HH:mm' }}</p>
-              <p class="pm-visor__ctx">{{ aberto.prontuario.profissionalSaude.nome }}</p>
-              <p class="pm-visor__ctx">{{ aberto.prontuario.unidadeSaude.nome }}</p>
-            </div>
-
-            @if (aberto.documento.tokensEntrada != null) {
-              <p class="pm-visor__tokens">
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" /><circle cx="12" cy="12" r="3" /></svg>
-                IA: {{ aberto.documento.tokensEntrada | number }} tokens entrada · {{ aberto.documento.tokensSaida | number }} saída
-              </p>
-            }
-
             <p class="pm-visor__disc">Edição e anexos de documentos são feitos na tela de Prontuários.</p>
           }
         </aside>
@@ -542,6 +542,7 @@
               class="pm-visor__tira"
               [class.is-ativo]="dv.documento.id === aberto.documento.id"
               [class.pm-visor__tira--alerta]="dv.documento.statusAnalise === 'AGUARDANDO_VALIDACAO'"
+              [class.pm-visor__tira--confirmada]="dv.documento.statusAnalise === 'ALTERACAO_CONFIRMADA'"
               (click)="abrirDocumento(dv.documento, dv.prontuario)"
               [attr.aria-selected]="dv.documento.id === aberto.documento.id"
               [title]="dv.documento.nome"
