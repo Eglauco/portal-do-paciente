@@ -71,6 +71,9 @@ public class SecurityConfig {
                         // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
                         .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
+                        // ZapSign (POC): webhook é chamado pela ZapSign sem JWT; endpoints /dev/zapsign/**
+                        // são protegidos por segredo compartilhado no controller. Remover na Fase 2.
+                        .requestMatchers("/zapsign/webhook", "/dev/zapsign/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
                         .requestMatchers("/feed", "/feed/**").hasRole("PACIENTE")

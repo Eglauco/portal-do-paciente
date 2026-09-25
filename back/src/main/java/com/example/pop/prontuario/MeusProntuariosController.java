@@ -35,13 +35,16 @@ public class MeusProntuariosController {
 
     private final ProntuarioRepository repository;
     private final DocumentoRepository documentoRepository;
+    private final TermoAssinaturaRepository termoAssinaturaRepository;
     private final StorageService storageService;
     private final PacienteAcessoService acessoService;
 
     public MeusProntuariosController(ProntuarioRepository repository, DocumentoRepository documentoRepository,
-            StorageService storageService, PacienteAcessoService acessoService) {
+            TermoAssinaturaRepository termoAssinaturaRepository, StorageService storageService,
+            PacienteAcessoService acessoService) {
         this.repository = repository;
         this.documentoRepository = documentoRepository;
+        this.termoAssinaturaRepository = termoAssinaturaRepository;
         this.storageService = storageService;
         this.acessoService = acessoService;
     }
@@ -70,7 +73,8 @@ public class MeusProntuariosController {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         return repository.findByIdAndAgendamento_Paciente_Id(id, pacienteId)
-                .map(ProntuarioDetalheResponse::from)
+                .map(p -> ProntuarioDetalheResponse.from(p,
+                        termoAssinaturaRepository.findByProntuario_IdOrderByCriadoEmAsc(p.getId())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Prontuário não encontrado"));
     }
 

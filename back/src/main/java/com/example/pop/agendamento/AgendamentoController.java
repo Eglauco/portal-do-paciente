@@ -43,6 +43,7 @@ import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.motivofalta.MotivoFaltaRepository;
 import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.prontuario.TermoAssinaturaService;
 import com.example.pop.procedimento.ProcedimentoRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.push.PushService;
@@ -83,13 +84,15 @@ public class AgendamentoController {
     private final AgendamentoLogService logService;
     private final AgendamentoEntregaService entregaService;
     private final AgendamentoEntregaRepository entregaRepository;
+    private final TermoAssinaturaService termoAssinaturaService;
 
     public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
             ExportacaoService exportacaoService, AgendamentoLogService logService,
-            AgendamentoEntregaService entregaService, AgendamentoEntregaRepository entregaRepository) {
+            AgendamentoEntregaService entregaService, AgendamentoEntregaRepository entregaRepository,
+            TermoAssinaturaService termoAssinaturaService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
@@ -103,6 +106,7 @@ public class AgendamentoController {
         this.logService = logService;
         this.entregaService = entregaService;
         this.entregaRepository = entregaRepository;
+        this.termoAssinaturaService = termoAssinaturaService;
     }
 
     /**
@@ -342,6 +346,13 @@ public class AgendamentoController {
                     logService.registrarDaUnidade(salvo, anterior, salvo.getStatusAgendamento(), uidDoToken(jwt));
                     // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
                     npsService.gerarSeNecessario(salvo);
+                    // Regra: na presença, se o procedimento tiver termos (TCLE), gera as pendências de
+                    // assinatura no prontuário (best-effort — não bloqueia o registro da presença).
+                    try {
+                        termoAssinaturaService.dispararSeNecessario(salvo);
+                    } catch (RuntimeException ignored) {
+                        // não impede a atualização do agendamento
+                    }
                     // Ao MARCAR falta (transição), notifica o paciente para justificar a ausência.
                     if (salvo.getStatusAgendamento() == StatusAgendamento.FALTA_PACIENTE
                             && anterior != StatusAgendamento.FALTA_PACIENTE) {

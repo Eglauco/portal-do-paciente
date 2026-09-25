@@ -11,6 +11,15 @@ export interface DocumentoApi {
   url?: string | null;
 }
 
+/** Termo (TCLE) a assinar dentro de um prontuário. */
+export interface TermoAssinaturaApi {
+  id: number;
+  nome: string;
+  status: 'PENDENTE' | 'EM_CONFIRMACAO' | 'ASSINADO' | 'TENTAR_NOVAMENTE' | 'CANCELADO';
+  statusDescricao: string;
+  criadoEm: string;
+}
+
 /** Item da listagem de prontuários. */
 interface ProntuarioItem {
   id: number;
@@ -34,6 +43,8 @@ export interface ProntuarioDetalhe {
   unidadeSaude: Ref;
   dataHora: string;
   documentos: DocumentoApi[];
+  /** Termos (TCLE) pendentes/assinados deste atendimento. */
+  termos: TermoAssinaturaApi[];
 }
 
 interface Pagina<T> {
@@ -70,4 +81,30 @@ export async function listarProntuarios(): Promise<ProntuarioDetalhe[]> {
 
   // Ordena por data do atendimento (mais recente primeiro).
   return detalhes.sort((a, b) => b.dataHora.localeCompare(a.dataHora));
+}
+
+/**
+ * Inicia a assinatura de TODOS os termos pendentes de um atendimento (prontuário) numa cerimônia só
+ * e devolve o sign_url da ZapSign. 1 termo = documento único; vários = assinatura em lote (mesmo link).
+ * O backend cria os documentos com as variáveis já substituídas.
+ */
+export async function iniciarAssinaturaLote(prontuarioId: number): Promise<string> {
+  const resposta = await fetchMeu(`/meu/termos/prontuario/${prontuarioId}/assinar`, { method: 'POST' });
+  const dados = await comoJson<{ signUrl: string }>(resposta);
+  return dados.signUrl;
+}
+
+/**
+ * Marca os termos do atendimento como "Assinatura em confirmação" — chamado assim que a cerimônia
+ * conclui (evento zs-doc-signed), para o botão sumir na hora e não deixar reassinar.
+ */
+export async function marcarEmConfirmacao(prontuarioId: number): Promise<TermoAssinaturaApi[]> {
+  const resposta = await fetchMeu(`/meu/termos/prontuario/${prontuarioId}/em-confirmacao`, { method: 'POST' });
+  return comoJson<TermoAssinaturaApi[]>(resposta);
+}
+
+/** Endpoint leve: relê os termos do atendimento (usado no loop de conferência da tela). */
+export async function conferirTermos(prontuarioId: number): Promise<TermoAssinaturaApi[]> {
+  const resposta = await fetchMeu(`/meu/termos/prontuario/${prontuarioId}`);
+  return comoJson<TermoAssinaturaApi[]>(resposta);
 }

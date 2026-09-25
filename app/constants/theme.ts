@@ -60,6 +60,7 @@ export const DocTipo: Record<string, { fg: string; bg: string; icon: string }> =
   atestado: { fg: '#A5741A', bg: '#FBF0D6', icon: 'shield-checkmark-outline' },
   ficha: { fg: '#7A5AF5', bg: '#EFEAFE', icon: 'clipboard-outline' },
   laudo: { fg: '#B23B4E', bg: '#FBE4E7', icon: 'document-text-outline' },
+  termo: { fg: '#0E7C74', bg: '#E3F3F1', icon: 'create-outline' },
 };
 
 export const Fonts = Platform.select({

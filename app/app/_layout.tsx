@@ -130,6 +130,7 @@ function Navegacao() {
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
         <Stack.Screen name="perfil-editar" options={{ headerShown: false }} />
         <Stack.Screen name="alterar-senha" options={{ headerShown: false }} />
+        <Stack.Screen name="assinar-termo" options={{ headerShown: false }} />
         <Stack.Screen name="responsaveis" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Directory, File, Paths } from 'expo-file-system';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -22,7 +22,13 @@ import { DocTipo } from '@/constants/theme';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
-import { DocumentoApi, listarProntuarios, ProntuarioDetalhe } from '@/services/prontuario';
+import {
+  conferirTermos,
+  DocumentoApi,
+  iniciarAssinaturaLote,
+  listarProntuarios,
+  ProntuarioDetalhe,
+} from '@/services/prontuario';
 import { podeVer } from '@/services/sessao';
 import { urlDownload } from '@/services/storage';
 
@@ -53,18 +59,22 @@ const ROTULO_TIPO: Record<TipoDoc, string> = {
   atestado: 'Atestado',
   ficha: 'Ficha de atendimento',
   laudo: 'Laudo',
+  termo: 'Termo de Consentimento',
 };
 
 const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 
 function dataLonga(iso: string): string {
   const d = new Date(iso);
-  return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()} · ${hh}:${mm}`;
 }
 
 /** Infere o tipo do documento a partir do nome (para manter ícones/cores). */
 function inferirTipo(nome: string): TipoDoc {
   const n = nome.toLowerCase();
+  if (n.includes('tcle') || n.includes('consentimento') || n.includes('(assinado)')) return 'termo';
   if (n.includes('receita')) return 'receita';
   if (n.includes('atestado')) return 'atestado';
   if (n.includes('laudo')) return 'laudo';
@@ -84,6 +94,74 @@ function inferirTipo(nome: string): TipoDoc {
   return 'ficha';
 }
 
+/**
+ * Termos em "Assinatura em confirmação": esconde o botão e fica num loop de conferência
+ * (5..4..3..2..1..Conferindo…) batendo no endpoint leve enquanto a tela está em foco. Quando nenhum
+ * termo do atendimento continua EM_CONFIRMACAO (virou ASSINADO ou TENTAR_NOVAMENTE), chama onResolvido
+ * para a tela recarregar por inteiro. Pausa fora de foco (useFocusEffect limpa o timer no blur).
+ */
+function ConfirmacaoTermos({
+  prontuarioId,
+  onResolvido,
+}: {
+  prontuarioId: number;
+  onResolvido: () => void;
+}) {
+  const t = useTema();
+  const styles = useMemo(() => criarEstilosConfirmacao(t), [t]);
+  const [segundos, setSegundos] = useState(5);
+  const [conferindo, setConferindo] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      const conferir = async () => {
+        if (cancelado) return;
+        setConferindo(true);
+        try {
+          const termos = await conferirTermos(prontuarioId);
+          if (cancelado) return;
+          if (!termos.some((tm) => tm.status === 'EM_CONFIRMACAO')) {
+            onResolvido(); // resolveu (assinado ou recusado): recarrega a tela e sai do loop
+            return;
+          }
+        } catch {
+          // erro de rede: ignora e tenta de novo no próximo ciclo
+        }
+        contar(5);
+      };
+
+      const contar = (n: number) => {
+        if (cancelado) return;
+        if (n <= 0) {
+          conferir();
+          return;
+        }
+        setConferindo(false);
+        setSegundos(n);
+        timer = setTimeout(() => contar(n - 1), 1000);
+      };
+
+      conferir(); // confere já na chegada (t=0)
+      return () => {
+        cancelado = true;
+        if (timer) clearTimeout(timer);
+      };
+    }, [prontuarioId, onResolvido]),
+  );
+
+  return (
+    <View style={styles.box}>
+      <ActivityIndicator size="small" color={t.brandDeep} />
+      <Text style={styles.txt}>
+        {conferindo ? 'Conferindo…' : `Confirmando assinatura em ${segundos}…`}
+      </Text>
+    </View>
+  );
+}
+
 export default function ProntuarioScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
@@ -95,6 +173,8 @@ export default function ProntuarioScreen() {
   const [atualizando, setAtualizando] = useState(false);
   const [baixando, setBaixando] = useState<number[]>([]);
   const [menu, setMenu] = useState<{ doc: DocumentoApi; link: string } | null>(null);
+  const [assinandoId, setAssinandoId] = useState<number | null>(null);
+  const router = useRouter();
   const jaCarregou = useRef(false);
 
   const carregar = useCallback(async (mostrarSpinner: boolean) => {
@@ -117,6 +197,9 @@ export default function ProntuarioScreen() {
       carregar(!jaCarregou.current);
     }, [carregar]),
   );
+
+  // Recarrega a tela inteira (F5) sem spinner — usado quando a confirmação de assinatura resolve.
+  const recarregar = useCallback(() => carregar(false), [carregar]);
 
   // Notificação (app aberto) ou volta ao primeiro plano: atualiza sem spinner.
   useAtualizarComPush(() => carregar(false));
@@ -177,6 +260,26 @@ export default function ProntuarioScreen() {
       Alert.alert('Ops', 'Não foi possível gerar o link do documento.');
     } finally {
       setBaixando((l) => l.filter((id) => id !== doc.id));
+    }
+  };
+
+  /**
+   * Cria os documentos na ZapSign (com as variáveis) e abre a cerimônia no WebView. Assina TODOS os
+   * termos pendentes do atendimento numa cerimônia só (lote quando há mais de um). Chaveado pelo prontuário.
+   */
+  const iniciarAssinatura = async (prontuarioId: number, titulo: string) => {
+    if (assinandoId != null) return;
+    setAssinandoId(prontuarioId);
+    try {
+      const signUrl = await iniciarAssinaturaLote(prontuarioId);
+      router.push({
+        pathname: '/assinar-termo',
+        params: { signUrl, nome: titulo, prontuarioId: String(prontuarioId) },
+      });
+    } catch {
+      Alert.alert('Ops', 'Não foi possível iniciar a assinatura agora. Tente novamente.');
+    } finally {
+      setAssinandoId(null);
     }
   };
 
@@ -254,6 +357,61 @@ export default function ProntuarioScreen() {
             <Text style={styles.profissional}>
               {at.profissionalSaude.nome} · {at.unidadeSaude.nome}
             </Text>
+
+            {(() => {
+              const emConfirmacao = at.termos.filter((tm) => tm.status === 'EM_CONFIRMACAO');
+              const paraAssinar = at.termos.filter(
+                (tm) => tm.status === 'PENDENTE' || tm.status === 'TENTAR_NOVAMENTE',
+              );
+              const visiveis = at.termos.filter(
+                (tm) =>
+                  tm.status === 'PENDENTE' ||
+                  tm.status === 'TENTAR_NOVAMENTE' ||
+                  tm.status === 'EM_CONFIRMACAO',
+              );
+              if (visiveis.length === 0) return null;
+              const temRecusa = paraAssinar.some((tm) => tm.status === 'TENTAR_NOVAMENTE');
+              return (
+                <View style={styles.termos}>
+                  <Text style={styles.termosTitulo}>Termos para assinar</Text>
+                  {visiveis.map((termo) => (
+                    <View key={termo.id} style={styles.termoRow}>
+                      <View style={styles.termoIcon}>
+                        <Ionicons name="create-outline" size={18} color={t.brandDeep} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.termoNome} numberOfLines={1}>
+                          {termo.nome}
+                        </Text>
+                        <Text style={styles.termoStatus}>{termo.statusDescricao}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {emConfirmacao.length > 0 ? (
+                    <ConfirmacaoTermos prontuarioId={at.id} onResolvido={recarregar} />
+                  ) : (
+                    <Pressable
+                      style={styles.termoBtnFull}
+                      onPress={() => iniciarAssinatura(at.id, 'Termo de consentimento')}
+                      disabled={assinandoId === at.id}
+                      accessibilityRole="button"
+                      accessibilityLabel="Assinar termos pendentes">
+                      {assinandoId === at.id ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.termoBtnTxt}>
+                          {temRecusa
+                            ? 'Tentar novamente'
+                            : paraAssinar.length > 1
+                              ? `Assinar ${paraAssinar.length} termos`
+                              : 'Iniciar assinatura'}
+                        </Text>
+                      )}
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })()}
 
             <View style={styles.docs}>
               {at.documentos.map((doc, i) => {
@@ -354,6 +512,43 @@ const criarEstilos = (t: Tema) =>
   docTipo: { fontSize: 12, color: t.muted, marginTop: 1 },
   docBaixar: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
+  // Termos a assinar (TCLE)
+  termos: {
+    marginTop: 8,
+    backgroundColor: t.brandTint,
+    borderRadius: 12,
+    padding: 10,
+  },
+  termosTitulo: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: t.brandDeep,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  termoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  termoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.surface,
+  },
+  termoNome: { fontSize: 14, fontWeight: '700', color: t.ink },
+  termoStatus: { fontSize: 12, color: t.muted, marginTop: 1 },
+  termoBtn: { backgroundColor: t.brand, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  termoBtnFull: {
+    marginTop: 8,
+    backgroundColor: t.brand,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termoBtnTxt: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
+
   // Estados (carregando / erro / vazio)
   estado: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
   estadoIcone: {
@@ -380,3 +575,20 @@ const criarEstilos = (t: Tema) =>
   },
   estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
+
+const criarEstilosConfirmacao = (t: Tema) =>
+  StyleSheet.create({
+    box: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: t.surface,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: t.line,
+      paddingVertical: 11,
+    },
+    txt: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep },
+  });

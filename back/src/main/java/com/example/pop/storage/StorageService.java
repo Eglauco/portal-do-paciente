@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -191,6 +192,21 @@ public class StorageService {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * Grava bytes gerados no backend direto no S3 (putObject server-side) e devolve a URL pública.
+     * Usado quando o arquivo NÃO vem do navegador (ex.: PDF assinado baixado da ZapSign). Falha
+     * (S3 não configurado) sobe como IllegalStateException.
+     */
+    public String salvarBytes(byte[] conteudo, String contentType, String pasta, String nomeArquivo) {
+        exigirConfiguracao();
+        String tipo = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
+        String chave = pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
+        client().putObject(
+                PutObjectRequest.builder().bucket(bucket).key(chave).contentType(tipo).build(),
+                RequestBody.fromBytes(conteudo));
+        return publicEndpoint + "/" + bucket + "/" + chave;
     }
 
     /** Remove o objeto no S3 a partir da URL salva no documento. */

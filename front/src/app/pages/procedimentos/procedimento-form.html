@@ -32,6 +32,12 @@
         [attr.aria-selected]="abaAtiva() === 'lembretes'"
         (click)="selecionarAba('lembretes')"
       >Lembretes</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'tcle'"
+        [attr.aria-selected]="abaAtiva() === 'tcle'"
+        (click)="selecionarAba('tcle')"
+      >Termo de Consentimento (TCLE)</button>
     </div>
   }
 
@@ -187,6 +193,87 @@
       </form>
     </section>
   }
+
+  <!-- Termos de Consentimento (TCLE) — só ao editar um procedimento já existente -->
+  @if (editando() && abaAtiva() === 'tcle') {
+    <section class="panel form-card">
+      <div class="panel__head">
+        <h2 class="panel__title">Termo de Consentimento (TCLE)</h2>
+        <button type="button" class="btn btn--ghost var-btn" (click)="abrirVariaveis()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 6 3 12l5 6M16 6l5 6-5 6" />
+          </svg>
+          Variáveis dinâmicas
+        </button>
+      </div>
+      <p class="field-hint">
+        Documentos em Word do termo deste procedimento. Use as <strong>variáveis dinâmicas</strong> (botão acima) dentro
+        do Word para o sistema preencher os dados do paciente na hora da assinatura — a substituição automática exige
+        <strong>.docx</strong> (o .doc serve para termo sem variáveis).
+      </p>
+
+      @if (carregandoTermos()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando termos…</p></div>
+      } @else if (termos().length === 0) {
+        <p class="tcle-vazio">Nenhum termo cadastrado ainda.</p>
+      } @else {
+        <ul class="tcle-lista">
+          @for (t of termos(); track t.id) {
+            <li class="tcle-item">
+              <div class="tcle-item__info">
+                <div class="tcle-item__nome">{{ t.nome }}</div>
+                <div class="tcle-item__meta">Documento Word</div>
+              </div>
+              <div class="tcle-item__acoes">
+                <button type="button" class="tcle-btn" (click)="baixarTermo(t)">Baixar</button>
+                <label class="tcle-btn">
+                  {{ substituindoId() === t.id ? 'Enviando…' : 'Substituir' }}
+                  <input
+                    type="file"
+                    accept=".doc,.docx"
+                    (change)="substituirArquivo(t, $event)"
+                    [disabled]="substituindoId() === t.id"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="tcle-btn tcle-btn--danger"
+                  (click)="removerTermo(t)"
+                  [attr.aria-label]="'Excluir termo: ' + t.nome"
+                >Excluir</button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="tcle-nome">Nome do termo <span class="req" aria-hidden="true">*</span></label>
+          <input
+            id="tcle-nome"
+            class="input"
+            [formControl]="termoNome"
+            placeholder="Ex.: TCLE — Endoscopia digestiva alta"
+            autocomplete="off"
+            maxlength="120"
+          />
+        </div>
+        <div class="form-field">
+          <label class="label" for="tcle-arquivo">Arquivo Word (.docx/.doc) <span class="req" aria-hidden="true">*</span></label>
+          <input id="tcle-arquivo" class="input" type="file" accept=".doc,.docx" (change)="onArquivoTermo($event)" />
+          @if (nomeArquivoTermo(); as nome) {
+            <span class="tcle-arquivo">Selecionado: {{ nome }}</span>
+          }
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn--solid" (click)="adicionarTermo()" [disabled]="salvandoTermo()">
+          {{ salvandoTermo() ? 'Adicionando…' : 'Adicionar termo' }}
+        </button>
+      </div>
+    </section>
+  }
 </section>
 
 <!-- Diálogo de confirmação (Sim / Não) -->
@@ -209,6 +296,60 @@
       <div class="modal__actions">
         <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
         <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: catálogo de variáveis dinâmicas do TCLE -->
+@if (mostrarVariaveis()) {
+  <div class="modal-backdrop" (click)="fecharVariaveis()">
+    <div
+      class="modal var-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="var-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="var-modal__head">
+        <div>
+          <h2 id="var-title" class="var-modal__title">Variáveis dinâmicas</h2>
+          <p class="var-modal__sub">
+            Copie e cole estes campos dentro do documento Word (.docx). Ao enviar para a assinatura, o sistema
+            substitui cada um pelos dados reais do paciente/atendimento.
+          </p>
+        </div>
+        <button type="button" class="var-modal__close" (click)="fecharVariaveis()" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="var-modal__body">
+        @if (carregandoVariaveis()) {
+          <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando variáveis…</p></div>
+        } @else {
+          @for (g of variaveisPorGrupo(); track g.grupo) {
+            <div class="var-grupo">
+              <h3 class="var-grupo__titulo">{{ g.grupo }}</h3>
+              <div class="var-lista">
+                @for (v of g.itens; track v.token) {
+                  <div class="var-item">
+                    <div class="var-item__info">
+                      <div class="var-item__token">{{ v.token }}</div>
+                      <div class="var-item__desc">{{ v.descricao }} — ex.: {{ v.exemplo }}</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="var-copiar"
+                      [class.var-copiar--ok]="tokenCopiado() === v.token"
+                      (click)="copiarVariavel(v.token)"
+                    >
+                      {{ tokenCopiado() === v.token ? 'Copiado ✓' : 'Copiar' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
       </div>
     </div>
   </div>

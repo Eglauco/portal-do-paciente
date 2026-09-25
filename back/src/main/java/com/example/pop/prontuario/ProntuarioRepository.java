@@ -14,6 +14,9 @@ public interface ProntuarioRepository extends JpaRepository<Prontuario, Long> {
 
     boolean existsByNumeroAtendimentoAndIdNot(String numeroAtendimento, Long id);
 
+    /** Prontuário já existente de um agendamento (reuso ao gerar termos na presença). */
+    Optional<Prontuario> findFirstByAgendamento_Id(Long agendamentoId);
+
     /** Detalhe garantindo que o prontuário é do paciente (via agendamento.paciente). Escopo do app. */
     Optional<Prontuario> findByIdAndAgendamento_Paciente_Id(Long id, Long pacienteId);
 
