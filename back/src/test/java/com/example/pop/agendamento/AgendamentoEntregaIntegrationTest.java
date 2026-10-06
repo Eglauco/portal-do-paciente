@@ -39,6 +39,7 @@ class HorarioEntregaIntegrationTest {
 
     @Autowired private HorarioEntregaService entregaService;
     @Autowired private HorarioRepository agendamentoRepository;
+    @Autowired private AgendaRepository agendaRepository;
     @Autowired private HorarioEntregaRepository entregaRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
     @Autowired private ProcedimentoRepository procedimentoRepository;
@@ -151,13 +152,17 @@ class HorarioEntregaIntegrationTest {
         unidadeRepository.save(uni);
         uniId = uni.getId();
 
+        Agenda agenda = new Agenda();
+        agenda.setData(LocalDateTime.now().plusDays(1).toLocalDate());
+        agenda.setEspecialidade(esp);
+        agenda.setProfissionalSaude(prof);
+        agenda.setProcedimento(proc);
+        agenda.setUnidadeSaude(uni);
+        agenda = agendaRepository.save(agenda);
         Horario a = new Horario();
+        a.setAgenda(agenda);
         a.setDataHora(LocalDateTime.now().plusDays(1));
-        a.setEspecialidade(esp);
-        a.setProfissionalSaude(prof);
-        a.setProcedimento(proc);
         a.setPaciente(paciente);
-        a.setUnidadeSaude(uni);
         a.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
         Horario salvo = agendamentoRepository.save(a);
         agendamentoId = salvo.getId();

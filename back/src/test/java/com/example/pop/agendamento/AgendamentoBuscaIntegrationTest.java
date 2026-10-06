@@ -33,6 +33,7 @@ class AgendamentoBuscaIntegrationTest {
 
     @Autowired private AgendamentoController agendamentoController;
     @Autowired private HorarioRepository agendamentoRepository;
+    @Autowired private AgendaRepository agendaRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
     @Autowired private ProcedimentoRepository procedimentoRepository;
     @Autowired private ProfissionalSaudeRepository profissionalRepository;
@@ -155,13 +156,17 @@ class AgendamentoBuscaIntegrationTest {
     private Horario criar(String nomePaciente, Long especialidadeId, LocalDateTime dataHora) {
         Paciente p = pacienteController.criar(new PacienteRequest(nomePaciente, "11900000000"), null);
         pacientes.add(p.getId());
+        Agenda agenda = new Agenda();
+        agenda.setData(dataHora.toLocalDate());
+        agenda.setEspecialidade(especialidadeRepository.findById(especialidadeId).orElseThrow());
+        agenda.setProfissionalSaude(profissionalRepository.findById(profId).orElseThrow());
+        agenda.setProcedimento(procedimentoRepository.findById(procId).orElseThrow());
+        agenda.setUnidadeSaude(unidadeRepository.findById(uniId).orElseThrow());
+        agenda = agendaRepository.save(agenda);
         Horario a = new Horario();
+        a.setAgenda(agenda);
         a.setDataHora(dataHora);
-        a.setEspecialidade(especialidadeRepository.findById(especialidadeId).orElseThrow());
-        a.setProfissionalSaude(profissionalRepository.findById(profId).orElseThrow());
-        a.setProcedimento(procedimentoRepository.findById(procId).orElseThrow());
         a.setPaciente(p);
-        a.setUnidadeSaude(unidadeRepository.findById(uniId).orElseThrow());
         a.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
         Horario salvo = agendamentoRepository.save(a);
         agendamentos.add(salvo.getId());

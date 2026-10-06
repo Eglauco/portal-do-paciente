@@ -318,10 +318,12 @@ class HorarioEntregaServiceTest {
     private Horario agendamento(Paciente p) {
         Especialidade esp = new Especialidade();
         esp.setNome("Cardiologia");
+        Agenda agenda = new Agenda();
+        agenda.setEspecialidade(esp);
         Horario a = new Horario();
         a.setId(100L);
+        a.setAgenda(agenda);
         a.setDataHora(LocalDateTime.of(2026, 9, 20, 14, 30));
-        a.setEspecialidade(esp);
         a.setPaciente(p);
         return a;
     }
