@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AgendamentoLog } from '../agendamentos/agendamento.model';
+import { AgendamentoEntrega, AgendamentoLog } from '../agendamentos/agendamento.model';
 import { Agenda, AgendaFiltro, AgendaRequest, AgendaResumo, Horario, HorarioRequest, Pagina } from './agenda.model';
 
 /** Agendas (slots) e Horários (marcações dos pacientes). */
@@ -61,5 +61,9 @@ export class AgendaService {
 
   logsHorario(id: number): Observable<AgendamentoLog[]> {
     return this.http.get<AgendamentoLog[]>(`${this.baseHorario}/${id}/logs`);
+  }
+
+  entregaHorario(id: number): Observable<AgendamentoEntrega[]> {
+    return this.http.get<AgendamentoEntrega[]>(`${this.baseHorario}/${id}/entrega`);
   }
 }

@@ -33,7 +33,7 @@
 
       <p class="section-label">Adicionar horário</p>
       <form class="add-row" [formGroup]="novoHorario" (submit)="adicionar(); $event.preventDefault()">
-        <div class="form-field">
+        <div class="form-field form-field--paciente">
           <label class="label" for="h-pac">Paciente</label>
           <ng-select id="h-pac" formControlName="pacienteId" [items]="pacientes()" bindValue="id" bindLabel="nome" placeholder="Selecione o paciente" [clearable]="false"></ng-select>
         </div>
@@ -82,6 +82,7 @@
                     </span>
                   </td>
                   <td class="col-act">
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="abrirDetalhe(h)">Detalhes</button>
                     <button type="button" class="btn btn--ghost btn--sm" (click)="removerHorario(h)" [disabled]="ocupado(h.id)">Remover</button>
                   </td>
                 </tr>
@@ -91,5 +92,56 @@
         </div>
       }
     </section>
+  }
+
+  @if (detalheHorario(); as h) {
+    <div class="modal__overlay" (click)="fecharDetalhe()">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Detalhes do horário" (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <div>
+            <h2 class="modal__title">{{ h.paciente.nome }}</h2>
+            <p class="modal__sub">Início {{ h.horaInicio?.slice(0, 5) }} · {{ h.statusDescricao || h.statusAgendamento }}</p>
+          </div>
+          <button type="button" class="modal__x" (click)="fecharDetalhe()" aria-label="Fechar">×</button>
+        </div>
+        <div class="modal__body">
+          @if (carregandoDetalhe()) {
+            <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+          }
+
+          <p class="painel-tit">Histórico de status</p>
+          @if (logs().length === 0) {
+            <p class="modal__sub">Sem trocas de status registradas.</p>
+          } @else {
+            <ul class="tl">
+              @for (l of logs(); track l.id) {
+                <li class="tl__item">
+                  <span class="tl__dot" [class.tl__dot--resp]="autorResponsavel(l)"></span>
+                  <span>
+                    <span class="tl__txt">
+                      {{ l.statusAnteriorDescricao ? l.statusAnteriorDescricao + ' → ' : '' }}<b>{{ l.statusNovoDescricao || l.statusNovo }}</b>
+                    </span>
+                    <span class="tl__meta"> · {{ descreverAutor(l) }} · {{ l.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+
+          <p class="painel-tit">Destinatários da notificação</p>
+          @if (entregasPorPessoa().length === 0) {
+            <p class="modal__sub">Nenhuma notificação registrada.</p>
+          } @else {
+            @for (d of entregasPorPessoa(); track d.chave) {
+              <div class="dest">
+                <div class="dest__nome">{{ d.nome }} <span class="dest__sub">({{ d.tipo === 'PACIENTE' ? 'paciente' : 'responsável' }})</span></div>
+                @if (d.telefone) { <div class="dest__sub">{{ d.telefone }}</div> }
+                <span class="pill">{{ rotuloEntrega(d.eventos[d.eventos.length - 1].estado) }}</span>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
   }
 </section>
