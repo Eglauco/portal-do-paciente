@@ -15,6 +15,9 @@ public interface ProfissionalSaudeRepository extends JpaRepository<ProfissionalS
 
     boolean existsByCodigoIntegracaoAndIdNot(String codigoIntegracao, Long id);
 
+    /** Profissional pelo código de integração (SIRESP/CROSS ID_PROFISSIONAL) — único quando preenchido. */
+    java.util.Optional<ProfissionalSaude> findByCodigoIntegracao(String codigoIntegracao);
+
     @Query(value = """
             select u from ProfissionalSaude u
             where (:id is null or u.id = :id)

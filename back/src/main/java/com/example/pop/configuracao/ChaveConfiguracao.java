@@ -121,4 +121,95 @@ public final class ChaveConfiguracao {
     public static final String CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK = "CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK";
     /** Preço dos tokens de SAÍDA do Claude Haiku 4.5, em US$ por MTok (NUMERICO). */
     public static final String CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK = "CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK";
+
+    // ---------- Assinatura eletrônica (TCLE) ----------
+
+    /**
+     * Provedor de assinatura eletrônica dos termos (TEXTO): {@code ZAPSIGN}, {@code AUTENTIQUE},
+     * {@code CLICKSIGN} ou {@code DOCUSIGN}. As credenciais de cada provedor ficam em variáveis de ambiente;
+     * aqui só se ESCOLHE qual usar. Semeada em V112 com {@code ZAPSIGN} (retrocompatibilidade).
+     */
+    public static final String PROVEDOR_ASSINATURA = "PROVEDOR_ASSINATURA";
+
+    /**
+     * Modo de assinatura em lote quando o provedor é AUTENTIQUE (TEXTO): {@code SEPARADO} (um documento e
+     * um PDF assinado por termo) ou {@code COMBINADO} (todos os termos num único PDF/uma assinatura). Não
+     * afeta a ZapSign (que sempre agrupa numa cerimônia só, mantendo um PDF por termo). Semeada em V112.
+     */
+    public static final String AUTENTIQUE_MODO_LOTE = "AUTENTIQUE_MODO_LOTE";
+
+    /**
+     * Modo de assinatura em lote quando o provedor é CLICKSIGN (TEXTO): {@code SEPARADO} (um documento por
+     * termo dentro do mesmo envelope) ou {@code COMBINADO} (todos os termos num único PDF). Semeada em V113.
+     */
+    public static final String CLICKSIGN_MODO_LOTE = "CLICKSIGN_MODO_LOTE";
+
+    /**
+     * Modo de assinatura em lote quando o provedor é DOCUSIGN (TEXTO): {@code SEPARADO} (um documento por
+     * termo dentro do mesmo envelope/cerimônia, um PDF assinado por termo) ou {@code COMBINADO} (todos os
+     * termos num único PDF). Semeada em V114.
+     */
+    public static final String DOCUSIGN_MODO_LOTE = "DOCUSIGN_MODO_LOTE";
+
+    // ---------- Credenciais dos provedores de assinatura (self-service pela tela "Provedores de assinatura") ----------
+    // Os tokens/segredos são do tipo SEGREDO (cifrados no banco, write-only). O AMBIENTE (TEXTO) = SANDBOX|PRODUCAO
+    // e resolve a base URL internamente (o cliente escolhe o ambiente, não digita URL). Semeadas em V122 (vazias).
+
+    /** ZapSign — Token de API (SEGREDO). */
+    public static final String ZAPSIGN_API_TOKEN = "ZAPSIGN_API_TOKEN";
+    /** ZapSign — Segredo do webhook (SEGREDO; header X-Zapsign-Secret que registramos no painel da ZapSign). */
+    public static final String ZAPSIGN_WEBHOOK_SECRET = "ZAPSIGN_WEBHOOK_SECRET";
+    /** ZapSign — Ambiente ATIVO (TEXTO): {@code SANDBOX} ou {@code PRODUCAO} (escolhe qual URL abaixo é usada). */
+    public static final String ZAPSIGN_AMBIENTE = "ZAPSIGN_AMBIENTE";
+    /** ZapSign — URL base de SANDBOX (TEXTO editável; o provedor pode mudar). */
+    public static final String ZAPSIGN_URL_SANDBOX = "ZAPSIGN_URL_SANDBOX";
+    /** ZapSign — URL base de PRODUÇÃO (TEXTO editável). */
+    public static final String ZAPSIGN_URL_PRODUCAO = "ZAPSIGN_URL_PRODUCAO";
+
+    /** Autentique — Token de API (SEGREDO). */
+    public static final String AUTENTIQUE_API_TOKEN = "AUTENTIQUE_API_TOKEN";
+    /** Autentique — Segredo do webhook (SEGREDO; valida o HMAC do X-Autentique-Signature). */
+    public static final String AUTENTIQUE_WEBHOOK_SECRET = "AUTENTIQUE_WEBHOOK_SECRET";
+    /** Autentique — Ambiente ATIVO (TEXTO): {@code SANDBOX} (documentos sem validade jurídica) ou {@code PRODUCAO}. */
+    public static final String AUTENTIQUE_AMBIENTE = "AUTENTIQUE_AMBIENTE";
+    /** Autentique — URL base de SANDBOX (TEXTO editável). */
+    public static final String AUTENTIQUE_URL_SANDBOX = "AUTENTIQUE_URL_SANDBOX";
+    /** Autentique — URL base de PRODUÇÃO (TEXTO editável). */
+    public static final String AUTENTIQUE_URL_PRODUCAO = "AUTENTIQUE_URL_PRODUCAO";
+
+    /** Clicksign — Access token (SEGREDO). */
+    public static final String CLICKSIGN_ACCESS_TOKEN = "CLICKSIGN_ACCESS_TOKEN";
+    /** Clicksign — Segredo do webhook (SEGREDO; valida o HMAC do header Content-Hmac). */
+    public static final String CLICKSIGN_WEBHOOK_SECRET = "CLICKSIGN_WEBHOOK_SECRET";
+    /** Clicksign — Ambiente ATIVO (TEXTO): {@code SANDBOX} ou {@code PRODUCAO} (escolhe qual URL abaixo é usada; o host do widget deriva dela). */
+    public static final String CLICKSIGN_AMBIENTE = "CLICKSIGN_AMBIENTE";
+    /** Clicksign — URL base de SANDBOX (TEXTO editável). */
+    public static final String CLICKSIGN_URL_SANDBOX = "CLICKSIGN_URL_SANDBOX";
+    /** Clicksign — URL base de PRODUÇÃO (TEXTO editável). */
+    public static final String CLICKSIGN_URL_PRODUCAO = "CLICKSIGN_URL_PRODUCAO";
+    /**
+     * Clicksign — Autenticação do signatário no Widget Embedded (TEXTO): {@code sms} (padrão), {@code email} ou
+     * {@code whatsapp}. Token enviado ao celular/e-mail do signatário; a tela do Clicksign conduz a verificação.
+     */
+    public static final String CLICKSIGN_AUTENTICACAO = "CLICKSIGN_AUTENTICACAO";
+
+    /** SIRESP — Liga/desliga geral da atualização do cadastro do paciente na importação do XML (BOOLEANO). */
+    public static final String SIRESP_ATUALIZAR_PACIENTE = "SIRESP_ATUALIZAR_PACIENTE";
+    /** SIRESP — Criar o paciente quando não encontrado (por código de integração / CPF) na importação (BOOLEANO). */
+    public static final String SIRESP_CRIAR_PACIENTE = "SIRESP_CRIAR_PACIENTE";
+    /**
+     * SIRESP — URL do cliente que recebe o XML via HTTP POST (TEXTO), replicando o "Post XML" do SIRESP
+     * (parâmetro de formulário {@code msg} com o XML inteiro). Vazia = envio desabilitado.
+     */
+    public static final String SIRESP_POST_URL = "SIRESP_POST_URL";
+    /**
+     * SIRESP — Enviar o XML ao cliente automaticamente ao importar (BOOLEANO). Ligado: logo após o upload, o
+     * arquivo original é reenviado ao cliente (só se houver {@link #SIRESP_POST_URL}). Desligado: só importa.
+     */
+    public static final String SIRESP_ENVIAR_AO_IMPORTAR = "SIRESP_ENVIAR_AO_IMPORTAR";
+    /**
+     * SIRESP — Procedimento padrão (NUMERICO = id do Procedimento) usado nos agendamentos criados a partir do
+     * SIRESP, já que o XML do CROSS não traz "procedimento". Vazio = não configurado (bloqueia a criação).
+     */
+    public static final String SIRESP_PROCEDIMENTO_PADRAO_ID = "SIRESP_PROCEDIMENTO_PADRAO_ID";
 }

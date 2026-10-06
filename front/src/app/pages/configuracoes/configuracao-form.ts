@@ -113,6 +113,36 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
     return this.confirmar('Existe alteração não salva na tela, deseja sair?');
   }
 
+  /**
+   * Chaves TEXTO cujo valor é uma escolha entre valores conhecidos → renderizam um dropdown (em vez de
+   * texto livre). Evita erro de digitação em configurações "enum" (o backend valida por whitelist também).
+   */
+  private static readonly OPCOES_TEXTO: Record<string, { valor: string; rotulo: string }[]> = {
+    PROVEDOR_ASSINATURA: [
+      { valor: 'ZAPSIGN', rotulo: 'ZapSign' },
+      { valor: 'AUTENTIQUE', rotulo: 'Autentique' },
+      { valor: 'CLICKSIGN', rotulo: 'Clicksign' },
+      { valor: 'DOCUSIGN', rotulo: 'DocuSign' },
+    ],
+    AUTENTIQUE_MODO_LOTE: [
+      { valor: 'SEPARADO', rotulo: 'Separado — um PDF assinado por termo' },
+      { valor: 'COMBINADO', rotulo: 'Combinado — todos os termos num único PDF' },
+    ],
+    CLICKSIGN_MODO_LOTE: [
+      { valor: 'SEPARADO', rotulo: 'Separado — um PDF assinado por termo' },
+      { valor: 'COMBINADO', rotulo: 'Combinado — todos os termos num único PDF' },
+    ],
+    DOCUSIGN_MODO_LOTE: [
+      { valor: 'SEPARADO', rotulo: 'Separado — um PDF assinado por termo' },
+      { valor: 'COMBINADO', rotulo: 'Combinado — todos os termos num único PDF' },
+    ],
+  };
+
+  /** Opções fixas de dropdown para a chave (ou null se o valor é texto livre). */
+  protected opcoesTexto(chave: string): { valor: string; rotulo: string }[] | null {
+    return ConfiguracaoForm.OPCOES_TEXTO[chave] ?? null;
+  }
+
   /** Rótulo amigável do tipo. */
   protected rotuloTipo(tipo: TipoConfiguracao): string {
     return tipo === 'BOOLEANO'

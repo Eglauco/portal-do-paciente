@@ -35,11 +35,11 @@ import com.example.pop.unidade.UnidadeRepository;
  * (entidade destacada + open-in-view desligado): aqui a persistência é real.
  */
 @SpringBootTest
-class AgendamentoEntregaIntegrationTest {
+class HorarioEntregaIntegrationTest {
 
-    @Autowired private AgendamentoEntregaService entregaService;
-    @Autowired private AgendamentoRepository agendamentoRepository;
-    @Autowired private AgendamentoEntregaRepository entregaRepository;
+    @Autowired private HorarioEntregaService entregaService;
+    @Autowired private HorarioRepository agendamentoRepository;
+    @Autowired private HorarioEntregaRepository entregaRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
     @Autowired private ProcedimentoRepository procedimentoRepository;
     @Autowired private ProfissionalSaudeRepository profissionalRepository;
@@ -79,7 +79,7 @@ class AgendamentoEntregaIntegrationTest {
 
     @Test
     void resumoDeEntregaEhPersistidoNoAgendamento() {
-        Agendamento salvo = novoAgendamentoSalvo();
+        Horario salvo = novoAgendamentoSalvo();
 
         entregaService.notificarNovoAgendamento(salvo);
 
@@ -87,7 +87,7 @@ class AgendamentoEntregaIntegrationTest {
         EstadoEntrega resumo = agendamentoRepository.findById(agendamentoId).orElseThrow().getEntregaResumo();
         assertEquals(EstadoEntrega.PACIENTE_SEM_APLICATIVO, resumo, "resumo de entrega persistido no banco");
 
-        List<AgendamentoEntrega> linhas = entregaRepository.findByAgendamento_IdOrderByIdAsc(agendamentoId);
+        List<HorarioEntrega> linhas = entregaRepository.findByHorario_IdOrderByIdAsc(agendamentoId);
         assertEquals(1, linhas.size(), "uma linha por destinatário (só o paciente)");
         assertEquals(TipoDestinatario.PACIENTE, linhas.get(0).getTipo());
         assertEquals(EstadoEntrega.PACIENTE_SEM_APLICATIVO, linhas.get(0).getEstado());
@@ -95,10 +95,10 @@ class AgendamentoEntregaIntegrationTest {
 
     @Test
     void jobDeReceiptsPromoveParaEntregueEPersiste() {
-        Agendamento salvo = novoAgendamentoSalvo();
+        Horario salvo = novoAgendamentoSalvo();
         // Simula uma entrega "enviada" aguardando confirmação, pronta para o job (>15min atrás).
-        AgendamentoEntrega entrega = new AgendamentoEntrega();
-        entrega.setAgendamento(salvo);
+        HorarioEntrega entrega = new HorarioEntrega();
+        entrega.setHorario(salvo);
         entrega.setTipo(TipoDestinatario.PACIENTE);
         entrega.setNome("Paciente Entrega");
         entrega.setEstado(EstadoEntrega.NOTIFICACAO_ENVIADA);
@@ -112,11 +112,11 @@ class AgendamentoEntregaIntegrationTest {
         entregaService.resolverReceiptsPendentes();
 
         // Append-only: a linha original é PRESERVADA (segue ENVIADA), só perde o receipt pendente.
-        AgendamentoEntrega original = entregaRepository.findById(entregaId).orElseThrow();
+        HorarioEntrega original = entregaRepository.findById(entregaId).orElseThrow();
         assertEquals(EstadoEntrega.NOTIFICACAO_ENVIADA, original.getEstado(), "não sobrescreve o histórico");
         assertNull(original.getReceiptsPendentes(), "receipt resolvido deixa de ser pendente");
         // E um NOVO registro ENTREGUE foi criado (2 linhas no total) — tudo PERSISTIDO.
-        List<AgendamentoEntrega> linhas = entregaRepository.findByAgendamento_IdOrderByIdAsc(agendamentoId);
+        List<HorarioEntrega> linhas = entregaRepository.findByHorario_IdOrderByIdAsc(agendamentoId);
         assertEquals(2, linhas.size(), "criação + promoção = 2 registros");
         assertEquals(EstadoEntrega.NOTIFICACAO_ENTREGUE, linhas.get(1).getEstado(), "o mais recente é 'entregue'");
         // O resumo do agendamento reflete o estado ATUAL (última linha da pessoa).
@@ -125,7 +125,7 @@ class AgendamentoEntregaIntegrationTest {
     }
 
     /** Cria (e salva) um agendamento com todas as FKs mínimas; registra os ids para limpeza. */
-    private Agendamento novoAgendamentoSalvo() {
+    private Horario novoAgendamentoSalvo() {
         Paciente paciente = pacienteController.criar(new PacienteRequest("Paciente Entrega", "11900000000"), null);
         pacienteId = paciente.getId();
 
@@ -151,7 +151,7 @@ class AgendamentoEntregaIntegrationTest {
         unidadeRepository.save(uni);
         uniId = uni.getId();
 
-        Agendamento a = new Agendamento();
+        Horario a = new Horario();
         a.setDataHora(LocalDateTime.now().plusDays(1));
         a.setEspecialidade(esp);
         a.setProfissionalSaude(prof);
@@ -159,7 +159,7 @@ class AgendamentoEntregaIntegrationTest {
         a.setPaciente(paciente);
         a.setUnidadeSaude(uni);
         a.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
-        Agendamento salvo = agendamentoRepository.save(a);
+        Horario salvo = agendamentoRepository.save(a);
         agendamentoId = salvo.getId();
         return salvo;
     }

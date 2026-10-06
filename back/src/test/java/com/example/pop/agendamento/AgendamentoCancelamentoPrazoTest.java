@@ -40,7 +40,7 @@ class AgendamentoCancelamentoPrazoTest {
     @Autowired
     private AgendamentoController agendamentoController;
     @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private HorarioRepository agendamentoRepository;
     @Autowired
     private ProcedimentoRepository procedimentoRepository;
     @Autowired
@@ -110,7 +110,7 @@ class AgendamentoCancelamentoPrazoTest {
 
     @Test
     void naoConfirmadoNaoPodeCancelar() {
-        // Agendamento apenas aguardando (não confirmado) → 409, mesmo dentro do prazo.
+        // Horario apenas aguardando (não confirmado) → 409, mesmo dentro do prazo.
         Long id = criarAgendamento(LocalDateTime.now(FUSO).plusHours(48));
         assertEquals(409, assertThrows(ResponseStatusException.class,
                 () -> meuController.cancelar(jwt, id)).getStatusCode().value());

@@ -88,6 +88,9 @@ export class Shell {
     return this.auth.temTela(chave);
   }
 
+  /** True se o usuário é um profissional de saúde (mostra "Meus termos para assinar"). */
+  protected readonly ehProfissional = this.auth.ehProfissional;
+
   /** True se o usuário pode ver ao menos um dashboard (controla o grupo "Dashboard"). */
   protected temAlgumDashboard(): boolean {
     return (

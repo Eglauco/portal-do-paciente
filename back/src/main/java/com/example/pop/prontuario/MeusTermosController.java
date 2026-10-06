@@ -29,12 +29,12 @@ public class MeusTermosController {
         this.acessoService = acessoService;
     }
 
-    /** Inicia a assinatura de um termo pendente e devolve o sign_url para abrir a cerimônia no app. */
+    /** Inicia a assinatura de um termo pendente e devolve o(s) link(s) para abrir a cerimônia no app. */
     @PostMapping("/{id}/assinar")
     public IniciarAssinaturaResponse assinar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return new IniciarAssinaturaResponse(service.iniciar(id, pacienteId));
+        return IniciarAssinaturaResponse.de(service.iniciar(id, pacienteId));
     }
 
     /**
@@ -45,7 +45,7 @@ public class MeusTermosController {
     public IniciarAssinaturaResponse assinarLote(@AuthenticationPrincipal Jwt jwt, @PathVariable Long prontuarioId) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return new IniciarAssinaturaResponse(service.iniciarLote(prontuarioId, pacienteId));
+        return IniciarAssinaturaResponse.de(service.iniciarLote(prontuarioId, pacienteId));
     }
 
     /**
@@ -60,7 +60,7 @@ public class MeusTermosController {
         return service.marcarEmConfirmacao(prontuarioId, pacienteId).stream().map(TermoAssinaturaResponse::from).toList();
     }
 
-    /** Endpoint leve de conferência: devolve os termos do atendimento com o status atual (loop do app). */
+    /** Conferência do loop: verifica no provedor se já assinou e devolve os termos com o status atual. */
     @GetMapping("/prontuario/{prontuarioId}")
     public List<TermoAssinaturaResponse> conferir(@AuthenticationPrincipal Jwt jwt, @PathVariable Long prontuarioId) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
@@ -68,7 +68,23 @@ public class MeusTermosController {
         return service.conferir(prontuarioId, pacienteId).stream().map(TermoAssinaturaResponse::from).toList();
     }
 
-    /** URL da cerimônia de assinatura (ZapSign) para o app abrir no WebView. */
-    public record IniciarAssinaturaResponse(String signUrl) {
+    /** Cancela a confirmação (voltar termos EM_CONFIRMACAO para pendente) — quando o paciente não assinou. */
+    @PostMapping("/prontuario/{prontuarioId}/cancelar")
+    public List<TermoAssinaturaResponse> cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long prontuarioId) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
+        return service.cancelarConfirmacao(prontuarioId, pacienteId).stream().map(TermoAssinaturaResponse::from).toList();
+    }
+
+    /**
+     * Link(s) da cerimônia + provedor. {@code signUrl} = o primeiro (compat com o app atual); {@code signUrls}
+     * = todos (a Autentique no modo "separado" devolve um por termo); {@code provedor} = ZAPSIGN/AUTENTIQUE
+     * (o app decide como detectar o fim da cerimônia — a página da Autentique não emite os eventos zs-*).
+     */
+    public record IniciarAssinaturaResponse(String signUrl, List<String> signUrls, String provedor) {
+        static IniciarAssinaturaResponse de(AssinaturaTermoService.InicioAssinatura inicio) {
+            List<String> urls = inicio.signUrls();
+            return new IniciarAssinaturaResponse(urls.isEmpty() ? null : urls.get(0), urls, inicio.provedor());
+        }
     }
 }

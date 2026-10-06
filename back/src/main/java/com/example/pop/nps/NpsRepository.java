@@ -12,18 +12,18 @@ import org.springframework.data.repository.query.Param;
 
 public interface NpsRepository extends JpaRepository<Nps, Long> {
 
-    boolean existsByAgendamentoId(Long agendamentoId);
+    boolean existsByHorarioId(Long agendamentoId);
 
     /** O responsável respondeu algum NPS (lançamento)? Trava a remoção do responsável. */
     boolean existsByResponsavelId(Long responsavelId);
 
-    Optional<Nps> findByAgendamentoId(Long agendamentoId);
+    Optional<Nps> findByHorarioId(Long agendamentoId);
 
     /** Carrega o NPS garantindo que é do paciente (via agendamento.paciente). Escopo do app. */
-    Optional<Nps> findByIdAndAgendamento_Paciente_Id(Long id, Long pacienteId);
+    Optional<Nps> findByIdAndHorario_Paciente_Id(Long id, Long pacienteId);
 
     /** Como acima, mas só se JÁ foi disparado (o paciente não acessa NPS ainda agendado). */
-    Optional<Nps> findByIdAndAgendamento_Paciente_IdAndDisparadoEmNotNull(Long id, Long pacienteId);
+    Optional<Nps> findByIdAndHorario_Paciente_IdAndDisparadoEmNotNull(Long id, Long pacienteId);
 
     /** Ids dos NPS agendados cuja hora de disparo já chegou e ainda não foram disparados. */
     @Query("""
@@ -38,7 +38,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Lista do app: só NPS já disparados (visíveis ao paciente), opcionalmente por status. */
     @Query("""
             select n from Nps n
-            where n.agendamento.paciente.id = :pacienteId
+            where n.horario.paciente.id = :pacienteId
               and n.disparadoEm is not null
               and (:status is null or n.status = :status)
             """)
@@ -50,8 +50,8 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     @Query("""
             select n from Nps n
             where (:status is null or n.status = :status)
-              and (:pacienteId is null or n.agendamento.paciente.id = :pacienteId)
-              and (:unidadeId is null or n.agendamento.unidadeSaude.id = :unidadeId)
+              and (:pacienteId is null or n.horario.paciente.id = :pacienteId)
+              and (:unidadeId is null or n.horario.agenda.unidadeSaude.id = :unidadeId)
             """)
     Page<Nps> search(
             @Param("status") StatusNps status,
@@ -64,7 +64,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** NPS GERADOS no período agrupados por status (via criadoEm). */
     @Query("""
             select n.status, count(n) from Nps n
-            where (:unidadeId is null or n.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or n.horario.agenda.unidadeSaude.id = :unidadeId)
               and n.criadoEm between :inicio and :fim
             group by n.status
             """)
@@ -78,7 +78,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
      */
     @Query("""
             select cast(n.criadoEm as date), count(n) from Nps n
-            where (:unidadeId is null or n.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or n.horario.agenda.unidadeSaude.id = :unidadeId)
               and n.criadoEm between :inicio and :fim
             group by cast(n.criadoEm as date)
             """)
@@ -88,7 +88,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Média geral das avaliações respondidas do coorte gerado no período. */
     @Query("""
             select avg(n.media) from Nps n
-            where (:unidadeId is null or n.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or n.horario.agenda.unidadeSaude.id = :unidadeId)
               and n.media is not null
               and n.criadoEm between :inicio and :fim
             """)
@@ -98,7 +98,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Médias por avaliação (para classificar satisfeito/neutro/insatisfeito em Java). */
     @Query("""
             select n.media from Nps n
-            where (:unidadeId is null or n.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or n.horario.agenda.unidadeSaude.id = :unidadeId)
               and n.media is not null
               and n.criadoEm between :inicio and :fim
             """)
@@ -108,7 +108,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Média (1–5) por categoria de NPS no período (coorte gerado). */
     @Query("""
             select c.categoria.nome, avg(c.nota), count(c) from NpsCategoriaNota c
-            where (:unidadeId is null or c.nps.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or c.nps.horario.agenda.unidadeSaude.id = :unidadeId)
               and c.nps.criadoEm between :inicio and :fim
             group by c.categoria.id, c.categoria.nome
             order by avg(c.nota) desc, c.categoria.nome asc
@@ -119,7 +119,7 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
     /** Distribuição das notas individuais (1..5 estrelas) no período (coorte gerado). */
     @Query("""
             select c.nota, count(c) from NpsCategoriaNota c
-            where (:unidadeId is null or c.nps.agendamento.unidadeSaude.id = :unidadeId)
+            where (:unidadeId is null or c.nps.horario.agenda.unidadeSaude.id = :unidadeId)
               and c.nps.criadoEm between :inicio and :fim
             group by c.nota
             order by c.nota asc

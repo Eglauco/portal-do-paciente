@@ -15,7 +15,7 @@ export interface DocumentoApi {
 export interface TermoAssinaturaApi {
   id: number;
   nome: string;
-  status: 'PENDENTE' | 'EM_CONFIRMACAO' | 'ASSINADO' | 'TENTAR_NOVAMENTE' | 'CANCELADO';
+  status: 'PENDENTE' | 'EM_CONFIRMACAO' | 'AGUARDANDO_PROFISSIONAL' | 'ASSINADO' | 'TENTAR_NOVAMENTE' | 'CANCELADO';
   statusDescricao: string;
   criadoEm: string;
 }
@@ -59,9 +59,22 @@ interface Pagina<T> {
 
 async function comoJson<T>(resposta: Response): Promise<T> {
   if (!resposta.ok) {
-    throw new Error(`Falha na requisição (${resposta.status})`);
+    throw new Error(await mensagemDeErro(resposta));
   }
   return resposta.json() as Promise<T>;
+}
+
+/** Extrai a mensagem de negócio do backend ({"message": "..."}) ou cai num texto genérico. */
+async function mensagemDeErro(resposta: Response): Promise<string> {
+  try {
+    const corpo = (await resposta.json()) as { message?: unknown };
+    if (typeof corpo?.message === 'string' && corpo.message.trim()) {
+      return corpo.message;
+    }
+  } catch {
+    // corpo não-JSON ou vazio: usa o genérico
+  }
+  return `Falha na requisição (${resposta.status})`;
 }
 
 /**
@@ -83,15 +96,25 @@ export async function listarProntuarios(): Promise<ProntuarioDetalhe[]> {
   return detalhes.sort((a, b) => b.dataHora.localeCompare(a.dataHora));
 }
 
+/** Retorno do início da assinatura: os link(s) da cerimônia + o provedor usado. */
+export interface InicioAssinatura {
+  /** Um link (ZapSign / Autentique combinado / 1 termo) ou vários (Autentique separado, 1 por termo). */
+  signUrls: string[];
+  /** 'ZAPSIGN' | 'AUTENTIQUE' — decide como o app detecta o fim da cerimônia. */
+  provedor: string;
+}
+
 /**
- * Inicia a assinatura de TODOS os termos pendentes de um atendimento (prontuário) numa cerimônia só
- * e devolve o sign_url da ZapSign. 1 termo = documento único; vários = assinatura em lote (mesmo link).
- * O backend cria os documentos com as variáveis já substituídas.
+ * Inicia a assinatura de TODOS os termos pendentes de um atendimento (prontuário) e devolve os link(s) da
+ * cerimônia + o provedor. O backend cria os documentos com as variáveis já substituídas. Na ZapSign é sempre
+ * um link (cerimônia única); na Autentique pode ser um (combinado) ou vários (separado, um por termo).
  */
-export async function iniciarAssinaturaLote(prontuarioId: number): Promise<string> {
+export async function iniciarAssinaturaLote(prontuarioId: number): Promise<InicioAssinatura> {
   const resposta = await fetchMeu(`/meu/termos/prontuario/${prontuarioId}/assinar`, { method: 'POST' });
-  const dados = await comoJson<{ signUrl: string }>(resposta);
-  return dados.signUrl;
+  const dados = await comoJson<{ signUrl?: string; signUrls?: string[]; provedor?: string }>(resposta);
+  const signUrls =
+    dados.signUrls && dados.signUrls.length > 0 ? dados.signUrls : dados.signUrl ? [dados.signUrl] : [];
+  return { signUrls, provedor: dados.provedor ?? 'ZAPSIGN' };
 }
 
 /**
@@ -107,4 +130,9 @@ export async function marcarEmConfirmacao(prontuarioId: number): Promise<TermoAs
 export async function conferirTermos(prontuarioId: number): Promise<TermoAssinaturaApi[]> {
   const resposta = await fetchMeu(`/meu/termos/prontuario/${prontuarioId}`);
   return comoJson<TermoAssinaturaApi[]>(resposta);
+}
+
+/** Cancela a confirmação: volta os termos "em confirmação" para pendente (quando não assinou de fato). */
+export async function cancelarAssinatura(prontuarioId: number): Promise<void> {
+  await fetchMeu(`/meu/termos/prontuario/${prontuarioId}/cancelar`, { method: 'POST' });
 }

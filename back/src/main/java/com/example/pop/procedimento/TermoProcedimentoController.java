@@ -2,8 +2,9 @@ package com.example.pop.procedimento;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.assinatura.AssinaturaProvider;
+import com.example.pop.assinatura.AssinaturaProviderFactory;
 import com.example.pop.storage.StorageService;
 import com.example.pop.zapsign.ZapSignClient;
 
@@ -25,8 +28,11 @@ import jakarta.validation.Valid;
 
 /**
  * CRUD dos documentos de Termo de Consentimento (TCLE) de um procedimento (back-office).
- * Sob /procedimento/** → ADMIN. O arquivo Word vive no S3 (pasta "tcle"); ao substituir/excluir,
- * o objeto antigo é removido do S3 (best-effort).
+ * Sob /procedimento/** → ADMIN.
+ *
+ * <p>Duas origens de modelo (ver {@link OrigemModeloTermo}): {@code ARQUIVO} (o .docx nosso, no S3 pasta
+ * "tcle", serve qualquer provedor) ou {@code ZAPSIGN_MODELO} (modelo já pronto no ZapSign — só o ZapSign
+ * assina). Os endpoints {@code /zapsign/modelos} listam/detalham os modelos do ZapSign para o seletor da tela.
  */
 @RestController
 @RequestMapping("/procedimento")
@@ -35,14 +41,17 @@ public class TermoProcedimentoController {
     private final TermoProcedimentoRepository repository;
     private final ProcedimentoRepository procedimentoRepository;
     private final StorageService storageService;
-    private final ZapSignClient zapSign;
+    private final AssinaturaProviderFactory providerFactory;
+    private final ZapSignClient zapSignClient;
 
     public TermoProcedimentoController(TermoProcedimentoRepository repository,
-            ProcedimentoRepository procedimentoRepository, StorageService storageService, ZapSignClient zapSign) {
+            ProcedimentoRepository procedimentoRepository, StorageService storageService,
+            AssinaturaProviderFactory providerFactory, ZapSignClient zapSignClient) {
         this.repository = repository;
         this.procedimentoRepository = procedimentoRepository;
         this.storageService = storageService;
-        this.zapSign = zapSign;
+        this.providerFactory = providerFactory;
+        this.zapSignClient = zapSignClient;
     }
 
     /**
@@ -52,6 +61,33 @@ public class TermoProcedimentoController {
     @GetMapping("/termos/variaveis")
     public List<VariavelTermoResponse> variaveis() {
         return Arrays.stream(VariavelTermo.values()).map(VariavelTermoResponse::from).toList();
+    }
+
+    /** Modelos (templates) prontos no ZapSign — para o admin selecionar no cadastro do termo. */
+    @GetMapping("/zapsign/modelos")
+    public List<ZapSignClient.ModeloResumo> modelosZapSign() {
+        return zapSignClient.listarModelos();
+    }
+
+    /** Variável do modelo do ZapSign + se o nosso resolver sabe preenchê-la ({@code conhecida}). */
+    public record VariavelModeloResponse(String variable, String label, boolean required, boolean conhecida) {
+    }
+
+    /** Detalhe de um modelo do ZapSign: nome + variáveis, marcando quais o POP sabe preencher. */
+    public record ModeloZapSignDetalheResponse(String token, String nome, List<VariavelModeloResponse> variaveis) {
+    }
+
+    /** Detalha um modelo do ZapSign, marcando cada variável como conhecida (o POP preenche) ou não. */
+    @GetMapping("/zapsign/modelos/{token}")
+    public ModeloZapSignDetalheResponse detalharModeloZapSign(@PathVariable String token) {
+        Set<String> conhecidos = Arrays.stream(VariavelTermo.values())
+                .map(VariavelTermo::token).collect(Collectors.toSet());
+        ZapSignClient.ModeloDetalhe d = zapSignClient.detalharModelo(token);
+        List<VariavelModeloResponse> vars = d.variaveis().stream()
+                .map(v -> new VariavelModeloResponse(v.variable(), v.label(), v.required(),
+                        v.variable() != null && conhecidos.contains(v.variable())))
+                .toList();
+        return new ModeloZapSignDetalheResponse(d.token(), d.nome(), vars);
     }
 
     /** Documentos TCLE de um procedimento (mais recentes primeiro). */
@@ -67,37 +103,27 @@ public class TermoProcedimentoController {
             @Valid @RequestBody TermoProcedimentoRequest request) {
         Procedimento procedimento = procedimentoRepository.findById(procedimentoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Procedimento não encontrado"));
-        exigirUrlNaPastaTcle(request.url());
         TermoProcedimento t = new TermoProcedimento();
         t.setProcedimento(procedimento);
         t.setNome(request.nome().trim());
-        t.setUrl(request.url());
-        t.setContentType(request.contentType());
-        // Registra o .docx como Modelo na ZapSign no upload (habilita as variáveis dinâmicas).
-        t.setZapsignTemplateToken(registrarModeloSeDocx(t.getNome(), t.getUrl(), t.getContentType()));
+        aplicarOrigem(t, request, null);
         t.setCriadoEm(LocalDateTime.now());
         return TermoProcedimentoResponse.from(repository.save(t));
     }
 
-    /** Substitui/renomeia um documento. Se o arquivo (URL) mudou, remove o antigo do S3. */
+    /** Substitui/renomeia/troca a origem de um documento. Se o arquivo antigo saiu de cena, remove do S3. */
     @PutMapping("/termos/{id}")
     public ResponseEntity<TermoProcedimentoResponse> atualizar(@PathVariable Long id,
             @Valid @RequestBody TermoProcedimentoRequest request) {
         return repository.findById(id)
                 .map(t -> {
-                    exigirUrlNaPastaTcle(request.url());
                     String urlAntiga = t.getUrl();
-                    boolean arquivoMudou = urlAntiga == null || !urlAntiga.equals(request.url());
                     t.setNome(request.nome().trim());
-                    t.setUrl(request.url());
-                    t.setContentType(request.contentType());
-                    if (arquivoMudou) {
-                        // Trocou o arquivo: re-registra o Modelo na ZapSign (novo token).
-                        t.setZapsignTemplateToken(registrarModeloSeDocx(t.getNome(), t.getUrl(), t.getContentType()));
-                    }
+                    aplicarOrigem(t, request, urlAntiga);
                     TermoProcedimento salvo = repository.save(t);
-                    if (arquivoMudou && urlAntiga != null) {
-                        excluirNoS3(urlAntiga); // trocou o arquivo: apaga o anterior (best-effort)
+                    // O arquivo antigo saiu (troca de arquivo OU virou modelo ZapSign): apaga do S3 (best-effort).
+                    if (urlAntiga != null && !urlAntiga.equals(salvo.getUrl())) {
+                        excluirNoS3(urlAntiga);
                     }
                     return ResponseEntity.ok(TermoProcedimentoResponse.from(salvo));
                 })
@@ -115,23 +141,67 @@ public class TermoProcedimentoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Registra o Word como Modelo na ZapSign quando é .docx; devolve o token (ou null). Best-effort. */
+    /**
+     * Aplica a origem escolhida ao termo, validando o que cada uma exige:
+     * <ul>
+     *   <li>{@code ZAPSIGN_MODELO}: exige o token do modelo selecionado; zera o arquivo (url/content-type).</li>
+     *   <li>{@code ARQUIVO}: exige a url na pasta "tcle"; (re)registra o Modelo no provedor ativo quando o
+     *       arquivo é novo/trocado (habilita as variáveis dinâmicas).</li>
+     * </ul>
+     * {@code urlAntiga} = url antes da alteração (null no cadastro) — usada para decidir o re-registro.
+     */
+    private void aplicarOrigem(TermoProcedimento t, TermoProcedimentoRequest request, String urlAntiga) {
+        t.setProfissionalAssina(request.profissionalAssinaEfetivo());
+        t.setProfissionalCertificado(request.profissionalCertificadoEfetivo());
+        OrigemModeloTermo origem = request.origemEfetiva();
+        t.setOrigemModelo(origem);
+        if (origem == OrigemModeloTermo.ZAPSIGN_MODELO) {
+            String token = request.providerTemplateToken() == null ? "" : request.providerTemplateToken().trim();
+            if (token.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selecione um modelo do ZapSign.");
+            }
+            t.setUrl(null);
+            t.setContentType(null);
+            t.setProviderTemplateToken(token);
+            t.setModeloProviderNome(request.modeloProviderNome() == null ? null : request.modeloProviderNome().trim());
+            return;
+        }
+        // ARQUIVO
+        exigirUrlNaPastaTcle(request.url());
+        boolean arquivoNovoOuTrocado = urlAntiga == null || !urlAntiga.equals(request.url());
+        t.setUrl(request.url());
+        t.setContentType(request.contentType());
+        t.setModeloProviderNome(null);
+        if (arquivoNovoOuTrocado) {
+            // Novo arquivo (ou trocado): re-registra o Modelo no provedor ativo (novo token, ou null).
+            t.setProviderTemplateToken(registrarModeloSeDocx(t.getNome(), t.getUrl(), t.getContentType()));
+        }
+    }
+
+    /**
+     * Registra o Word (.docx) como Modelo no provedor ATIVO e devolve o token (ou null). Best-effort — não
+     * bloqueia o cadastro. Provedor que renderiza local (Autentique) devolve null (usa o próprio .docx ao assinar).
+     */
     private String registrarModeloSeDocx(String nome, String url, String contentType) {
         if (!ehDocx(url, contentType)) {
             return null; // .doc / outro formato: não vira Modelo (não terá substituição de variáveis)
+        }
+        AssinaturaProvider provider = providerFactory.ativo();
+        if (!provider.usaModeloRemoto()) {
+            return null; // provedor renderiza o documento localmente (sem template remoto)
         }
         try {
             byte[] bytes = storageService.baixarBytes(url);
             if (bytes == null) {
                 return null;
             }
-            return zapSign.criarTemplate(nome, Base64.getEncoder().encodeToString(bytes));
+            return provider.registrarModelo(nome, bytes);
         } catch (RuntimeException e) {
-            return null; // não bloqueia o cadastro; re-registrável ao substituir o arquivo
+            return null; // não bloqueia o cadastro; re-registrável ao substituir o arquivo ou ao assinar
         }
     }
 
-    /** true quando o arquivo é .docx (Word moderno) — único formato que a ZapSign aceita como Modelo. */
+    /** true quando o arquivo é .docx (Word moderno) — único formato aceito como Modelo/renderização. */
     private static boolean ehDocx(String url, String contentType) {
         if (contentType != null && contentType.toLowerCase().contains("wordprocessingml")) {
             return true;

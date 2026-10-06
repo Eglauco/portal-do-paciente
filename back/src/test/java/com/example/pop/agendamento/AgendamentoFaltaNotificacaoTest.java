@@ -19,7 +19,7 @@ class AgendamentoFaltaNotificacaoTest {
     @Autowired
     private AgendamentoController controller;
     @Autowired
-    private AgendamentoRepository repository;
+    private HorarioRepository repository;
 
     @MockitoBean
     private PushService pushService;

@@ -32,7 +32,7 @@ import com.example.pop.unidade.UnidadeRepository;
 class AgendamentoBuscaIntegrationTest {
 
     @Autowired private AgendamentoController agendamentoController;
-    @Autowired private AgendamentoRepository agendamentoRepository;
+    @Autowired private HorarioRepository agendamentoRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
     @Autowired private ProcedimentoRepository procedimentoRepository;
     @Autowired private ProfissionalSaudeRepository profissionalRepository;
@@ -71,13 +71,13 @@ class AgendamentoBuscaIntegrationTest {
         uniId = salvarUnidade();
 
         LocalDateTime hoje = LocalDateTime.now();
-        Agendamento a1 = criar("Alice Souza", espCardio, hoje.plusHours(2));       // cardio, hoje
-        Agendamento a2 = criar("Bruno Lima", espDermato, hoje.plusDays(5));         // dermato, +5 dias
+        Horario a1 = criar("Alice Souza", espCardio, hoje.plusHours(2));       // cardio, hoje
+        Horario a2 = criar("Bruno Lima", espDermato, hoje.plusDays(5));         // dermato, +5 dias
 
-        List<Agendamento> soCardio = buscar(null, nomeCardio, null, null);
+        List<Horario> soCardio = buscar(null, nomeCardio, null, null);
         assertEquals(1, soCardio.size());
         assertEquals(a1.getId(), soCardio.get(0).getId());
-        List<Agendamento> soDermato = buscar(null, nomeDermato, null, null);
+        List<Horario> soDermato = buscar(null, nomeDermato, null, null);
         assertEquals(1, soDermato.size());
         assertEquals(a2.getId(), soDermato.get(0).getId());
 
@@ -108,8 +108,8 @@ class AgendamentoBuscaIntegrationTest {
         uniId = salvarUnidade();
 
         LocalDate hoje = LocalDate.now();
-        Agendamento doDia = criar("Carla Dia", espCardio, hoje.atTime(10, 0));
-        Agendamento meiaNoiteSeguinte = criar("Diego MeiaNoite", espCardio, hoje.plusDays(1).atStartOfDay());
+        Horario doDia = criar("Carla Dia", espCardio, hoje.atTime(10, 0));
+        Horario meiaNoiteSeguinte = criar("Diego MeiaNoite", espCardio, hoje.plusDays(1).atStartOfDay());
 
         List<Long> ids = agendamentoController
                 .listar(null, null, nomeCardio, null, null, hoje, null, null, 0, 50)
@@ -131,7 +131,7 @@ class AgendamentoBuscaIntegrationTest {
         procId = salvarProcedimento();
         uniId = salvarUnidade();
 
-        Agendamento comSublinhado = criar("Zeta_Um", espDermato, LocalDateTime.now().plusHours(3));
+        Horario comSublinhado = criar("Zeta_Um", espDermato, LocalDateTime.now().plusHours(3));
         criar("ZetaXUm", espDermato, LocalDateTime.now().plusHours(4)); // o '_' NÃO pode casar o 'X'
 
         List<Long> ids = agendamentoController
@@ -142,7 +142,7 @@ class AgendamentoBuscaIntegrationTest {
         assertEquals(comSublinhado.getId(), ids.get(0));
     }
 
-    private List<Agendamento> buscar(String nome, String especialidadeNome, LocalDateTime de, LocalDateTime ate) {
+    private List<Horario> buscar(String nome, String especialidadeNome, LocalDateTime de, LocalDateTime ate) {
         // search espera os padrões LIKE já montados (minúsculos, com curingas).
         return agendamentoRepository.search(null, padrao(nome), padrao(especialidadeNome), null, null, de, ate, null,
                 Pageable.unpaged()).getContent();
@@ -152,10 +152,10 @@ class AgendamentoBuscaIntegrationTest {
         return v == null ? null : "%" + v.toLowerCase() + "%";
     }
 
-    private Agendamento criar(String nomePaciente, Long especialidadeId, LocalDateTime dataHora) {
+    private Horario criar(String nomePaciente, Long especialidadeId, LocalDateTime dataHora) {
         Paciente p = pacienteController.criar(new PacienteRequest(nomePaciente, "11900000000"), null);
         pacientes.add(p.getId());
-        Agendamento a = new Agendamento();
+        Horario a = new Horario();
         a.setDataHora(dataHora);
         a.setEspecialidade(especialidadeRepository.findById(especialidadeId).orElseThrow());
         a.setProfissionalSaude(profissionalRepository.findById(profId).orElseThrow());
@@ -163,7 +163,7 @@ class AgendamentoBuscaIntegrationTest {
         a.setPaciente(p);
         a.setUnidadeSaude(unidadeRepository.findById(uniId).orElseThrow());
         a.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
-        Agendamento salvo = agendamentoRepository.save(a);
+        Horario salvo = agendamentoRepository.save(a);
         agendamentos.add(salvo.getId());
         return salvo;
     }

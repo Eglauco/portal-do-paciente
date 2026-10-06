@@ -11,5 +11,11 @@ public enum TipoConfiguracao {
     /** Cor (hex {@code #RRGGBB}) guardada em {@code valorCor}; a tela mostra um seletor RGB. */
     COR,
     /** Imagem: a URL do objeto no S3 (pasta "configuracao") guardada em {@code valorImagem}; a tela sobe o arquivo. */
-    IMAGEM
+    IMAGEM,
+    /**
+     * Segredo (token/chave de integração) guardado CIFRADO em {@code valorSegredo} (AES-GCM, {@link SegredoCripto}).
+     * É WRITE-ONLY: a API nunca devolve o valor em claro (só um flag "preenchido") e é OCULTO da tela genérica de
+     * Configurações — editável apenas pela tela dedicada (ex.: Provedores de assinatura).
+     */
+    SEGREDO
 }

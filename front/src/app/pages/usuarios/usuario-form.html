@@ -115,6 +115,23 @@
       </div>
 
       <div class="form-field">
+        <label class="label" for="profissional">Profissional de saúde vinculado</label>
+        <ng-select
+          labelForId="profissional"
+          formControlName="profissionalSaudeId"
+          [items]="profissionais()"
+          bindLabel="nome"
+          bindValue="id"
+          placeholder="Nenhum (usuário comum)"
+          notFoundText="Nenhum profissional encontrado"
+          aria-describedby="profissional-dica"
+        ></ng-select>
+        <span id="profissional-dica" class="field-hint">
+          Vincule quando este usuário for um profissional de saúde — ele poderá ver e assinar os termos dos atendimentos dele.
+        </span>
+      </div>
+
+      <div class="form-field">
         <label class="label" for="senha">
           Senha @if (!editando()) { <span class="req"><span class="sr-only">(obrigatório)</span><span aria-hidden="true">*</span></span> }
         </label>

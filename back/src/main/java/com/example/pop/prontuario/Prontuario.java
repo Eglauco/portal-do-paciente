@@ -3,7 +3,7 @@ package com.example.pop.prontuario;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -34,8 +34,8 @@ public class Prontuario {
     private Long id;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "agendamento_id", nullable = false)
-    private Agendamento agendamento;
+    @JoinColumn(name = "horario_id", nullable = false)
+    private Horario horario;
 
     /** Número do atendimento (único). */
     @Column(name = "numero_atendimento", nullable = false, unique = true, length = 40)

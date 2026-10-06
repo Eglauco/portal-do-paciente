@@ -34,6 +34,10 @@ public class Unidade {
     @Column(nullable = false, length = 120)
     private String nome;
 
+    /** Código da unidade em um sistema externo (integração SIRESP/CROSS). Único quando preenchido. */
+    @Column(name = "codigo_integracao", length = 60)
+    private String codigoIntegracao;
+
     /**
      * FAQ da unidade (base de conhecimento da IA do chat). Não serializado direto na entidade
      * (o grid/export de unidades não carregam FAQ); é exposto/gravado pelos DTOs do cadastro.

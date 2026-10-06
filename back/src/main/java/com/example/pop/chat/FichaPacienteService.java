@@ -12,8 +12,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.pop.agendamento.Agendamento;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.Horario;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.lembrete.Lembrete;
 import com.example.pop.lembrete.LembreteRepository;
@@ -33,11 +33,11 @@ public class FichaPacienteService {
     /** No máximo estes agendamentos futuros na ficha (mantém o prompt curto/barato). */
     private static final int MAX_AGENDAMENTOS = 3;
 
-    private final AgendamentoRepository agendamentoRepository;
+    private final HorarioRepository agendamentoRepository;
     private final ProntuarioRepository prontuarioRepository;
     private final LembreteRepository lembreteRepository;
 
-    public FichaPacienteService(AgendamentoRepository agendamentoRepository,
+    public FichaPacienteService(HorarioRepository agendamentoRepository,
             ProntuarioRepository prontuarioRepository, LembreteRepository lembreteRepository) {
         this.agendamentoRepository = agendamentoRepository;
         this.prontuarioRepository = prontuarioRepository;
@@ -53,8 +53,8 @@ public class FichaPacienteService {
         LocalDateTime agora = LocalDateTime.now(FUSO);
         StringBuilder sb = new StringBuilder();
 
-        List<Agendamento> proximos = agendamentoRepository
-                .findByPaciente_IdAndUnidadeSaude_IdAndDataHoraGreaterThanEqualOrderByDataHoraAsc(pacienteId, unidadeId, agora);
+        List<Horario> proximos = agendamentoRepository
+                .findByPaciente_IdAndAgenda_UnidadeSaude_IdAndDataHoraGreaterThanEqualOrderByDataHoraAsc(pacienteId, unidadeId, agora);
         if (proximos.isEmpty()) {
             sb.append("Próximos agendamentos nesta unidade: nenhum agendamento futuro.\n");
         } else {
@@ -76,7 +76,7 @@ public class FichaPacienteService {
         return sb.toString().trim();
     }
 
-    private String descreverAgendamento(Agendamento a, LocalDateTime agora) {
+    private String descreverAgendamento(Horario a, LocalDateTime agora) {
         StringBuilder s = new StringBuilder("- ")
                 .append(a.getProcedimento().getNome())
                 .append(" em ").append(a.getDataHora().format(DATA))
@@ -107,7 +107,7 @@ public class FichaPacienteService {
     }
 
     /** Mesma regra do cancelamento pelo app: só confirmado, e dentro de dataHora - horasCancelamento. */
-    private String descreverCancelamento(Agendamento a, LocalDateTime agora) {
+    private String descreverCancelamento(Horario a, LocalDateTime agora) {
         if (a.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             return "Cancelamento pelo app: só é possível quando o agendamento está confirmado pelo paciente.";
         }

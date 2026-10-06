@@ -65,6 +65,10 @@ public class Configuracao {
     @Column(name = "valor_imagem", columnDefinition = "TEXT")
     private String valorImagem;
 
+    /** Valor do tipo SEGREDO: token/chave CIFRADO (AES-GCM, base64 de IV||ciphertext). Nunca exposto em claro. */
+    @Column(name = "valor_segredo", columnDefinition = "TEXT")
+    private String valorSegredo;
+
     /** Auditoria leve: quando e por quem o valor foi alterado pela última vez. */
     @Column(name = "atualizado_em")
     private LocalDateTime atualizadoEm;

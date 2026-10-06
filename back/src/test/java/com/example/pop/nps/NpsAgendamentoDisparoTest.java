@@ -15,7 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.pop.agendamento.AgendamentoController;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.AgendamentoRequest;
 import com.example.pop.agendamento.AgendamentoResponse;
 import com.example.pop.agendamento.StatusAgendamento;
@@ -32,7 +32,7 @@ class NpsAgendamentoDisparoTest {
     @Autowired
     private AgendamentoController agendamentoController;
     @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private HorarioRepository agendamentoRepository;
     @Autowired
     private ProcedimentoController procedimentoController;
     @Autowired
@@ -55,7 +55,7 @@ class NpsAgendamentoDisparoTest {
     }
 
     private void limpar(Long agId, Long procId) {
-        npsRepository.findByAgendamentoId(agId).ifPresent(n -> npsRepository.deleteById(n.getId()));
+        npsRepository.findByHorarioId(agId).ifPresent(n -> npsRepository.deleteById(n.getId()));
         agendamentoRepository.deleteById(agId);
         procedimentoRepository.deleteById(procId);
     }
@@ -65,7 +65,7 @@ class NpsAgendamentoDisparoTest {
         Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc NPS 0h", null, 24, 0));
         AgendamentoResponse ag = presenca(proc.getId());
         try {
-            Nps nps = npsRepository.findByAgendamentoId(ag.id()).orElseThrow();
+            Nps nps = npsRepository.findByHorarioId(ag.id()).orElseThrow();
             assertNotNull(nps.getDisparadoEm()); // 0h: já disparado na presença
             verify(pushService).notificarNpsPendente(argThat(n -> n.getId().equals(nps.getId())));
         } finally {
@@ -78,7 +78,7 @@ class NpsAgendamentoDisparoTest {
         Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc NPS 2h", null, 24, 2));
         AgendamentoResponse ag = presenca(proc.getId());
         try {
-            Nps nps = npsRepository.findByAgendamentoId(ag.id()).orElseThrow();
+            Nps nps = npsRepository.findByHorarioId(ag.id()).orElseThrow();
             assertNull(nps.getDisparadoEm()); // agendado, ainda não disparado
             assertNotNull(nps.getDispararEm());
 
@@ -103,7 +103,7 @@ class NpsAgendamentoDisparoTest {
         AgendamentoResponse ag = presenca(proc.getId());
         Long procId = proc.getId();
         try {
-            Nps nps = npsRepository.findByAgendamentoId(ag.id()).orElseThrow();
+            Nps nps = npsRepository.findByHorarioId(ag.id()).orElseThrow();
             // Sai de presença (ex.: correção para falta).
             LocalDateTime dh = LocalDateTime.now(FUSO).plusDays(1).withNano(0);
             agendamentoController.atualizar(ag.id(),
@@ -114,7 +114,7 @@ class NpsAgendamentoDisparoTest {
             npsService.dispararAgendados();
 
             // Não está mais em presença: o NPS agendado foi cancelado (removido).
-            assertTrue(npsRepository.findByAgendamentoId(ag.id()).isEmpty());
+            assertTrue(npsRepository.findByHorarioId(ag.id()).isEmpty());
         } finally {
             limpar(ag.id(), procId);
         }

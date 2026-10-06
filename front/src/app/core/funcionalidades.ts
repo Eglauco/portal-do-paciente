@@ -47,6 +47,7 @@ const ICONE = {
   engrenagem: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 0 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 2.6 15H2.5a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.1-2.7 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9 4.6h.1A2 2 0 0 1 11 2.5"/>'),
   perfis: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><path d="M5.5 16a3.2 3.2 0 0 1 6 0"/><path d="M14 10h4M14 13h3"/>'),
   ia: svg('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/><circle cx="12" cy="12" r="3"/>'),
+  assinatura: svg('<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/>'),
 } as const;
 
 export const FUNCIONALIDADES: readonly Funcionalidade[] = [
@@ -88,5 +89,7 @@ export const FUNCIONALIDADES: readonly Funcionalidade[] = [
   { tela: 'UNIDADES', rotulo: 'Unidades de Saúde', rota: '/unidades', grupo: 'Administração', icone: ICONE.predio, palavras: ['unidade', 'clínica', 'posto', 'local'] },
   { tela: 'PERFIS', rotulo: 'Perfis', rota: '/perfis', grupo: 'Administração', icone: ICONE.perfis, palavras: ['permissões', 'acesso', 'rbac', 'papéis'] },
   { tela: 'CONFIGURACOES', rotulo: 'Configurações', rota: '/configuracoes', grupo: 'Administração', icone: ICONE.engrenagem, palavras: ['ajustes', 'settings', 'white-label', 'tema', 'cor'] },
+  { tela: 'PROVEDORES_ASSINATURA', rotulo: 'Provedores de assinatura', rota: '/provedores-assinatura', grupo: 'Administração', icone: ICONE.assinatura, palavras: ['assinatura', 'provedor', 'token', 'credenciais', 'integração', 'zapsign', 'autentique', 'clicksign', 'docusign', 'chaves', 'api'] },
   { tela: 'USO_IA', rotulo: 'Uso de IA', rota: '/uso-ia', grupo: 'Administração', icone: ICONE.ia, palavras: ['custo', 'tokens', 'auditoria', 'ia', 'gasto', 'fatura', 'claude'] },
+  { tela: 'SIRESP', rotulo: 'SIRESP', rota: '/siresp', grupo: 'Administração', icone: ICONE.tipoDoc, palavras: ['siresp', 'cross', 'importação', 'xml', 'regulação', 'agendamento', 'integração'] },
 ];

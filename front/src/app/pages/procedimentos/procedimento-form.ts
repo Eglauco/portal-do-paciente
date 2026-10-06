@@ -8,7 +8,13 @@ import { StorageService } from '../prontuarios/storage.service';
 import { Lembrete } from './lembrete.model';
 import { LembreteService } from './lembrete.service';
 import { ProcedimentoService } from './procedimento.service';
-import { TermoProcedimento, VariavelTermo } from './termo-procedimento.model';
+import {
+  ModeloZapSign,
+  ModeloZapSignDetalhe,
+  OrigemModeloTermo,
+  TermoProcedimento,
+  VariavelTermo,
+} from './termo-procedimento.model';
 import { TermoProcedimentoService } from './termo-procedimento.service';
 
 /** Abas do procedimento (na edição): dados + lembretes + termos de consentimento (TCLE). */
@@ -77,6 +83,34 @@ type AbaId = 'dados' | 'lembretes' | 'tcle';
     .var-copiar { border: 1px solid var(--line); background: none; cursor: pointer; border-radius: 0.45rem; padding: 0.35rem 0.65rem; font-size: 0.78rem; font-weight: 600; color: var(--brand-deep); white-space: nowrap; }
     .var-copiar:hover { background: color-mix(in srgb, var(--brand) 8%, transparent); }
     .var-copiar--ok { color: #1e9e5a; border-color: #1e9e5a; }
+    /* Adicionar termo: origem (arquivo x modelo ZapSign) + variáveis do modelo. */
+    .tcle-add-titulo { font-size: 0.95rem; font-weight: 700; color: var(--ink); margin: 0.5rem 0 0.75rem; }
+    .tcle-tag {
+      display: inline-block; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--brand-deep); background: color-mix(in srgb, var(--brand) 12%, transparent);
+      border-radius: 0.35rem; padding: 0.05rem 0.4rem; margin-right: 0.4rem;
+    }
+    .origem-toggle { display: inline-flex; gap: 0.35rem; padding: 0.2rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--surface); }
+    .origem-opt {
+      border: none; background: none; cursor: pointer; padding: 0.45rem 0.8rem; border-radius: 0.45rem;
+      font-size: 0.85rem; font-weight: 600; color: var(--muted);
+    }
+    .origem-opt:hover { color: var(--ink); }
+    .origem-opt--ativa { background: var(--brand); color: #fff; }
+    .state--inline { flex-direction: row; gap: 0.5rem; padding: 0.6rem 0; justify-content: flex-start; }
+    .state--inline p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+    .modelo-vars { margin-top: 0.75rem; padding: 0.75rem 0.85rem; border: 1px solid var(--line); border-radius: 0.6rem; background: var(--surface); }
+    .modelo-vars__titulo { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--brand-deep); margin-bottom: 0.5rem; }
+    .modelo-vars__chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .modelo-chip {
+      font-family: ui-monospace, "Cascadia Code", monospace; font-size: 0.78rem; color: var(--ink);
+      border: 1px solid var(--line); border-radius: 0.4rem; padding: 0.2rem 0.5rem; background: var(--bg);
+    }
+    .modelo-chip--alerta { color: #9a5b00; border-color: #e0a24a; background: #fff7e8; }
+    .modelo-aviso { margin: 0.6rem 0 0; font-size: 0.82rem; color: #9a5b00; line-height: 1.45; }
+    .check-linha { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; color: var(--ink); font-weight: 600; }
+    .check-linha input { width: 1.05rem; height: 1.05rem; cursor: pointer; accent-color: var(--brand); }
+    .check-linha--sub { margin-top: 0.6rem; margin-left: 1.55rem; font-weight: 600; }
   `],
 })
 export class ProcedimentoForm implements PodeSair {
@@ -140,6 +174,31 @@ export class ProcedimentoForm implements PodeSair {
     nonNullable: true,
     validators: [Validators.required, Validators.maxLength(120)],
   });
+
+  /**
+   * Seleção de "Modelo do ZapSign" temporariamente OCULTA no front (backend + lógica prontos; será melhorada
+   * e liberada depois). Com `false`, o seletor de origem some e a origem fica sempre ARQUIVO (upload do .docx,
+   * comportamento atual). Para reativar a funcionalidade ao usuário, trocar para `true`.
+   */
+  protected readonly modeloZapsignHabilitado = false;
+
+  /** Coassinatura: se o profissional de saúde do atendimento também assina o termo a adicionar. */
+  protected readonly profissionalAssinaTermo = signal(false);
+  /** Se o profissional assina com certificado digital (ICP) em vez de em tela (só com o check acima). */
+  protected readonly profissionalCertificadoTermo = signal(false);
+
+  // Origem do modelo do termo a adicionar: arquivo .docx (padrão) ou modelo pronto no ZapSign.
+  protected readonly origemTermo = signal<OrigemModeloTermo>('ARQUIVO');
+  protected readonly modelosZapsign = signal<ModeloZapSign[]>([]);
+  protected readonly carregandoModelos = signal(false);
+  protected readonly erroModelos = signal(false);
+  protected readonly modeloSelecionadoToken = signal<string | null>(null);
+  protected readonly modeloDetalhe = signal<ModeloZapSignDetalhe | null>(null);
+  protected readonly carregandoDetalhe = signal(false);
+  /** Variáveis que o modelo exige mas o POP não sabe preencher (aviso no cadastro). */
+  protected readonly variaveisDesconhecidas = computed(
+    () => this.modeloDetalhe()?.variaveis.filter((v) => !v.conhecida) ?? [],
+  );
 
   // Variáveis dinâmicas (catálogo do backend) para o admin copiar no Word.
   protected readonly variaveis = signal<VariavelTermo[]>([]);
@@ -254,18 +313,124 @@ export class ProcedimentoForm implements PodeSair {
     }
     this.arquivoTermo = arquivo;
     this.nomeArquivoTermo.set(arquivo?.name ?? null);
-    // Sugere o nome do termo a partir do arquivo, quando ainda vazio.
+    // Sugere o nome do termo a partir do arquivo, quando ainda vazio (limitado ao maxLength do nome).
     if (arquivo && !this.termoNome.value.trim()) {
-      this.termoNome.setValue(arquivo.name.replace(/\.[^.]+$/, ''));
+      this.termoNome.setValue(arquivo.name.replace(/\.[^.]+$/, '').slice(0, 120));
     }
+  }
+
+  /** Troca a origem do termo a adicionar; ao ir para ZapSign, carrega os modelos (uma vez). */
+  protected selecionarOrigem(origem: OrigemModeloTermo): void {
+    this.origemTermo.set(origem);
+    if (origem === 'ZAPSIGN_MODELO' && this.modelosZapsign().length === 0 && !this.carregandoModelos()) {
+      this.carregarModelosZapsign();
+    }
+  }
+
+  private carregarModelosZapsign(): void {
+    this.carregandoModelos.set(true);
+    this.erroModelos.set(false);
+    this.termoService.modelosZapSign().subscribe({
+      next: (modelos) => {
+        this.modelosZapsign.set(modelos);
+        this.carregandoModelos.set(false);
+      },
+      error: () => {
+        this.erroModelos.set(true);
+        this.carregandoModelos.set(false);
+      },
+    });
+  }
+
+  /** Ao escolher um modelo: guarda o token, sugere o nome e carrega as variáveis (para o aviso). */
+  protected aoSelecionarModelo(event: Event): void {
+    const token = (event.target as HTMLSelectElement).value || null;
+    this.modeloSelecionadoToken.set(token);
+    this.modeloDetalhe.set(null);
+    if (!token) {
+      this.carregandoDetalhe.set(false);
+      return;
+    }
+    const modelo = this.modelosZapsign().find((m) => m.token === token);
+    if (modelo && !this.termoNome.value.trim()) {
+      this.termoNome.setValue(modelo.nome.slice(0, 120)); // respeita o maxLength(120) do nome
+    }
+    this.carregandoDetalhe.set(true);
+    this.termoService.detalharModeloZapSign(token).subscribe({
+      next: (detalhe) => {
+        if (this.modeloSelecionadoToken() !== token) return; // seleção mudou: ignora resposta obsoleta
+        this.modeloDetalhe.set(detalhe);
+        this.carregandoDetalhe.set(false);
+      },
+      error: () => {
+        if (this.modeloSelecionadoToken() !== token) return;
+        this.carregandoDetalhe.set(false);
+      },
+    });
+  }
+
+  /** Liga/desliga a coassinatura; ao desligar, zera também a opção de certificado. */
+  protected aoMarcarAssinaProfissional(marcado: boolean): void {
+    this.profissionalAssinaTermo.set(marcado);
+    if (!marcado) this.profissionalCertificadoTermo.set(false);
+  }
+
+  private resetarFormTermo(): void {
+    this.termoNome.reset('');
+    this.arquivoTermo = null;
+    this.nomeArquivoTermo.set(null);
+    this.modeloSelecionadoToken.set(null);
+    this.modeloDetalhe.set(null);
+    this.profissionalAssinaTermo.set(false);
+    this.profissionalCertificadoTermo.set(false);
+    // Volta à origem padrão: além de simplificar, remonta o <select> limpo (evita valor "fantasma").
+    this.origemTermo.set('ARQUIVO');
   }
 
   protected async adicionarTermo(): Promise<void> {
     const id = this.codigo();
     if (id == null || this.salvandoTermo()) return;
-    if (this.termoNome.invalid || !this.arquivoTermo) {
+    if (this.termoNome.invalid) {
       this.termoNome.markAsTouched();
-      if (!this.arquivoTermo) this.toastr.error('Selecione o arquivo Word do termo.');
+      return;
+    }
+
+    // Origem "modelo do ZapSign": sem upload, envia só o token do modelo selecionado.
+    if (this.origemTermo() === 'ZAPSIGN_MODELO') {
+      const token = this.modeloSelecionadoToken();
+      if (!token) {
+        this.toastr.error('Selecione um modelo do ZapSign.');
+        return;
+      }
+      const modelo = this.modelosZapsign().find((m) => m.token === token);
+      this.salvandoTermo.set(true);
+      try {
+        const termo = await firstValueFrom(
+          this.termoService.criar(id, {
+            nome: this.termoNome.value.trim(),
+            origemModelo: 'ZAPSIGN_MODELO',
+            url: null,
+            contentType: null,
+            providerTemplateToken: token,
+            modeloProviderNome: modelo?.nome ?? null,
+            profissionalAssina: this.profissionalAssinaTermo(),
+            profissionalCertificado: this.profissionalCertificadoTermo(),
+          }),
+        );
+        this.termos.update((atual) => [termo, ...atual]);
+        this.resetarFormTermo();
+        this.toastr.success('Termo adicionado');
+      } catch {
+        this.toastr.error('Não foi possível adicionar o termo.');
+      } finally {
+        this.salvandoTermo.set(false);
+      }
+      return;
+    }
+
+    // Origem "arquivo Word": sobe o .docx e cadastra.
+    if (!this.arquivoTermo) {
+      this.toastr.error('Selecione o arquivo Word do termo.');
       return;
     }
     this.salvandoTermo.set(true);
@@ -274,14 +439,17 @@ export class ProcedimentoForm implements PodeSair {
       const termo = await firstValueFrom(
         this.termoService.criar(id, {
           nome: this.termoNome.value.trim(),
+          origemModelo: 'ARQUIVO',
           url,
           contentType: this.arquivoTermo.type || null,
+          providerTemplateToken: null,
+          modeloProviderNome: null,
+          profissionalAssina: this.profissionalAssinaTermo(),
+          profissionalCertificado: this.profissionalCertificadoTermo(),
         }),
       );
       this.termos.update((atual) => [termo, ...atual]);
-      this.termoNome.reset('');
-      this.arquivoTermo = null;
-      this.nomeArquivoTermo.set(null);
+      this.resetarFormTermo();
       this.toastr.success('Termo adicionado');
     } catch {
       this.toastr.error('Não foi possível adicionar o termo.');
@@ -303,7 +471,16 @@ export class ProcedimentoForm implements PodeSair {
     try {
       const url = await this.storage.enviar(arquivo, 'tcle');
       const atualizado = await firstValueFrom(
-        this.termoService.atualizar(termo.id, { nome: termo.nome, url, contentType: arquivo.type || null }),
+        this.termoService.atualizar(termo.id, {
+          nome: termo.nome,
+          origemModelo: 'ARQUIVO',
+          url,
+          contentType: arquivo.type || null,
+          providerTemplateToken: null,
+          modeloProviderNome: null,
+          profissionalAssina: termo.profissionalAssina,
+          profissionalCertificado: termo.profissionalCertificado,
+        }),
       );
       this.termos.update((atual) => atual.map((t) => (t.id === termo.id ? atualizado : t)));
       this.toastr.success('Arquivo substituído');
@@ -327,6 +504,7 @@ export class ProcedimentoForm implements PodeSair {
   }
 
   protected async baixarTermo(termo: TermoProcedimento): Promise<void> {
+    if (!termo.url) return; // termo por modelo do ZapSign não tem arquivo nosso
     try {
       const url = await this.storage.urlDownload(termo.url);
       window.open(url, '_blank', 'noopener');

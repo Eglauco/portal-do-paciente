@@ -22,4 +22,7 @@ public interface EspecialidadeRepository extends JpaRepository<Especialidade, Lo
 
     /** Unicidade do código de integração ignorando o próprio registro (edição passa o id; criação, -1). */
     boolean existsByCodigoIntegracaoAndIdNot(String codigoIntegracao, Long id);
+
+    /** Especialidade pelo código de integração (SIRESP/CROSS ID_ESPECIALIDADE) — único quando preenchido. */
+    java.util.Optional<Especialidade> findByCodigoIntegracao(String codigoIntegracao);
 }

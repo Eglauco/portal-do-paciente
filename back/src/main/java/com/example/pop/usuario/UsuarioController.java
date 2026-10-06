@@ -35,6 +35,8 @@ import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
 import com.example.pop.perfil.Perfil;
 import com.example.pop.perfil.PerfilRepository;
+import com.example.pop.profissional.ProfissionalSaude;
+import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 
@@ -61,15 +63,18 @@ public class UsuarioController {
     private final PasswordEncoder passwordEncoder;
     private final UnidadeRepository unidadeRepository;
     private final PerfilRepository perfilRepository;
+    private final ProfissionalSaudeRepository profissionalSaudeRepository;
     private final ExportacaoService exportacaoService;
 
     public UsuarioController(UsuarioRepository repository, PasswordEncoder passwordEncoder,
             UnidadeRepository unidadeRepository, PerfilRepository perfilRepository,
+            ProfissionalSaudeRepository profissionalSaudeRepository,
             ExportacaoService exportacaoService) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.unidadeRepository = unidadeRepository;
         this.perfilRepository = perfilRepository;
+        this.profissionalSaudeRepository = profissionalSaudeRepository;
         this.exportacaoService = exportacaoService;
     }
 
@@ -188,6 +193,7 @@ public class UsuarioController {
         usuario.setSenhaHash(passwordEncoder.encode(senha));
         usuario.setUnidade(unidade);
         usuario.setPerfis(perfis);
+        usuario.setProfissionalSaude(resolverProfissional(request.profissionalSaudeId(), null));
         return salvarUnico(usuario);
     }
 
@@ -209,6 +215,7 @@ public class UsuarioController {
                     existente.setEmail(email);
                     existente.setUnidade(unidade);
                     existente.setPerfis(perfis);
+                    existente.setProfissionalSaude(resolverProfissional(request.profissionalSaudeId(), id));
                     // Senha em branco na edição = mantém a atual. Não normalizamos a senha
                     // (é comparada crua no login), só validamos o tamanho.
                     String senha = request.senha();
@@ -226,6 +233,26 @@ public class UsuarioController {
         }
         return unidadeRepository.findById(unidadeSaudeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade de saúde não encontrada"));
+    }
+
+    /**
+     * Resolve o profissional vinculado (opcional). Null = usuário sem profissional. Garante que o mesmo
+     * profissional não seja vinculado a dois usuários ({@code usuarioIdAtual} = null na criação).
+     */
+    private ProfissionalSaude resolverProfissional(Long profissionalSaudeId, Long usuarioIdAtual) {
+        if (profissionalSaudeId == null) {
+            return null;
+        }
+        ProfissionalSaude profissional = profissionalSaudeRepository.findById(profissionalSaudeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional de saúde não encontrado"));
+        boolean deOutro = usuarioIdAtual == null
+                ? repository.existsByAgenda_ProfissionalSaude_Id(profissionalSaudeId)
+                : repository.existsByAgenda_ProfissionalSaude_IdAndIdNot(profissionalSaudeId, usuarioIdAtual);
+        if (deOutro) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Este profissional já está vinculado a outro usuário");
+        }
+        return profissional;
     }
 
     /** Resolve e valida os perfis informados (todos precisam existir). */

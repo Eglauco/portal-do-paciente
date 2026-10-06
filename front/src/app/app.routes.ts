@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, inicioGuard, selecionarUnidadeGuard, telaGuard } from './core/auth.guard';
+import { authGuard, inicioGuard, profissionalGuard, selecionarUnidadeGuard, telaGuard } from './core/auth.guard';
 import { pendingChangesGuard } from './core/pending-changes.guard';
 
 export const routes: Routes = [
@@ -451,6 +451,32 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/uso-ia/uso-ia-list').then((m) => m.UsoIaList),
         canActivate: [telaGuard('USO_IA')],
         title: 'Uso de IA',
+      },
+      {
+        path: 'siresp',
+        loadComponent: () => import('./pages/siresp/siresp-list').then((m) => m.SirespList),
+        canActivate: [telaGuard('SIRESP')],
+        title: 'SIRESP',
+      },
+      {
+        path: 'siresp/:id',
+        loadComponent: () => import('./pages/siresp/siresp-detalhe').then((m) => m.SirespDetalheComponent),
+        canActivate: [telaGuard('SIRESP')],
+        title: 'Registro do SIRESP',
+      },
+      {
+        path: 'provedores-assinatura',
+        loadComponent: () =>
+          import('./pages/provedores-assinatura/provedores-assinatura').then((m) => m.ProvedoresAssinatura),
+        canActivate: [telaGuard('PROVEDORES_ASSINATURA')],
+        title: 'Provedores de assinatura',
+      },
+      {
+        path: 'meus-termos',
+        loadComponent: () =>
+          import('./pages/coassinatura/meus-termos-profissional').then((m) => m.MeusTermosProfissional),
+        canActivate: [profissionalGuard],
+        title: 'Meus termos para assinar',
       },
       { path: '', redirectTo: 'inicio', pathMatch: 'full' },
     ],

@@ -14,6 +14,8 @@ import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { Perfil } from '../perfis/perfil.model';
 import { PerfilService } from '../perfis/perfil.service';
+import { ProfissionalSaude } from '../profissionais/profissional.model';
+import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { UsuarioService } from './usuario.service';
 
 /**
@@ -35,6 +37,7 @@ function senhasConferem(group: AbstractControl): ValidationErrors | null {
 export class UsuarioForm implements PodeSair {
   private readonly service = inject(UsuarioService);
   private readonly perfilService = inject(PerfilService);
+  private readonly profissionalService = inject(ProfissionalSaudeService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -43,6 +46,8 @@ export class UsuarioForm implements PodeSair {
   /** Unidades que o perfil do usuário logado libera (só essas podem ser vinculadas). */
   protected readonly unidades = this.auth.unidadesAcessiveis;
   protected readonly perfis = signal<Perfil[]>([]);
+  /** Profissionais para vincular o usuário (opcional) — o usuário passa a "ser" o profissional. */
+  protected readonly profissionais = signal<ProfissionalSaude[]>([]);
 
   protected readonly form = new FormGroup(
     {
@@ -61,6 +66,7 @@ export class UsuarioForm implements PodeSair {
       confirmarSenha: new FormControl('', { nonNullable: true }),
       unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
       perfilIds: new FormControl<number[]>([], { nonNullable: true, validators: [Validators.required] }),
+      profissionalSaudeId: new FormControl<number | null>(null),
     },
     { validators: senhasConferem },
   );
@@ -96,6 +102,11 @@ export class UsuarioForm implements PodeSair {
   private carregar(): void {
     // Multi-select precisa de todos os perfis (uma página grande basta).
     this.perfilService.listar({}, 0, 100).subscribe({ next: (p) => this.perfis.set(p.content), error: () => {} });
+    // Profissionais para o vínculo (todos, p/ também mostrar o já vinculado mesmo se inativo).
+    this.profissionalService.listar({ situacao: 'TODOS' }, 0, 100).subscribe({
+      next: (p) => this.profissionais.set(p.content),
+      error: () => {},
+    });
     if (this.editando() && this.codigo() != null) {
       this.service.buscarPorId(this.codigo()!).subscribe({
         next: (usuario) =>
@@ -104,6 +115,7 @@ export class UsuarioForm implements PodeSair {
             email: usuario.email,
             unidadeSaudeId: usuario.unidade?.id ?? null,
             perfilIds: usuario.perfis?.map((p) => p.id) ?? [],
+            profissionalSaudeId: usuario.profissionalSaudeId ?? null,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -144,6 +156,7 @@ export class UsuarioForm implements PodeSair {
       email: this.form.controls.email.value.trim(),
       unidadeSaudeId: this.form.controls.unidadeSaudeId.value!,
       perfilIds: this.form.controls.perfilIds.value,
+      profissionalSaudeId: this.form.controls.profissionalSaudeId.value ?? null,
       // Só envia quando preenchida; em branco na edição = mantém a atual.
       ...(senhaBruta.trim() ? { senha: senhaBruta } : {}),
     };
@@ -159,7 +172,8 @@ export class UsuarioForm implements PodeSair {
       error: (e) => {
         this.salvando.set(false);
         if (e?.status === 409) {
-          this.toastr.error('Já existe um usuário com este e-mail.');
+          // 409 pode ser e-mail duplicado OU profissional já vinculado a outro usuário.
+          this.toastr.error(e?.error?.message || 'Já existe um usuário com este e-mail.');
         } else if (e?.status === 400) {
           this.toastr.error('Verifique os dados: a senha precisa ter ao menos 6 caracteres.');
         } else {

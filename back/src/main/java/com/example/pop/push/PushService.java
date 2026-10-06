@@ -15,7 +15,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.chat.Chat;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
@@ -70,7 +70,7 @@ public class PushService {
     }
 
     /** Falta registrada — pede ao paciente para justificar a ausência. */
-    public void notificarFaltaPaciente(Agendamento a) {
+    public void notificarFaltaPaciente(Horario a) {
         String corpo = "Você foi marcado como falta na consulta de " + a.getEspecialidade().getNome()
                 + " em " + a.getDataHora().format(DATA_FMT) + ". Toque para justificar.";
         Map<String, Object> data = Map.of("tipo", "FALTA", "agendamentoId", a.getId());
@@ -87,9 +87,9 @@ public class PushService {
 
     /** Nova avaliação NPS pendente — só o paciente do atendimento. */
     public void notificarNpsPendente(Nps nps) {
-        String especialidade = nps.getAgendamento().getEspecialidade().getNome();
+        String especialidade = nps.getHorario().getEspecialidade().getNome();
         String corpo = "Como foi seu atendimento de " + especialidade + "? Toque para avaliar.";
-        Long pacienteId = nps.getAgendamento().getPaciente().getId();
+        Long pacienteId = nps.getHorario().getPaciente().getId();
         notificacaoService.registrar(pacienteId, TipoNotificacao.NPS, "Avalie seu atendimento", corpo, null);
         notificarPaciente(pacienteId, FuncionalidadeApp.NPS, "Avalie seu atendimento", corpo, Map.of("tipo", "NPS"));
     }

@@ -4,8 +4,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 import com.example.pop.perfil.Perfil;
+import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.unidade.Unidade;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -66,4 +68,20 @@ public class Usuario {
             joinColumns = @JoinColumn(name = "usuario_id"),
             inverseJoinColumns = @JoinColumn(name = "perfil_id"))
     private Set<Perfil> perfis = new HashSet<>();
+
+    /**
+     * Profissional de saúde que ESTE usuário representa (opcional): quando preenchido, o usuário "é" um
+     * profissional e pode ver/assinar os termos (TCLE) dos atendimentos dele. LAZY + não serializado como
+     * objeto (evita carregar o profissional inteiro); o front recebe só o id via {@link #getProfissionalSaudeId()}.
+     */
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profissional_saude_id")
+    private ProfissionalSaude profissionalSaude;
+
+    /** Id do profissional vinculado (para o front pré-selecionar), sem serializar o objeto inteiro. */
+    @JsonProperty("profissionalSaudeId")
+    public Long getProfissionalSaudeId() {
+        return profissionalSaude == null ? null : profissionalSaude.getId();
+    }
 }

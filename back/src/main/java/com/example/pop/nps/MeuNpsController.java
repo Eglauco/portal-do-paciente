@@ -100,7 +100,7 @@ public class MeuNpsController {
     private Nps meuNps(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
         // Só NPS já disparado é acessível ao paciente (agendado não existe para ele ainda).
-        return repository.findByIdAndAgendamento_Paciente_IdAndDisparadoEmNotNull(id, pacienteId)
+        return repository.findByIdAndHorario_Paciente_IdAndDisparadoEmNotNull(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "NPS não encontrado"));
     }
 }

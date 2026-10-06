@@ -71,7 +71,8 @@ public class AgendamentoController {
     private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.DESC, "dataHora")
             .and(Sort.by(Sort.Direction.ASC, "id"));
 
-    private final AgendamentoRepository repository;
+    private final HorarioRepository repository;
+    private final AgendaRepository agendaRepository;
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final EspecialidadeRepository especialidadeRepository;
@@ -81,19 +82,21 @@ public class AgendamentoController {
     private final NpsService npsService;
     private final PushService pushService;
     private final ExportacaoService exportacaoService;
-    private final AgendamentoLogService logService;
-    private final AgendamentoEntregaService entregaService;
-    private final AgendamentoEntregaRepository entregaRepository;
+    private final HorarioLogService logService;
+    private final HorarioEntregaService entregaService;
+    private final HorarioEntregaRepository entregaRepository;
     private final TermoAssinaturaService termoAssinaturaService;
 
-    public AgendamentoController(AgendamentoRepository repository, PacienteRepository pacienteRepository,
+    public AgendamentoController(HorarioRepository repository, AgendaRepository agendaRepository,
+            PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
-            ExportacaoService exportacaoService, AgendamentoLogService logService,
-            AgendamentoEntregaService entregaService, AgendamentoEntregaRepository entregaRepository,
+            ExportacaoService exportacaoService, HorarioLogService logService,
+            HorarioEntregaService entregaService, HorarioEntregaRepository entregaRepository,
             TermoAssinaturaService termoAssinaturaService) {
         this.repository = repository;
+        this.agendaRepository = agendaRepository;
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.especialidadeRepository = especialidadeRepository;
@@ -129,7 +132,7 @@ public class AgendamentoController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
-        Page<Agendamento> resultado = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
+        Page<Horario> resultado = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
                 padraoNome(profissionalNome), entregaResumo, inicioDoDia(data), fimDoDia(data), unidadeId, pageable);
         List<AgendamentoResponse> content = resultado.getContent().stream()
                 .map(AgendamentoResponse::from)
@@ -163,11 +166,11 @@ public class AgendamentoController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<Agendamento> dados = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
+        List<Horario> dados = repository.search(status, padraoNome(nome), padraoNome(especialidadeNome),
                 padraoNome(profissionalNome), entregaResumo, inicioDoDia(data), fimDoDia(data), unidadeId,
                 Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO)))
                 .getContent();
-        List<ColunaExport<Agendamento>> cols = ExportacaoService.filtrar(colunasAgendamento(), colunas);
+        List<ColunaExport<Horario>> cols = ExportacaoService.filtrar(colunasAgendamento(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
@@ -246,7 +249,7 @@ public class AgendamentoController {
     }
 
     /** Todas as colunas disponíveis do agendamento (o usuário escolhe quais exportar). */
-    private static List<ColunaExport<Agendamento>> colunasAgendamento() {
+    private static List<ColunaExport<Horario>> colunasAgendamento() {
         return List.of(
                 ColunaExport.de("Código", a -> String.valueOf(a.getId())),
                 ColunaExport.de("Data/Hora", a -> a.getDataHora() == null ? "" : a.getDataHora().format(DATA_HORA)),
@@ -305,12 +308,12 @@ public class AgendamentoController {
 
     /** Destinatários da notificação deste agendamento e o estado de entrega de cada um. */
     @GetMapping("/{id}/entrega")
-    public ResponseEntity<List<AgendamentoEntregaResponse>> entrega(@PathVariable Long id) {
+    public ResponseEntity<List<HorarioEntregaResponse>> entrega(@PathVariable Long id) {
         if (!repository.existsById(id)) {
             return ResponseEntity.notFound().build(); // distingue "não existe" de "sem dados de entrega"
         }
-        List<AgendamentoEntregaResponse> lista = entregaRepository.findByAgendamento_IdOrderByIdAsc(id).stream()
-                .map(AgendamentoEntregaResponse::from)
+        List<HorarioEntregaResponse> lista = entregaRepository.findByHorario_IdOrderByIdAsc(id).stream()
+                .map(HorarioEntregaResponse::from)
                 .toList();
         return ResponseEntity.ok(lista);
     }
@@ -319,11 +322,11 @@ public class AgendamentoController {
     @ResponseStatus(HttpStatus.CREATED)
     public AgendamentoResponse criar(@Valid @RequestBody AgendamentoRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-        Agendamento agendamento = new Agendamento();
+        Horario agendamento = new Horario();
         aplicar(agendamento, request);
         // Regra de negócio: todo novo agendamento nasce aguardando confirmação do paciente.
         agendamento.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
-        Agendamento salvo = repository.save(agendamento);
+        Horario salvo = repository.save(agendamento);
         // Primeira linha do histórico: a unidade criou o agendamento (status inicial).
         logService.registrarDaUnidade(salvo, null, StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, uidDoToken(jwt));
         // Notifica o paciente/responsáveis (push) e RASTREIA a entrega por destinatário.
@@ -341,7 +344,7 @@ public class AgendamentoController {
                     if (request.statusAgendamento() != null) {
                         agendamento.setStatusAgendamento(request.statusAgendamento());
                     }
-                    Agendamento salvo = repository.save(agendamento);
+                    Horario salvo = repository.save(agendamento);
                     // Registra a troca de status feita pela unidade (só grava se de fato mudou).
                     logService.registrarDaUnidade(salvo, anterior, salvo.getStatusAgendamento(), uidDoToken(jwt));
                     // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
@@ -381,7 +384,7 @@ public class AgendamentoController {
      */
     @GetMapping("/{id}/logs")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<AgendamentoLogResponse>> logs(@PathVariable Long id) {
+    public ResponseEntity<List<HorarioLogResponse>> logs(@PathVariable Long id) {
         if (!repository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
@@ -417,7 +420,7 @@ public class AgendamentoController {
                 .map(agendamento -> {
                     StatusAgendamento antes = agendamento.getStatusAgendamento();
                     agendamento.setStatusAgendamento(status);
-                    Agendamento salvo = repository.save(agendamento);
+                    Horario salvo = repository.save(agendamento);
                     // Feita pela unidade (back-office); grava só se o status mudou de fato.
                     logService.registrarDaUnidade(salvo, antes, status, usuarioId);
                     return ResponseEntity.ok(AgendamentoResponse.from(salvo));
@@ -439,17 +442,21 @@ public class AgendamentoController {
         return ResponseEntity.noContent().build();
     }
 
-    private void aplicar(Agendamento agendamento, AgendamentoRequest request) {
-        agendamento.setDataHora(request.dataHora());
-        agendamento.setEspecialidade(especialidadeRepository.findById(request.especialidadeId())
+    private void aplicar(Horario horario, AgendamentoRequest request) {
+        horario.setDataHora(request.dataHora());
+        // Modelo "booking" desta tela (Fase 1): cada horário tem a sua Agenda (slot). Cria na inclusão, atualiza na edição.
+        Agenda agenda = horario.getAgenda() != null ? horario.getAgenda() : new Agenda();
+        agenda.setData(request.dataHora().toLocalDate());
+        agenda.setEspecialidade(especialidadeRepository.findById(request.especialidadeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
-        agendamento.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())
+        agenda.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional não encontrado")));
-        agendamento.setProcedimento(procedimentoRepository.findById(request.procedimentoId())
+        agenda.setProcedimento(procedimentoRepository.findById(request.procedimentoId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Procedimento não encontrado")));
-        agendamento.setPaciente(pacienteRepository.findById(request.pacienteId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
-        agendamento.setUnidadeSaude(unidadeRepository.findById(request.unidadeSaudeId())
+        agenda.setUnidadeSaude(unidadeRepository.findById(request.unidadeSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não encontrada")));
+        horario.setAgenda(agendaRepository.save(agenda));
+        horario.setPaciente(pacienteRepository.findById(request.pacienteId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
     }
 }

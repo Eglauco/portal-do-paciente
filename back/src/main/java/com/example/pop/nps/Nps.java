@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -37,8 +37,8 @@ public class Nps {
     private Long id;
 
     @OneToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "agendamento_id", nullable = false, unique = true)
-    private Agendamento agendamento;
+    @JoinColumn(name = "horario_id", nullable = false, unique = true)
+    private Horario horario;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

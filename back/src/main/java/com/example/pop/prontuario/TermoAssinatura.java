@@ -2,6 +2,7 @@ package com.example.pop.prontuario;
 
 import java.time.LocalDateTime;
 
+import com.example.pop.assinatura.ProvedorAssinatura;
 import com.example.pop.procedimento.TermoProcedimento;
 
 import jakarta.persistence.Column;
@@ -50,24 +51,29 @@ public class TermoAssinatura {
     @Column(nullable = false, length = 120)
     private String nome;
 
-    /** Snapshot da URL do arquivo Word (S3) no momento da geração. */
-    @Column(nullable = false, columnDefinition = "TEXT")
+    /** Snapshot da URL do arquivo Word (S3) no momento da geração. Nulo quando a origem é modelo do ZapSign. */
+    @Column(columnDefinition = "TEXT")
     private String url;
 
     @Column(name = "content_type", length = 120)
     private String contentType;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 30)
     private StatusTermoAssinatura status = StatusTermoAssinatura.PENDENTE;
 
-    /** Token do documento criado na ZapSign para esta assinatura (preenchido ao iniciar). */
-    @Column(name = "zapsign_doc_token", length = 120)
-    private String zapsignDocToken;
+    /** Provedor que criou este documento (ZapSign/Autentique) — roteia webhook e download após troca. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ProvedorAssinatura provedor = ProvedorAssinatura.ZAPSIGN;
 
-    /** Token do signatário na ZapSign (para conferência/rastreio). */
-    @Column(name = "signer_token", length = 120)
-    private String signerToken;
+    /** Id do documento criado no PROVEDOR para esta assinatura (preenchido ao iniciar). */
+    @Column(name = "provider_doc_token", length = 120)
+    private String providerDocToken;
+
+    /** Id do signatário no PROVEDOR (para conferência/rastreio). */
+    @Column(name = "provider_signer_id", length = 120)
+    private String providerSignerId;
 
     /** URL (S3 do POP) do PDF assinado, gravado pelo webhook após a assinatura. */
     @Column(name = "signed_url", columnDefinition = "TEXT")
@@ -75,6 +81,28 @@ public class TermoAssinatura {
 
     @Column(name = "assinado_em")
     private LocalDateTime assinadoEm;
+
+    // ---------- Coassinatura do profissional de saúde (2º signatário, após o paciente) ----------
+
+    /** Snapshot (na geração) se este termo exige a assinatura do profissional além do paciente. */
+    @Column(name = "profissional_assina", nullable = false)
+    private boolean profissionalAssina = false;
+
+    /** Snapshot: profissional assina com certificado digital (ICP/qualificada) em vez de assinatura em tela. */
+    @Column(name = "profissional_certificado", nullable = false)
+    private boolean profissionalCertificado = false;
+
+    /** Id do signatário PROFISSIONAL no provedor (add-signer), quando há coassinatura. */
+    @Column(name = "provider_signer_id_profissional", length = 120)
+    private String providerSignerIdProfissional;
+
+    /** URL da cerimônia do PROFISSIONAL (usada na tela do profissional, embutida em iframe). */
+    @Column(name = "sign_url_profissional", columnDefinition = "TEXT")
+    private String signUrlProfissional;
+
+    /** Momento em que o profissional coassinou. */
+    @Column(name = "assinado_em_profissional")
+    private LocalDateTime assinadoEmProfissional;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;

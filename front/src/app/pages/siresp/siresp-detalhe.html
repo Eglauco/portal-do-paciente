@@ -1,0 +1,108 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <a class="btn btn--ghost btn--sm" routerLink="/siresp">← Voltar</a>
+      <h1 class="page-title">Registro do SIRESP</h1>
+      <p class="page-sub">Somente leitura — todos os campos importados do XML.</p>
+    </div>
+  </header>
+
+  @if (carregando()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h3>Não foi possível carregar</h3>
+      <a class="btn btn--solid" routerLink="/siresp">Voltar à lista</a>
+    </div>
+  } @else if (detalhe(); as d) {
+    <section class="panel">
+      <p class="meta">
+        <span>Arquivo: <b>{{ d.arquivo || '—' }}</b></span>
+        <span>Importado em: <b>{{ d.importadoEm | date: 'dd/MM/yyyy HH:mm' }}</b></span>
+        <span>Por: <b>{{ d.importadoPorNome || '—' }}</b></span>
+        @if (d.agendamentoId) {
+          <span>Agendamento gerado: <b>#{{ d.agendamentoId }}</b></span>
+        }
+      </p>
+
+      <p class="meta-status">
+        <span class="status-badge" [class.status-badge--ok]="d.agendamentoId" [class.status-badge--rev]="!d.agendamentoId">
+          {{ d.agendamentoId ? 'Agendado com sucesso' : 'Precisa de revisão' }}
+        </span>
+      </p>
+
+      @if (d.arquivoUrl) {
+        <div class="meta-acoes">
+          <button type="button" class="btn btn--ghost btn--sm" (click)="baixarOriginal()" [disabled]="baixando()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+            </svg>
+            {{ baixando() ? 'Abrindo…' : 'Baixar XML original' }}
+          </button>
+        </div>
+      }
+
+      <div class="log" [class.log--ok]="d.logIntegracao && d.logIntegracao.startsWith('Tudo OK')">
+        <div class="log__head">
+          <p class="log__tit">Log de integração</p>
+          <button
+            type="button"
+            class="btn btn--solid btn--sm"
+            (click)="processar()"
+            [disabled]="processando() || !!detalhe()?.agendamentoId"
+            [title]="detalhe()?.agendamentoId ? 'Registro já agendado — concluído; não é possível reprocessar.' : (urlConfigurada() ? 'Reprocessa o log e reenvia o XML ao cliente (Post XML)' : 'Reprocessa o log. Configure a URL de envio para também enviar ao cliente.')"
+          >
+            @if (detalhe()?.agendamentoId) {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Concluído
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
+              </svg>
+              {{ processando() ? 'Processando…' : (urlConfigurada() ? 'Reprocessar e enviar' : 'Reprocessar') }}
+            }
+          </button>
+        </div>
+        <p class="log__txt">{{ d.logIntegracao || 'Log ainda não calculado. Clique em "Reprocessar" para gerar.' }}</p>
+      </div>
+
+      @for (g of grupos; track g.titulo) {
+        <div class="grupo">
+          <h2 class="grupo__titulo">{{ g.titulo }}</h2>
+          <div class="kv">
+            @for (c of g.campos; track c.chave) {
+              <div class="kv__item">
+                <span class="kv__rot">
+                  {{ c.rotulo }}
+                  <button
+                    type="button"
+                    class="kv__info"
+                    (click)="alternar(c, $event)"
+                    [attr.aria-expanded]="aberto(c.chave)"
+                    [attr.aria-label]="'O que é ' + c.rotulo + '?'"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+                    </svg>
+                  </button>
+                </span>
+                <span class="kv__val">{{ valor(c.chave) }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </section>
+  }
+
+  @if (popover(); as p) {
+    <div class="popover" role="tooltip" [style.top.px]="p.top" [style.left.px]="p.left" (click)="$event.stopPropagation()">
+      <span class="popover__caret" [style.left.px]="p.caret"></span>
+      <p class="popover__tit">{{ p.titulo }}</p>
+      <p class="popover__txt">{{ p.texto }}</p>
+    </div>
+  }
+</section>

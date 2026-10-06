@@ -5,6 +5,8 @@ public enum StatusTermoAssinatura {
     PENDENTE("Pendente de assinatura"),
     /** Assinado na cerimônia (evento do app); aguardando o webhook doc_signed confirmar. */
     EM_CONFIRMACAO("Assinatura em confirmação"),
+    /** Paciente já assinou; falta a coassinatura do profissional de saúde (feita pelo painel). */
+    AGUARDANDO_PROFISSIONAL("Aguardando assinatura do profissional"),
     ASSINADO("Assinado"),
     /** Falha do lado da ZapSign (recusa); o paciente precisa refazer a assinatura. */
     TENTAR_NOVAMENTE("Tentar novamente"),

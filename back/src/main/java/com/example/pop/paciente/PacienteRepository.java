@@ -13,6 +13,9 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
     /** Paciente pelo CPF (dígitos) — a chave de identidade do login. */
     Optional<Paciente> findByCpf(String cpf);
 
+    /** Paciente pelo código de integração (SIRESP/CROSS COD_PACIENTE) — único quando preenchido. */
+    Optional<Paciente> findByCodigoIntegracao(String codigoIntegracao);
+
     /** Pacientes cujo número está na lista de telefones — usado na limpeza de testes (telefone não é chave). */
     @Query("select p from Paciente p join p.telefonesAdicionais t where t = :numero")
     java.util.List<Paciente> buscarPorTelefoneNaLista(@Param("numero") String numero);

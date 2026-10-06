@@ -33,7 +33,7 @@ public interface NotificacaoRepository extends JpaRepository<Notificacao, Long> 
     int marcarTodasLidas(@Param("pacienteId") Long pacienteId, @Param("agora") LocalDateTime agora);
 
     /** Carrega garantindo que a notificação é do paciente logado (escopo do app). */
-    Optional<Notificacao> findByIdAndPacienteId(Long id, Long pacienteId);
+    Optional<Notificacao> findByIdAndPaciente_Id(Long id, Long pacienteId);
 
     /** Notificações de um tipo ainda não lidas (ex.: lembretes pendentes de pop-up). */
     java.util.List<Notificacao> findByPacienteIdAndTipoAndLidaFalseOrderByCriadoEmDesc(Long pacienteId, TipoNotificacao tipo);

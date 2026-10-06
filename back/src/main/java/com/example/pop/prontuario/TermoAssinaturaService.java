@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.procedimento.TermoProcedimento;
 import com.example.pop.procedimento.TermoProcedimentoRepository;
@@ -37,7 +37,7 @@ public class TermoAssinaturaService {
      * procedimento tem termos. Idempotente: pode ser chamado a cada atualização do agendamento.
      */
     @Transactional
-    public void dispararSeNecessario(Agendamento agendamento) {
+    public void dispararSeNecessario(Horario agendamento) {
         if (agendamento == null || agendamento.getStatusAgendamento() != StatusAgendamento.PRESENCA_PACIENTE) {
             return;
         }
@@ -62,6 +62,8 @@ public class TermoAssinaturaService {
             pendencia.setNome(termo.getNome());
             pendencia.setUrl(termo.getUrl());
             pendencia.setContentType(termo.getContentType());
+            pendencia.setProfissionalAssina(termo.isProfissionalAssina()); // congela a regra de coassinatura
+            pendencia.setProfissionalCertificado(termo.isProfissionalCertificado());
             pendencia.setStatus(StatusTermoAssinatura.PENDENTE);
             pendencia.setCriadoEm(agora);
             termoAssinaturaRepository.save(pendencia);
@@ -69,11 +71,11 @@ public class TermoAssinaturaService {
     }
 
     /** Reusa o prontuário do agendamento se já existir; senão cria um (número de atendimento gerado). */
-    private Prontuario obterOuCriarProntuario(Agendamento agendamento) {
-        return prontuarioRepository.findFirstByAgendamento_Id(agendamento.getId())
+    private Prontuario obterOuCriarProntuario(Horario agendamento) {
+        return prontuarioRepository.findFirstByHorario_Id(agendamento.getId())
                 .orElseGet(() -> {
                     Prontuario p = new Prontuario();
-                    p.setAgendamento(agendamento);
+                    p.setHorario(agendamento);
                     p.setNumeroAtendimento(gerarNumeroAtendimento(agendamento.getId()));
                     return prontuarioRepository.save(p);
                 });

@@ -8,6 +8,8 @@ export interface UnidadeFaqItem {
 export interface Unidade {
   id?: number;
   nome: string;
+  /** Código da unidade em um sistema externo (integração SIRESP/CROSS); único quando preenchido. */
+  codigoIntegracao?: string | null;
   /** FAQ que a assistente virtual usa no chat desta unidade (não vem no grid). */
   faq?: UnidadeFaqItem[];
 }

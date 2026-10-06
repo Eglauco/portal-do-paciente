@@ -149,13 +149,13 @@ public class NpsController {
         return List.of(
                 ColunaExport.de("Código", n -> String.valueOf(n.getId())),
                 ColunaExport.de("Atendimento",
-                        n -> n.getAgendamento().getDataHora() == null ? "" : n.getAgendamento().getDataHora().format(DATA_HORA)),
-                ColunaExport.de("Paciente", n -> n.getAgendamento().getPaciente().getNome()),
-                ColunaExport.de("Unidade", n -> n.getAgendamento().getUnidadeSaude().getNome()),
-                ColunaExport.de("Especialidade", n -> n.getAgendamento().getEspecialidade().getNome()),
-                ColunaExport.de("Profissional", n -> n.getAgendamento().getProfissionalSaude().getNome()),
-                ColunaExport.de("Procedimento", n -> n.getAgendamento().getProcedimento().getNome()),
-                ColunaExport.de("Status do atendimento", n -> n.getAgendamento().getStatusAgendamento().getDescricao()),
+                        n -> n.getHorario().getDataHora() == null ? "" : n.getHorario().getDataHora().format(DATA_HORA)),
+                ColunaExport.de("Paciente", n -> n.getHorario().getPaciente().getNome()),
+                ColunaExport.de("Unidade", n -> n.getHorario().getUnidadeSaude().getNome()),
+                ColunaExport.de("Especialidade", n -> n.getHorario().getEspecialidade().getNome()),
+                ColunaExport.de("Profissional", n -> n.getHorario().getProfissionalSaude().getNome()),
+                ColunaExport.de("Procedimento", n -> n.getHorario().getProcedimento().getNome()),
+                ColunaExport.de("Status do atendimento", n -> n.getHorario().getStatusAgendamento().getDescricao()),
                 ColunaExport.de("Média", n -> n.getMedia() == null ? "" : String.format(Locale.forLanguageTag("pt-BR"), "%.1f", n.getMedia())),
                 ColunaExport.de("Nota (legado)", n -> n.getNota() == null ? "" : String.valueOf(n.getNota())),
                 ColunaExport.de("Status", n -> n.getStatus().getDescricao()),
@@ -210,6 +210,6 @@ public class NpsController {
 
     /** Foto pré-assinada do paciente do atendimento (avatar da tela de detalhe do NPS). */
     private String fotoDoNps(Nps nps) {
-        return storageService.urlFotoPaciente(nps.getAgendamento().getPaciente().getFotoUrl());
+        return storageService.urlFotoPaciente(nps.getHorario().getPaciente().getFotoUrl());
     }
 }

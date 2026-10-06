@@ -29,8 +29,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.pop.agendamento.Agendamento;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.Horario;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
@@ -61,7 +61,7 @@ public class ProntuarioController {
     private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "agendamento.paciente.nome", "id");
 
     private final ProntuarioRepository repository;
-    private final AgendamentoRepository agendamentoRepository;
+    private final HorarioRepository agendamentoRepository;
     private final StorageService storageService;
     private final PushService pushService;
     private final PacienteRepository pacienteRepository;
@@ -71,7 +71,7 @@ public class ProntuarioController {
     private final ProntuarioIaService iaService;
     private final ProntuarioIaOrchestrator iaOrchestrator;
 
-    public ProntuarioController(ProntuarioRepository repository, AgendamentoRepository agendamentoRepository,
+    public ProntuarioController(ProntuarioRepository repository, HorarioRepository agendamentoRepository,
             StorageService storageService, PushService pushService, PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, ExportacaoService exportacaoService,
             TipoDocumentoProntuarioRepository tipoRepository, ProntuarioIaService iaService,
@@ -165,25 +165,25 @@ public class ProntuarioController {
     private static List<ColunaExport<Prontuario>> colunasProntuario() {
         return List.of(
                 ColunaExport.de("Nº atendimento", Prontuario::getNumeroAtendimento),
-                ColunaExport.de("Paciente", p -> p.getAgendamento().getPaciente().getNome()),
-                ColunaExport.de("CPF do paciente", p -> formatarCpf(p.getAgendamento().getPaciente().getCpf())),
-                ColunaExport.de("Prontuário do paciente", p -> texto(p.getAgendamento().getPaciente().getProntuario())),
-                ColunaExport.de("Telefone do paciente", p -> p.getAgendamento().getPaciente().getTelefonesAdicionais() == null ? ""
-                        : p.getAgendamento().getPaciente().getTelefonesAdicionais().stream()
+                ColunaExport.de("Paciente", p -> p.getHorario().getPaciente().getNome()),
+                ColunaExport.de("CPF do paciente", p -> formatarCpf(p.getHorario().getPaciente().getCpf())),
+                ColunaExport.de("Prontuário do paciente", p -> texto(p.getHorario().getPaciente().getProntuario())),
+                ColunaExport.de("Telefone do paciente", p -> p.getHorario().getPaciente().getTelefonesAdicionais() == null ? ""
+                        : p.getHorario().getPaciente().getTelefonesAdicionais().stream()
                                 .map(ProntuarioController::formatarTelefone).collect(java.util.stream.Collectors.joining("; "))),
-                ColunaExport.de("Especialidade", p -> p.getAgendamento().getEspecialidade().getNome()),
-                ColunaExport.de("Profissional", p -> p.getAgendamento().getProfissionalSaude().getNome()),
-                ColunaExport.de("Procedimento", p -> p.getAgendamento().getProcedimento().getNome()),
-                ColunaExport.de("Unidade", p -> p.getAgendamento().getUnidadeSaude().getNome()),
+                ColunaExport.de("Especialidade", p -> p.getHorario().getEspecialidade().getNome()),
+                ColunaExport.de("Profissional", p -> p.getHorario().getProfissionalSaude().getNome()),
+                ColunaExport.de("Procedimento", p -> p.getHorario().getProcedimento().getNome()),
+                ColunaExport.de("Unidade", p -> p.getHorario().getUnidadeSaude().getNome()),
                 ColunaExport.de("Atendimento",
-                        p -> p.getAgendamento().getDataHora() == null ? "" : p.getAgendamento().getDataHora().format(DATA_HORA)),
-                ColunaExport.de("Status", p -> p.getAgendamento().getStatusAgendamento().getDescricao()),
-                ColunaExport.de("Justificativa da falta", p -> texto(p.getAgendamento().getJustificativaFalta())),
+                        p -> p.getHorario().getDataHora() == null ? "" : p.getHorario().getDataHora().format(DATA_HORA)),
+                ColunaExport.de("Status", p -> p.getHorario().getStatusAgendamento().getDescricao()),
+                ColunaExport.de("Justificativa da falta", p -> texto(p.getHorario().getJustificativaFalta())),
                 ColunaExport.de("Falta justificada em",
-                        p -> p.getAgendamento().getFaltaJustificadaEm() == null ? ""
-                                : p.getAgendamento().getFaltaJustificadaEm().format(DATA_HORA)),
-                ColunaExport.de("Motivos da falta", p -> p.getAgendamento().getMotivosFalta() == null ? ""
-                        : p.getAgendamento().getMotivosFalta().stream().map(MotivoFalta::getMotivo)
+                        p -> p.getHorario().getFaltaJustificadaEm() == null ? ""
+                                : p.getHorario().getFaltaJustificadaEm().format(DATA_HORA)),
+                ColunaExport.de("Motivos da falta", p -> p.getHorario().getMotivosFalta() == null ? ""
+                        : p.getHorario().getMotivosFalta().stream().map(MotivoFalta::getMotivo)
                                 .collect(java.util.stream.Collectors.joining("; "))),
                 ColunaExport.de("Status da análise", p -> p.getStatusAlerta() == null ? "" : p.getStatusAlerta().getDescricao()),
                 ColunaExport.de("Documentos", p -> String.valueOf(p.getDocumentos().size())),
@@ -237,7 +237,7 @@ public class ProntuarioController {
         Prontuario salvo = repository.save(prontuario);
         ProntuarioAdminDetalheResponse resposta = ProntuarioAdminDetalheResponse.from(salvo);
         // Notifica o paciente dono sobre o novo prontuário.
-        pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), true);
+        pushService.notificarProntuario(salvo.getHorario().getPaciente().getId(), true);
         dispararAnalise(salvo);
         return resposta;
     }
@@ -255,7 +255,7 @@ public class ProntuarioController {
                     ProntuarioAdminDetalheResponse resposta = ProntuarioAdminDetalheResponse.from(salvo);
                     // Notifica o paciente dono se novos documentos foram adicionados.
                     if (!novos.isEmpty()) {
-                        pushService.notificarProntuario(salvo.getAgendamento().getPaciente().getId(), false);
+                        pushService.notificarProntuario(salvo.getHorario().getPaciente().getId(), false);
                     }
                     dispararAnalise(salvo);
                     return ResponseEntity.ok(resposta);
@@ -327,9 +327,9 @@ public class ProntuarioController {
      * os novos. Devolve a lista dos documentos NOVOS (para disparar a análise por IA só neles).
      */
     private List<Documento> aplicar(Prontuario prontuario, ProntuarioRequest request) {
-        Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
+        Horario agendamento = agendamentoRepository.findById(request.agendamentoId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Agendamento não encontrado"));
-        prontuario.setAgendamento(agendamento);
+        prontuario.setHorario(agendamento);
         prontuario.setNumeroAtendimento(request.numeroAtendimento().trim());
 
         List<Documento> atuais = prontuario.getDocumentos();

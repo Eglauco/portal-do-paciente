@@ -171,7 +171,7 @@ public class MeuChatController {
     /** Carrega a conversa garantindo que é do paciente logado (404 caso contrário). */
     private Chat minhaConversa(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return repository.findByIdAndPacienteId(id, pacienteId)
+        return repository.findByIdAndPaciente_Id(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversa não encontrada"));
     }
 }

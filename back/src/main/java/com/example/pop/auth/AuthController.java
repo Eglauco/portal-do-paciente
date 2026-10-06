@@ -81,7 +81,7 @@ public class AuthController {
         Long unidadeId = ativa == null ? null : ativa.getId();
         String unidadeNome = ativa == null ? null : ativa.getNome();
         return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira,
-                Permissoes.telas(usuario), Permissoes.unidades(usuario));
+                Permissoes.telas(usuario), Permissoes.unidades(usuario), usuario.getProfissionalSaudeId() != null);
     }
 
     /** Dados do usuário autenticado (recarrega do banco para refletir a unidade atual). */

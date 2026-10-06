@@ -13,7 +13,9 @@ public record UsuarioLogadoResponse(
         Long unidadeSaudeId,
         String unidadeSaudeNome,
         List<String> telas,
-        List<Ref> unidades) {
+        List<Ref> unidades,
+        /** true se o usuário está vinculado a um profissional de saúde (coassinatura de termos). */
+        boolean ehProfissional) {
 
     public static UsuarioLogadoResponse from(Usuario u) {
         Unidade ativa = Permissoes.unidadeAtivaEfetiva(u);
@@ -23,6 +25,7 @@ public record UsuarioLogadoResponse(
                 ativa == null ? null : ativa.getId(),
                 ativa == null ? null : ativa.getNome(),
                 Permissoes.telas(u),
-                Permissoes.unidades(u));
+                Permissoes.unidades(u),
+                u.getProfissionalSaudeId() != null);
     }
 }

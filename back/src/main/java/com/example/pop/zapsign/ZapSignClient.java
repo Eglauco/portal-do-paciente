@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.configuracao.ChaveConfiguracao;
+import com.example.pop.configuracao.ConfiguracaoService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -28,23 +30,39 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Service
 public class ZapSignClient {
 
-    private final String baseUrl;
-    private final String apiToken;
+    private static final String BASE_SANDBOX = "https://sandbox.api.zapsign.com.br/api/v1";
+    private static final String BASE_PRODUCAO = "https://api.zapsign.com.br/api/v1";
+
+    private final ConfiguracaoService configuracaoService;
     private final int connectTimeout;
     private final int readTimeout;
     private final ObjectMapper mapper = new ObjectMapper();
     private RestClient restClient;
 
     public ZapSignClient(
-            @Value("${zapsign.base-url}") String baseUrl,
-            @Value("${zapsign.api-token}") String apiToken,
+            ConfiguracaoService configuracaoService,
             @Value("${zapsign.connect-timeout-segundos:5}") int connectTimeout,
             @Value("${zapsign.read-timeout-segundos:20}") int readTimeout) {
-        // Normaliza a base sem barra final (montamos os caminhos com "/docs/" etc.).
-        this.baseUrl = baseUrl != null && baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        this.apiToken = apiToken == null ? "" : apiToken.trim();
+        this.configuracaoService = configuracaoService;
         this.connectTimeout = connectTimeout;
         this.readTimeout = readTimeout;
+    }
+
+    /** Token da API do ZapSign (SEGREDO) lido do banco, cifrado, em runtime. */
+    private String apiToken() {
+        return configuracaoService.lerSegredo(ChaveConfiguracao.ZAPSIGN_API_TOKEN);
+    }
+
+    /** Base URL: a URL (editável) do ambiente ativo; cai nas constantes se a config estiver vazia. */
+    private String baseUrl() {
+        String amb = configuracaoService.lerTexto(ChaveConfiguracao.ZAPSIGN_AMBIENTE);
+        boolean prod = "PRODUCAO".equalsIgnoreCase(amb == null ? "" : amb.trim());
+        String url = configuracaoService.lerTexto(prod ? ChaveConfiguracao.ZAPSIGN_URL_PRODUCAO : ChaveConfiguracao.ZAPSIGN_URL_SANDBOX);
+        if (url == null || url.isBlank()) {
+            return prod ? BASE_PRODUCAO : BASE_SANDBOX;
+        }
+        // remove barra final para casar com os paths ("/templates/..."), que já começam com "/"
+        return url.trim().replaceAll("/+$", "");
     }
 
     private synchronized RestClient client() {
@@ -58,10 +76,21 @@ public class ZapSignClient {
     }
 
     private void exigirToken() {
-        if (apiToken.isEmpty()) {
+        if (!temToken()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Assinatura eletrônica indisponível (token ZapSign não configurado).");
         }
+    }
+
+    /** true se o token da API está configurado (usado por {@code ZapSignProvider.disponivel()}). */
+    public boolean temToken() {
+        return configuracaoService.segredoPreenchido(ChaveConfiguracao.ZAPSIGN_API_TOKEN);
+    }
+
+    /** Teste de conexão: chamada autenticada leve (1ª página de modelos). Lança em erro de token/rede. */
+    public void testar() {
+        exigirToken();
+        getRawBody("/templates/?page=1");
     }
 
     /** Dados de um signatário para a criação do documento. */
@@ -197,6 +226,90 @@ public class ZapSignClient {
         return texto(resp, "token");
     }
 
+    /** Resumo de um Modelo (template) para o seletor no back-office. */
+    public record ModeloResumo(String token, String nome, String tipo, boolean ativo) {
+    }
+
+    /** Uma variável ({{...}}) que o Modelo do ZapSign espera. */
+    public record ModeloVariavel(String variable, String label, boolean required) {
+    }
+
+    /** Detalhe de um Modelo: nome + variáveis (inputs) que ele espera. */
+    public record ModeloDetalhe(String token, String nome, List<ModeloVariavel> variaveis) {
+    }
+
+    /**
+     * Lista os Modelos (templates) da conta ZapSign — para o admin escolher no cadastro do termo. Agrega as
+     * páginas (20/página) até acabar, com teto de 10 páginas (200 modelos) para não varrer contas enormes.
+     */
+    public List<ModeloResumo> listarModelos() {
+        exigirToken();
+        List<ModeloResumo> out = new ArrayList<>();
+        for (int page = 1; page <= 10; page++) {
+            JsonNode resp = getJson("/templates/?page=" + page);
+            JsonNode results = resp.path("results");
+            if (!results.isArray() || results.isEmpty()) {
+                break;
+            }
+            for (JsonNode t : results) {
+                out.add(new ModeloResumo(texto(t, "token"), texto(t, "name"),
+                        texto(t, "template_type"), t.path("active").asBoolean(true)));
+            }
+            JsonNode next = resp.path("next");
+            if (next.isNull() || next.asText("").isBlank()) {
+                break;
+            }
+        }
+        return out;
+    }
+
+    /** Detalha um Modelo (nome + variáveis {{...}} esperadas) — usado para mapear/avisar no cadastro. */
+    public ModeloDetalhe detalharModelo(String templateToken) {
+        exigirToken();
+        JsonNode t = getJson("/templates/" + templateToken + "/");
+        List<ModeloVariavel> variaveis = new ArrayList<>();
+        JsonNode inputs = t.path("inputs");
+        if (inputs.isArray()) {
+            for (JsonNode in : inputs) {
+                variaveis.add(new ModeloVariavel(texto(in, "variable"), texto(in, "label"),
+                        in.path("required").asBoolean(false)));
+            }
+        }
+        return new ModeloDetalhe(texto(t, "token"), texto(t, "name"), variaveis);
+    }
+
+    /** Signatário adicionado a um documento existente (coassinatura): token + link da cerimônia. */
+    public record SignatarioAdicionado(String signerToken, String signUrl) {
+    }
+
+    /**
+     * Adiciona um signatário a um documento JÁ criado ({@code POST /docs/{token}/add-signer/}) — usado na
+     * COASSINATURA do profissional. Assinatura em tela, sem e-mail/WhatsApp automático. Devolve token + sign_url.
+     */
+    public SignatarioAdicionado adicionarSignatario(String docToken, Signatario s) {
+        exigirToken();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", s.nome());
+        if (s.cpf() != null && !s.cpf().isBlank()) {
+            body.put("cpf", s.cpf());
+        }
+        if (s.phoneNumber() != null && !s.phoneNumber().isBlank()) {
+            body.put("phone_country", s.phoneCountry() == null ? "55" : s.phoneCountry());
+            body.put("phone_number", s.phoneNumber());
+        }
+        body.put("auth_mode", s.authMode() == null ? "assinaturaTela" : s.authMode());
+        body.put("send_automatic_email", false);
+        body.put("send_automatic_whatsapp", false);
+        if (s.qualification() != null) {
+            body.put("qualification", s.qualification());
+        }
+        if (s.externalId() != null) {
+            body.put("external_id", s.externalId());
+        }
+        JsonNode resp = postJson("/docs/" + docToken + "/add-signer/", body);
+        return new SignatarioAdicionado(texto(resp, "token"), texto(resp, "sign_url"));
+    }
+
     /** Detalha o documento (status, signers[], original_file, signed_file, signature_report...). */
     public JsonNode detalhar(String docToken) {
         exigirToken();
@@ -229,8 +342,8 @@ public class ZapSignClient {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Falha ao montar requisição ZapSign.");
         }
         String resp = client().post()
-                .uri(baseUrl + caminho)
-                .header("Authorization", "Bearer " + apiToken)
+                .uri(baseUrl() + caminho)
+                .header("Authorization", "Bearer " + apiToken())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(json)
                 .retrieve()
@@ -248,8 +361,8 @@ public class ZapSignClient {
 
     private String getRawBody(String caminho) {
         return client().get()
-                .uri(baseUrl + caminho)
-                .header("Authorization", "Bearer " + apiToken)
+                .uri(baseUrl() + caminho)
+                .header("Authorization", "Bearer " + apiToken())
                 .retrieve()
                 .onStatus(status -> status.is4xxClientError() || status.is5xxServerError(), (req, res) -> {
                     throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,

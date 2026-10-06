@@ -1,0 +1,279 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">SIRESP</h1>
+      <p class="page-sub">Registros importados do SIRESP/CROSS. Importe um XML para popular a tabela (sem gerar agendamento).</p>
+    </div>
+    <div class="page-head__actions">
+      <button type="button" class="btn btn--ghost" (click)="abrirConfig()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </svg>
+        Configurações
+      </button>
+      <input #fileInput type="file" accept=".xml,text/xml,application/xml" hidden (change)="aoSelecionarArquivo($event)" />
+      <button type="button" class="btn btn--solid" (click)="escolherArquivo(fileInput)" [disabled]="importando()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 21V9m0 0 4 4m-4-4-4 4M5 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" />
+        </svg>
+        {{ importando() ? 'Importando…' : 'Importar XML' }}
+      </button>
+    </div>
+  </header>
+
+  <!-- Filtros -->
+  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+    <p class="section-label">Filtros</p>
+    <div class="filters__chat">
+      <div class="form-field uso-busca">
+        <label class="label" for="f-busca">Busca</label>
+        <input id="f-busca" type="text" class="input" formControlName="busca" placeholder="Paciente, CPF, profissional ou especialidade" />
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-status">Status</label>
+        <span class="select">
+          <select id="f-status" formControlName="status" (change)="buscar()">
+            <option value="">Todos</option>
+            <option value="AGENDADO">Agendado com sucesso</option>
+            <option value="REVISAO">Precisa de revisão</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </div>
+    </div>
+    <div class="filters__actions">
+      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+      <button type="submit" class="btn btn--solid">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+        </svg>
+        Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <!-- Dados -->
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Registros</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} registro(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Carregando registros…</p>
+      </div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (registros().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" />
+          </svg>
+        </span>
+        <h3>Nenhum registro do SIRESP</h3>
+        <p>Clique em “Importar XML” para popular a tabela a partir de um arquivo do SIRESP.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Hora</th>
+              <th>Paciente</th>
+              <th>CPF</th>
+              <th>Especialidade</th>
+              <th>Profissional</th>
+              <th>Status</th>
+              <th>Importado em</th>
+              <th class="col-act"><span class="sr-only">Ver</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of registros(); track r.id) {
+              <tr>
+                <td class="cell-data">{{ r.dataAgenda || '—' }}</td>
+                <td class="muted-cell">{{ r.horIni || '—' }}</td>
+                <td>{{ r.nomePaciente || '—' }}</td>
+                <td class="muted-cell">{{ r.cpf || '—' }}</td>
+                <td>{{ r.nomeEspecialidade || '—' }}</td>
+                <td class="muted-cell">{{ r.nomeProfissional || '—' }}</td>
+                <td>
+                  <span class="status-badge" [class.status-badge--ok]="r.status === 'AGENDADO'" [class.status-badge--rev]="r.status !== 'AGENDADO'">
+                    {{ r.status === 'AGENDADO' ? 'Agendado' : 'Revisão' }}
+                  </span>
+                </td>
+                <td class="muted-cell">{{ r.importadoEm | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td class="col-act">
+                  <a class="btn btn--ghost btn--sm" [routerLink]="[r.id]">Ver</a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação -->
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Registros por página">
+                @for (t of tamanhos; track t) {
+                  <option [value]="t" [selected]="t === size()">{{ t }}</option>
+                }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">
+            Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}
+          </span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m15 6-6 6 6 6" />
+              </svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') {
+                <span class="pager__ellipsis" aria-hidden="true">…</span>
+              } @else {
+                <button
+                  type="button"
+                  class="pager__btn"
+                  [class.is-active]="item === page()"
+                  [attr.aria-current]="item === page() ? 'page' : null"
+                  (click)="irParaPagina(item)"
+                >
+                  {{ item + 1 }}
+                </button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+
+  @if (modalAberto()) {
+    <div class="modal__overlay" (click)="fecharConfig()">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Configurações de atualização do paciente" (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <div>
+            <h2 class="modal__title">Atualização do paciente</h2>
+            <p class="modal__sub">Ao importar, se o <b>Código do paciente</b> casar com o <b>Código de integração</b> de um paciente, cada campo abaixo é tratado conforme a regra. Sem correspondência: não faz nada.</p>
+          </div>
+          <button type="button" class="modal__x" (click)="fecharConfig()" aria-label="Fechar">×</button>
+        </div>
+
+        <div class="modal__body">
+          @if (carregandoConfig()) {
+            <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+          } @else {
+            <label class="geral">
+              <input type="checkbox" [checked]="habilitado()" (change)="habilitado.set($any($event.target).checked)" />
+              <span class="geral__txt">
+                <b>Atualizar o cadastro quando o paciente for encontrado</b>
+                <span>Casa pelo Código do paciente (ou CPF). Se desligado, não altera quem já existe.</span>
+              </span>
+            </label>
+
+            <label class="geral">
+              <input type="checkbox" [checked]="criar()" (change)="criar.set($any($event.target).checked)" />
+              <span class="geral__txt">
+                <b>Criar o paciente quando não encontrado</b>
+                <span>Cria o cadastro completo com os dados do XML (inclui telefones). Auditado como “Importação SIRESP”.</span>
+              </span>
+            </label>
+
+            <div class="form-field" style="margin-bottom: 1rem">
+              <label class="label" for="cfg-procedimento">Procedimento padrão para agendamentos do SIRESP</label>
+              <span class="select select--full">
+                <select id="cfg-procedimento" (change)="setProcedimento($any($event.target).value)">
+                  <option value="" [selected]="procedimentoPadraoId() == null">— Selecione —</option>
+                  @for (p of procedimentos(); track p.id) {
+                    <option [value]="p.id" [selected]="p.id === procedimentoPadraoId()">{{ p.nome }}</option>
+                  }
+                </select>
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+              </span>
+              <span style="display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted)">
+                O XML do CROSS não traz “procedimento” — este é usado em todo agendamento criado a partir do SIRESP. Sem ele, o agendamento não é criado (o diagnóstico acusa a falta).
+              </span>
+            </div>
+
+            <div class="form-field" style="margin-bottom: 1rem">
+              <label class="label" for="cfg-post-url">URL de envio do XML ao cliente (Post XML)</label>
+              <input
+                id="cfg-post-url"
+                type="url"
+                class="input"
+                placeholder="https://cliente.exemplo.com/siresp/receber"
+                [value]="postUrl()"
+                (input)="postUrl.set($any($event.target).value)"
+              />
+              <span style="display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted)">
+                Endpoint que recebe o XML por HTTP POST (parâmetro <b>msg</b>), igual ao que o SIRESP envia. Em branco, o botão “Enviar ao cliente” fica desabilitado.
+              </span>
+            </div>
+
+            <label class="geral">
+              <input type="checkbox" [checked]="enviarAoImportar()" (change)="enviarAoImportar.set($any($event.target).checked)" />
+              <span class="geral__txt">
+                <b>Enviar ao cliente automaticamente ao importar</b>
+                <span>Logo após o upload, reenvia o arquivo original ao cliente (Post XML). Só dispara se a URL acima estiver preenchida.</span>
+              </span>
+            </label>
+
+            <p class="section-label" style="margin-top: 0.5rem">Por campo (atualização de quem já existe)</p>
+            <div class="campos" [class.campos--off]="!habilitado()">
+              @for (c of campos(); track c.campo) {
+                <div class="campo-linha">
+                  <span class="campo-linha__rot">{{ c.rotulo }}</span>
+                  <span class="select">
+                    <select [value]="c.acao" (change)="setAcao(c.campo, $any($event.target).value)" [attr.aria-label]="c.rotulo">
+                      @for (op of acoesOpcoes; track op.valor) {
+                        <option [value]="op.valor">{{ op.rotulo }}</option>
+                      }
+                    </select>
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                  </span>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="modal__foot">
+          <button type="button" class="btn btn--ghost" (click)="fecharConfig()" [disabled]="salvandoConfig()">Cancelar</button>
+          <button type="button" class="btn btn--solid" (click)="salvarConfig()" [disabled]="salvandoConfig() || carregandoConfig()">
+            {{ salvandoConfig() ? 'Salvando…' : 'Salvar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

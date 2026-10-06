@@ -2,7 +2,7 @@ package com.example.pop.prontuario;
 
 import java.time.LocalDateTime;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.common.Ref;
 
 /** Item da listagem de prontuários no BACK-OFFICE (inclui o status de alerta, para filtro). */
@@ -19,7 +19,7 @@ public record ProntuarioAdminResponse(
         String statusAlertaDescricao) {
 
     public static ProntuarioAdminResponse from(Prontuario p) {
-        Agendamento a = p.getAgendamento();
+        Horario a = p.getHorario();
         return new ProntuarioAdminResponse(
                 p.getId(),
                 p.getNumeroAtendimento(),

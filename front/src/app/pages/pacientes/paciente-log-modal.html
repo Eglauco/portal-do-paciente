@@ -33,6 +33,8 @@
               <!-- Origem no app (o próprio paciente ou um responsável) fica marcada como "pelo app". -->
               @if (log.autor === 'PACIENTE' || log.autor === 'RESPONSAVEL') {
                 <p class="plog__autor">pelo app — <b>{{ log.autorNome || 'Paciente' }}</b></p>
+              } @else if (log.autor === 'IMPORTACAO_SIRESP') {
+                <p class="plog__autor">via <b>Importação SIRESP</b>{{ log.autorNome ? ' — ' + log.autorNome : '' }}</p>
               } @else {
                 <p class="plog__autor">por <b>{{ log.autorNome || 'Sistema' }}</b></p>
               }

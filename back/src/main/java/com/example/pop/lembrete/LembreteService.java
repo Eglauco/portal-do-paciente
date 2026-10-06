@@ -11,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import com.example.pop.agendamento.Agendamento;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.Horario;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.notificacao.Notificacao;
 import com.example.pop.notificacao.NotificacaoRepository;
@@ -38,13 +38,13 @@ public class LembreteService {
 
     private final LembreteRepository lembreteRepository;
     private final LembreteDisparoRepository disparoRepository;
-    private final AgendamentoRepository agendamentoRepository;
+    private final HorarioRepository agendamentoRepository;
     private final NotificacaoRepository notificacaoRepository;
     private final NotificacaoService notificacaoService;
     private final PushService pushService;
 
     public LembreteService(LembreteRepository lembreteRepository, LembreteDisparoRepository disparoRepository,
-            AgendamentoRepository agendamentoRepository, NotificacaoRepository notificacaoRepository,
+            HorarioRepository agendamentoRepository, NotificacaoRepository notificacaoRepository,
             NotificacaoService notificacaoService, PushService pushService) {
         this.lembreteRepository = lembreteRepository;
         this.disparoRepository = disparoRepository;
@@ -65,13 +65,13 @@ public class LembreteService {
         List<Runnable> pushes = new ArrayList<>();
         for (Lembrete l : lembreteRepository.findAll()) {
             LocalDateTime limite = agora.plusHours(l.getHorasAntecedencia());
-            for (Agendamento a : agendamentoRepository.paraLembrete(l.getProcedimento().getId(), ATIVOS, agora, limite)) {
-                if (disparoRepository.existsByLembreteIdAndAgendamentoId(l.getId(), a.getId())) {
+            for (Horario a : agendamentoRepository.paraLembrete(l.getProcedimento().getId(), ATIVOS, agora, limite)) {
+                if (disparoRepository.existsByLembreteIdAndHorarioId(l.getId(), a.getId())) {
                     continue;
                 }
                 LembreteDisparo d = new LembreteDisparo();
                 d.setLembrete(l);
-                d.setAgendamento(a);
+                d.setHorario(a);
                 d.setCriadoEm(agora);
                 disparoRepository.save(d);
                 notificacaoService.registrarParaPaciente(a.getPaciente(), TipoNotificacao.LEMBRETE, TITULO, l.getTexto(), a.getId());
@@ -97,7 +97,7 @@ public class LembreteService {
 
     private LembretePopupResponse toPopup(Notificacao n, LocalDateTime agora) {
         Long agendamentoId = n.getReferenciaId();
-        Agendamento a = agendamentoId == null ? null : agendamentoRepository.findById(agendamentoId).orElse(null);
+        Horario a = agendamentoId == null ? null : agendamentoRepository.findById(agendamentoId).orElse(null);
         boolean podeCancelar = a != null && podeCancelar(a, agora);
         LocalDateTime dataHora = a != null ? a.getDataHora() : null;
         String especialidade = a != null && a.getEspecialidade() != null ? a.getEspecialidade().getNome() : null;
@@ -106,7 +106,7 @@ public class LembreteService {
     }
 
     /** Mesma regra do cancelamento pelo paciente: confirmado e dentro do prazo. */
-    private boolean podeCancelar(Agendamento a, LocalDateTime agora) {
+    private boolean podeCancelar(Horario a, LocalDateTime agora) {
         if (a.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             return false;
         }

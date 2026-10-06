@@ -13,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface ManifestacaoRepository extends JpaRepository<Manifestacao, Long> {
 
     /** Carrega a manifestação garantindo que é do paciente informado (escopo do app). */
-    Optional<Manifestacao> findByIdAndPacienteId(Long id, Long pacienteId);
+    Optional<Manifestacao> findByIdAndPaciente_Id(Long id, Long pacienteId);
 
     /** Manifestações do paciente, mais recentes (atualizadas) primeiro. */
     Page<Manifestacao> findByPacienteIdOrderByAtualizadoEmDesc(Long pacienteId, Pageable pageable);

@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -144,6 +145,9 @@ public class UnidadeController {
     public UnidadeResponse criar(@RequestBody UnidadeRequest req) {
         Unidade unidade = new Unidade();
         unidade.setNome(req.nome());
+        String codigo = limpar(req.codigoIntegracao());
+        validarCodigoIntegracao(codigo, null);
+        unidade.setCodigoIntegracao(codigo);
         aplicarFaq(unidade, req);
         return UnidadeResponse.from(repository.save(unidade));
     }
@@ -154,10 +158,36 @@ public class UnidadeController {
         return repository.findById(id)
                 .map(existente -> {
                     existente.setNome(req.nome());
+                    String codigo = limpar(req.codigoIntegracao());
+                    validarCodigoIntegracao(codigo, id);
+                    existente.setCodigoIntegracao(codigo);
                     aplicarFaq(existente, req);
                     return ResponseEntity.ok(UnidadeResponse.from(repository.save(existente)));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Código de integração é único quando preenchido (identifica a unidade na integração SIRESP/CROSS). */
+    private void validarCodigoIntegracao(String codigo, Long idAtual) {
+        if (codigo == null) {
+            return;
+        }
+        boolean duplicado = idAtual == null
+                ? repository.existsByCodigoIntegracao(codigo)
+                : repository.existsByCodigoIntegracaoAndIdNot(codigo, idAtual);
+        if (duplicado) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Já existe uma unidade com este código de integração.");
+        }
+    }
+
+    /** Trim; vazio vira null (para não colidir no índice único e não gravar string vazia). */
+    private static String limpar(String v) {
+        if (v == null) {
+            return null;
+        }
+        String t = v.trim();
+        return t.isEmpty() ? null : t;
     }
 
     /**

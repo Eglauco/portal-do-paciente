@@ -2,7 +2,7 @@ package com.example.pop.lembrete;
 
 import java.time.LocalDateTime;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -23,7 +23,7 @@ import lombok.Setter;
  * agendamento). A UNIQUE (lembrete, agendamento) impede duplicidade sob corrida.
  */
 @Entity
-@Table(name = "lembrete_disparo", uniqueConstraints = @UniqueConstraint(columnNames = { "lembrete_id", "agendamento_id" }))
+@Table(name = "lembrete_disparo", uniqueConstraints = @UniqueConstraint(columnNames = { "lembrete_id", "horario_id" }))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -38,8 +38,8 @@ public class LembreteDisparo {
     private Lembrete lembrete;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "agendamento_id", nullable = false)
-    private Agendamento agendamento;
+    @JoinColumn(name = "horario_id", nullable = false)
+    private Horario horario;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;

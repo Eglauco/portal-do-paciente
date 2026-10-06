@@ -71,9 +71,14 @@ public class SecurityConfig {
                         // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
                         .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
-                        // ZapSign (POC): webhook é chamado pela ZapSign sem JWT; endpoints /dev/zapsign/**
-                        // são protegidos por segredo compartilhado no controller. Remover na Fase 2.
+                        // Assinatura eletrônica: os webhooks são chamados pelos provedores sem JWT (autenticados por
+                        // header secreto/HMAC no controller); endpoints /dev/** são protegidos por segredo compartilhado.
                         .requestMatchers("/zapsign/webhook", "/dev/zapsign/**").permitAll()
+                        .requestMatchers("/autentique/webhook", "/dev/autentique/**").permitAll()
+                        // Clicksign: webhook + dev + a página wrapper do widget (aberta no WebView, sem JWT).
+                        .requestMatchers("/clicksign/webhook", "/dev/clicksign/**", "/assinatura/clicksign/widget").permitAll()
+                        // DocuSign: webhook (Connect) + dev + a página de retorno da cerimônia (aberta no WebView, sem JWT).
+                        .requestMatchers("/docusign/webhook", "/dev/docusign/**", "/assinatura/docusign/retorno").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
                         .requestMatchers("/feed", "/feed/**").hasRole("PACIENTE")
@@ -91,7 +96,8 @@ public class SecurityConfig {
                                 "/agendamento/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
-                                "/tipo-documento-prontuario/**", "/uso-ia/**",
+                                "/tipo-documento-prontuario/**", "/uso-ia/**", "/coassinatura/**",
+                                "/provedores-assinatura/**", "/siresp/**",
                                 "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).

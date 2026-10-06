@@ -20,6 +20,7 @@ interface LoginResponse {
   expiraEm: string;
   telas: string[];
   unidades: UnidadeRef[];
+  ehProfissional?: boolean;
 }
 
 interface UsuarioLogadoResponse {
@@ -29,6 +30,7 @@ interface UsuarioLogadoResponse {
   unidadeSaudeNome: string | null;
   telas: string[];
   unidades: UnidadeRef[];
+  ehProfissional?: boolean;
 }
 
 export interface UsuarioLogado {
@@ -40,6 +42,8 @@ export interface UsuarioLogado {
   telas: string[];
   /** Unidades de saúde acessíveis (união dos perfis). */
   unidades: UnidadeRef[];
+  /** true se o usuário está vinculado a um profissional (vê a tela "Meus termos para assinar"). */
+  ehProfissional: boolean;
 }
 
 /**
@@ -72,6 +76,7 @@ const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
   ['PERFIS', '/perfis'],
   ['CONFIGURACOES', '/configuracoes'],
   ['USO_IA', '/uso-ia'],
+  ['SIRESP', '/siresp'],
 ];
 
 const CHAVE_TOKEN = 'pop.token';
@@ -94,6 +99,8 @@ export class AuthService {
   readonly telas = computed(() => this._usuario()?.telas ?? []);
   /** Unidades de saúde acessíveis ao usuário (união dos perfis). */
   readonly unidadesAcessiveis = computed<UnidadeRef[]>(() => this._usuario()?.unidades ?? []);
+  /** True se o usuário é um profissional de saúde (habilita a tela "Meus termos para assinar"). */
+  readonly ehProfissional = computed(() => this._usuario()?.ehProfissional ?? false);
 
   /** True se o usuário tem acesso à tela informada (chave do enum, ex.: 'AGENDAMENTOS'). */
   temTela(chave: string): boolean {
@@ -158,6 +165,7 @@ export class AuthService {
       unidadeSaudeNome: u.unidadeSaudeNome,
       telas: u.telas ?? [],
       unidades: u.unidades ?? [],
+      ehProfissional: u.ehProfissional ?? false,
     };
     this._usuario.set(atualizado);
     this.gravarUsuario(atualizado);
@@ -188,6 +196,7 @@ export class AuthService {
       unidadeSaudeNome: r.unidadeSaudeNome,
       telas: r.telas ?? [],
       unidades: r.unidades ?? [],
+      ehProfissional: r.ehProfissional ?? false,
     };
     this._usuario.set(usuario);
     if (!this.ehNavegador) return;

@@ -11,7 +11,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.configuracao.CustoIaService;
@@ -137,7 +137,7 @@ public class ProntuarioIaService {
         if (resultado.status() == StatusAnaliseDocumento.AGUARDANDO_VALIDACAO) {
             notificarUnidade(p, d);
         }
-        return p.getAgendamento().getPaciente().getId();
+        return p.getHorario().getPaciente().getId();
     }
 
     /**
@@ -191,7 +191,7 @@ public class ProntuarioIaService {
 
     /** Notifica os admins da unidade (sino) sobre o documento aguardando validação — após o commit. */
     private void notificarUnidade(Prontuario p, Documento d) {
-        Agendamento a = p.getAgendamento();
+        Horario a = p.getHorario();
         Long unidadeId = a.getUnidadeSaude() == null ? null : a.getUnidadeSaude().getId();
         String paciente = a.getPaciente() == null ? "" : a.getPaciente().getNome();
         Long documentoId = d.getId();

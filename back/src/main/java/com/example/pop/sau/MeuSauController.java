@@ -124,7 +124,7 @@ public class MeuSauController {
     /** Carrega a manifestação garantindo que é do paciente logado (404 caso contrário). */
     private Manifestacao minha(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return repository.findByIdAndPacienteId(id, pacienteId)
+        return repository.findByIdAndPaciente_Id(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Manifestação não encontrada"));
     }
 }

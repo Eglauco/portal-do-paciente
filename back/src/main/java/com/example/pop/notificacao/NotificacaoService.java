@@ -125,7 +125,7 @@ public class NotificacaoService {
     /** Marca como lida ao tocar (idempotente); ignora se não for do paciente. */
     @Transactional
     public void marcarLida(Long id, Long pacienteId) {
-        repository.findByIdAndPacienteId(id, pacienteId).ifPresent(n -> {
+        repository.findByIdAndPaciente_Id(id, pacienteId).ifPresent(n -> {
             if (!n.isLida()) {
                 n.setLida(true);
                 n.setLidaEm(LocalDateTime.now());

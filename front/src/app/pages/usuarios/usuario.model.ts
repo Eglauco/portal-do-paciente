@@ -5,6 +5,8 @@ export interface Usuario {
   unidade?: { id: number; nome: string } | null;
   /** Perfis de acesso do usuário (a permissão efetiva é a união deles). */
   perfis?: { id: number; nome: string }[];
+  /** Profissional de saúde vinculado (opcional) — o usuário "é" esse profissional. */
+  profissionalSaudeId?: number | null;
 }
 
 /** Dados de criação/edição. `senha` é obrigatória na criação e opcional na edição. */
@@ -14,6 +16,7 @@ export interface UsuarioRequest {
   senha?: string;
   unidadeSaudeId: number;
   perfilIds: number[];
+  profissionalSaudeId?: number | null;
 }
 
 export interface UsuarioFiltro {

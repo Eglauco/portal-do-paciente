@@ -3,7 +3,7 @@ package com.example.pop.prontuario;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.common.Ref;
 
 /** Detalhe do prontuário no BACK-OFFICE: documentos com o resultado da análise por IA. */
@@ -21,7 +21,7 @@ public record ProntuarioAdminDetalheResponse(
         List<DocumentoAdminResponse> documentos) {
 
     public static ProntuarioAdminDetalheResponse from(Prontuario p) {
-        Agendamento a = p.getAgendamento();
+        Horario a = p.getHorario();
         return new ProntuarioAdminDetalheResponse(
                 p.getId(),
                 p.getNumeroAtendimento(),

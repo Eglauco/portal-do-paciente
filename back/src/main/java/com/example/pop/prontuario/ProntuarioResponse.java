@@ -2,7 +2,7 @@ package com.example.pop.prontuario;
 
 import java.time.LocalDateTime;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.common.Ref;
 
 /** Item da listagem de prontuários. */
@@ -17,7 +17,7 @@ public record ProntuarioResponse(
         int documentos) {
 
     public static ProntuarioResponse from(Prontuario p) {
-        Agendamento a = p.getAgendamento();
+        Horario a = p.getHorario();
         return new ProntuarioResponse(
                 p.getId(),
                 p.getNumeroAtendimento(),

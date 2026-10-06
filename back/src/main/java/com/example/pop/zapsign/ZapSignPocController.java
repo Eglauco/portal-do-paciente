@@ -5,9 +5,9 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,9 +21,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.assinatura.AssinaturaProvider;
+import com.example.pop.configuracao.ChaveConfiguracao;
+import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.prontuario.AssinaturaTermoService;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * POC da integração ZapSign (assinatura eletrônica do TCLE) — SOMENTE para validar o fluxo em
@@ -46,17 +47,18 @@ public class ZapSignPocController {
     private static final int MAX_EVENTOS = 50;
 
     private final ZapSignClient zapSign;
+    private final ZapSignProvider zapSignProvider;
     private final AssinaturaTermoService assinaturaTermoService;
-    private final String segredo;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ConfiguracaoService configuracaoService;
     /** Buffer em memória dos webhooks recebidos (só para inspeção na POC). */
     private final Deque<EventoWebhook> eventos = new ConcurrentLinkedDeque<>();
 
-    public ZapSignPocController(ZapSignClient zapSign, AssinaturaTermoService assinaturaTermoService,
-            @Value("${zapsign.webhook-secret}") String segredo) {
+    public ZapSignPocController(ZapSignClient zapSign, ZapSignProvider zapSignProvider,
+            AssinaturaTermoService assinaturaTermoService, ConfiguracaoService configuracaoService) {
         this.zapSign = zapSign;
+        this.zapSignProvider = zapSignProvider;
         this.assinaturaTermoService = assinaturaTermoService;
-        this.segredo = segredo == null ? "" : segredo;
+        this.configuracaoService = configuracaoService;
     }
 
     // ------- criar (dev) -------
@@ -107,42 +109,26 @@ public class ZapSignPocController {
     }
 
     /**
-     * Recebe o webhook da ZapSign. Valida o segredo, registra o evento e (para doc_signed com o
-     * documento concluído) confirma que o signed_file está presente. Responde 200 rápido; qualquer
-     * status != 200 faria a ZapSign reenviar (idempotência ficará no serviço real).
+     * Recebe o webhook da ZapSign e delega ao {@link ZapSignProvider} (valida o segredo e normaliza o
+     * evento) + ao {@link AssinaturaTermoService} (processa assinatura/recusa, independente de provedor).
+     * Responde 200 rápido; qualquer status != 200 faria a ZapSign reenviar. 401 (segredo inválido) não retenta.
      */
     @PostMapping("/zapsign/webhook")
-    public ResponseEntity<Void> webhook(@RequestHeader(value = "X-Zapsign-Secret", required = false) String recebido,
+    public ResponseEntity<Void> webhook(@RequestHeader Map<String, String> headers,
             @RequestBody(required = false) String corpoBruto) {
-        // Autenticidade: único mecanismo da ZapSign é o header que registramos. 401 não dispara retry.
-        if (segredo.isBlank() || !segredo.equals(recebido)) {
+        AssinaturaProvider.EventoWebhook ev = zapSignProvider.parseWebhook(headers, corpoBruto);
+        if (!ev.autentico()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        // Corpo cru + parse defensivo: um webhook nunca deve responder 500 (500 faria a ZapSign reenviar).
+        registrar(new EventoWebhook(LocalDateTime.now(), ev.tipo().name(), String.join(",", ev.docTokens()), null, false));
         try {
-            JsonNode corpo = mapper.readTree(corpoBruto == null || corpoBruto.isBlank() ? "{}" : corpoBruto);
-            String eventType = texto(corpo, "event_type");
-            String docToken = texto(corpo, "token");
-            String status = texto(corpo, "status");
-            boolean temSigned = corpo.hasNonNull("signed_file") && !corpo.get("signed_file").asText().isBlank();
-            registrar(new EventoWebhook(LocalDateTime.now(), eventType, docToken, status, temSigned));
-            // Fluxo real: ao assinar, processa o termo (idempotente; no-op se o doc não for um termo nosso).
-            if ("doc_signed".equals(eventType)) {
-                try {
-                    assinaturaTermoService.processarAssinado(docToken);
-                } catch (RuntimeException e) {
-                    registrar(new EventoWebhook(LocalDateTime.now(), "PROC_ERROR:" + e.getClass().getSimpleName(), docToken, status, temSigned));
-                }
-            } else if ("doc_refused".equals(eventType)) {
-                // Recusa: o paciente não concluiu — libera o atendimento para refazer a assinatura.
-                try {
-                    assinaturaTermoService.processarRecusa(docToken);
-                } catch (RuntimeException e) {
-                    registrar(new EventoWebhook(LocalDateTime.now(), "RECUSA_ERROR:" + e.getClass().getSimpleName(), docToken, status, temSigned));
-                }
+            if (ev.tipo() == AssinaturaProvider.TipoEvento.ASSINADO) {
+                assinaturaTermoService.processarAssinados(zapSignProvider, ev.docTokens());
+            } else if (ev.tipo() == AssinaturaProvider.TipoEvento.RECUSADO) {
+                assinaturaTermoService.processarRecusa(ev.docTokens());
             }
-        } catch (Exception e) {
-            registrar(new EventoWebhook(LocalDateTime.now(), "PARSE_ERROR:" + e.getClass().getSimpleName(), null, null, false));
+        } catch (RuntimeException e) {
+            registrar(new EventoWebhook(LocalDateTime.now(), "PROC_ERROR:" + e.getClass().getSimpleName(), null, null, false));
         }
         return ResponseEntity.ok().build();
     }
@@ -163,13 +149,9 @@ public class ZapSignPocController {
     }
 
     private void exigirSegredo(String recebido) {
-        if (segredo.isBlank() || !segredo.equals(recebido)) {
+        String segredo = configuracaoService.lerSegredo(ChaveConfiguracao.ZAPSIGN_WEBHOOK_SECRET);
+        if (segredo == null || segredo.isBlank() || !segredo.equals(recebido)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Segredo de POC inválido.");
         }
-    }
-
-    private static String texto(JsonNode node, String campo) {
-        JsonNode v = node.get(campo);
-        return v == null || v.isNull() ? null : v.asText();
     }
 }

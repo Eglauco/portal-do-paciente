@@ -61,6 +61,17 @@
           <span class="field-error">Informe o nome (mínimo 3 caracteres).</span>
         }
       </div>
+      <div class="form-field">
+        <label class="label" for="codigoIntegracao">Código de integração</label>
+        <input
+          id="codigoIntegracao"
+          class="input"
+          formControlName="codigoIntegracao"
+          placeholder="Ex.: código da unidade no SIRESP/CROSS"
+          autocomplete="off"
+        />
+        <span class="field-hint">Opcional. Usado para casar a unidade na importação do SIRESP (único quando preenchido).</span>
+      </div>
     </div>
     }
 

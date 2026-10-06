@@ -148,7 +148,7 @@ export interface PacienteFiltro {
 export type TipoEventoPaciente = 'CRIACAO' | 'ALTERACAO' | 'INATIVACAO' | 'REATIVACAO';
 
 /** Quem realizou o evento de auditoria. */
-export type AutorLogPaciente = 'UNIDADE' | 'PACIENTE' | 'RESPONSAVEL' | 'SISTEMA';
+export type AutorLogPaciente = 'UNIDADE' | 'PACIENTE' | 'RESPONSAVEL' | 'SISTEMA' | 'IMPORTACAO_SIRESP';
 
 /** Alteração de um campo (antes/depois) dentro de um evento de auditoria. */
 export interface PacienteLogAlteracao {

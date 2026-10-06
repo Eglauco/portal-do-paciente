@@ -4,11 +4,13 @@ package com.example.pop.paciente;
  * Quem realizou o evento de auditoria do cadastro. UNIDADE = atendente do back-office;
  * PACIENTE = o próprio paciente pelo app (ex.: adicionar/remover pessoa autorizada);
  * RESPONSAVEL fica reservado para eventos originados por um responsável no app. SISTEMA
- * cobre ações sem ator identificado (ex.: sem token).
+ * cobre ações sem ator identificado (ex.: sem token). IMPORTACAO_SIRESP = criação/alteração
+ * do cadastro feita pela importação do XML do SIRESP (o usuário importador fica como ator).
  */
 public enum AutorLogPaciente {
     UNIDADE,
     PACIENTE,
     RESPONSAVEL,
-    SISTEMA
+    SISTEMA,
+    IMPORTACAO_SIRESP
 }

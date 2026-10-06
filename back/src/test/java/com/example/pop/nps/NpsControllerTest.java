@@ -61,7 +61,7 @@ class NpsControllerTest {
                 StatusAgendamento.PRESENCA_PACIENTE);
         agendamentoController.atualizar(criado.id(), presenca, null);
 
-        Nps gerado = repository.findByAgendamentoId(criado.id()).orElseThrow();
+        Nps gerado = repository.findByHorarioId(criado.id()).orElseThrow();
         assertEquals(StatusNps.PENDENTE, gerado.getStatus());
         assertNull(gerado.getNota());
 
@@ -95,7 +95,7 @@ class NpsControllerTest {
         agendamentoController.atualizar(criado.id(), new AgendamentoRequest(
                 LocalDateTime.of(2026, 11, 7, 9, 0), 1L, 1L, 1L, 1L, 1L,
                 StatusAgendamento.PRESENCA_PACIENTE), null);
-        Nps gerado = repository.findByAgendamentoId(criado.id()).orElseThrow();
+        Nps gerado = repository.findByHorarioId(criado.id()).orElseThrow();
 
         // Duas notas para a mesma categoria devem ser recusadas com 400 (e não estourar 500).
         assertThrows(ResponseStatusException.class,
@@ -121,11 +121,11 @@ class NpsControllerTest {
         agendamentoController.atualizar(criado.id(), presenca, null);
 
         long total = repository.findAll().stream()
-                .filter(n -> n.getAgendamento().getId().equals(criado.id()))
+                .filter(n -> n.getHorario().getId().equals(criado.id()))
                 .count();
         assertEquals(1, total, "deve existir apenas um NPS por agendamento");
 
-        repository.findByAgendamentoId(criado.id()).ifPresent(n -> repository.deleteById(n.getId()));
+        repository.findByHorarioId(criado.id()).ifPresent(n -> repository.deleteById(n.getId()));
         agendamentoController.excluir(criado.id());
     }
 }

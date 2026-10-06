@@ -9,7 +9,7 @@ public interface DocumentoRepository extends JpaRepository<Documento, Long> {
      * (documento -> prontuário -> agendamento -> paciente). Usado para autorizar
      * o download escopado e fechar o IDOR do /storage/download-url.
      */
-    boolean existsByUrlAndProntuario_Agendamento_Paciente_Id(String url, Long pacienteId);
+    boolean existsByUrlAndProntuario_Horario_Paciente_Id(String url, Long pacienteId);
 
     /** Há algum documento usando este Tipo? (bloqueia a exclusão do tipo em uso). */
     boolean existsByTipo_Id(Long tipoId);

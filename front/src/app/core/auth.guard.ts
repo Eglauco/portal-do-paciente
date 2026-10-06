@@ -39,6 +39,22 @@ export function telaGuard(chave: string): CanActivateFn {
   };
 }
 
+/**
+ * Protege a tela "Meus termos para assinar" (coassinatura): só para usuário vinculado a um profissional.
+ * A posse dos termos é conferida no servidor; aqui é só a defesa da rota (o menu já fica escondido).
+ */
+export const profissionalGuard: CanActivateFn = () => {
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return true;
+
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (!auth.token()) return router.createUrlTree(['/login']);
+  if (auth.unidadeId() == null) return router.createUrlTree(['/selecionar-unidade']);
+  if (!auth.ehProfissional()) return router.createUrlTree(['/sem-permissao']);
+  return true;
+};
+
 /** Rota "início": redireciona para a primeira tela liberada do usuário. */
 export const inicioGuard: CanActivateFn = () => {
   const platformId = inject(PLATFORM_ID);

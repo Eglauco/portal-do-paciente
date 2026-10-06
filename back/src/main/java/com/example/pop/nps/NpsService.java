@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.categorianps.CategoriaNps;
 import com.example.pop.categorianps.CategoriaNpsRepository;
@@ -63,11 +63,11 @@ public class NpsService {
      * a presença (0 = na hora): com 0 dispara já; senão fica agendado (invisível ao
      * paciente) e o job {@link #dispararAgendados()} envia quando chegar a hora.
      */
-    public void gerarSeNecessario(Agendamento agendamento) {
+    public void gerarSeNecessario(Horario agendamento) {
         if (agendamento.getStatusAgendamento() != StatusAgendamento.PRESENCA_PACIENTE) {
             return;
         }
-        if (repository.existsByAgendamentoId(agendamento.getId())) {
+        if (repository.existsByHorarioId(agendamento.getId())) {
             return;
         }
         LocalDateTime agora = LocalDateTime.now(FUSO);
@@ -75,7 +75,7 @@ public class NpsService {
         LocalDateTime dispararEm = agora.plusHours(horas);
 
         Nps nps = new Nps();
-        nps.setAgendamento(agendamento);
+        nps.setHorario(agendamento);
         nps.setStatus(StatusNps.PENDENTE);
         nps.setCriadoEm(agora);
         nps.setDispararEm(dispararEm);
@@ -120,7 +120,7 @@ public class NpsService {
         if (nps == null || nps.getDisparadoEm() != null) {
             return null;
         }
-        if (nps.getAgendamento().getStatusAgendamento() != StatusAgendamento.PRESENCA_PACIENTE) {
+        if (nps.getHorario().getStatusAgendamento() != StatusAgendamento.PRESENCA_PACIENTE) {
             repository.delete(nps);
             return null;
         }
@@ -182,7 +182,7 @@ public class NpsService {
             return;
         }
         Long npsId = nps.getId();
-        Long unidadeIdEvento = nps.getAgendamento().getUnidadeSaude().getId();
+        Long unidadeIdEvento = nps.getHorario().getUnidadeSaude().getId();
         double media = nps.getMedia();
         aposCommit(() -> notificacaoAdminService.registrar(TipoNotificacaoAdmin.NPS, unidadeIdEvento,
                 "NPS com nota baixa",

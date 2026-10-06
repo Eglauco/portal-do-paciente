@@ -86,6 +86,7 @@ export class UnidadeForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
     }),
+    codigoIntegracao: new FormControl('', { nonNullable: true }),
     faq: new FormArray<FaqItemForm>([]),
   });
 
@@ -122,7 +123,7 @@ export class UnidadeForm implements PodeSair {
       this.codigo.set(id);
       this.service.buscarPorId(id).subscribe({
         next: (unidade) => {
-          this.form.patchValue({ nome: unidade.nome });
+          this.form.patchValue({ nome: unidade.nome, codigoIntegracao: unidade.codigoIntegracao ?? '' });
           this.setFaq(unidade.faq ?? []);
         },
         error: () => this.erroCarregar.set(true),
@@ -171,6 +172,7 @@ export class UnidadeForm implements PodeSair {
   private valores(): Unidade {
     return {
       nome: this.form.controls.nome.value.trim(),
+      codigoIntegracao: this.form.controls.codigoIntegracao.value.trim() || null,
       // Só envia itens completos; a ordem na lista é a posição enviada ao backend.
       faq: this.faqItens.controls
         .map((g) => ({

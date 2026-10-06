@@ -13,7 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.configuracao.CustoIaService;
@@ -181,7 +181,7 @@ public class ProntuarioMedicoService {
                 sb.append("\n(demais atendimentos mais antigos omitidos)\n");
                 break;
             }
-            Agendamento a = p.getAgendamento();
+            Horario a = p.getHorario();
             sb.append("\n- Atendimento ")
                     .append(a.getDataHora() == null ? "(sem data)" : a.getDataHora().format(DATA))
                     .append(" · ").append(nome(a.getEspecialidade() == null ? null : a.getEspecialidade().getNome()))

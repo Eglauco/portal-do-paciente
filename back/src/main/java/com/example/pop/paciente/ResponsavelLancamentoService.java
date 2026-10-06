@@ -2,7 +2,7 @@ package com.example.pop.paciente;
 
 import org.springframework.stereotype.Service;
 
-import com.example.pop.agendamento.AgendamentoLogRepository;
+import com.example.pop.agendamento.HorarioLogRepository;
 import com.example.pop.chat.MensagemRepository;
 import com.example.pop.nps.NpsRepository;
 import com.example.pop.postagem.ComentarioRepository;
@@ -22,7 +22,7 @@ public class ResponsavelLancamentoService {
     private final ManifestacaoRepository manifestacaoRepository;
     private final ManifestacaoMensagemRepository manifestacaoMensagemRepository;
     private final MensagemRepository mensagemRepository;
-    private final AgendamentoLogRepository agendamentoLogRepository;
+    private final HorarioLogRepository agendamentoLogRepository;
     private final NpsRepository npsRepository;
     private final PacienteLogRepository pacienteLogRepository;
 
@@ -30,7 +30,7 @@ public class ResponsavelLancamentoService {
             ManifestacaoRepository manifestacaoRepository,
             ManifestacaoMensagemRepository manifestacaoMensagemRepository,
             MensagemRepository mensagemRepository,
-            AgendamentoLogRepository agendamentoLogRepository,
+            HorarioLogRepository agendamentoLogRepository,
             NpsRepository npsRepository,
             PacienteLogRepository pacienteLogRepository) {
         this.comentarioRepository = comentarioRepository;

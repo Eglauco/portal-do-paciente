@@ -13,7 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     /** Carrega a conversa garantindo que é do paciente informado (escopo do app). */
-    Optional<Chat> findByIdAndPacienteId(Long id, Long pacienteId);
+    Optional<Chat> findByIdAndPaciente_Id(Long id, Long pacienteId);
 
     /** Conversa única do par paciente+unidade (base do "abrir ou criar"). */
     Optional<Chat> findByPacienteIdAndUnidadeSaudeId(Long pacienteId, Long unidadeId);

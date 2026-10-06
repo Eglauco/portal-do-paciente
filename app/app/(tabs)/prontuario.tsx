@@ -23,6 +23,7 @@ import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import {
+  cancelarAssinatura,
   conferirTermos,
   DocumentoApi,
   iniciarAssinaturaLote,
@@ -152,12 +153,29 @@ function ConfirmacaoTermos({
     }, [prontuarioId, onResolvido]),
   );
 
+  const [cancelando, setCancelando] = useState(false);
+  const cancelar = async () => {
+    if (cancelando) return;
+    setCancelando(true);
+    try {
+      await cancelarAssinatura(prontuarioId);
+    } catch {
+      // ignora: onResolvido recarrega de qualquer forma
+    }
+    onResolvido();
+  };
+
   return (
     <View style={styles.box}>
-      <ActivityIndicator size="small" color={t.brandDeep} />
-      <Text style={styles.txt}>
-        {conferindo ? 'Conferindo…' : `Confirmando assinatura em ${segundos}…`}
-      </Text>
+      <View style={styles.boxLinha}>
+        <ActivityIndicator size="small" color={t.brandDeep} />
+        <Text style={styles.txt}>
+          {conferindo ? 'Conferindo…' : `Confirmando assinatura em ${segundos}…`}
+        </Text>
+      </View>
+      <Pressable onPress={cancelar} disabled={cancelando} hitSlop={8} accessibilityRole="button">
+        <Text style={styles.cancelar}>{cancelando ? 'Cancelando…' : 'Não assinei / cancelar'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -271,13 +289,27 @@ export default function ProntuarioScreen() {
     if (assinandoId != null) return;
     setAssinandoId(prontuarioId);
     try {
-      const signUrl = await iniciarAssinaturaLote(prontuarioId);
+      const { signUrls, provedor } = await iniciarAssinaturaLote(prontuarioId);
+      if (signUrls.length === 0) {
+        Alert.alert('Ops', 'Não foi possível iniciar a assinatura agora. Tente novamente.');
+        return;
+      }
       router.push({
         pathname: '/assinar-termo',
-        params: { signUrl, nome: titulo, prontuarioId: String(prontuarioId) },
+        params: {
+          signUrls: JSON.stringify(signUrls),
+          provedor,
+          nome: titulo,
+          prontuarioId: String(prontuarioId),
+        },
       });
-    } catch {
-      Alert.alert('Ops', 'Não foi possível iniciar a assinatura agora. Tente novamente.');
+    } catch (e) {
+      // Mostra o motivo real do backend (ex.: termo de modelo ZapSign com outro provedor ativo).
+      const msg =
+        e instanceof Error && e.message && !e.message.startsWith('Falha na requisição')
+          ? e.message
+          : 'Não foi possível iniciar a assinatura agora. Tente novamente.';
+      Alert.alert('Ops', msg);
     } finally {
       setAssinandoId(null);
     }
@@ -367,7 +399,8 @@ export default function ProntuarioScreen() {
                 (tm) =>
                   tm.status === 'PENDENTE' ||
                   tm.status === 'TENTAR_NOVAMENTE' ||
-                  tm.status === 'EM_CONFIRMACAO',
+                  tm.status === 'EM_CONFIRMACAO' ||
+                  tm.status === 'AGUARDANDO_PROFISSIONAL',
               );
               if (visiveis.length === 0) return null;
               const temRecusa = paraAssinar.some((tm) => tm.status === 'TENTAR_NOVAMENTE');
@@ -389,7 +422,7 @@ export default function ProntuarioScreen() {
                   ))}
                   {emConfirmacao.length > 0 ? (
                     <ConfirmacaoTermos prontuarioId={at.id} onResolvido={recarregar} />
-                  ) : (
+                  ) : paraAssinar.length > 0 ? (
                     <Pressable
                       style={styles.termoBtnFull}
                       onPress={() => iniciarAssinatura(at.id, 'Termo de consentimento')}
@@ -408,7 +441,7 @@ export default function ProntuarioScreen() {
                         </Text>
                       )}
                     </Pressable>
-                  )}
+                  ) : null}
                 </View>
               );
             })()}
@@ -580,15 +613,16 @@ const criarEstilosConfirmacao = (t: Tema) =>
   StyleSheet.create({
     box: {
       marginTop: 8,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: 6,
       backgroundColor: t.surface,
       borderRadius: 10,
       borderWidth: 1,
       borderColor: t.line,
       paddingVertical: 11,
     },
+    boxLinha: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     txt: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep },
+    cancelar: { fontSize: 12, fontWeight: '600', color: t.muted, textDecorationLine: 'underline' },
   });

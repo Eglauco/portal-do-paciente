@@ -39,17 +39,17 @@ import com.example.pop.push.PushService;
 
 /** Regra de entrega (Fase 1): estado por destinatário + resumo "qualquer autorizado". */
 @ExtendWith(MockitoExtension.class)
-class AgendamentoEntregaServiceTest {
+class HorarioEntregaServiceTest {
 
     @Mock private PushService pushService;
     @Mock private NotificacaoService notificacaoService;
     @Mock private ResponsavelRepository responsavelRepository;
     @Mock private ContaAppRepository contaRepository;
     @Mock private DispositivoRepository dispositivoRepository;
-    @Mock private AgendamentoEntregaRepository entregaRepository;
-    @Mock private AgendamentoRepository agendamentoRepository;
+    @Mock private HorarioEntregaRepository entregaRepository;
+    @Mock private HorarioRepository agendamentoRepository;
     @Mock private PlatformTransactionManager transactionManager;
-    @InjectMocks private AgendamentoEntregaService service;
+    @InjectMocks private HorarioEntregaService service;
 
     private static final String PAC_CPF = "10000000200";
     private static final String RESP_CPF = "10000000201";
@@ -57,8 +57,8 @@ class AgendamentoEntregaServiceTest {
     @Test
     void pacienteComAppEResponsavelSemApp_enviadaEResumoEnviada() {
         Paciente paciente = paciente(1L, "Ana Titular", "11955557777");
-        Agendamento a = agendamento(paciente);
-        Agendamento gerenciado = agendamento(paciente); // "recarregado" (gerenciado) na transação de gravação
+        Horario a = agendamento(paciente);
+        Horario gerenciado = agendamento(paciente); // "recarregado" (gerenciado) na transação de gravação
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(gerenciado));
         // Paciente tem conta + 1 aparelho; responsável ativo com acesso, mas sem conta (nunca logou).
         Responsavel resp = responsavel(7L, "Maria Ajuda", "11988881111", NivelAcessoResponsavel.VISUALIZAR_LANCAR);
@@ -74,8 +74,8 @@ class AgendamentoEntregaServiceTest {
 
         service.notificarNovoAgendamento(a);
 
-        List<AgendamentoEntrega> salvas = capturarEntregas(2);
-        AgendamentoEntrega doPaciente = salvas.stream().filter(x -> x.getTipo() == TipoDestinatario.PACIENTE)
+        List<HorarioEntrega> salvas = capturarEntregas(2);
+        HorarioEntrega doPaciente = salvas.stream().filter(x -> x.getTipo() == TipoDestinatario.PACIENTE)
                 .findFirst().orElseThrow();
         assertEquals(EstadoEntrega.NOTIFICACAO_ENVIADA, doPaciente.getEstado());
         assertEquals("rcpt-ExpoTokenA", doPaciente.getReceiptsPendentes(), "guarda o receipt id p/ conferir a entrega");
@@ -87,8 +87,8 @@ class AgendamentoEntregaServiceTest {
     @Test
     void ninguemComApp_semAplicativoEnaoEnviaPush() {
         Paciente paciente = paciente(1L, "Ana Titular", "11955557777");
-        Agendamento a = agendamento(paciente);
-        Agendamento gerenciado = agendamento(paciente);
+        Horario a = agendamento(paciente);
+        Horario gerenciado = agendamento(paciente);
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(gerenciado));
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of());
         when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.empty());
@@ -96,7 +96,7 @@ class AgendamentoEntregaServiceTest {
 
         service.notificarNovoAgendamento(a);
 
-        List<AgendamentoEntrega> salvas = capturarEntregas(1);
+        List<HorarioEntrega> salvas = capturarEntregas(1);
         assertEquals(EstadoEntrega.PACIENTE_SEM_APLICATIVO, salvas.get(0).getEstado());
         assertEquals(EstadoEntrega.PACIENTE_SEM_APLICATIVO, gerenciado.getEntregaResumo());
         // Sem nenhum token, nem chega a chamar a Expo.
@@ -106,8 +106,8 @@ class AgendamentoEntregaServiceTest {
     @Test
     void pacienteComTokenRejeitado_semNotificacaoAtiva() {
         Paciente paciente = paciente(1L, "Ana Titular", "11955557777");
-        Agendamento a = agendamento(paciente);
-        Agendamento gerenciado = agendamento(paciente);
+        Horario a = agendamento(paciente);
+        Horario gerenciado = agendamento(paciente);
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(gerenciado));
         when(responsavelRepository.findByPaciente_Id(1L)).thenReturn(List.of());
         when(contaRepository.findByCpf(PAC_CPF)).thenReturn(Optional.of(conta(10L)));
@@ -120,7 +120,7 @@ class AgendamentoEntregaServiceTest {
 
         service.notificarNovoAgendamento(a);
 
-        List<AgendamentoEntrega> salvas = capturarEntregas(1);
+        List<HorarioEntrega> salvas = capturarEntregas(1);
         assertEquals(EstadoEntrega.SEM_NOTIFICACAO_ATIVA, salvas.get(0).getEstado());
         assertEquals(EstadoEntrega.SEM_NOTIFICACAO_ATIVA, gerenciado.getEntregaResumo());
     }
@@ -128,7 +128,7 @@ class AgendamentoEntregaServiceTest {
     @Test
     void responsavelSemAcessoNaoEhDestinatario() {
         Paciente paciente = paciente(1L, "Ana Titular", "11955557777");
-        Agendamento a = agendamento(paciente);
+        Horario a = agendamento(paciente);
         Responsavel semAcesso = responsavel(7L, "Sem Acesso", "11988881111", NivelAcessoResponsavel.SEM_ACESSO);
         Responsavel inativo = responsavel(8L, "Inativo", "11977772222", NivelAcessoResponsavel.VISUALIZAR);
         inativo.setAtivo(false);
@@ -140,20 +140,20 @@ class AgendamentoEntregaServiceTest {
         service.notificarNovoAgendamento(a);
 
         // Só o paciente vira destinatário — responsável sem acesso e inativo são suprimidos.
-        List<AgendamentoEntrega> salvas = capturarEntregas(1);
+        List<HorarioEntrega> salvas = capturarEntregas(1);
         assertEquals(TipoDestinatario.PACIENTE, salvas.get(0).getTipo());
     }
 
     @Test
     void receiptOkCriaNovoRegistroEntregueSemSobrescrever() {
-        Agendamento ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
-        AgendamentoEntrega enviada = entregaEnviada(ag, "r1");
+        Horario ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
+        HorarioEntrega enviada = entregaEnviada(ag, "r1");
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(enviada));
         when(pushService.consultarReceipts(anyList())).thenReturn(Map.of("r1", true));
         when(agendamentoRepository.getReferenceById(100L)).thenReturn(ag);
         // Recompute enxerga o estado pós-append (enviada + novo entregue): o ATUAL da pessoa é ENTREGUE.
-        when(entregaRepository.findByAgendamento_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada, eventoEntregue(ag)));
+        when(entregaRepository.findByHorario_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada, eventoEntregue(ag)));
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(ag));
 
         service.resolverReceiptsPendentes();
@@ -171,13 +171,13 @@ class AgendamentoEntregaServiceTest {
 
     @Test
     void receiptComErroCriaNovoRegistroSemNotificacaoAtiva() {
-        Agendamento ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
-        AgendamentoEntrega enviada = entregaEnviada(ag, "r1");
+        Horario ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
+        HorarioEntrega enviada = entregaEnviada(ag, "r1");
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(enviada));
         when(pushService.consultarReceipts(anyList())).thenReturn(Map.of("r1", false));
         when(agendamentoRepository.getReferenceById(100L)).thenReturn(ag);
-        when(entregaRepository.findByAgendamento_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada));
+        when(entregaRepository.findByHorario_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada));
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(ag));
 
         service.resolverReceiptsPendentes();
@@ -190,8 +190,8 @@ class AgendamentoEntregaServiceTest {
 
     @Test
     void receiptAindaPendentePermaneceEnviada() {
-        Agendamento ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
-        AgendamentoEntrega e = entregaEnviada(ag, "r1");
+        Horario ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
+        HorarioEntrega e = entregaEnviada(ag, "r1");
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(e));
         when(pushService.consultarReceipts(anyList())).thenReturn(Map.of()); // receipt ainda não pronto (ausente)
@@ -205,13 +205,13 @@ class AgendamentoEntregaServiceTest {
 
     @Test
     void multiplosReceiptsComUmOkCriaEventoEntregue() {
-        Agendamento ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
-        AgendamentoEntrega enviada = entregaEnviada(ag, "r1,r2");
+        Horario ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
+        HorarioEntrega enviada = entregaEnviada(ag, "r1,r2");
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(enviada));
         when(pushService.consultarReceipts(anyList())).thenReturn(Map.of("r1", false, "r2", true));
         when(agendamentoRepository.getReferenceById(100L)).thenReturn(ag);
-        when(entregaRepository.findByAgendamento_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada));
+        when(entregaRepository.findByHorario_IdOrderByIdAsc(100L)).thenReturn(List.of(enviada));
         when(agendamentoRepository.findById(100L)).thenReturn(Optional.of(ag));
 
         service.resolverReceiptsPendentes();
@@ -223,8 +223,8 @@ class AgendamentoEntregaServiceTest {
 
     @Test
     void desisteDepoisDe24hMantendoEnviada() {
-        Agendamento ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
-        AgendamentoEntrega e = entregaEnviada(ag, "r1");
+        Horario ag = agendamento(paciente(1L, "Ana Titular", "11955557777"));
+        HorarioEntrega e = entregaEnviada(ag, "r1");
         e.setCriadoEm(LocalDateTime.now().minusHours(25)); // além das 24h da Expo
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(e));
@@ -240,15 +240,15 @@ class AgendamentoEntregaServiceTest {
     @Test
     void responsaveisExcluidosNaoColapsamNoResumo() {
         // Dois responsáveis já EXCLUÍDOS do cadastro → responsavelId nulo (FK SET NULL) em ambos.
-        Agendamento ag = agendamento(paciente(1L, "Ana", "11955557777"));
-        AgendamentoEntrega pendenteA = eventoResponsavel(ag, null, "Resp A", "11911111111",
+        Horario ag = agendamento(paciente(1L, "Ana", "11955557777"));
+        HorarioEntrega pendenteA = eventoResponsavel(ag, null, "Resp A", "11911111111",
                 EstadoEntrega.NOTIFICACAO_ENVIADA, "rA");
         when(entregaRepository.findByEstadoAndReceiptsPendentesIsNotNullAndCriadoEmLessThanEqual(
                 eq(EstadoEntrega.NOTIFICACAO_ENVIADA), any())).thenReturn(List.of(pendenteA));
         when(pushService.consultarReceipts(anyList())).thenReturn(Map.of("rA", true));
         when(agendamentoRepository.getReferenceById(100L)).thenReturn(ag);
         // Estado pós-append: A (entregue, tel 111) e B (sem notif., tel 222) — ambos com responsavelId nulo.
-        when(entregaRepository.findByAgendamento_IdOrderByIdAsc(100L)).thenReturn(List.of(
+        when(entregaRepository.findByHorario_IdOrderByIdAsc(100L)).thenReturn(List.of(
                 pendenteA,
                 eventoResponsavel(ag, null, "Resp A", "11911111111", EstadoEntrega.NOTIFICACAO_ENTREGUE, null),
                 eventoResponsavel(ag, null, "Resp B", "11922222222", EstadoEntrega.SEM_NOTIFICACAO_ATIVA, null)));
@@ -263,10 +263,10 @@ class AgendamentoEntregaServiceTest {
 
     // --- helpers ---
 
-    private AgendamentoEntrega eventoResponsavel(Agendamento ag, Long respId, String nome, String tel,
+    private HorarioEntrega eventoResponsavel(Horario ag, Long respId, String nome, String tel,
             EstadoEntrega estado, String receipts) {
-        AgendamentoEntrega e = new AgendamentoEntrega();
-        e.setAgendamento(ag);
+        HorarioEntrega e = new HorarioEntrega();
+        e.setHorario(ag);
         e.setTipo(TipoDestinatario.RESPONSAVEL);
         e.setResponsavelId(respId);
         e.setNome(nome);
@@ -277,15 +277,15 @@ class AgendamentoEntregaServiceTest {
         return e;
     }
 
-    private List<AgendamentoEntrega> todosSaves() {
-        ArgumentCaptor<AgendamentoEntrega> captor = ArgumentCaptor.forClass(AgendamentoEntrega.class);
+    private List<HorarioEntrega> todosSaves() {
+        ArgumentCaptor<HorarioEntrega> captor = ArgumentCaptor.forClass(HorarioEntrega.class);
         verify(entregaRepository, org.mockito.Mockito.atLeastOnce()).save(captor.capture());
         return captor.getAllValues();
     }
 
-    private AgendamentoEntrega entregaEnviada(Agendamento ag, String receipts) {
-        AgendamentoEntrega e = new AgendamentoEntrega();
-        e.setAgendamento(ag);
+    private HorarioEntrega entregaEnviada(Horario ag, String receipts) {
+        HorarioEntrega e = new HorarioEntrega();
+        e.setHorario(ag);
         e.setTipo(TipoDestinatario.PACIENTE);
         e.setNome("Ana Titular");
         e.setEstado(EstadoEntrega.NOTIFICACAO_ENVIADA);
@@ -295,9 +295,9 @@ class AgendamentoEntregaServiceTest {
     }
 
     /** Evento posterior de ENTREGA da mesma pessoa (paciente) — simula o estado pós-append. */
-    private AgendamentoEntrega eventoEntregue(Agendamento ag) {
-        AgendamentoEntrega e = new AgendamentoEntrega();
-        e.setAgendamento(ag);
+    private HorarioEntrega eventoEntregue(Horario ag) {
+        HorarioEntrega e = new HorarioEntrega();
+        e.setHorario(ag);
         e.setTipo(TipoDestinatario.PACIENTE);
         e.setNome("Ana Titular");
         e.setEstado(EstadoEntrega.NOTIFICACAO_ENTREGUE);
@@ -305,20 +305,20 @@ class AgendamentoEntregaServiceTest {
         return e;
     }
 
-    private List<AgendamentoEntrega> capturarEntregas(int esperado) {
-        ArgumentCaptor<AgendamentoEntrega> captor = ArgumentCaptor.forClass(AgendamentoEntrega.class);
+    private List<HorarioEntrega> capturarEntregas(int esperado) {
+        ArgumentCaptor<HorarioEntrega> captor = ArgumentCaptor.forClass(HorarioEntrega.class);
         verify(entregaRepository, org.mockito.Mockito.times(esperado)).save(captor.capture());
         return captor.getAllValues();
     }
 
-    private static EstadoEntrega estadoDe(List<AgendamentoEntrega> lista, TipoDestinatario tipo) {
+    private static EstadoEntrega estadoDe(List<HorarioEntrega> lista, TipoDestinatario tipo) {
         return lista.stream().filter(e -> e.getTipo() == tipo).findFirst().orElseThrow().getEstado();
     }
 
-    private Agendamento agendamento(Paciente p) {
+    private Horario agendamento(Paciente p) {
         Especialidade esp = new Especialidade();
         esp.setNome("Cardiologia");
-        Agendamento a = new Agendamento();
+        Horario a = new Horario();
         a.setId(100L);
         a.setDataHora(LocalDateTime.of(2026, 9, 20, 14, 30));
         a.setEspecialidade(esp);

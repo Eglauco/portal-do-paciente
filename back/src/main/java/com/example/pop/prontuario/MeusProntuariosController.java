@@ -72,7 +72,7 @@ public class MeusProntuariosController {
     public ProntuarioDetalheResponse buscar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return repository.findByIdAndAgendamento_Paciente_Id(id, pacienteId)
+        return repository.findByIdAndHorario_Paciente_Id(id, pacienteId)
                 .map(p -> ProntuarioDetalheResponse.from(p,
                         termoAssinaturaRepository.findByProntuario_IdOrderByCriadoEmAsc(p.getId())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Prontuário não encontrado"));
@@ -87,7 +87,7 @@ public class MeusProntuariosController {
     public DownloadUrlResponse downloadDocumento(@AuthenticationPrincipal Jwt jwt, @RequestParam String url) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.PRONTUARIO);
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        if (!documentoRepository.existsByUrlAndProntuario_Agendamento_Paciente_Id(url, pacienteId)) {
+        if (!documentoRepository.existsByUrlAndProntuario_Horario_Paciente_Id(url, pacienteId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Documento não encontrado");
         }
         try {

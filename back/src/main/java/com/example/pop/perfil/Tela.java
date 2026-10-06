@@ -33,7 +33,9 @@ public enum Tela {
     USUARIOS("Usuários"),
     PERFIS("Perfis"),
     CONFIGURACOES("Configurações"),
-    USO_IA("Uso de IA");
+    PROVEDORES_ASSINATURA("Provedores de assinatura"),
+    USO_IA("Uso de IA"),
+    SIRESP("SIRESP");
 
     private final String descricao;
 

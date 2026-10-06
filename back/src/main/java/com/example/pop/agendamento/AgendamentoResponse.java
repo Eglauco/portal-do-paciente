@@ -20,7 +20,7 @@ public record AgendamentoResponse(
         EstadoEntrega entregaResumo,
         String entregaResumoDescricao) {
 
-    public static AgendamentoResponse from(Agendamento a) {
+    public static AgendamentoResponse from(Horario a) {
         EstadoEntrega entrega = a.getEntregaResumo();
         return new AgendamentoResponse(
                 a.getId(),

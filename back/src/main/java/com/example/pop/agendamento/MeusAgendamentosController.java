@@ -45,14 +45,14 @@ public class MeusAgendamentosController {
     /** Fuso das unidades (o dataHora do agendamento é hora local do Brasil). */
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
 
-    private final AgendamentoRepository repository;
+    private final HorarioRepository repository;
     private final MotivoFaltaRepository motivoFaltaRepository;
     private final PacienteAcessoService acessoService;
-    private final AgendamentoLogService logService;
+    private final HorarioLogService logService;
 
-    public MeusAgendamentosController(AgendamentoRepository repository,
+    public MeusAgendamentosController(HorarioRepository repository,
             MotivoFaltaRepository motivoFaltaRepository, PacienteAcessoService acessoService,
-            AgendamentoLogService logService) {
+            HorarioLogService logService) {
         this.repository = repository;
         this.motivoFaltaRepository = motivoFaltaRepository;
         this.acessoService = acessoService;
@@ -70,7 +70,7 @@ public class MeusAgendamentosController {
         int pagina = Math.max(page, 0);
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "dataHora"));
-        Page<Agendamento> resultado = repository.findByPaciente_Id(pacienteId, pageable);
+        Page<Horario> resultado = repository.findByPaciente_Id(pacienteId, pageable);
         List<AgendamentoResponse> content = resultado.getContent().stream()
                 .map(AgendamentoResponse::from)
                 .toList();
@@ -94,14 +94,14 @@ public class MeusAgendamentosController {
     @Transactional
     public AgendamentoResponse confirmar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
-        Agendamento agendamento = meuAgendamento(jwt, id);
+        Horario agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Só é possível confirmar um agendamento que aguarda confirmação.");
         }
         StatusAgendamento antes = agendamento.getStatusAgendamento();
         agendamento.setStatusAgendamento(StatusAgendamento.PACIENTE_CONFIRMOU);
-        Agendamento salvo = repository.save(agendamento);
+        Horario salvo = repository.save(agendamento);
         // Registra quem confirmou: responsável (se a sessão age por um dependente) ou o próprio paciente.
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         logService.registrarDoApp(salvo, antes, StatusAgendamento.PACIENTE_CONFIRMOU, responsavel);
@@ -117,7 +117,7 @@ public class MeusAgendamentosController {
     @Transactional
     public AgendamentoResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
-        Agendamento agendamento = meuAgendamento(jwt, id);
+        Horario agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Só é possível cancelar um agendamento confirmado.");
@@ -132,7 +132,7 @@ public class MeusAgendamentosController {
         }
         StatusAgendamento antes = agendamento.getStatusAgendamento();
         agendamento.setStatusAgendamento(StatusAgendamento.CANCELADO_PELO_PACIENTE);
-        Agendamento salvo = repository.save(agendamento);
+        Horario salvo = repository.save(agendamento);
         // Registra quem cancelou: responsável (se a sessão age por um dependente) ou o próprio paciente.
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         logService.registrarDoApp(salvo, antes, StatusAgendamento.CANCELADO_PELO_PACIENTE, responsavel);
@@ -148,7 +148,7 @@ public class MeusAgendamentosController {
     public AgendamentoResponse justificarFalta(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody JustificarFaltaRequest request) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
-        Agendamento agendamento = meuAgendamento(jwt, id);
+        Horario agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.FALTA_PACIENTE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "O agendamento não está marcado como falta do paciente");
@@ -168,16 +168,16 @@ public class MeusAgendamentosController {
      */
     @GetMapping("/{id}/logs")
     @Transactional(readOnly = true)
-    public List<AgendamentoLogResponse> logs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+    public List<HorarioLogResponse> logs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
-        Agendamento agendamento = meuAgendamento(jwt, id); // 404 se não é do paciente logado
+        Horario agendamento = meuAgendamento(jwt, id); // 404 se não é do paciente logado
         return logService.listar(agendamento.getId());
     }
 
     /** Carrega o agendamento garantindo que é do paciente logado (404 caso contrário). */
-    private Agendamento meuAgendamento(Jwt jwt, Long id) {
+    private Horario meuAgendamento(Jwt jwt, Long id) {
         Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
-        return repository.findByIdAndPacienteId(id, pacienteId)
+        return repository.findByIdAndPaciente_Id(id, pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Agendamento não encontrado"));
     }
 }

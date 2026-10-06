@@ -18,5 +18,7 @@ public record UsuarioRequest(
         @NotBlank @Email @Size(max = 160) String email,
         String senha,
         @NotNull Long unidadeSaudeId,
-        @NotEmpty(message = "Selecione ao menos um perfil de acesso") List<Long> perfilIds) {
+        @NotEmpty(message = "Selecione ao menos um perfil de acesso") List<Long> perfilIds,
+        /** Opcional: vincula este usuário a um profissional de saúde (o usuário "é" o profissional). */
+        Long profissionalSaudeId) {
 }

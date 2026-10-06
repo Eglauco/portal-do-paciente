@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.conselho.ConselhoRepository;
@@ -71,12 +71,12 @@ public class ProfissionalSaudeController {
     private final ConselhoRepository conselhoRepository;
     private final EspecialidadeRepository especialidadeRepository;
     private final UnidadeRepository unidadeRepository;
-    private final AgendamentoRepository agendamentoRepository;
+    private final HorarioRepository agendamentoRepository;
 
     public ProfissionalSaudeController(ProfissionalSaudeRepository repository, ExportacaoService exportacaoService,
             StorageService storageService, ConselhoRepository conselhoRepository,
             EspecialidadeRepository especialidadeRepository, UnidadeRepository unidadeRepository,
-            AgendamentoRepository agendamentoRepository) {
+            HorarioRepository agendamentoRepository) {
         this.repository = repository;
         this.exportacaoService = exportacaoService;
         this.storageService = storageService;
@@ -381,7 +381,7 @@ public class ProfissionalSaudeController {
         }
         // Com lançamentos (agendamentos, e por tabela os prontuários), NÃO exclui: preserva o
         // histórico e a auditoria. O caminho é inativar.
-        if (agendamentoRepository.existsByProfissionalSaude_Id(id)) {
+        if (agendamentoRepository.existsByAgenda_ProfissionalSaude_Id(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Profissional com lançamentos (agendamentos/prontuários). Inative-o para preservar o histórico.");
         }

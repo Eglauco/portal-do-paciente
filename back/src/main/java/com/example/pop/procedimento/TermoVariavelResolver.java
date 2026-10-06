@@ -4,19 +4,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.paciente.Paciente;
-import com.example.pop.zapsign.ZapSignClient.CampoModelo;
 
 /**
  * Resolve as variáveis dinâmicas ({@link VariavelTermo}) para os valores reais do paciente/atendimento,
- * montando os pares {@code de → para} que a ZapSign usa para substituir os {@code {{...}}} no Word.
- * É a contraparte do catálogo: tudo que a tela oferece para copiar é resolvido aqui.
+ * montando o mapa {@code token ({{...}}) → valor} usado para substituir os placeholders no Word. É neutro
+ * de provedor: a ZapSign converte para {@code data[]{de,para}}; a Autentique renderiza o Word localmente.
  */
 @Service
 public class TermoVariavelResolver {
@@ -26,17 +26,17 @@ public class TermoVariavelResolver {
     private static final String[] MESES = {"janeiro", "fevereiro", "março", "abril", "maio", "junho",
             "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"};
 
-    /** Monta a lista {de, para} de todas as variáveis para o agendamento (paciente é o signatário). */
-    public List<CampoModelo> resolver(Agendamento ag) {
+    /** Monta o mapa {token → valor} de todas as variáveis para o agendamento (paciente é o signatário). */
+    public Map<String, String> resolver(Horario ag) {
         LocalDateTime agora = LocalDateTime.now();
-        List<CampoModelo> campos = new ArrayList<>();
+        Map<String, String> campos = new LinkedHashMap<>();
         for (VariavelTermo v : VariavelTermo.values()) {
-            campos.add(new CampoModelo(v.token(), valor(v, ag, agora)));
+            campos.put(v.token(), valor(v, ag, agora));
         }
         return campos;
     }
 
-    private String valor(VariavelTermo v, Agendamento ag, LocalDateTime agora) {
+    private String valor(VariavelTermo v, Horario ag, LocalDateTime agora) {
         Paciente p = ag.getPaciente();
         switch (v) {
             case NOME_PACIENTE: return nn(p.getNome());

@@ -71,10 +71,21 @@
             </div>
           }
           @case ('TEXTO') {
-            <div class="form-field form-field--full">
-              <label class="label" for="valorTexto">Valor</label>
-              <textarea id="valorTexto" class="input input--area" formControlName="valorTexto"></textarea>
-            </div>
+            @if (opcoesTexto(c.chave); as opcoes) {
+              <div class="form-field">
+                <label class="label" for="valorTexto">Valor</label>
+                <select id="valorTexto" class="input" formControlName="valorTexto">
+                  @for (op of opcoes; track op.valor) {
+                    <option [value]="op.valor">{{ op.rotulo }}</option>
+                  }
+                </select>
+              </div>
+            } @else {
+              <div class="form-field form-field--full">
+                <label class="label" for="valorTexto">Valor</label>
+                <textarea id="valorTexto" class="input input--area" formControlName="valorTexto"></textarea>
+              </div>
+            }
           }
           @case ('COR') {
             <div class="form-field">

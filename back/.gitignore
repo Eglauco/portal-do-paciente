@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Config local com segredos (back/config/ é auto-carregado pelo Spring do working dir; NUNCA versionar) ###
+/config/

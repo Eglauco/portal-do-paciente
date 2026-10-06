@@ -83,7 +83,16 @@ public class PacienteLogService {
 
     /** Evento de criação: registra quem cadastrou e tudo que foi preenchido (antes = null). */
     public void registrarCriacao(Paciente novo, Long usuarioId) {
-        PacienteLog log = novoEvento(novo, TipoEventoPaciente.CRIACAO, usuarioId);
+        gravarCriacao(novoEvento(novo, TipoEventoPaciente.CRIACAO, usuarioId), novo);
+    }
+
+    /** Criação originada pela importação do SIRESP: autor = IMPORTACAO_SIRESP (mantém o usuário importador como ator). */
+    public void registrarCriacaoSiresp(Paciente novo, Long usuarioId) {
+        gravarCriacao(novoEventoComAutor(novo, TipoEventoPaciente.CRIACAO, usuarioId,
+                AutorLogPaciente.IMPORTACAO_SIRESP), novo);
+    }
+
+    private void gravarCriacao(PacienteLog log, Paciente novo) {
         List<PacienteLogAlteracao> mudancas = log.getAlteracoes();
 
         for (CampoPaciente c : CampoPaciente.values()) {
@@ -113,7 +122,16 @@ public class PacienteLogService {
      * responsável. Nada mudou → não grava nada.
      */
     public void registrarAlteracao(SnapshotPaciente antes, Paciente depois, Long usuarioId) {
-        PacienteLog log = novoEvento(depois, TipoEventoPaciente.ALTERACAO, usuarioId);
+        gravarAlteracao(novoEvento(depois, TipoEventoPaciente.ALTERACAO, usuarioId), antes, depois);
+    }
+
+    /** Alteração originada pela importação do SIRESP: autor = IMPORTACAO_SIRESP (só grava se algo mudou de fato). */
+    public void registrarAlteracaoSiresp(SnapshotPaciente antes, Paciente depois, Long usuarioId) {
+        gravarAlteracao(novoEventoComAutor(depois, TipoEventoPaciente.ALTERACAO, usuarioId,
+                AutorLogPaciente.IMPORTACAO_SIRESP), antes, depois);
+    }
+
+    private void gravarAlteracao(PacienteLog log, SnapshotPaciente antes, Paciente depois) {
         List<PacienteLogAlteracao> mudancas = new ArrayList<>();
 
         diffEscalares(log, antes, depois, mudancas);
@@ -343,6 +361,14 @@ public class PacienteLogService {
         Usuario usuario = usuarioId == null ? null : usuarioRepository.findById(usuarioId).orElse(null);
         log.setUsuario(usuario);
         log.setAutor(usuario != null ? AutorLogPaciente.UNIDADE : AutorLogPaciente.SISTEMA);
+        return log;
+    }
+
+    /** Como {@link #novoEvento}, mas força o autor (ex.: IMPORTACAO_SIRESP) mantendo o usuário como ator. */
+    private PacienteLog novoEventoComAutor(Paciente paciente, TipoEventoPaciente tipo, Long usuarioId,
+            AutorLogPaciente autor) {
+        PacienteLog log = novoEvento(paciente, tipo, usuarioId);
+        log.setAutor(autor);
         return log;
     }
 

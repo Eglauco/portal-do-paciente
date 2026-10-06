@@ -2,7 +2,7 @@ package com.example.pop.nps;
 
 import java.time.LocalDateTime;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.common.Ref;
 
 /** Item da listagem de NPS. */
@@ -24,7 +24,7 @@ public record NpsResponse(
     }
 
     public static NpsResponse from(Nps nps, String responsavelNome) {
-        Agendamento a = nps.getAgendamento();
+        Horario a = nps.getHorario();
         return new NpsResponse(
                 nps.getId(),
                 new Ref(a.getPaciente().getId(), a.getPaciente().getNome()),

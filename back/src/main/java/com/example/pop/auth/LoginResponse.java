@@ -14,5 +14,7 @@ public record LoginResponse(
         String unidadeSaudeNome,
         Instant expiraEm,
         List<String> telas,
-        List<Ref> unidades) {
+        List<Ref> unidades,
+        /** true se o usuário está vinculado a um profissional de saúde (coassinatura de termos). */
+        boolean ehProfissional) {
 }

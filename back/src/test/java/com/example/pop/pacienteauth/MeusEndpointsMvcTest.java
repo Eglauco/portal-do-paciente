@@ -17,8 +17,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.example.pop.agendamento.Agendamento;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.Horario;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.chat.Chat;
 import com.example.pop.chat.ChatRepository;
 import com.example.pop.nps.Nps;
@@ -55,7 +55,7 @@ class MeusEndpointsMvcTest {
     @Autowired
     private PacienteRepository pacienteRepository;
     @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private HorarioRepository agendamentoRepository;
     @Autowired
     private ProntuarioRepository prontuarioRepository;
     @Autowired
@@ -105,7 +105,7 @@ class MeusEndpointsMvcTest {
 
     @Test
     void naoCancelaAgendamentoDeOutroPaciente() throws Exception {
-        Agendamento alheio = agendamentoRepository.findAll().stream().findFirst().orElse(null);
+        Horario alheio = agendamentoRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem agendamento semeado para testar IDOR");
         mvc.perform(post("/meu/agendamentos/" + alheio.getId() + "/cancelar").header("Authorization", bearer()))
                 .andExpect(status().isNotFound());

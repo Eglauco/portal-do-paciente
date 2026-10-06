@@ -12,7 +12,7 @@ import java.util.function.Function;
 
 import org.springframework.stereotype.Service;
 
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.chat.ChatRepository;
 import com.example.pop.chat.MensagemRepository;
@@ -39,7 +39,7 @@ public class DashboardService {
     private static final ZoneId FUSO = ZoneId.of("America/Sao_Paulo");
     private static final int TOP = 6;
 
-    private final AgendamentoRepository agendamentoRepository;
+    private final HorarioRepository agendamentoRepository;
     private final ChatRepository chatRepository;
     private final MensagemRepository mensagemRepository;
     private final ManifestacaoRepository manifestacaoRepository;
@@ -48,7 +48,7 @@ public class DashboardService {
     private final PacienteRepository pacienteRepository;
     private final UsuarioRepository usuarioRepository;
 
-    public DashboardService(AgendamentoRepository agendamentoRepository, ChatRepository chatRepository,
+    public DashboardService(HorarioRepository agendamentoRepository, ChatRepository chatRepository,
             MensagemRepository mensagemRepository, ManifestacaoRepository manifestacaoRepository,
             ManifestacaoMensagemRepository manifestacaoMensagemRepository, NpsRepository npsRepository,
             PacienteRepository pacienteRepository, UsuarioRepository usuarioRepository) {

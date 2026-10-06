@@ -3,7 +3,7 @@ package com.example.pop.nps;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.example.pop.agendamento.Agendamento;
+import com.example.pop.agendamento.Horario;
 import com.example.pop.common.Ref;
 
 /** Detalhamento do NPS (inclui os dados do atendimento e as notas por categoria). */
@@ -40,7 +40,7 @@ public record NpsDetalheResponse(
      * {@code responsavelNome}: responsável que respondeu pelo dependente, ou null.
      */
     public static NpsDetalheResponse from(Nps nps, String pacienteFotoUrl, String responsavelNome) {
-        Agendamento a = nps.getAgendamento();
+        Horario a = nps.getHorario();
         List<CategoriaNotaResponse> notas = nps.getNotasCategorias().stream()
                 .sorted((x, y) -> x.getCategoria().getNome().compareToIgnoreCase(y.getCategoria().getNome()))
                 .map(CategoriaNotaResponse::from)

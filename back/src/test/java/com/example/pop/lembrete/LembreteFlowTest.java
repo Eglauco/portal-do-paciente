@@ -14,7 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.pop.agendamento.AgendamentoController;
-import com.example.pop.agendamento.AgendamentoRepository;
+import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.AgendamentoRequest;
 import com.example.pop.agendamento.AgendamentoResponse;
 import com.example.pop.agendamento.StatusAgendamento;
@@ -34,7 +34,7 @@ class LembreteFlowTest {
     @Autowired
     private AgendamentoController agendamentoController;
     @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private HorarioRepository agendamentoRepository;
     @Autowired
     private ProcedimentoController procedimentoController;
     @Autowired
@@ -56,7 +56,7 @@ class LembreteFlowTest {
         // Procedimento com prazo de cancelamento de 1h (para o pop-up poder cancelar).
         Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc Lembrete Teste", null, 1, 0));
 
-        // Agendamento CONFIRMADO daqui a 2h nesse procedimento (paciente/unidade/etc. do seed = id 1).
+        // Horario CONFIRMADO daqui a 2h nesse procedimento (paciente/unidade/etc. do seed = id 1).
         LocalDateTime dh = LocalDateTime.now(FUSO).plusHours(2).withNano(0);
         AgendamentoResponse ag = agendamentoController.criar(
                 new AgendamentoRequest(dh, 1L, 1L, proc.getId(), 1L, 1L, null), null);

@@ -15,17 +15,17 @@ public interface ProntuarioRepository extends JpaRepository<Prontuario, Long> {
     boolean existsByNumeroAtendimentoAndIdNot(String numeroAtendimento, Long id);
 
     /** Prontuário já existente de um agendamento (reuso ao gerar termos na presença). */
-    Optional<Prontuario> findFirstByAgendamento_Id(Long agendamentoId);
+    Optional<Prontuario> findFirstByHorario_Id(Long agendamentoId);
 
     /** Detalhe garantindo que o prontuário é do paciente (via agendamento.paciente). Escopo do app. */
-    Optional<Prontuario> findByIdAndAgendamento_Paciente_Id(Long id, Long pacienteId);
+    Optional<Prontuario> findByIdAndHorario_Paciente_Id(Long id, Long pacienteId);
 
     @Query("""
             select p from Prontuario p
             where (:numero = '' or lower(p.numeroAtendimento) like lower(concat('%', :numero, '%')))
-              and (:pacienteId is null or p.agendamento.paciente.id = :pacienteId)
-              and (:unidadeId is null or p.agendamento.unidadeSaude.id = :unidadeId)
-              and (:especialidade = '' or lower(p.agendamento.especialidade.nome) like lower(concat('%', :especialidade, '%')))
+              and (:pacienteId is null or p.horario.paciente.id = :pacienteId)
+              and (:unidadeId is null or p.horario.agenda.unidadeSaude.id = :unidadeId)
+              and (:especialidade = '' or lower(p.horario.agenda.especialidade.nome) like lower(concat('%', :especialidade, '%')))
               and (:status is null or p.statusAlerta = :status)
             """)
     Page<Prontuario> search(

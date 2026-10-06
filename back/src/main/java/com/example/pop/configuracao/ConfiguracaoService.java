@@ -48,13 +48,16 @@ public class ConfiguracaoService {
 
     private final ConfiguracaoRepository repository;
     private final UsuarioRepository usuarioRepository;
+    private final SegredoCripto cripto;
 
     /** Cache por chave (snapshot desanexado). Null = precisa recarregar. */
     private volatile Map<String, Configuracao> cachePorChave;
 
-    public ConfiguracaoService(ConfiguracaoRepository repository, UsuarioRepository usuarioRepository) {
+    public ConfiguracaoService(ConfiguracaoRepository repository, UsuarioRepository usuarioRepository,
+            SegredoCripto cripto) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
+        this.cripto = cripto;
     }
 
     // ---------- CRUD (tela) ----------
@@ -93,6 +96,10 @@ public class ConfiguracaoService {
                 case COR -> c.setValorCor(normalizarCor(req.valorCor()));
                 // Guarda a URL do objeto já enviado ao S3 pelo front (vazio → limpa a imagem).
                 case IMAGEM -> c.setValorImagem(vazioParaNulo(req.valorImagem()));
+                // SEGREDO não é editável por este CRUD genérico (nem aparece nele) — só pela tela dedicada,
+                // que cifra e nunca expõe o valor. Barra qualquer tentativa de setá-lo por aqui.
+                case SEGREDO -> throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Credenciais de provedor são editadas na tela de Provedores de assinatura.");
             }
             c.setAtualizadoEm(LocalDateTime.now());
             c.setAtualizadoPor(usuarioId);
@@ -143,6 +150,82 @@ public class ConfiguracaoService {
     /** URL da imagem (S3) da chave; pode ser null. Erro se a chave não existir ou o tipo divergir. */
     public String lerImagem(String chave) {
         return obrigatoria(chave, TipoConfiguracao.IMAGEM).getValorImagem();
+    }
+
+    /** Valor SEGREDO (token/chave) DECIFRADO da chave; null se vazio. Erro se a chave não existir/tipo divergir. */
+    public String lerSegredo(String chave) {
+        return cripto.decifrar(obrigatoria(chave, TipoConfiguracao.SEGREDO).getValorSegredo());
+    }
+
+    /** true se o SEGREDO está preenchido (sem decifrar). false se a chave não existir ou estiver vazia. */
+    public boolean segredoPreenchido(String chave) {
+        Configuracao c = cache().get(chave);
+        return c != null && c.getTipoConfiguracao() == TipoConfiguracao.SEGREDO
+                && c.getValorSegredo() != null && !c.getValorSegredo().isBlank();
+    }
+
+    /**
+     * Grava um SEGREDO (cifrado) na chave + auditoria; invalida o cache. {@code valorPlano} em branco MANTÉM o
+     * valor atual (permite salvar o resto do formulário sem redigitar o segredo). Usado pela tela de provedores.
+     */
+    @Transactional
+    public void salvarSegredo(String chave, String valorPlano, Long usuarioId) {
+        Configuracao c = repository.findByChave(chave)
+                .orElseThrow(() -> new IllegalStateException("Configuração não encontrada: '" + chave + "'."));
+        if (c.getTipoConfiguracao() != TipoConfiguracao.SEGREDO) {
+            throw new IllegalStateException("Configuração '" + chave + "' não é do tipo SEGREDO.");
+        }
+        if (valorPlano == null || valorPlano.isBlank()) {
+            return; // branco mantém o segredo atual
+        }
+        c.setValorSegredo(cripto.cifrar(valorPlano.trim()));
+        c.setAtualizadoEm(LocalDateTime.now());
+        c.setAtualizadoPor(usuarioId);
+        repository.save(c);
+        invalidarCacheAposCommit();
+    }
+
+    /** Grava um valor TEXTO na chave + auditoria; invalida o cache. Usado pela tela de provedores (ambiente, ativo). */
+    @Transactional
+    public void salvarTexto(String chave, String valor, Long usuarioId) {
+        Configuracao c = repository.findByChave(chave)
+                .orElseThrow(() -> new IllegalStateException("Configuração não encontrada: '" + chave + "'."));
+        if (c.getTipoConfiguracao() != TipoConfiguracao.TEXTO) {
+            throw new IllegalStateException("Configuração '" + chave + "' não é do tipo TEXTO.");
+        }
+        c.setValorTexto(vazioParaNulo(valor));
+        c.setAtualizadoEm(LocalDateTime.now());
+        c.setAtualizadoPor(usuarioId);
+        repository.save(c);
+        invalidarCacheAposCommit();
+    }
+
+    public void salvarBooleano(String chave, boolean valor, Long usuarioId) {
+        Configuracao c = repository.findByChave(chave)
+                .orElseThrow(() -> new IllegalStateException("Configuração não encontrada: '" + chave + "'."));
+        if (c.getTipoConfiguracao() != TipoConfiguracao.BOOLEANO) {
+            throw new IllegalStateException("Configuração '" + chave + "' não é do tipo BOOLEANO.");
+        }
+        c.setValorBooleano(valor);
+        c.setAtualizadoEm(LocalDateTime.now());
+        c.setAtualizadoPor(usuarioId);
+        repository.save(c);
+        invalidarCacheAposCommit();
+    }
+
+    /** Grava um valor NUMERICO (pode ser null) na chave + auditoria; invalida o cache. */
+    @Transactional
+    public void salvarNumerico(String chave, BigDecimal valor, Long usuarioId) {
+        Configuracao c = repository.findByChave(chave)
+                .orElseThrow(() -> new IllegalStateException("Configuração não encontrada: '" + chave + "'."));
+        if (c.getTipoConfiguracao() != TipoConfiguracao.NUMERICO) {
+            throw new IllegalStateException("Configuração '" + chave + "' não é do tipo NUMERICO.");
+        }
+        c.setValorNumerico(valor);
+        c.setAtualizadoEm(LocalDateTime.now());
+        c.setAtualizadoPor(usuarioId);
+        repository.save(c);
+        invalidarCacheAposCommit();
     }
 
     private static String vazioParaNulo(String s) {
