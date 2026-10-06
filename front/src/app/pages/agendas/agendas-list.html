@@ -1,0 +1,127 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Agendamentos</h1>
+      <p class="page-sub">Agendas (slots do profissional). Abra uma agenda para ver e adicionar os horários (pacientes).</p>
+    </div>
+    <div class="page-head__actions">
+      <a class="btn btn--solid" routerLink="/agendas/nova">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        Nova agenda
+      </a>
+    </div>
+  </header>
+
+  <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
+    <p class="section-label">Filtros</p>
+    <div class="filters__chat">
+      <div class="form-field">
+        <label class="label" for="f-data">Data</label>
+        <input id="f-data" type="date" class="input" formControlName="data" (change)="buscar()" />
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-prof">Profissional</label>
+        <input id="f-prof" type="text" class="input" formControlName="profissionalNome" placeholder="Nome do profissional" />
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-esp">Especialidade</label>
+        <input id="f-esp" type="text" class="input" formControlName="especialidadeNome" placeholder="Nome da especialidade" />
+      </div>
+    </div>
+    <div class="filters__actions">
+      <button type="button" class="btn btn--ghost" (click)="limpar()">Limpar</button>
+      <button type="submit" class="btn btn--solid">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        Pesquisar
+      </button>
+    </div>
+  </form>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Agendas</h2>
+      @if (carregado() && !error() && !loading()) {
+        <span class="result-count">{{ totalElements() }} agenda(s)</span>
+      }
+    </div>
+
+    @if (loading()) {
+      <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando agendas…</p></div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
+      </div>
+    } @else if (registros().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+        </span>
+        <h3>Nenhuma agenda</h3>
+        <p>Clique em “Nova agenda” para criar um slot e depois adicionar os horários.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Profissional</th>
+              <th>Especialidade</th>
+              <th>Procedimento</th>
+              <th>Pacientes</th>
+              <th class="col-act"><span class="sr-only">Ver</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of registros(); track a.id) {
+              <tr>
+                <td class="cell-data">{{ a.data | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ a.profissionalSaude.nome }}</td>
+                <td>{{ a.especialidade.nome }}</td>
+                <td class="muted-cell">{{ a.procedimento.nome }}</td>
+                <td class="muted-cell">{{ a.totalHorarios }}</td>
+                <td class="col-act"><a class="btn btn--ghost btn--sm" [routerLink]="[a.id]">Ver</a></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <div class="pagination__left">
+          <label class="page-size">
+            Exibir
+            <span class="select">
+              <select [value]="size()" (change)="alterarTamanho($event)" aria-label="Agendas por página">
+                @for (t of tamanhos; track t) { <option [value]="t" [selected]="t === size()">{{ t }}</option> }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+            por página
+          </label>
+          <span class="pagination__info">Mostrando {{ inicioFaixa() }}–{{ fimFaixa() }} de {{ totalElements() }}</span>
+        </div>
+
+        @if (totalPages() > 1) {
+          <nav class="pager" aria-label="Paginação">
+            <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+            </button>
+            @for (item of paginasVisiveis(); track $index) {
+              @if (item === 'ellipsis') {
+                <span class="pager__ellipsis" aria-hidden="true">…</span>
+              } @else {
+                <button type="button" class="pager__btn" [class.is-active]="item === page()" (click)="irParaPagina(item)">{{ item + 1 }}</button>
+              }
+            }
+            <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+          </nav>
+        }
+      </div>
+    }
+  </section>
+</section>

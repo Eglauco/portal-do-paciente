@@ -1,0 +1,95 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <a class="btn btn--ghost btn--sm" routerLink="/agendas">← Voltar</a>
+      <h1 class="page-title">Agenda</h1>
+      <p class="page-sub">O slot do profissional e os horários (pacientes) marcados nele.</p>
+    </div>
+    @if (agenda(); as a) {
+      <div class="page-head__actions">
+        <a class="btn btn--ghost" [routerLink]="['/agendas', a.id, 'editar']">Editar agenda</a>
+        <button type="button" class="btn btn--ghost" (click)="excluirAgenda()" [disabled]="excluindoAgenda()">Excluir</button>
+      </div>
+    }
+  </header>
+
+  @if (carregando() && !agenda()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h3>Não foi possível carregar a agenda</h3>
+      <a class="btn btn--solid" routerLink="/agendas">Voltar à lista</a>
+    </div>
+  } @else if (agenda(); as a) {
+    <section class="panel">
+      <p class="meta">
+        <span>Data: <b>{{ a.data | date: 'dd/MM/yyyy' }}</b></span>
+        <span>Profissional: <b>{{ a.profissionalSaude.nome }}</b></span>
+        <span>Especialidade: <b>{{ a.especialidade.nome }}</b></span>
+        <span>Procedimento: <b>{{ a.procedimento.nome }}</b></span>
+        <span>Unidade: <b>{{ a.unidadeSaude.nome }}</b></span>
+      </p>
+
+      <p class="section-label">Adicionar horário</p>
+      <form class="add-row" [formGroup]="novoHorario" (submit)="adicionar(); $event.preventDefault()">
+        <div class="form-field">
+          <label class="label" for="h-pac">Paciente</label>
+          <ng-select id="h-pac" formControlName="pacienteId" [items]="pacientes()" bindValue="id" bindLabel="nome" placeholder="Selecione o paciente" [clearable]="false"></ng-select>
+        </div>
+        <div class="form-field form-field--hora">
+          <label class="label" for="h-ini">Início</label>
+          <input id="h-ini" type="time" class="input" formControlName="horaInicio" />
+        </div>
+        <div class="form-field form-field--hora">
+          <label class="label" for="h-fim">Fim (opcional)</label>
+          <input id="h-fim" type="time" class="input" formControlName="horaFim" />
+        </div>
+        <button type="submit" class="btn btn--solid" [disabled]="adicionando()">
+          {{ adicionando() ? 'Adicionando…' : 'Adicionar' }}
+        </button>
+      </form>
+
+      <p class="section-label">Horários ({{ a.horarios.length }})</p>
+      @if (a.horarios.length === 0) {
+        <div class="state"><p>Nenhum paciente marcado nesta agenda ainda.</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Início</th>
+                <th>Fim</th>
+                <th>Paciente</th>
+                <th>CPF</th>
+                <th>Status</th>
+                <th class="col-act"><span class="sr-only">Ações</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (h of a.horarios; track h.id) {
+                <tr>
+                  <td class="cell-data">{{ h.horaInicio?.slice(0, 5) }}</td>
+                  <td class="muted-cell">{{ h.horaFim ? h.horaFim.slice(0, 5) : '—' }}</td>
+                  <td>{{ h.paciente.nome }}</td>
+                  <td class="muted-cell">{{ h.pacienteCpf || '—' }}</td>
+                  <td>
+                    <span class="select">
+                      <select [value]="h.statusAgendamento" (change)="trocarStatus(h, $any($event.target).value)" [disabled]="ocupado(h.id)" aria-label="Status">
+                        @for (s of statusOpcoes; track s.value) { <option [value]="s.value">{{ s.label }}</option> }
+                      </select>
+                      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                    </span>
+                  </td>
+                  <td class="col-act">
+                    <button type="button" class="btn btn--ghost btn--sm" (click)="removerHorario(h)" [disabled]="ocupado(h.id)">Remover</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+</section>

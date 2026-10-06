@@ -118,6 +118,32 @@ export const routes: Routes = [
         title: 'Editar agendamento',
       },
       {
+        path: 'agendas',
+        loadComponent: () => import('./pages/agendas/agendas-list').then((m) => m.AgendasList),
+        canActivate: [telaGuard('AGENDAMENTOS')],
+        title: 'Agendamentos',
+      },
+      {
+        path: 'agendas/nova',
+        loadComponent: () => import('./pages/agendas/agenda-form').then((m) => m.AgendaForm),
+        canActivate: [telaGuard('AGENDAMENTOS')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Nova agenda',
+      },
+      {
+        path: 'agendas/:id/editar',
+        loadComponent: () => import('./pages/agendas/agenda-form').then((m) => m.AgendaForm),
+        canActivate: [telaGuard('AGENDAMENTOS')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar agenda',
+      },
+      {
+        path: 'agendas/:id',
+        loadComponent: () => import('./pages/agendas/agenda-detalhe').then((m) => m.AgendaDetalhe),
+        canActivate: [telaGuard('AGENDAMENTOS')],
+        title: 'Agenda',
+      },
+      {
         path: 'chats',
         loadComponent: () => import('./pages/chats/chats-list').then((m) => m.ChatsList),
         canActivate: [telaGuard('CHATS')],
