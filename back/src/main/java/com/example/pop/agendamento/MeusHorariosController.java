@@ -36,8 +36,8 @@ import jakarta.validation.Valid;
  * respondem 404 quando o agendamento não é do paciente (não vaza existência).
  */
 @RestController
-@RequestMapping("/meu/agendamentos")
-public class MeusAgendamentosController {
+@RequestMapping("/meu/horarios")
+public class MeusHorariosController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
@@ -50,7 +50,7 @@ public class MeusAgendamentosController {
     private final PacienteAcessoService acessoService;
     private final HorarioLogService logService;
 
-    public MeusAgendamentosController(HorarioRepository repository,
+    public MeusHorariosController(HorarioRepository repository,
             MotivoFaltaRepository motivoFaltaRepository, PacienteAcessoService acessoService,
             HorarioLogService logService) {
         this.repository = repository;
@@ -61,7 +61,7 @@ public class MeusAgendamentosController {
 
     /** Lista os agendamentos do paciente logado (mais recentes primeiro). */
     @GetMapping
-    public Pagina<AgendamentoResponse> listar(@AuthenticationPrincipal Jwt jwt,
+    public Pagina<MeuHorarioResponse> listar(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "100") int size) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
@@ -71,8 +71,8 @@ public class MeusAgendamentosController {
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Sort.by(Sort.Direction.DESC, "dataHora"));
         Page<Horario> resultado = repository.findByPaciente_Id(pacienteId, pageable);
-        List<AgendamentoResponse> content = resultado.getContent().stream()
-                .map(AgendamentoResponse::from)
+        List<MeuHorarioResponse> content = resultado.getContent().stream()
+                .map(MeuHorarioResponse::from)
                 .toList();
 
         return new Pagina<>(
@@ -92,7 +92,7 @@ public class MeusAgendamentosController {
      */
     @PostMapping("/{id}/confirmar")
     @Transactional
-    public AgendamentoResponse confirmar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+    public MeuHorarioResponse confirmar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Horario agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE) {
@@ -105,7 +105,7 @@ public class MeusAgendamentosController {
         // Registra quem confirmou: responsável (se a sessão age por um dependente) ou o próprio paciente.
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         logService.registrarDoApp(salvo, antes, StatusAgendamento.PACIENTE_CONFIRMOU, responsavel);
-        return AgendamentoResponse.from(salvo);
+        return MeuHorarioResponse.from(salvo);
     }
 
     /**
@@ -115,7 +115,7 @@ public class MeusAgendamentosController {
      */
     @PostMapping("/{id}/cancelar")
     @Transactional
-    public AgendamentoResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+    public MeuHorarioResponse cancelar(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Horario agendamento = meuAgendamento(jwt, id);
         if (agendamento.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
@@ -136,7 +136,7 @@ public class MeusAgendamentosController {
         // Registra quem cancelou: responsável (se a sessão age por um dependente) ou o próprio paciente.
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         logService.registrarDoApp(salvo, antes, StatusAgendamento.CANCELADO_PELO_PACIENTE, responsavel);
-        return AgendamentoResponse.from(salvo);
+        return MeuHorarioResponse.from(salvo);
     }
 
     /**
@@ -145,7 +145,7 @@ public class MeusAgendamentosController {
      */
     @PostMapping("/{id}/justificar-falta")
     @Transactional
-    public AgendamentoResponse justificarFalta(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
+    public MeuHorarioResponse justificarFalta(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id,
             @Valid @RequestBody JustificarFaltaRequest request) {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Horario agendamento = meuAgendamento(jwt, id);
@@ -158,7 +158,7 @@ public class MeusAgendamentosController {
         String texto = request.justificativa() == null ? null : request.justificativa().trim();
         agendamento.setJustificativaFalta(texto == null || texto.isBlank() ? null : texto);
         agendamento.setFaltaJustificadaEm(LocalDateTime.now());
-        return AgendamentoResponse.from(repository.save(agendamento));
+        return MeuHorarioResponse.from(repository.save(agendamento));
     }
 
     /**

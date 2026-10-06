@@ -7,14 +7,22 @@ interface Ref {
   nome: string;
 }
 
-interface AgendamentoBackend {
+/** Dados da Agenda (slot) aninhados no horário do paciente (modelo Agenda > Horário). */
+interface AgendaRef {
   id: number;
-  dataHora: string;
+  data: string;
   especialidade: Ref;
   profissionalSaude: Ref;
   procedimento: Ref;
-  paciente: Ref;
   unidadeSaude: Ref;
+}
+
+/** Horário do paciente (o "agendamento" do app): um Horário que referencia uma Agenda. */
+interface AgendamentoBackend {
+  id: number;
+  dataHora: string;
+  agenda: AgendaRef;
+  paciente: Ref;
   statusAgendamento: StatusBackend;
   statusDescricao: string;
   faltaJustificada: boolean;
@@ -65,10 +73,10 @@ function paraViewModel(b: AgendamentoBackend): Agendamento {
     dia: doisDigitos(data.getDate()),
     mes: MESES[data.getMonth()],
     semana: SEMANA[data.getDay()],
-    especialidade: b.especialidade.nome,
-    profissional: b.profissionalSaude.nome,
+    especialidade: b.agenda.especialidade.nome,
+    profissional: b.agenda.profissionalSaude.nome,
     hora: `${doisDigitos(data.getHours())}:${doisDigitos(data.getMinutes())}`,
-    unidade: b.unidadeSaude.nome,
+    unidade: b.agenda.unidadeSaude.nome,
     status,
     statusLabel: b.statusDescricao,
     grupo,
@@ -115,20 +123,20 @@ async function comoJson<T>(resposta: Response): Promise<T> {
 
 /** Lista os agendamentos do paciente logado (mais recentes primeiro). */
 export async function listarAgendamentos(): Promise<Agendamento[]> {
-  const resposta = await fetchMeu('/meu/agendamentos?page=0&size=100');
+  const resposta = await fetchMeu('/meu/horarios?page=0&size=100');
   const pagina = await comoJson<Pagina<AgendamentoBackend>>(resposta);
   return pagina.content.map(paraViewModel);
 }
 
 /** Confirma o agendamento (paciente). */
 export async function confirmarAgendamento(id: string): Promise<Agendamento> {
-  const resposta = await fetchMeu(`/meu/agendamentos/${id}/confirmar`, { method: 'POST' });
+  const resposta = await fetchMeu(`/meu/horarios/${id}/confirmar`, { method: 'POST' });
   return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
 }
 
 /** Cancela o agendamento (paciente). */
 export async function cancelarAgendamento(id: string): Promise<Agendamento> {
-  const resposta = await fetchMeu(`/meu/agendamentos/${id}/cancelar`, { method: 'POST' });
+  const resposta = await fetchMeu(`/meu/horarios/${id}/cancelar`, { method: 'POST' });
   return paraViewModel(await comoJson<AgendamentoBackend>(resposta));
 }
 
@@ -161,7 +169,7 @@ export interface AgendamentoLog {
 
 /** Linha do tempo das trocas de status do agendamento do paciente logado (mais antigo primeiro). */
 export async function listarLogsAgendamento(id: string): Promise<AgendamentoLog[]> {
-  const resposta = await fetchMeu(`/meu/agendamentos/${id}/logs`);
+  const resposta = await fetchMeu(`/meu/horarios/${id}/logs`);
   return comoJson<AgendamentoLog[]>(resposta);
 }
 
@@ -171,7 +179,7 @@ export async function justificarFalta(
   motivoIds: number[],
   justificativa: string,
 ): Promise<Agendamento> {
-  const resposta = await fetchMeu(`/meu/agendamentos/${id}/justificar-falta`, {
+  const resposta = await fetchMeu(`/meu/horarios/${id}/justificar-falta`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ motivoIds, justificativa }),
