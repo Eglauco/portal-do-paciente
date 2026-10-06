@@ -16,9 +16,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     boolean existsByEmailIgnoreCase(String email);
 
     /** Já existe OUTRO usuário vinculado a este profissional? (um profissional por usuário). */
-    boolean existsByAgenda_ProfissionalSaude_IdAndIdNot(Long profissionalSaudeId, Long id);
+    boolean existsByProfissionalSaude_IdAndIdNot(Long profissionalSaudeId, Long id);
 
-    boolean existsByAgenda_ProfissionalSaude_Id(Long profissionalSaudeId);
+    boolean existsByProfissionalSaude_Id(Long profissionalSaudeId);
 
     /** Quantos usuários têm o perfil informado (usado para bloquear a exclusão de um perfil em uso). */
     long countByPerfis_Id(Long perfilId);

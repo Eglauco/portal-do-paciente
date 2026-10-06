@@ -246,8 +246,8 @@ public class UsuarioController {
         ProfissionalSaude profissional = profissionalSaudeRepository.findById(profissionalSaudeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional de saúde não encontrado"));
         boolean deOutro = usuarioIdAtual == null
-                ? repository.existsByAgenda_ProfissionalSaude_Id(profissionalSaudeId)
-                : repository.existsByAgenda_ProfissionalSaude_IdAndIdNot(profissionalSaudeId, usuarioIdAtual);
+                ? repository.existsByProfissionalSaude_Id(profissionalSaudeId)
+                : repository.existsByProfissionalSaude_IdAndIdNot(profissionalSaudeId, usuarioIdAtual);
         if (deOutro) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Este profissional já está vinculado a outro usuário");
