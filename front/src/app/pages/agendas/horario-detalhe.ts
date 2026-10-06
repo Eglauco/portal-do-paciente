@@ -31,14 +31,16 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
   imports: [ReactiveFormsModule, DatePipe, RouterLink],
   templateUrl: './horario-detalhe.html',
   styles: [`
+    /* Cabeçalho fixo com os dados da agenda/horário (sempre visível, acima das abas). */
+    .agenda-head { border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.9rem 1rem; margin-bottom: 1.1rem; background: color-mix(in srgb, var(--brand) 5%, transparent); }
+    .agenda-head__main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.6rem; }
+    .agenda-head__paciente { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+    .agenda-head__grid { display: flex; flex-wrap: wrap; gap: 0.35rem 1.5rem; font-size: 0.88rem; color: var(--muted); }
+    .agenda-head__grid b { color: var(--ink); font-weight: 600; }
     .form-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
     .form-tab { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0.95rem; border: none; background: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0.4rem 0.4rem 0 0; }
     .form-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--brand) 8%, transparent); }
     .form-tab--ativa { color: var(--brand-deep, var(--brand)); border-bottom-color: var(--brand); }
-    .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.7rem 1.25rem; margin-bottom: 1.25rem; }
-    .kv__item { display: flex; flex-direction: column; gap: 0.1rem; }
-    .kv__rot { font-size: 0.74rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
-    .kv__val { color: var(--ink); }
     .status-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin: 0.5rem 0 1.25rem; }
     .status-row .form-field { margin: 0; min-width: 280px; }
     .falta-box { padding: 0.8rem 0.9rem; border: 1px solid #e6c200; background: color-mix(in srgb, #ffcc00 10%, transparent); border-radius: 0.55rem; margin-bottom: 1rem; }

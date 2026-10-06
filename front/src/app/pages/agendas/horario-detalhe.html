@@ -17,6 +17,22 @@
     </div>
   } @else if (horario(); as h) {
     <section class="panel">
+      <div class="agenda-head">
+        <div class="agenda-head__main">
+          <span class="agenda-head__paciente">{{ h.paciente.nome }}</span>
+          <span class="status-pill">{{ h.statusDescricao || h.statusAgendamento }}</span>
+        </div>
+        <div class="agenda-head__grid">
+          <span>Data: <b>{{ h.data ? (h.data | date: 'dd/MM/yyyy') : '—' }}</b></span>
+          <span>Horário: <b>{{ h.horaInicio?.slice(0, 5) }}{{ h.horaFim ? ' – ' + h.horaFim.slice(0, 5) : '' }}</b></span>
+          <span>Profissional: <b>{{ h.profissionalSaude?.nome || '—' }}</b></span>
+          <span>Especialidade: <b>{{ h.especialidade?.nome || '—' }}</b></span>
+          <span>Procedimento: <b>{{ h.procedimento?.nome || '—' }}</b></span>
+          <span>Unidade: <b>{{ h.unidadeSaude?.nome || '—' }}</b></span>
+          <span>CPF: <b>{{ h.pacienteCpf || '—' }}</b></span>
+        </div>
+      </div>
+
       <nav class="form-tabs" aria-label="Seções do horário">
         <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'dados'" (click)="selecionarAba('dados')">Dados</button>
         <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'destinatarios'" (click)="selecionarAba('destinatarios')">Destinatários</button>
@@ -24,17 +40,6 @@
       </nav>
 
       @if (abaAtiva() === 'dados') {
-        <div class="kv">
-          <div class="kv__item"><span class="kv__rot">Paciente</span><span class="kv__val">{{ h.paciente.nome }}</span></div>
-          <div class="kv__item"><span class="kv__rot">CPF</span><span class="kv__val">{{ h.pacienteCpf || '—' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Data</span><span class="kv__val">{{ h.data ? (h.data | date: 'dd/MM/yyyy') : '—' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Início / Fim</span><span class="kv__val">{{ h.horaInicio?.slice(0, 5) }}{{ h.horaFim ? ' – ' + h.horaFim.slice(0, 5) : '' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Profissional</span><span class="kv__val">{{ h.profissionalSaude?.nome || '—' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Especialidade</span><span class="kv__val">{{ h.especialidade?.nome || '—' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Procedimento</span><span class="kv__val">{{ h.procedimento?.nome || '—' }}</span></div>
-          <div class="kv__item"><span class="kv__rot">Unidade</span><span class="kv__val">{{ h.unidadeSaude?.nome || '—' }}</span></div>
-        </div>
-
         @if (h.faltaJustificada) {
           <div class="falta-box">
             <p class="kv__rot">Justificativa da falta (informada pelo paciente)</p>
