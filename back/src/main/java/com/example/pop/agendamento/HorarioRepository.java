@@ -24,6 +24,16 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
     /** Horários de um paciente (app "Meus agendamentos"); a ordenação vem do Pageable. */
     Page<Horario> findByPaciente_Id(Long pacienteId, Pageable pageable);
 
+    /** Horários (pacientes marcados) de uma Agenda, do mais cedo ao mais tarde — para o detalhe da agenda. */
+    List<Horario> findByAgenda_IdOrderByDataHoraAsc(Long agendaId);
+
+    /** Quantos horários uma agenda tem (trava a exclusão da agenda com pacientes). */
+    long countByAgenda_Id(Long agendaId);
+
+    /** Contagem de horários por agenda (para a lista de agendas, evitando N+1). */
+    @Query("select h.agenda.id, count(h) from Horario h where h.agenda.id in :ids group by h.agenda.id")
+    List<Object[]> contarPorAgendas(@Param("ids") List<Long> ids);
+
     /**
      * Próximos horários do paciente NA UNIDADE informada (a partir de :agora), do mais próximo
      * ao mais distante. Escopado por unidade para não misturar dados de unidades diferentes.

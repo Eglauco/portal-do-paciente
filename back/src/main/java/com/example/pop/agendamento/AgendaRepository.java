@@ -1,7 +1,37 @@
 package com.example.pop.agendamento;
 
+import java.time.LocalDate;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Agendas (slots/sessões do profissional). Os pacientes marcados ficam em {@link Horario}. */
 public interface AgendaRepository extends JpaRepository<Agenda, Long> {
+
+    /**
+     * Busca de agendas da tela: por unidade (escopo), dia e nome de profissional/especialidade (parcial).
+     * Params nuláveis = sem filtro. Ordenação vem do Pageable.
+     */
+    @Query(value = """
+            select a from Agenda a
+            where (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
+              and (:data is null or a.data = :data)
+              and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome)
+              and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome)
+            """,
+            countQuery = """
+            select count(a) from Agenda a
+            where (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
+              and (:data is null or a.data = :data)
+              and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome)
+              and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome)
+            """)
+    Page<Agenda> search(@Param("unidadeId") Long unidadeId,
+            @Param("data") LocalDate data,
+            @Param("profissionalNome") String profissionalNome,
+            @Param("especialidadeNome") String especialidadeNome,
+            Pageable pageable);
 }
