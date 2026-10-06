@@ -144,6 +144,12 @@ export const routes: Routes = [
         title: 'Agenda',
       },
       {
+        path: 'horarios/:id',
+        loadComponent: () => import('./pages/agendas/horario-detalhe').then((m) => m.HorarioDetalhe),
+        canActivate: [telaGuard('AGENDAMENTOS')],
+        title: 'Horário',
+      },
+      {
         path: 'chats',
         loadComponent: () => import('./pages/chats/chats-list').then((m) => m.ChatsList),
         canActivate: [telaGuard('CHATS')],

@@ -27,6 +27,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'horarios/:id',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'chats/:id',
     renderMode: RenderMode.Server,
   },

@@ -1,0 +1,104 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <a class="btn btn--ghost btn--sm" [routerLink]="voltarUrl()">← Voltar à agenda</a>
+      <h1 class="page-title">Horário</h1>
+      <p class="page-sub">Marcação do paciente nesta agenda. Aqui você troca o status e remove o horário.</p>
+    </div>
+  </header>
+
+  @if (carregando() && !horario()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+  } @else if (erro()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h3>Não foi possível carregar o horário</h3>
+      <a class="btn btn--solid" routerLink="/agendas">Voltar</a>
+    </div>
+  } @else if (horario(); as h) {
+    <section class="panel">
+      <nav class="form-tabs" aria-label="Seções do horário">
+        <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'dados'" (click)="selecionarAba('dados')">Dados</button>
+        <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'destinatarios'" (click)="selecionarAba('destinatarios')">Destinatários</button>
+        <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'historico'" (click)="selecionarAba('historico')">Histórico de status</button>
+      </nav>
+
+      @if (abaAtiva() === 'dados') {
+        <div class="kv">
+          <div class="kv__item"><span class="kv__rot">Paciente</span><span class="kv__val">{{ h.paciente.nome }}</span></div>
+          <div class="kv__item"><span class="kv__rot">CPF</span><span class="kv__val">{{ h.pacienteCpf || '—' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Data</span><span class="kv__val">{{ h.data ? (h.data | date: 'dd/MM/yyyy') : '—' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Início / Fim</span><span class="kv__val">{{ h.horaInicio?.slice(0, 5) }}{{ h.horaFim ? ' – ' + h.horaFim.slice(0, 5) : '' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Profissional</span><span class="kv__val">{{ h.profissionalSaude?.nome || '—' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Especialidade</span><span class="kv__val">{{ h.especialidade?.nome || '—' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Procedimento</span><span class="kv__val">{{ h.procedimento?.nome || '—' }}</span></div>
+          <div class="kv__item"><span class="kv__rot">Unidade</span><span class="kv__val">{{ h.unidadeSaude?.nome || '—' }}</span></div>
+        </div>
+
+        @if (h.faltaJustificada) {
+          <div class="falta-box">
+            <p class="kv__rot">Justificativa da falta (informada pelo paciente)</p>
+            <p>{{ h.justificativaFalta || '—' }}</p>
+            @if (h.motivosFalta?.length) {
+              <p class="dest__sub">Motivos: {{ (h.motivosFalta || []).map(m => m.nome).join(', ') }}</p>
+            }
+          </div>
+        }
+
+        <p class="section-label">Status</p>
+        <div class="status-row">
+          <div class="form-field">
+            <label class="label" for="st">Status do horário</label>
+            <span class="select select--full">
+              <select id="st" [formControl]="statusControl">
+                @for (s of statusOpcoes; track s.value) { <option [value]="s.value">{{ s.label }}</option> }
+              </select>
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </span>
+          </div>
+          <button type="button" class="btn btn--solid" (click)="salvarStatus()" [disabled]="salvandoStatus()">
+            {{ salvandoStatus() ? 'Salvando…' : 'Salvar status' }}
+          </button>
+        </div>
+
+        <div class="form-actions" style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+          <button type="button" class="btn btn--ghost" (click)="remover()" [disabled]="removendo()">
+            {{ removendo() ? 'Removendo…' : 'Remover horário' }}
+          </button>
+        </div>
+      }
+
+      @if (abaAtiva() === 'destinatarios') {
+        @if (entregasPorPessoa().length === 0) {
+          <p class="dest__sub">Nenhuma notificação registrada para este horário.</p>
+        } @else {
+          @for (d of entregasPorPessoa(); track d.chave) {
+            <div class="dest">
+              <div class="dest__nome">{{ d.nome }} <span class="dest__sub">({{ d.tipo === 'PACIENTE' ? 'paciente' : 'responsável' }})</span></div>
+              @if (d.telefone) { <div class="dest__sub">{{ d.telefone }}</div> }
+              <span class="pill">{{ rotuloEntrega(d.eventos[d.eventos.length - 1].estado) }}</span>
+            </div>
+          }
+        }
+      }
+
+      @if (abaAtiva() === 'historico') {
+        @if (logs().length === 0) {
+          <p class="dest__sub">Sem trocas de status registradas.</p>
+        } @else {
+          <ul class="tl">
+            @for (l of logs(); track l.id) {
+              <li class="tl__item">
+                <span class="tl__dot" [class.tl__dot--resp]="autorResponsavel(l)"></span>
+                <span>
+                  <span>{{ l.statusAnteriorDescricao ? l.statusAnteriorDescricao + ' → ' : '' }}<b>{{ l.statusNovoDescricao || l.statusNovo }}</b></span>
+                  <span class="tl__meta"> · {{ descreverAutor(l) }} · {{ l.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </section>
+  }
+</section>

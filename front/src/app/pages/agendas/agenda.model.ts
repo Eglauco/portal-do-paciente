@@ -14,16 +14,22 @@ export interface AgendaResumo {
   totalHorarios: number;
 }
 
-/** Um Horário (marcação de um paciente) dentro de uma agenda. */
+/** Um Horário (marcação de um paciente) dentro de uma agenda. Traz o contexto da agenda embutido. */
 export interface Horario {
   id: number;
   agendaId: number;
+  /** yyyy-MM-dd (data da agenda). */
+  data?: string;
   dataHora: string;
   /** HH:mm:ss */
   horaInicio: string;
   horaFim?: string | null;
   paciente: Ref;
   pacienteCpf?: string | null;
+  especialidade?: Ref;
+  profissionalSaude?: Ref;
+  procedimento?: Ref;
+  unidadeSaude?: Ref;
   statusAgendamento: StatusAgendamento;
   statusDescricao?: string;
   faltaJustificada?: boolean;

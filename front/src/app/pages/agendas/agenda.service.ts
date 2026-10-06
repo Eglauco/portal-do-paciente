@@ -47,6 +47,10 @@ export class AgendaService {
 
   // --- Horários (marcações) ---
 
+  buscarHorario(id: number): Observable<Horario> {
+    return this.http.get<Horario>(`${this.baseHorario}/${id}`);
+  }
+
   criarHorario(req: HorarioRequest): Observable<Horario> {
     return this.http.post<Horario>(this.baseHorario, req);
   }
