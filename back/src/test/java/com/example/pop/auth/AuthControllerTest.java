@@ -48,7 +48,7 @@ class AuthControllerTest {
     void criarUsuario() {
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
         usuarioId = usuarioController
-                .criar(new UsuarioRequest("Auth Controller Test", EMAIL, SENHA, 1L, List.of(adminPerfilId))).getId();
+                .criar(new UsuarioRequest("Auth Controller Test", EMAIL, SENHA, 1L, List.of(adminPerfilId), null)).getId();
     }
 
     @AfterEach

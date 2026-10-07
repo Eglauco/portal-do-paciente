@@ -36,7 +36,7 @@ class AgendamentoCancelamentoPrazoTest {
     private static final java.time.LocalDate DOB = java.time.LocalDate.of(1990, 1, 1);
 
     @Autowired
-    private MeusAgendamentosController meuController;
+    private MeusHorariosController meuController;
     @Autowired
     private AgendamentoController agendamentoController;
     @Autowired
@@ -95,7 +95,7 @@ class AgendamentoCancelamentoPrazoTest {
         // Consulta daqui a 48h, prazo de 24h → limite ainda no futuro → cancela.
         Long id = criarAgendamento(LocalDateTime.now(FUSO).plusHours(48));
         meuController.confirmar(jwt, id); // → PACIENTE_CONFIRMOU
-        AgendamentoResponse resp = meuController.cancelar(jwt, id);
+        MeuHorarioResponse resp = meuController.cancelar(jwt, id);
         assertEquals(StatusAgendamento.CANCELADO_PELO_PACIENTE, resp.statusAgendamento());
     }
 

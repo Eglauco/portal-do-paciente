@@ -58,7 +58,7 @@ class PacienteOrdenacaoMvcTest {
         mvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
         usuarioId = usuarioController
-                .criar(new UsuarioRequest("Paciente Ordenacao MVC", EMAIL, SENHA, 1L, List.of(adminPerfilId))).getId();
+                .criar(new UsuarioRequest("Paciente Ordenacao MVC", EMAIL, SENHA, 1L, List.of(adminPerfilId), null)).getId();
     }
 
     @AfterEach

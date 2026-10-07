@@ -80,7 +80,7 @@ class PacienteAuthMvcTest {
         // Admin de teste (para as chamadas /paciente/** que agora exigem role ADMIN).
         Long adminPerfilId = perfilRepository.findByNomeIgnoreCase("Administrador").orElseThrow().getId();
         adminId = usuarioController
-                .criar(new UsuarioRequest("Admin Paci MVC", ADMIN_EMAIL, ADMIN_SENHA, 1L, List.of(adminPerfilId)))
+                .criar(new UsuarioRequest("Admin Paci MVC", ADMIN_EMAIL, ADMIN_SENHA, 1L, List.of(adminPerfilId), null))
                 .getId();
         adminToken = authController.login(new LoginRequest(ADMIN_EMAIL, ADMIN_SENHA)).token();
     }

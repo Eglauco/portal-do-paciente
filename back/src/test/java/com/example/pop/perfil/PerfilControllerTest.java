@@ -78,7 +78,7 @@ class PerfilControllerTest {
         String email = "perfil.rbac.test@unidadesaude.com.br";
         // A unidade ativa (2) precisa estar entre as unidades do perfil.
         Long uid = usuarioController
-                .criar(new UsuarioRequest("RBAC Test", email, "segredo123", 2L, List.of(perfil.id()))).getId();
+                .criar(new UsuarioRequest("RBAC Test", email, "segredo123", 2L, List.of(perfil.id()), null)).getId();
         try {
             LoginResponse login = authController.login(new LoginRequest(email, "segredo123"));
             // Telas efetivas = as do perfil.
@@ -123,7 +123,7 @@ class PerfilControllerTest {
                 .criar(new PerfilRequest("Perfil Em Uso", EnumSet.of(Tela.SAU), List.of(2L)));
         String email = "perfil.emuso.test@unidadesaude.com.br";
         Long uid = usuarioController
-                .criar(new UsuarioRequest("Em Uso Test", email, "segredo123", 2L, List.of(perfil.id()))).getId();
+                .criar(new UsuarioRequest("Em Uso Test", email, "segredo123", 2L, List.of(perfil.id()), null)).getId();
         try {
             // Perfil vinculado a um usuário → 409.
             ResponseStatusException ex = assertThrows(ResponseStatusException.class,
