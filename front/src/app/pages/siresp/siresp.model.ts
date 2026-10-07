@@ -11,6 +11,15 @@ export interface Pagina<T> {
 /** Status derivado de um registro do SIRESP: já agendado ou pendente de revisão. */
 export type SirespStatus = 'AGENDADO' | 'REVISAO';
 
+/** Status do envio do XML ao Sistema de Gestão (independente do agendamento). */
+export type SirespStatusEnvio = 'NAO_ENVIADO' | 'ENVIADO' | 'FALHA';
+
+/** Tipo do registro importado do SIRESP: consulta ou exame (mesma tabela). */
+export type SirespTipoRegistro = 'CONSULTA' | 'EXAME';
+
+/** Movimentação da mensagem do SIRESP (TIPO_CONSULTA/TIPO_EXAME). */
+export type SirespTipoMovimento = 'AGENDAMENTO' | 'CANCELAMENTO' | 'TRANSFERENCIA';
+
 /** Linha da LISTA do SIRESP (resumo). */
 export interface SirespResumo {
   id: number;
@@ -28,6 +37,15 @@ export interface SirespResumo {
   importadoPorNome?: string | null;
   status: SirespStatus;
   statusDescricao: string;
+  /** Status do envio ao Sistema de Gestão. */
+  statusEnvio: SirespStatusEnvio;
+  statusEnvioDescricao: string;
+  /** Tipo do registro (consulta ou exame). */
+  tipoRegistro: SirespTipoRegistro;
+  tipoRegistroDescricao: string;
+  /** Movimentação (agendamento/cancelamento/transferência). */
+  tipoMovimento: SirespTipoMovimento;
+  tipoMovimentoDescricao: string;
 }
 
 /** Detalhe (todos os campos do XML + metadados da importação) — somente leitura. */
@@ -42,8 +60,20 @@ export interface SirespDetalhe {
   arquivoUrl?: string | null;
   /** Id do agendamento gerado a partir deste registro (null = ainda não gerado). */
   agendamentoId?: number | null;
-  /** Diagnóstico da integração (encontrou/não encontrou cada entidade pelo código de integração). */
+  /** Tipo do registro (consulta ou exame). */
+  tipoRegistro?: SirespTipoRegistro;
+  /** Movimentação (agendamento/cancelamento/transferência). */
+  tipoMovimento?: SirespTipoMovimento;
+  /** true quando o sistema preencheu campos de exibição (paciente/data/etc.) a partir do horário — não vieram do XML. */
+  dadosResolvidos?: boolean;
+  /** Log do PROCESSAMENTO INTERNO (encontrou/não encontrou cada entidade pelo código de integração + agendamento). */
   logIntegracao?: string | null;
+  /** Log do ENVIO ao Sistema de Gestão (resultado do último Post XML). */
+  logEnvio?: string | null;
+  /** Status do envio ao Sistema de Gestão. */
+  statusEnvio?: SirespStatusEnvio;
+  /** Data/hora da última tentativa de envio (ISO). */
+  enviadoEm?: string | null;
 
   tipoConsulta?: string | null;
   codUnidadeExecutante?: string | null;
@@ -97,17 +127,33 @@ export interface SirespDetalhe {
   contatoTel?: string | null;
   numCns?: string | null;
   numProntuario?: string | null;
+
+  // Horário de origem da transferência (consulta/exame).
+  idAgeConsultaHorOrigem?: string | null;
+  idAgeExameHorOrigem?: string | null;
+
+  // Campos específicos do EXAME (nulos quando o registro é consulta).
+  tipoExame?: string | null;
+  idAgeExameHor?: string | null;
+  idAgeExame?: string | null;
+  ageExameNome?: string | null;
+  idAssociacao?: string | null;
+  nomeAssociacao?: string | null;
+  idExame?: string | null;
+  codExame?: string | null;
+  nomeExame?: string | null;
+  tipoTabela?: string | null;
 }
 
-/** Resultado de uma importação de XML (inclui o desfecho do envio automático ao cliente, quando ligado). */
+/** Resultado de uma importação de XML (inclui o desfecho do envio automático ao Sistema de Gestão, quando ligado). */
 export interface SirespImportResultado {
   importados: number;
   arquivo?: string | null;
   pacientesAtualizados: number;
   pacientesCriados: number;
-  /** true se houve tentativa de envio automático ao cliente após o import. */
+  /** true se houve tentativa de envio automático ao Sistema de Gestão após o import. */
   enviado: boolean;
-  /** true se o cliente processou o XML (só relevante quando enviado = true). */
+  /** true se o Sistema de Gestão processou o XML (só relevante quando enviado = true). */
   envioSucesso: boolean;
   envioMensagem?: string | null;
 }
@@ -115,6 +161,8 @@ export interface SirespImportResultado {
 export interface SirespFiltro {
   busca?: string | null;
   status?: SirespStatus | null;
+  statusEnvio?: SirespStatusEnvio | null;
+  tipoMovimento?: SirespTipoMovimento | null;
 }
 
 /** Política de atualização de um campo do paciente a partir do XML. */
@@ -126,24 +174,14 @@ export interface SirespConfigCampo {
   acao: AcaoAtualizacao;
 }
 
-/** Opção do dropdown de procedimento padrão. */
-export interface SirespProcedimentoOpcao {
-  id: number;
-  nome: string;
-}
-
-/** Config exibida no modal: atualizar + criar + URL de envio + enviar-ao-importar + procedimento padrão + campos. */
+/** Config exibida no modal: atualizar + criar + URL de envio + enviar-ao-importar + campos. */
 export interface SirespConfig {
   habilitado: boolean;
   criar: boolean;
-  /** URL do cliente que recebe o XML via HTTP POST (vazia = envio desabilitado). */
+  /** URL do Sistema de Gestão que recebe o XML via HTTP POST (vazia = envio desabilitado). */
   postUrl?: string | null;
-  /** Enviar o XML ao cliente automaticamente ao importar (só dispara se houver URL). */
+  /** Enviar o XML ao Sistema de Gestão automaticamente ao importar (só dispara se houver URL). */
   enviarAoImportar: boolean;
-  /** Id do procedimento padrão usado nos agendamentos do SIRESP (null = não configurado). */
-  procedimentoPadraoId?: number | null;
-  /** Procedimentos disponíveis para escolher o padrão. */
-  procedimentos: SirespProcedimentoOpcao[];
   campos: SirespConfigCampo[];
 }
 
@@ -153,17 +191,16 @@ export interface SirespConfigSalvar {
   criar: boolean;
   postUrl: string | null;
   enviarAoImportar: boolean;
-  procedimentoPadraoId: number | null;
   campos: Record<string, AcaoAtualizacao>;
 }
 
-/** Resultado do botão "Reprocessar e enviar" (reprocessa o log e, se houver URL, reenvia o XML ao cliente). */
+/** Resultado do botão "Enviar" (reenvia o XML ao Sistema de Gestão via Post XML). */
 export interface SirespEnvioResultado {
-  /** true se houve tentativa de envio ao cliente (false quando só reprocessou, por falta de URL). */
+  /** true se houve tentativa de envio ao Sistema de Gestão (false quando não há URL configurada). */
   enviado: boolean;
-  /** true se o cliente processou o XML (só relevante quando enviado = true). */
+  /** true se o Sistema de Gestão processou o XML (só relevante quando enviado = true). */
   sucesso: boolean;
   mensagem: string;
-  /** Registro atualizado (log recalculado e/ou resultado do envio anexado). */
+  /** Registro atualizado (log de envio + status de envio). */
   registro: SirespDetalhe;
 }

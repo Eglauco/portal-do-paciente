@@ -275,6 +275,26 @@ export const routes: Routes = [
         title: 'Editar especialidade',
       },
       {
+        path: 'exames',
+        loadComponent: () => import('./pages/exames/exames-list').then((m) => m.ExamesList),
+        canActivate: [telaGuard('EXAME')],
+        title: 'Exames',
+      },
+      {
+        path: 'exames/novo',
+        loadComponent: () => import('./pages/exames/exame-form').then((m) => m.ExameForm),
+        canActivate: [telaGuard('EXAME')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Novo exame',
+      },
+      {
+        path: 'exames/:id/editar',
+        loadComponent: () => import('./pages/exames/exame-form').then((m) => m.ExameForm),
+        canActivate: [telaGuard('EXAME')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar exame',
+      },
+      {
         path: 'motivos-falta',
         loadComponent: () => import('./pages/motivos-falta/motivos-falta-list').then((m) => m.MotivosFaltaList),
         canActivate: [telaGuard('MOTIVOS_FALTA')],

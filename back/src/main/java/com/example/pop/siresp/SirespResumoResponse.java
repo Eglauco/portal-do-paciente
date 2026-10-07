@@ -17,10 +17,19 @@ public record SirespResumoResponse(
         LocalDateTime importadoEm,
         String importadoPorNome,
         StatusSiresp status,
-        String statusDescricao) {
+        String statusDescricao,
+        StatusEnvio statusEnvio,
+        String statusEnvioDescricao,
+        TipoRegistroSiresp tipoRegistro,
+        String tipoRegistroDescricao,
+        TipoMovimento tipoMovimento,
+        String tipoMovimentoDescricao) {
 
     public static SirespResumoResponse from(Siresp s) {
         StatusSiresp status = StatusSiresp.de(s);
+        StatusEnvio statusEnvio = s.getStatusEnvio() == null ? StatusEnvio.NAO_ENVIADO : s.getStatusEnvio();
+        TipoRegistroSiresp tipo = s.getTipoRegistro() == null ? TipoRegistroSiresp.CONSULTA : s.getTipoRegistro();
+        TipoMovimento movimento = s.getTipoMovimento() == null ? TipoMovimento.AGENDAMENTO : s.getTipoMovimento();
         return new SirespResumoResponse(
                 s.getId(),
                 s.getDataAgenda(),
@@ -35,6 +44,12 @@ public record SirespResumoResponse(
                 s.getImportadoEm(),
                 s.getImportadoPorNome(),
                 status,
-                status.getDescricao());
+                status.descricao(movimento),
+                statusEnvio,
+                statusEnvio.getDescricao(),
+                tipo,
+                tipo.getDescricao(),
+                movimento,
+                movimento.getDescricao());
     }
 }

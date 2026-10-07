@@ -33,8 +33,8 @@ import com.example.pop.usuario.UsuarioRepository;
  * arquivo e insere TUDO (não deduplica — decisão de negócio fica para depois). Não gera agendamento.
  *
  * <p>O ARQUIVO ORIGINAL (bytes exatos do upload) é gravado no S3 (pasta {@code siresp/}) e sua URL fica em cada
- * linha do import — é o que reenviamos ao cliente no "Post XML" (sem divergência) e o que o botão de download
- * baixa. Se o S3 falhar, o import inteiro é cancelado (para nenhum registro ficar sem o original fiel).
+ * linha do import — é o que reenviamos ao Sistema de Gestão no "Post XML" (sem divergência) e o que o botão de
+ * download baixa. Se o S3 falhar, o import inteiro é cancelado (para nenhum registro ficar sem o original fiel).
  */
 @Service
 public class SirespImportacaoService {
@@ -57,7 +57,7 @@ public class SirespImportacaoService {
 
     /**
      * Resultado do import: Mensagens gravadas + pacientes atualizados/criados + a URL do arquivo original no S3 e
-     * os ids das linhas gravadas (usados pela rotina de envio automático ao cliente, feita após o commit).
+     * os ids das linhas gravadas (usados pela rotina de envio automático ao Sistema de Gestão, feita após o commit).
      */
     public record Resultado(int importados, String arquivo, int pacientesAtualizados, int pacientesCriados,
             String arquivoUrl, List<Long> ids) {
@@ -185,6 +185,9 @@ public class SirespImportacaoService {
 
     /** Atribui cada campo do XML à coluna correspondente (texto cru). Campos ausentes ficam nulos. */
     private void aplicar(Siresp s, Map<String, String> m) {
+        s.setTipoRegistro(detectarTipo(m));
+        s.setTipoMovimento(detectarMovimento(m, s.getTipoRegistro()));
+        // Campos da CONSULTA (nulos quando o registro é EXAME).
         s.setTipoConsulta(m.get("TIPO_CONSULTA"));
         s.setCodUnidadeExecutante(m.get("COD_UNIDADE_EXECUTANTE"));
         s.setIdAgeConsultaHor(m.get("ID_AGE_CONSULTA_HOR"));
@@ -237,5 +240,39 @@ public class SirespImportacaoService {
         s.setContatoTel(m.get("CONTATO_TEL"));
         s.setNumCns(m.get("NUM_CNS"));
         s.setNumProntuario(m.get("NUM_PRONTUARIO"));
+
+        // Campos do EXAME (nulos quando o registro é CONSULTA).
+        s.setTipoExame(m.get("TIPO_EXAME"));
+        s.setIdAgeExameHor(m.get("ID_AGE_EXAME_HOR"));
+        s.setIdAgeExame(m.get("ID_AGE_EXAME"));
+        // Horário de origem da transferência (consulta/exame).
+        s.setIdAgeConsultaHorOrigem(m.get("ID_AGE_CONSULTA_HOR_ORIGEM"));
+        s.setIdAgeExameHorOrigem(m.get("ID_AGE_EXAME_HOR_ORIGEM"));
+        s.setAgeExameNome(m.get("AGE_EXAME_NOME"));
+        s.setIdAssociacao(m.get("ID_ASSOCIACAO"));
+        s.setNomeAssociacao(m.get("NOME_ASSOCIACAO"));
+        s.setIdExame(m.get("ID_EXAME"));
+        s.setCodExame(m.get("COD_EXAME"));
+        s.setNomeExame(m.get("NOME_EXAME"));
+        s.setTipoTabela(m.get("TIPO_TABELA"));
+    }
+
+    /** Detecta o tipo pela estrutura do XML: elementos do exame presentes → EXAME; senão CONSULTA. */
+    private static TipoRegistroSiresp detectarTipo(Map<String, String> m) {
+        boolean exame = m.get("ID_AGE_EXAME") != null || m.get("ID_AGE_EXAME_HOR") != null
+                || m.get("TIPO_EXAME") != null || m.get("ID_EXAME") != null;
+        return exame ? TipoRegistroSiresp.EXAME : TipoRegistroSiresp.CONSULTA;
+    }
+
+    /** Movimentação pelo TIPO_CONSULTA/TIPO_EXAME: C=cancelamento, T=transferência, senão (A/vazio)=agendamento. */
+    private static TipoMovimento detectarMovimento(Map<String, String> m, TipoRegistroSiresp tipo) {
+        String mov = tipo == TipoRegistroSiresp.EXAME ? m.get("TIPO_EXAME") : m.get("TIPO_CONSULTA");
+        if ("C".equalsIgnoreCase(mov)) {
+            return TipoMovimento.CANCELAMENTO;
+        }
+        if ("T".equalsIgnoreCase(mov)) {
+            return TipoMovimento.TRANSFERENCIA;
+        }
+        return TipoMovimento.AGENDAMENTO;
     }
 }

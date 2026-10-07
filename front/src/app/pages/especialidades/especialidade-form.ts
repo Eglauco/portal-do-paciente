@@ -1,20 +1,26 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
+import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { Procedimento } from '../procedimentos/procedimento.model';
+import { ProcedimentoService } from '../procedimentos/procedimento.service';
 import { EspecialidadeService } from './especialidade.service';
 
 @Component({
   selector: 'app-especialidade-form',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, NgSelectModule],
   templateUrl: './especialidade-form.html',
 })
 export class EspecialidadeForm implements PodeSair {
   private readonly service = inject(EspecialidadeService);
+  private readonly procedimentoService = inject(ProcedimentoService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+
+  protected readonly procedimentos = signal<Procedimento[]>([]);
 
   protected readonly form = new FormGroup({
     nome: new FormControl('', {
@@ -22,6 +28,7 @@ export class EspecialidadeForm implements PodeSair {
       validators: [Validators.required, Validators.minLength(3)],
     }),
     codigoIntegracao: new FormControl('', { nonNullable: true }),
+    procedimentoId: new FormControl<number | null>(null),
   });
 
   protected readonly editando = signal(false);
@@ -35,6 +42,10 @@ export class EspecialidadeForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
+    this.procedimentoService.listar({}, 0, 100).subscribe({
+      next: (p) => this.procedimentos.set(p.content),
+    });
+
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       const id = Number(idParam);
@@ -45,6 +56,7 @@ export class EspecialidadeForm implements PodeSair {
           this.form.patchValue({
             nome: especialidade.nome,
             codigoIntegracao: especialidade.codigoIntegracao ?? '',
+            procedimentoId: especialidade.procedimento?.id ?? null,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -69,7 +81,12 @@ export class EspecialidadeForm implements PodeSair {
     }
     this.salvando.set(true);
     const codigo = this.form.controls.codigoIntegracao.value.trim();
-    const dados = { nome: this.form.controls.nome.value, codigoIntegracao: codigo || null };
+    const procId = this.form.controls.procedimentoId.value;
+    const dados = {
+      nome: this.form.controls.nome.value,
+      codigoIntegracao: codigo || null,
+      procedimento: procId ? { id: procId } : null,
+    };
     const requisicao = this.editando()
       ? this.service.atualizar(this.codigo()!, dados)
       : this.service.criar(dados);

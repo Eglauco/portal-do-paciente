@@ -10,8 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface SirespRepository extends JpaRepository<Siresp, Long> {
 
-    /** Dedup de agendamento: primeiro registro da mesma consulta/horário (ID_AGE_CONSULTA_HOR) que já gerou um. */
+    /** Dedup de agendamento (consulta): primeiro registro do mesmo horário (ID_AGE_CONSULTA_HOR) que já gerou um. */
     Optional<Siresp> findFirstByIdAgeConsultaHorAndAgendamentoIdIsNotNull(String idAgeConsultaHor);
+
+    /** Dedup de agendamento (exame): primeiro registro do mesmo horário (ID_AGE_EXAME_HOR) que já gerou um. */
+    Optional<Siresp> findFirstByIdAgeExameHorAndAgendamentoIdIsNotNull(String idAgeExameHor);
 
     // Filtros nuláveis via coalesce(:param, coluna): quando o parâmetro é null a condição vira "coluna = coluna"
     // (sempre true) e o coalesce dá o TIPO ao parâmetro — evita o erro do Postgres de tipo indeterminado.
@@ -31,7 +34,10 @@ public interface SirespRepository extends JpaRepository<Siresp, Long> {
               and (:agendado is null
                    or (:agendado = true and s.agendamentoId is not null)
                    or (:agendado = false and s.agendamentoId is null))
+              and (:statusEnvio is null or s.statusEnvio = :statusEnvio)
+              and (:tipoMovimento is null or s.tipoMovimento = :tipoMovimento)
             """)
     Page<Siresp> search(@Param("unidadeId") Long unidadeId, @Param("busca") String busca,
-            @Param("agendado") Boolean agendado, Pageable pageable);
+            @Param("agendado") Boolean agendado, @Param("statusEnvio") StatusEnvio statusEnvio,
+            @Param("tipoMovimento") TipoMovimento tipoMovimento, Pageable pageable);
 }

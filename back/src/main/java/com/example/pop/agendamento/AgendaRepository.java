@@ -1,6 +1,7 @@
 package com.example.pop.agendamento;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,13 @@ import org.springframework.data.repository.query.Param;
 
 /** Agendas (slots/sessões do profissional). Os pacientes marcados ficam em {@link Horario}. */
 public interface AgendaRepository extends JpaRepository<Agenda, Long> {
+
+    /**
+     * Dedup/agrupamento da importação SIRESP: a agenda já criada para este código de integração DENTRO do tipo
+     * (consulta/exame). O tipo é obrigatório na chave porque os id-spaces do CROSS podem colidir numericamente.
+     */
+    Optional<Agenda> findFirstByCodigoIntegracaoAndTipoAtendimento(String codigoIntegracao,
+            TipoAtendimento tipoAtendimento);
 
     /**
      * Busca de agendas da tela: por unidade (escopo), dia e nome de profissional/especialidade (parcial).

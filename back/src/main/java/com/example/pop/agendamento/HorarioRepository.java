@@ -42,12 +42,30 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
             Long pacienteId, Long unidadeId, LocalDateTime agora);
 
     /**
-     * Dedup (chave natural) da criação via SIRESP: já existe horário do mesmo paciente, com o mesmo
-     * profissional, no mesmo instante? Fecha o caso em que {@code ID_AGE_CONSULTA_HOR} vem vazio e evita duplicar
-     * um horário "órfão" (criado mas cujo vínculo no registro SIRESP não chegou a ser gravado).
+     * Dedup direto da criação via SIRESP: já existe um horário gravado com este código do CROSS DENTRO do tipo
+     * (consulta/exame)? É o caminho mais robusto (não depende do estado do registro SIRESP) e evita tentar inserir um
+     * código duplicado (que bateria no índice único {@code uk_horario_codigo_integracao}). O tipo é obrigatório na
+     * chave porque os id-spaces do CROSS (ID_AGE_CONSULTA_HOR × ID_AGE_EXAME_HOR) podem colidir numericamente.
      */
-    Optional<Horario> findFirstByPacienteAndAgenda_ProfissionalSaudeAndDataHora(
-            Paciente paciente, ProfissionalSaude profissionalSaude, LocalDateTime dataHora);
+    Optional<Horario> findFirstByCodigoIntegracaoAndTipoAtendimento(String codigoIntegracao,
+            TipoAtendimento tipoAtendimento);
+
+    /**
+     * Dedup (chave natural) da criação via SIRESP: horário do mesmo paciente + profissional + instante, do MESMO
+     * tipo de atendimento (ou manual, sem tipo). O filtro por tipo evita uma CONSULTA casar com um EXAME que caia no
+     * mesmo minuto. Fecha o caso de código vazio (órfão). Ordenado por id — o chamador pega o primeiro.
+     */
+    @Query("""
+            select h from Horario h
+            where h.paciente = :paciente
+              and h.agenda.profissionalSaude = :profissional
+              and h.dataHora = :dataHora
+              and (h.tipoAtendimento is null or h.tipoAtendimento = :tipo)
+            order by h.id
+            """)
+    List<Horario> buscarPorChaveNatural(@Param("paciente") Paciente paciente,
+            @Param("profissional") ProfissionalSaude profissional,
+            @Param("dataHora") LocalDateTime dataHora, @Param("tipo") TipoAtendimento tipo);
 
     /**
      * Horários de um procedimento que estão na janela de disparo de um lembrete:

@@ -67,14 +67,16 @@ public class SirespController {
             @RequestParam(required = false) Long unidadeId,
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) StatusSiresp status,
+            @RequestParam(required = false) StatusEnvio statusEnvio,
+            @RequestParam(required = false) TipoMovimento tipoMovimento,
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
-        // Status derivado → filtro por presença do agendamento (null = todos).
+        // Status de agendamento (derivado) → filtro por presença do agendamento; envio/movimento → colunas próprias.
         Boolean agendado = status == null ? null : status == StatusSiresp.AGENDADO;
-        Page<Siresp> resultado = repository.search(unidadeId, texto(busca), agendado, pageable);
+        Page<Siresp> resultado = repository.search(unidadeId, texto(busca), agendado, statusEnvio, tipoMovimento, pageable);
         List<SirespResumoResponse> content = resultado.getContent().stream().map(SirespResumoResponse::from).toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
@@ -98,26 +100,10 @@ public class SirespController {
     }
 
     /**
-     * Botão único do detalhe: REPROCESSA o registro (recalcula o diagnóstico + cria o agendamento quando completo)
-     * e, se houver URL configurada, em seguida REENVIA o XML ao cliente (Post XML), anexando o resultado ao log.
-     * Sem URL, só reprocessa. Devolve se houve envio ({@code enviado}), se o cliente processou e o registro.
-     */
-    @PostMapping("/{id}/reprocessar-e-enviar")
-    public SirespEnvioService.EnvioResponse reprocessarEEnviar(@PathVariable Long id, @AuthenticationPrincipal Jwt jwt) {
-        Siresp s = agendamentoService.processarRegistro(id, uidDoToken(jwt));
-        String url = configService.postUrl();
-        if (url == null || url.isBlank()) {
-            return new SirespEnvioService.EnvioResponse(false, false,
-                    "Registro reprocessado. URL de envio não configurada — nada foi enviado.", s);
-        }
-        return envioService.enviar(id);
-    }
-
-    /**
-     * Reenvia o XML deste registro ao cliente, replicando o "Post XML" do SIRESP (HTTP POST, parâmetro {@code msg}).
-     * Registra o resultado no Log de integração. Não gera agendamento. Devolve se o cliente processou + o registro
-     * atualizado. Falha de rede/recusa do cliente NÃO é erro HTTP (vem como {@code sucesso=false}); só configuração
-     * ausente (URL) devolve 422.
+     * Reenvia o XML deste registro ao Sistema de Gestão, replicando o "Post XML" do SIRESP (HTTP POST, parâmetro
+     * {@code msg}). Grava o resultado no log de envio + status de envio. Não gera agendamento. Devolve se o Sistema de
+     * Gestão processou + o registro atualizado. Falha de rede/recusa NÃO é erro HTTP (vem como {@code sucesso=false});
+     * só configuração ausente (URL) devolve 422.
      */
     @PostMapping("/{id}/enviar")
     public SirespEnvioService.EnvioResponse enviar(@PathVariable Long id) {
@@ -127,7 +113,7 @@ public class SirespController {
     /**
      * Importa um XML do SIRESP e popula a tabela (uma linha por Mensagem). Se o envio automático estiver ligado
      * ({@code SIRESP_ENVIAR_AO_IMPORTAR}) e houver URL configurada, logo após o import (fora da transação) o
-     * arquivo original é reenviado ao cliente (Post XML) e o resultado volta no corpo da resposta + no Log.
+     * arquivo original é reenviado ao Sistema de Gestão (Post XML) e o resultado volta no corpo da resposta + no Log.
      */
     @PostMapping("/importar")
     public SirespImportResponse importar(
@@ -160,7 +146,7 @@ public class SirespController {
             }
         }
 
-        // Envio automático ao cliente (fora da transação do import). Nunca derruba o import: falhas viram log + flag.
+        // Envio automático ao Sistema de Gestão (fora da transação do import). Nunca derruba o import: falhas viram log + flag.
         boolean enviado = false;
         boolean envioSucesso = false;
         String envioMensagem = null;

@@ -31,12 +31,34 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
   imports: [ReactiveFormsModule, DatePipe, RouterLink],
   templateUrl: './horario-detalhe.html',
   styles: [`
-    /* Cabeçalho fixo com os dados da agenda/horário (sempre visível, acima das abas). */
-    .agenda-head { border: 1px solid var(--line); border-radius: 0.7rem; padding: 0.9rem 1rem; margin-bottom: 1.1rem; background: color-mix(in srgb, var(--brand) 5%, transparent); }
-    .agenda-head__main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.6rem; }
-    .agenda-head__paciente { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
-    .agenda-head__grid { display: flex; flex-wrap: wrap; gap: 0.35rem 1.5rem; font-size: 0.88rem; color: var(--muted); }
-    .agenda-head__grid b { color: var(--ink); font-weight: 600; }
+    /* Dois cartões (acima das abas): Paciente (hero com avatar) e Agenda (contexto do slot). */
+    .hcards { display: grid; grid-template-columns: minmax(260px, 0.9fr) minmax(300px, 1.1fr); gap: 1rem; margin-bottom: 1.25rem; }
+    @media (max-width: 760px) { .hcards { grid-template-columns: 1fr; } }
+    .hcard { border: 1px solid var(--line); border-radius: 0.9rem; padding: 0.95rem 1.05rem 1.1rem; background: var(--surface); }
+    .hcard--pac { background: linear-gradient(155deg, color-mix(in srgb, var(--brand) 10%, var(--surface)), var(--surface) 72%); }
+    .hcard__head { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0 0.85rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--brand-deep, var(--brand)); }
+    .hcard__head svg { width: 0.95rem; height: 0.95rem; }
+    /* Paciente */
+    .pac { display: flex; align-items: center; gap: 1rem; }
+    .pac__avatar { width: 80px; height: 80px; border-radius: 50%; flex: none; display: grid; place-items: center; overflow: hidden; font-size: 1.8rem; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-deep, var(--brand))); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 15%, transparent), 0 8px 18px -6px rgba(var(--brand-deep-rgb), 0.5); }
+    .pac__avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .pac__info { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; }
+    .pac__nome { margin: 0; font-size: 1.18rem; font-weight: 800; line-height: 1.15; color: var(--ink); word-break: break-word; }
+    .pac__meta { margin: 0.1rem 0 0; display: flex; gap: 1.3rem; }
+    .pac__meta dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+    .pac__meta dd { margin: 0.1rem 0 0; font-size: 0.92rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+    /* Agenda */
+    .agd { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem 1rem; }
+    @media (max-width: 460px) { .agd { grid-template-columns: 1fr; } }
+    .agd__item { display: flex; gap: 0.6rem; align-items: flex-start; min-width: 0; }
+    .agd__item--wide { grid-column: 1 / -1; }
+    .agd__ic { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 0.55rem; display: grid; place-items: center; color: var(--brand-deep, var(--brand)); background: color-mix(in srgb, var(--brand) 11%, transparent); }
+    .agd__ic svg { width: 1rem; height: 1rem; }
+    .agd__txt { min-width: 0; }
+    .agd__txt dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+    .agd__txt dd { margin: 0.12rem 0 0; font-size: 0.9rem; font-weight: 600; color: var(--ink); word-break: break-word; }
+    .agd__cods { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .agd__cods .cod { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 0.35rem; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand-deep, var(--brand)); }
     .form-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
     .form-tab { position: relative; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 0.95rem; border: none; background: none; cursor: pointer; font-size: 0.9rem; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 0.4rem 0.4rem 0 0; }
     .form-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--brand) 8%, transparent); }
@@ -73,6 +95,8 @@ export class HorarioDetalhe {
   protected readonly erro = signal(false);
   protected readonly salvandoStatus = signal(false);
   protected readonly removendo = signal(false);
+  /** Foto do paciente falhou ao carregar → cai para o avatar com iniciais. */
+  protected readonly fotoErro = signal(false);
 
   protected readonly statusControl = new FormControl<StatusAgendamento | null>(null);
 
@@ -110,6 +134,15 @@ export class HorarioDetalhe {
 
   protected selecionarAba(id: AbaId): void {
     this.abaAtiva.set(id);
+  }
+
+  /** Iniciais do nome (1ª + última palavra) para o avatar quando não há foto. */
+  protected iniciais(nome: string): string {
+    const partes = (nome ?? '').trim().split(/\s+/).filter(Boolean);
+    if (partes.length === 0) return '?';
+    const primeira = partes[0][0] ?? '';
+    const ultima = partes.length > 1 ? partes[partes.length - 1][0] ?? '' : '';
+    return (primeira + ultima).toUpperCase();
   }
 
   protected voltarUrl(): unknown[] {
@@ -183,6 +216,7 @@ export class HorarioDetalhe {
     this.service.buscarHorario(this.idAtual!).subscribe({
       next: (h) => {
         this.horario.set(h);
+        this.fotoErro.set(false);
         this.statusControl.setValue(h.statusAgendamento);
         this.carregando.set(false);
       },

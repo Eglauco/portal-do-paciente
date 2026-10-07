@@ -18,18 +18,34 @@
   } @else if (detalhe(); as d) {
     <section class="panel">
       <p class="meta">
+        <span>Tipo: <b>{{ d.tipoRegistro === 'EXAME' ? 'Exame' : 'Consulta' }}</b></span>
+        <span>Movimento: <b>{{ movimentoLabel(d.tipoMovimento) }}</b></span>
         <span>Arquivo: <b>{{ d.arquivo || '—' }}</b></span>
         <span>Importado em: <b>{{ d.importadoEm | date: 'dd/MM/yyyy HH:mm' }}</b></span>
         <span>Por: <b>{{ d.importadoPorNome || '—' }}</b></span>
         @if (d.agendamentoId) {
-          <span>Agendamento gerado: <b>#{{ d.agendamentoId }}</b></span>
+          <span>Horário: <b><a [routerLink]="['/horarios', d.agendamentoId]" target="_blank" rel="noopener">#{{ d.agendamentoId }}</a></b></span>
         }
       </p>
 
       <p class="meta-status">
         <span class="status-badge" [class.status-badge--ok]="d.agendamentoId" [class.status-badge--rev]="!d.agendamentoId">
-          {{ d.agendamentoId ? 'Agendado com sucesso' : 'Precisa de revisão' }}
+          {{ situacaoLabel(d) }}
         </span>
+        <span
+          class="status-badge"
+          [class.status-badge--env-ok]="d.statusEnvio === 'ENVIADO'"
+          [class.status-badge--env-fail]="d.statusEnvio === 'FALHA'"
+          [class.status-badge--env-none]="d.statusEnvio !== 'ENVIADO' && d.statusEnvio !== 'FALHA'"
+        >
+          Envio: {{ enviaStatusLabel(d.statusEnvio) }}
+        </span>
+        @if (d.agendamentoId) {
+          <a class="btn btn--solid btn--sm" [routerLink]="['/horarios', d.agendamentoId]" target="_blank" rel="noopener">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            Abrir horário
+          </a>
+        }
       </p>
 
       @if (d.arquivoUrl) {
@@ -43,17 +59,18 @@
         </div>
       }
 
+      <!-- Log 1: processamento interno (diagnóstico + agendamento). Botão "Reprocessar" (trava quando já agendado). -->
       <div class="log" [class.log--ok]="d.logIntegracao && d.logIntegracao.startsWith('Tudo OK')">
         <div class="log__head">
-          <p class="log__tit">Log de integração</p>
+          <p class="log__tit">Log de integração (processamento interno)</p>
           <button
             type="button"
             class="btn btn--solid btn--sm"
-            (click)="processar()"
-            [disabled]="processando() || !!detalhe()?.agendamentoId"
-            [title]="detalhe()?.agendamentoId ? 'Registro já agendado — concluído; não é possível reprocessar.' : (urlConfigurada() ? 'Reprocessa o log e reenvia o XML ao cliente (Post XML)' : 'Reprocessa o log. Configure a URL de envio para também enviar ao cliente.')"
+            (click)="reprocessar()"
+            [disabled]="processando() || !!d.agendamentoId"
+            [title]="d.agendamentoId ? 'Registro já agendado — concluído; não é possível reprocessar.' : 'Recalcula o diagnóstico e cria o agendamento quando tudo está resolvido.'"
           >
-            @if (detalhe()?.agendamentoId) {
+            @if (d.agendamentoId) {
               <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20 6 9 17l-5-5" />
               </svg>
@@ -62,14 +79,70 @@
               <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
               </svg>
-              {{ processando() ? 'Processando…' : (urlConfigurada() ? 'Reprocessar e enviar' : 'Reprocessar') }}
+              {{ processando() ? 'Processando…' : 'Reprocessar' }}
             }
           </button>
         </div>
-        <p class="log__txt">{{ d.logIntegracao || 'Log ainda não calculado. Clique em "Reprocessar" para gerar.' }}</p>
+        @if (d.logIntegracao) {
+          <div class="log__txt">
+            @for (linha of logInternoLinhas(); track $index) {
+              @if (linha.rota) {
+                <a class="log__linha log__link" [href]="linha.rota" target="_blank" rel="noopener">{{ linha.texto }}</a>
+              } @else {
+                <span class="log__linha">{{ linha.texto }}</span>
+              }
+            }
+          </div>
+        } @else {
+          <p class="log__txt">Log ainda não calculado. Clique em "Reprocessar" para gerar.</p>
+        }
       </div>
 
-      @for (g of grupos; track g.titulo) {
+      <!-- Log 2: envio ao Sistema de Gestão. Botão "Enviar" (trava quando já enviado com sucesso ou sem URL). -->
+      <div
+        class="log"
+        [class.log--ok]="d.statusEnvio === 'ENVIADO'"
+        [class.log--fail]="d.statusEnvio === 'FALHA'"
+        [class.log--neutral]="d.statusEnvio !== 'ENVIADO' && d.statusEnvio !== 'FALHA'"
+      >
+        <div class="log__head">
+          <p class="log__tit">Log de envio ao Sistema de Gestão</p>
+          <button
+            type="button"
+            class="btn btn--solid btn--sm"
+            (click)="enviar()"
+            [disabled]="enviando() || d.statusEnvio === 'ENVIADO' || !urlConfigurada()"
+            [title]="d.statusEnvio === 'ENVIADO' ? 'Já enviado com sucesso — concluído.' : (urlConfigurada() ? 'Reenvia o XML ao Sistema de Gestão (Post XML).' : 'Configure a URL do Sistema de Gestão nas Configurações para enviar.')"
+          >
+            @if (d.statusEnvio === 'ENVIADO') {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              Enviado
+            } @else {
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+              {{ enviando() ? 'Enviando…' : 'Enviar' }}
+            }
+          </button>
+        </div>
+        <p class="log__txt">{{ d.logEnvio || (urlConfigurada() ? 'Ainda não enviado. Clique em "Enviar" para enviar ao Sistema de Gestão.' : 'Configure a URL do Sistema de Gestão nas Configurações para habilitar o envio.') }}</p>
+        @if (d.enviadoEm) {
+          <p class="log__meta">Última tentativa: {{ d.enviadoEm | date: 'dd/MM/yyyy HH:mm' }}</p>
+        }
+      </div>
+
+      @if (d.dadosResolvidos) {
+        <div class="aviso-sistema">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" /><path d="M12 16v-4" /><path d="M12 8h.01" />
+          </svg>
+          <span>Alguns dados exibidos (dados do paciente, do profissional e do agendamento) foram <b>preenchidos pelo sistema</b> a partir dos cadastros encontrados no processamento — <b>não vieram do XML</b> do SIRESP.</span>
+        </div>
+      }
+
+      @for (g of grupos(); track g.titulo) {
         <div class="grupo">
           <h2 class="grupo__titulo">{{ g.titulo }}</h2>
           <div class="kv">

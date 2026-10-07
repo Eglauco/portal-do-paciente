@@ -22,6 +22,7 @@ import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.prontuario.TermoAssinaturaService;
 import com.example.pop.push.PushService;
+import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
 
@@ -42,11 +43,12 @@ public class HorarioController {
     private final NpsService npsService;
     private final PushService pushService;
     private final TermoAssinaturaService termoAssinaturaService;
+    private final StorageService storageService;
 
     public HorarioController(HorarioRepository repository, AgendaRepository agendaRepository,
             PacienteRepository pacienteRepository, HorarioLogService logService, HorarioEntregaService entregaService,
             HorarioEntregaRepository entregaRepository, NpsService npsService, PushService pushService,
-            TermoAssinaturaService termoAssinaturaService) {
+            TermoAssinaturaService termoAssinaturaService, StorageService storageService) {
         this.repository = repository;
         this.agendaRepository = agendaRepository;
         this.pacienteRepository = pacienteRepository;
@@ -56,11 +58,18 @@ public class HorarioController {
         this.npsService = npsService;
         this.pushService = pushService;
         this.termoAssinaturaService = termoAssinaturaService;
+        this.storageService = storageService;
+    }
+
+    /** URL de exibição (pré-assinada, 6h) da foto do paciente do horário; null quando não há foto. */
+    private String fotoPaciente(Horario h) {
+        return storageService.urlFotoPaciente(h.getPaciente().getFotoUrl());
     }
 
     @GetMapping("/{id}")
     public HorarioResponse buscar(@PathVariable Long id) {
-        return HorarioResponse.from(carregar(id));
+        Horario h = carregar(id);
+        return HorarioResponse.from(h, fotoPaciente(h));
     }
 
     /** Adiciona um paciente (horário) a uma agenda. Nasce aguardando confirmação + notifica o paciente. */
@@ -73,7 +82,7 @@ public class HorarioController {
         Horario salvo = repository.save(h);
         logService.registrarDaUnidade(salvo, null, StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE, uidDoToken(jwt));
         entregaService.notificarNovoAgendamento(salvo);
-        return HorarioResponse.from(salvo);
+        return HorarioResponse.from(salvo, fotoPaciente(salvo));
     }
 
     /** Edita o horário (paciente/hora) e/ou troca o status, disparando NPS/TCLE/push como o fluxo antigo. */
@@ -100,7 +109,7 @@ public class HorarioController {
                 && anterior != StatusAgendamento.FALTA_PACIENTE) {
             pushService.notificarFaltaPaciente(salvo);
         }
-        return HorarioResponse.from(salvo);
+        return HorarioResponse.from(salvo, fotoPaciente(salvo));
     }
 
     @DeleteMapping("/{id}")

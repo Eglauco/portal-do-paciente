@@ -7,9 +7,10 @@ import { AuthService } from '../../core/auth.service';
 import {
   AcaoAtualizacao,
   SirespConfigCampo,
-  SirespProcedimentoOpcao,
   SirespResumo,
   SirespStatus,
+  SirespStatusEnvio,
+  SirespTipoMovimento,
 } from './siresp.model';
 import { SirespService } from './siresp.service';
 
@@ -50,6 +51,10 @@ export type PaginaItem = number | 'ellipsis';
       .status-badge::before { content: ''; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: currentColor; flex: none; }
       .status-badge--ok { color: #0a7a4b; background: color-mix(in srgb, #12b76a 15%, transparent); }
       .status-badge--rev { color: #9a6a00; background: color-mix(in srgb, #e6a700 20%, transparent); }
+      /* Badge do ENVIO: azul = enviado / vermelho = falha / cinza = não enviado. */
+      .status-badge--env-ok { color: #0a5bd3; background: color-mix(in srgb, #2e7bf6 15%, transparent); }
+      .status-badge--env-fail { color: #b42318; background: color-mix(in srgb, #f04438 15%, transparent); }
+      .status-badge--env-none { color: var(--muted); background: color-mix(in srgb, var(--muted) 16%, transparent); }
     `,
   ],
 })
@@ -69,8 +74,6 @@ export class SirespList {
   protected readonly criar = signal(false);
   protected readonly postUrl = signal('');
   protected readonly enviarAoImportar = signal(false);
-  protected readonly procedimentoPadraoId = signal<number | null>(null);
-  protected readonly procedimentos = signal<SirespProcedimentoOpcao[]>([]);
   protected readonly campos = signal<SirespConfigCampo[]>([]);
   protected readonly acoesOpcoes: { valor: AcaoAtualizacao; rotulo: string }[] = [
     { valor: 'SEMPRE', rotulo: 'Sempre atualizar' },
@@ -81,6 +84,8 @@ export class SirespList {
   protected readonly filtro = new FormGroup({
     busca: new FormControl<string>('', { nonNullable: true }),
     status: new FormControl<SirespStatus | ''>('', { nonNullable: true }),
+    statusEnvio: new FormControl<SirespStatusEnvio | ''>('', { nonNullable: true }),
+    tipoMovimento: new FormControl<SirespTipoMovimento | ''>('', { nonNullable: true }),
   });
 
   protected readonly size = signal(SirespService.TAMANHO_PADRAO);
@@ -124,7 +129,7 @@ export class SirespList {
   }
 
   protected limpar(): void {
-    this.filtro.reset({ busca: '', status: '' });
+    this.filtro.reset({ busca: '', status: '', statusEnvio: '', tipoMovimento: '' });
     this.page.set(0);
     this.carregar();
   }
@@ -171,9 +176,9 @@ export class SirespList {
         this.toastr.success(`${r.importados} registro(s) importado(s).${extra}`);
         if (r.enviado) {
           if (r.envioSucesso) {
-            this.toastr.success('XML enviado ao cliente — ' + (r.envioMensagem ?? ''));
+            this.toastr.success('XML enviado ao Sistema de Gestão — ' + (r.envioMensagem ?? ''));
           } else {
-            this.toastr.error('Falha ao enviar ao cliente — ' + (r.envioMensagem ?? ''));
+            this.toastr.error('Falha ao enviar ao Sistema de Gestão — ' + (r.envioMensagem ?? ''));
           }
         }
         this.page.set(0);
@@ -197,8 +202,6 @@ export class SirespList {
         this.criar.set(c.criar);
         this.postUrl.set(c.postUrl ?? '');
         this.enviarAoImportar.set(c.enviarAoImportar);
-        this.procedimentoPadraoId.set(c.procedimentoPadraoId ?? null);
-        this.procedimentos.set(c.procedimentos ?? []);
         this.campos.set(c.campos);
         this.carregandoConfig.set(false);
       },
@@ -212,10 +215,6 @@ export class SirespList {
 
   protected fecharConfig(): void {
     if (!this.salvandoConfig()) this.modalAberto.set(false);
-  }
-
-  protected setProcedimento(valor: string): void {
-    this.procedimentoPadraoId.set(valor ? Number(valor) : null);
   }
 
   protected setAcao(campo: string, acao: string): void {
@@ -234,7 +233,6 @@ export class SirespList {
         criar: this.criar(),
         postUrl: this.postUrl().trim() || null,
         enviarAoImportar: this.enviarAoImportar(),
-        procedimentoPadraoId: this.procedimentoPadraoId(),
         campos,
       })
       .subscribe({
@@ -243,8 +241,6 @@ export class SirespList {
         this.criar.set(c.criar);
         this.postUrl.set(c.postUrl ?? '');
         this.enviarAoImportar.set(c.enviarAoImportar);
-        this.procedimentoPadraoId.set(c.procedimentoPadraoId ?? null);
-        this.procedimentos.set(c.procedimentos ?? []);
         this.campos.set(c.campos);
         this.salvandoConfig.set(false);
         this.modalAberto.set(false);
@@ -259,7 +255,12 @@ export class SirespList {
 
   private carregar(): void {
     const bruto = this.filtro.getRawValue();
-    const filtro = { busca: bruto.busca || null, status: bruto.status || null };
+    const filtro = {
+      busca: bruto.busca || null,
+      status: bruto.status || null,
+      statusEnvio: bruto.statusEnvio || null,
+      tipoMovimento: bruto.tipoMovimento || null,
+    };
     this.loading.set(true);
     this.error.set(false);
     this.service.listar(filtro, this.auth.unidadeId(), this.page(), this.size()).subscribe({

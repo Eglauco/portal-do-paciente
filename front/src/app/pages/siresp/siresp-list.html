@@ -30,12 +30,36 @@
         <input id="f-busca" type="text" class="input" formControlName="busca" placeholder="Paciente, CPF, profissional ou especialidade" />
       </div>
       <div class="form-field">
-        <label class="label" for="f-status">Status</label>
+        <label class="label" for="f-status">Status do agendamento</label>
         <span class="select">
           <select id="f-status" formControlName="status" (change)="buscar()">
             <option value="">Todos</option>
             <option value="AGENDADO">Agendado com sucesso</option>
             <option value="REVISAO">Precisa de revisão</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-status-envio">Status de envio</label>
+        <span class="select">
+          <select id="f-status-envio" formControlName="statusEnvio" (change)="buscar()">
+            <option value="">Todos</option>
+            <option value="ENVIADO">Enviado com sucesso</option>
+            <option value="FALHA">Falha no envio</option>
+            <option value="NAO_ENVIADO">Não enviado</option>
+          </select>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
+      </div>
+      <div class="form-field">
+        <label class="label" for="f-movimento">Movimento</label>
+        <span class="select">
+          <select id="f-movimento" formControlName="tipoMovimento" (change)="buscar()">
+            <option value="">Todos</option>
+            <option value="AGENDAMENTO">Agendamento</option>
+            <option value="CANCELAMENTO">Cancelamento</option>
+            <option value="TRANSFERENCIA">Transferência</option>
           </select>
           <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
         </span>
@@ -89,12 +113,15 @@
           <thead>
             <tr>
               <th>Data</th>
+              <th>Tipo</th>
+              <th>Movimento</th>
               <th>Hora</th>
               <th>Paciente</th>
               <th>CPF</th>
               <th>Especialidade</th>
               <th>Profissional</th>
-              <th>Status</th>
+              <th>Situação</th>
+              <th>Envio</th>
               <th>Importado em</th>
               <th class="col-act"><span class="sr-only">Ver</span></th>
             </tr>
@@ -103,6 +130,8 @@
             @for (r of registros(); track r.id) {
               <tr>
                 <td class="cell-data">{{ r.dataAgenda || '—' }}</td>
+                <td>{{ r.tipoRegistro === 'EXAME' ? 'Exame' : 'Consulta' }}</td>
+                <td>{{ r.tipoMovimentoDescricao }}</td>
                 <td class="muted-cell">{{ r.horIni || '—' }}</td>
                 <td>{{ r.nomePaciente || '—' }}</td>
                 <td class="muted-cell">{{ r.cpf || '—' }}</td>
@@ -110,7 +139,17 @@
                 <td class="muted-cell">{{ r.nomeProfissional || '—' }}</td>
                 <td>
                   <span class="status-badge" [class.status-badge--ok]="r.status === 'AGENDADO'" [class.status-badge--rev]="r.status !== 'AGENDADO'">
-                    {{ r.status === 'AGENDADO' ? 'Agendado' : 'Revisão' }}
+                    {{ r.status !== 'AGENDADO' ? 'Revisão' : r.tipoMovimento === 'CANCELAMENTO' ? 'Cancelado' : r.tipoMovimento === 'TRANSFERENCIA' ? 'Transferido' : 'Agendado' }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="status-badge"
+                    [class.status-badge--env-ok]="r.statusEnvio === 'ENVIADO'"
+                    [class.status-badge--env-fail]="r.statusEnvio === 'FALHA'"
+                    [class.status-badge--env-none]="r.statusEnvio !== 'ENVIADO' && r.statusEnvio !== 'FALHA'"
+                  >
+                    {{ r.statusEnvio === 'ENVIADO' ? 'Enviado' : r.statusEnvio === 'FALHA' ? 'Falha' : 'Não enviado' }}
                   </span>
                 </td>
                 <td class="muted-cell">{{ r.importadoEm | date: 'dd/MM/yyyy HH:mm' }}</td>
@@ -210,41 +249,25 @@
             </label>
 
             <div class="form-field" style="margin-bottom: 1rem">
-              <label class="label" for="cfg-procedimento">Procedimento padrão para agendamentos do SIRESP</label>
-              <span class="select select--full">
-                <select id="cfg-procedimento" (change)="setProcedimento($any($event.target).value)">
-                  <option value="" [selected]="procedimentoPadraoId() == null">— Selecione —</option>
-                  @for (p of procedimentos(); track p.id) {
-                    <option [value]="p.id" [selected]="p.id === procedimentoPadraoId()">{{ p.nome }}</option>
-                  }
-                </select>
-                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
-              </span>
-              <span style="display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted)">
-                O XML do CROSS não traz “procedimento” — este é usado em todo agendamento criado a partir do SIRESP. Sem ele, o agendamento não é criado (o diagnóstico acusa a falta).
-              </span>
-            </div>
-
-            <div class="form-field" style="margin-bottom: 1rem">
-              <label class="label" for="cfg-post-url">URL de envio do XML ao cliente (Post XML)</label>
+              <label class="label" for="cfg-post-url">URL de envio do XML ao Sistema de Gestão (Post XML)</label>
               <input
                 id="cfg-post-url"
                 type="url"
                 class="input"
-                placeholder="https://cliente.exemplo.com/siresp/receber"
+                placeholder="https://sistema-gestao.exemplo.com/siresp/receber"
                 [value]="postUrl()"
                 (input)="postUrl.set($any($event.target).value)"
               />
               <span style="display: block; margin-top: 0.3rem; font-size: 0.8rem; color: var(--muted)">
-                Endpoint que recebe o XML por HTTP POST (parâmetro <b>msg</b>), igual ao que o SIRESP envia. Em branco, o botão “Enviar ao cliente” fica desabilitado.
+                Endpoint do Sistema de Gestão que recebe o XML por HTTP POST (parâmetro <b>msg</b>), igual ao que o SIRESP envia. Em branco, o botão “Enviar” fica desabilitado.
               </span>
             </div>
 
             <label class="geral">
               <input type="checkbox" [checked]="enviarAoImportar()" (change)="enviarAoImportar.set($any($event.target).checked)" />
               <span class="geral__txt">
-                <b>Enviar ao cliente automaticamente ao importar</b>
-                <span>Logo após o upload, reenvia o arquivo original ao cliente (Post XML). Só dispara se a URL acima estiver preenchida.</span>
+                <b>Enviar ao Sistema de Gestão automaticamente ao importar</b>
+                <span>Logo após o upload, reenvia o arquivo original ao Sistema de Gestão (Post XML). Só dispara se a URL acima estiver preenchida.</span>
               </span>
             </label>
 

@@ -128,6 +128,9 @@ public class AgendaController {
 
     private void aplicar(Agenda a, AgendaRequest request) {
         a.setData(request.data());
+        // Nome é só um rótulo editável; o código de integração (CROSS) NÃO é tocado aqui — fica a cargo do SIRESP.
+        String nome = request.nome() == null ? null : request.nome().trim();
+        a.setNome(nome == null || nome.isBlank() ? null : nome);
         a.setEspecialidade(especialidadeRepository.findById(request.especialidadeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
         a.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())

@@ -130,9 +130,16 @@ export class StorageService {
     return `${base || 'foto'}.${ext}`;
   }
 
-  /** Gera uma URL temporária (assinada) para visualizar/baixar o arquivo. */
+  /** Gera uma URL temporária (assinada) para VISUALIZAR o arquivo inline. */
   async urlDownload(url: string): Promise<string> {
     const params = new HttpParams().set('url', url);
+    const r = await firstValueFrom(this.http.get<{ url: string }>(`${this.base}/download-url`, { params }));
+    return r.url;
+  }
+
+  /** URL temporária (assinada) que FORÇA o download do arquivo (anexo) com o nome informado. */
+  async urlDownloadAnexo(url: string, nomeArquivo: string): Promise<string> {
+    const params = new HttpParams().set('url', url).set('nome', nomeArquivo);
     const r = await firstValueFrom(this.http.get<{ url: string }>(`${this.base}/download-url`, { params }));
     return r.url;
   }

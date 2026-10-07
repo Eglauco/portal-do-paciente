@@ -198,18 +198,13 @@ public final class ChaveConfiguracao {
     /** SIRESP — Criar o paciente quando não encontrado (por código de integração / CPF) na importação (BOOLEANO). */
     public static final String SIRESP_CRIAR_PACIENTE = "SIRESP_CRIAR_PACIENTE";
     /**
-     * SIRESP — URL do cliente que recebe o XML via HTTP POST (TEXTO), replicando o "Post XML" do SIRESP
+     * SIRESP — URL do Sistema de Gestão que recebe o XML via HTTP POST (TEXTO), replicando o "Post XML" do SIRESP
      * (parâmetro de formulário {@code msg} com o XML inteiro). Vazia = envio desabilitado.
      */
     public static final String SIRESP_POST_URL = "SIRESP_POST_URL";
     /**
-     * SIRESP — Enviar o XML ao cliente automaticamente ao importar (BOOLEANO). Ligado: logo após o upload, o
-     * arquivo original é reenviado ao cliente (só se houver {@link #SIRESP_POST_URL}). Desligado: só importa.
+     * SIRESP — Enviar o XML ao Sistema de Gestão automaticamente ao importar (BOOLEANO). Ligado: logo após o upload,
+     * o arquivo original é reenviado ao Sistema de Gestão (só se houver {@link #SIRESP_POST_URL}). Desligado: só importa.
      */
     public static final String SIRESP_ENVIAR_AO_IMPORTAR = "SIRESP_ENVIAR_AO_IMPORTAR";
-    /**
-     * SIRESP — Procedimento padrão (NUMERICO = id do Procedimento) usado nos agendamentos criados a partir do
-     * SIRESP, já que o XML do CROSS não traz "procedimento". Vazio = não configurado (bloqueia a criação).
-     */
-    public static final String SIRESP_PROCEDIMENTO_PADRAO_ID = "SIRESP_PROCEDIMENTO_PADRAO_ID";
 }

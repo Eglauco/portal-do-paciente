@@ -6,6 +6,8 @@ import java.time.LocalDate;
 public record AgendaResumoResponse(
         Long id,
         LocalDate data,
+        String nome,
+        String codigoIntegracao,
         RefResponse especialidade,
         RefResponse profissionalSaude,
         RefResponse procedimento,
@@ -16,6 +18,8 @@ public record AgendaResumoResponse(
         return new AgendaResumoResponse(
                 a.getId(),
                 a.getData(),
+                a.getNome(),
+                a.getCodigoIntegracao(),
                 new RefResponse(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 new RefResponse(a.getProfissionalSaude().getId(), a.getProfissionalSaude().getNome()),
                 new RefResponse(a.getProcedimento().getId(), a.getProcedimento().getNome()),

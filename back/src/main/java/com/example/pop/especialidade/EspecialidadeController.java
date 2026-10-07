@@ -30,6 +30,8 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.procedimento.Procedimento;
+import com.example.pop.procedimento.ProcedimentoRepository;
 
 @RestController
 @RequestMapping("/especialidade")
@@ -46,10 +48,13 @@ public class EspecialidadeController {
     private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final EspecialidadeRepository repository;
+    private final ProcedimentoRepository procedimentoRepository;
     private final ExportacaoService exportacaoService;
 
-    public EspecialidadeController(EspecialidadeRepository repository, ExportacaoService exportacaoService) {
+    public EspecialidadeController(EspecialidadeRepository repository,
+            ProcedimentoRepository procedimentoRepository, ExportacaoService exportacaoService) {
         this.repository = repository;
+        this.procedimentoRepository = procedimentoRepository;
         this.exportacaoService = exportacaoService;
     }
 
@@ -127,7 +132,8 @@ public class EspecialidadeController {
         return List.of(
                 ColunaExport.de("Código", e -> e.getId() == null ? "" : String.valueOf(e.getId())),
                 ColunaExport.de("Nome", Especialidade::getNome),
-                ColunaExport.de("Cód. integração", e -> e.getCodigoIntegracao() == null ? "" : e.getCodigoIntegracao()));
+                ColunaExport.de("Cód. integração", e -> e.getCodigoIntegracao() == null ? "" : e.getCodigoIntegracao()),
+                ColunaExport.de("Procedimento (SIRESP)", e -> e.getProcedimento() == null ? "" : e.getProcedimento().getNome()));
     }
 
     @GetMapping("/{id}")
@@ -143,6 +149,7 @@ public class EspecialidadeController {
         especialidade.setId(null);
         especialidade.setNome(validarNome(especialidade.getNome()));
         especialidade.setCodigoIntegracao(limpar(especialidade.getCodigoIntegracao()));
+        especialidade.setProcedimento(resolverProcedimento(especialidade.getProcedimento()));
         validarUnicidade(especialidade.getCodigoIntegracao(), -1L);
         return salvarUnico(especialidade);
     }
@@ -155,9 +162,23 @@ public class EspecialidadeController {
                     validarUnicidade(codigo, id);
                     existente.setNome(validarNome(especialidade.getNome()));
                     existente.setCodigoIntegracao(codigo);
+                    existente.setProcedimento(resolverProcedimento(especialidade.getProcedimento()));
                     return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Resolve o procedimento vinculado a partir do que veio no corpo (só o id importa): null quando não informado;
+     * senão carrega o procedimento gerenciado (422 se o id não existir). Evita persistir um procedimento "solto".
+     */
+    private Procedimento resolverProcedimento(Procedimento doRequest) {
+        if (doRequest == null || doRequest.getId() == null) {
+            return null;
+        }
+        return procedimentoRepository.findById(doRequest.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                        "Procedimento vinculado não encontrado."));
     }
 
     /**

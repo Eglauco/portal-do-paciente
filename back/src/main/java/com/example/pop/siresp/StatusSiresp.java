@@ -20,7 +20,22 @@ public enum StatusSiresp {
         return descricao;
     }
 
-    /** Deriva o status do registro: AGENDADO se já há agendamento gerado; senão REVISAO. */
+    /**
+     * Descrição do RESULTADO considerando a movimentação: concluído vira "Agendado"/"Cancelado"/"Transferido com
+     * sucesso" conforme o tipo; pendente continua "Precisa de revisão".
+     */
+    public String descricao(TipoMovimento movimento) {
+        if (this == REVISAO) {
+            return descricao;
+        }
+        return switch (movimento) {
+            case CANCELAMENTO -> "Cancelado com sucesso";
+            case TRANSFERENCIA -> "Transferido com sucesso";
+            default -> "Agendado com sucesso";
+        };
+    }
+
+    /** Deriva o status do registro: AGENDADO (concluído) se já há horário vinculado; senão REVISAO. */
     public static StatusSiresp de(Siresp s) {
         return s.getAgendamentoId() != null ? AGENDADO : REVISAO;
     }

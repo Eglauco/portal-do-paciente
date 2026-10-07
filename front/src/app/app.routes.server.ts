@@ -55,6 +55,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
+    path: 'exames/:id/editar',
+    renderMode: RenderMode.Server,
+  },
+  {
     path: 'profissionais/:id',
     renderMode: RenderMode.Server,
   },

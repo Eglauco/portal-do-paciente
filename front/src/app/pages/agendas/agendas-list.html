@@ -67,6 +67,7 @@
           <thead>
             <tr>
               <th>Data</th>
+              <th>Nome</th>
               <th>Profissional</th>
               <th>Especialidade</th>
               <th>Procedimento</th>
@@ -78,6 +79,9 @@
             @for (a of registros(); track a.id) {
               <tr>
                 <td class="cell-data">{{ a.data | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  @if (a.nome) { {{ a.nome }} } @else { <span class="muted-cell">—</span> }
+                </td>
                 <td>{{ a.profissionalSaude.nome }}</td>
                 <td>{{ a.especialidade.nome }}</td>
                 <td class="muted-cell">{{ a.procedimento.nome }}</td>

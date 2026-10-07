@@ -198,9 +198,19 @@ export default function LoginScreen() {
       </SafeAreaView>
 
       {/* Folha do formulário */}
+      {/*
+        Sob edge-to-edge (padrão do Expo SDK 54) o teclado só sobrepõe a tela no Android —
+        não a redimensiona (adjustResize não vale), então CPF e Data de nascimento ficavam
+        atrás do teclado. behavior="height" encolhe o viewport da folha até o topo do teclado,
+        e o RN rola o campo em foco para dentro da área visível. A faixa de marca fica acima da
+        KAV (irmã), então a hero continua intacta; keyboardVerticalOffset={0} porque o fundo da
+        KAV é o fundo da tela (sem compensação a fazer). Não reservar paddingBottom = altura do
+        teclado: a altura da KAV já encolhe e duplicaria o espaço.
+      */}
       <KeyboardAvoidingView
         style={styles.sheetWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}>
         <ScrollView
           style={styles.sheet}
           contentContainerStyle={styles.sheetContent}

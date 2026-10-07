@@ -17,20 +17,85 @@
     </div>
   } @else if (horario(); as h) {
     <section class="panel">
-      <div class="agenda-head">
-        <div class="agenda-head__main">
-          <span class="agenda-head__paciente">{{ h.paciente.nome }}</span>
-          <span class="status-pill">{{ h.statusDescricao || h.statusAgendamento }}</span>
-        </div>
-        <div class="agenda-head__grid">
-          <span>Data: <b>{{ h.data ? (h.data | date: 'dd/MM/yyyy') : '—' }}</b></span>
-          <span>Horário: <b>{{ h.horaInicio?.slice(0, 5) }}{{ h.horaFim ? ' – ' + h.horaFim.slice(0, 5) : '' }}</b></span>
-          <span>Profissional: <b>{{ h.profissionalSaude?.nome || '—' }}</b></span>
-          <span>Especialidade: <b>{{ h.especialidade?.nome || '—' }}</b></span>
-          <span>Procedimento: <b>{{ h.procedimento?.nome || '—' }}</b></span>
-          <span>Unidade: <b>{{ h.unidadeSaude?.nome || '—' }}</b></span>
-          <span>CPF: <b>{{ h.pacienteCpf || '—' }}</b></span>
-        </div>
+      <div class="hcards">
+        <!-- Paciente: avatar (foto ou iniciais) + nome + status + CPF. -->
+        <section class="hcard hcard--pac" aria-label="Dados do paciente">
+          <p class="hcard__head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 1 0-16 0" /><circle cx="12" cy="7" r="4" /></svg>
+            Paciente
+          </p>
+          <div class="pac">
+            <div class="pac__avatar">
+              @if (h.pacienteFotoUrl && !fotoErro()) {
+                <img [src]="h.pacienteFotoUrl" (error)="fotoErro.set(true)" [alt]="'Foto de ' + h.paciente.nome" />
+              } @else {
+                <span aria-hidden="true">{{ iniciais(h.paciente.nome) }}</span>
+              }
+            </div>
+            <div class="pac__info">
+              <h2 class="pac__nome">{{ h.paciente.nome }}</h2>
+              <span class="status-pill" [attr.data-st]="h.statusAgendamento">{{ h.statusDescricao || h.statusAgendamento }}</span>
+              <dl class="pac__meta">
+                <div>
+                  <dt>CPF</dt>
+                  <dd>{{ h.pacienteCpf || '—' }}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </section>
+
+        <!-- Agenda: contexto do slot (data/hora, profissional, especialidade, procedimento, unidade, códigos). -->
+        <section class="hcard hcard--agd" aria-label="Dados da agenda">
+          <p class="hcard__head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+            Agenda
+          </p>
+          <dl class="agd">
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg></span>
+              <span class="agd__txt"><dt>Data</dt><dd>{{ h.data ? (h.data | date: 'dd/MM/yyyy') : '—' }}</dd></span>
+            </div>
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+              <span class="agd__txt"><dt>Horário</dt><dd>{{ h.horaInicio?.slice(0, 5) }}{{ h.horaFim ? ' – ' + h.horaFim.slice(0, 5) : '' }}</dd></span>
+            </div>
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 1 0-16 0" /><circle cx="12" cy="7" r="4" /></svg></span>
+              <span class="agd__txt"><dt>Profissional</dt><dd>{{ h.profissionalSaude?.nome || '—' }}</dd></span>
+            </div>
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg></span>
+              <span class="agd__txt"><dt>Especialidade</dt><dd>{{ h.especialidade?.nome || '—' }}</dd></span>
+            </div>
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="3" width="8" height="4" rx="1" /><path d="M8 5H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 12h6M9 16h4" /></svg></span>
+              <span class="agd__txt"><dt>Procedimento</dt><dd>{{ h.procedimento?.nome || '—' }}</dd></span>
+            </div>
+            <div class="agd__item">
+              <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg></span>
+              <span class="agd__txt"><dt>Unidade</dt><dd>{{ h.unidadeSaude?.nome || '—' }}</dd></span>
+            </div>
+            @if (h.agendaNome) {
+              <div class="agd__item agd__item--wide">
+                <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg></span>
+                <span class="agd__txt"><dt>Nome da agenda</dt><dd>{{ h.agendaNome }}</dd></span>
+              </div>
+            }
+            @if (h.agendaCodigoIntegracao || h.codigoIntegracao) {
+              <div class="agd__item agd__item--wide">
+                <span class="agd__ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18" /></svg></span>
+                <span class="agd__txt">
+                  <dt>Cód. integração</dt>
+                  <dd class="agd__cods">
+                    @if (h.agendaCodigoIntegracao) { <span class="cod">agenda: {{ h.agendaCodigoIntegracao }}</span> }
+                    @if (h.codigoIntegracao) { <span class="cod">horário: {{ h.codigoIntegracao }}</span> }
+                  </dd>
+                </span>
+              </div>
+            }
+          </dl>
+        </section>
       </div>
 
       <nav class="form-tabs" aria-label="Seções do horário">

@@ -34,11 +34,15 @@ public class StorageController {
         }
     }
 
-    /** Gera uma URL pré-assinada (GET) temporária para visualizar o arquivo. */
+    /**
+     * Gera uma URL pré-assinada (GET) temporária. Sem {@code nome}: visualização inline. Com {@code nome}: força o
+     * download (Content-Disposition: attachment) com esse nome de arquivo.
+     */
     @GetMapping("/download-url")
-    public DownloadUrlResponse gerarDownloadUrl(@RequestParam String url) {
+    public DownloadUrlResponse gerarDownloadUrl(@RequestParam String url,
+            @RequestParam(required = false) String nome) {
         try {
-            return new DownloadUrlResponse(storageService.gerarDownloadUrl(url));
+            return new DownloadUrlResponse(storageService.gerarDownloadUrl(url, nome));
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Não foi possível gerar o link do arquivo.");
         }

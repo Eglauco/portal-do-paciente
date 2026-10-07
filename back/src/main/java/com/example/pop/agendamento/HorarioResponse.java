@@ -12,13 +12,17 @@ import java.util.List;
  */
 public record HorarioResponse(
         Long id,
+        String codigoIntegracao,
         Long agendaId,
+        String agendaNome,
+        String agendaCodigoIntegracao,
         LocalDate data,
         LocalDateTime dataHora,
         LocalTime horaInicio,
         LocalTime horaFim,
         RefResponse paciente,
         String pacienteCpf,
+        String pacienteFotoUrl,
         RefResponse especialidade,
         RefResponse profissionalSaude,
         RefResponse procedimento,
@@ -32,18 +36,34 @@ public record HorarioResponse(
         EstadoEntrega entregaResumo,
         String entregaResumoDescricao) {
 
+    /**
+     * Sem foto de exibição — para contextos que não a exibem (ex.: a lista de horários no detalhe da agenda),
+     * evitando o custo de pré-assinar a URL. O detalhe do horário usa a sobrecarga com {@code pacienteFotoUrl}.
+     */
     public static HorarioResponse from(Horario h) {
+        return from(h, null);
+    }
+
+    /**
+     * {@code pacienteFotoUrl} é a URL JÁ pronta para exibição (pré-assinada pelo controller via
+     * {@code StorageService.urlFotoPaciente}); o valor cru da entidade é uma chave do S3, que não é exibível direto.
+     */
+    public static HorarioResponse from(Horario h, String pacienteFotoUrl) {
         EstadoEntrega entrega = h.getEntregaResumo();
         Agenda ag = h.getAgenda();
         return new HorarioResponse(
                 h.getId(),
+                h.getCodigoIntegracao(),
                 ag.getId(),
+                ag.getNome(),
+                ag.getCodigoIntegracao(),
                 ag.getData(),
                 h.getDataHora(),
                 h.getDataHora().toLocalTime(),
                 h.getHoraFim(),
                 new RefResponse(h.getPaciente().getId(), h.getPaciente().getNome()),
                 h.getPaciente().getCpf(),
+                pacienteFotoUrl,
                 new RefResponse(ag.getEspecialidade().getId(), ag.getEspecialidade().getNome()),
                 new RefResponse(ag.getProfissionalSaude().getId(), ag.getProfissionalSaude().getNome()),
                 new RefResponse(ag.getProcedimento().getId(), ag.getProcedimento().getNome()),

@@ -37,6 +37,7 @@ const ICONE = {
   lista: svg('<path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 15l1.5 1.5L22 14"/>'),
   paciente: svg('<circle cx="12" cy="8" r="3.2"/><path d="M6 20a6 6 0 0 1 12 0"/><path d="M12 11.5c1.2 1.4 3 1.2 3-.2"/>'),
   especialidade: svg('<path d="M8 3v4a4 4 0 0 0 8 0V3"/><path d="M6 7a6 6 0 0 0 12 0"/><path d="M12 11v4a5 5 0 0 0 5 5 3 3 0 1 0 0-6"/><circle cx="6" cy="18" r="2"/>'),
+  exame: svg('<path d="M9 3h6"/><path d="M10 3v6l-4.5 8A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-3L14 9V3"/><path d="M8.5 14h7"/>'),
   profissional: svg('<circle cx="12" cy="7" r="3.2"/><path d="M6 21a6 6 0 0 1 12 0"/><path d="M12 13v3M10.5 14.5h3"/>'),
   procedimento: svg('<path d="M9 3h6v4H9z"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M12 11v6M9 14h6"/>'),
   alerta: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'),
@@ -76,6 +77,7 @@ export const FUNCIONALIDADES: readonly Funcionalidade[] = [
 
   // Cadastros.
   { tela: 'ESPECIALIDADES', rotulo: 'Especialidades', rota: '/especialidades', grupo: 'Cadastros', icone: ICONE.especialidade, palavras: ['cadastro', 'áreas', 'cardiologia'] },
+  { tela: 'EXAME', rotulo: 'Exames', rota: '/exames', grupo: 'Cadastros', icone: ICONE.exame, palavras: ['cadastro', 'exame', 'siresp', 'cross', 'laboratório', 'procedimento'] },
   { tela: 'PROFISSIONAIS', rotulo: 'Profissionais', rota: '/profissionais', grupo: 'Cadastros', icone: ICONE.profissional, palavras: ['médico', 'profissional de saúde', 'cadastro'] },
   { tela: 'CONSELHOS', rotulo: 'Conselhos', rota: '/conselhos', grupo: 'Cadastros', icone: ICONE.estrela, palavras: ['crm', 'coren', 'classe', 'conselho'] },
   { tela: 'PROCEDIMENTOS', rotulo: 'Procedimentos', rota: '/procedimentos', grupo: 'Cadastros', icone: ICONE.procedimento, palavras: ['exame', 'serviço', 'cadastro'] },

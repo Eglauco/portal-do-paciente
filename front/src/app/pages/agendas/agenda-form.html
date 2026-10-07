@@ -28,6 +28,18 @@
         </div>
 
         <div class="form-field">
+          <label class="label" for="f-nome">Nome da agenda (opcional)</label>
+          <input id="f-nome" type="text" class="input" formControlName="nome" placeholder="Rótulo da agenda" maxlength="255" />
+        </div>
+
+        @if (codigoIntegracao(); as cod) {
+          <div class="form-field">
+            <label class="label" for="f-cod">Código de integração</label>
+            <input id="f-cod" type="text" class="input" [value]="cod" disabled title="Código da agenda no sistema externo. Preenchido automaticamente pela integração." />
+          </div>
+        }
+
+        <div class="form-field">
           <label class="label" for="f-prof">Profissional</label>
           <ng-select
             id="f-prof"

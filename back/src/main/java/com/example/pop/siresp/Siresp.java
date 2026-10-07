@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -53,13 +55,30 @@ public class Siresp {
     @Column(name = "importado_por_nome", length = 150)
     private String importadoPorNome;
 
-    /** Diagnóstico da integração (encontrou/não encontrou especialidade/unidade/profissional/paciente). */
+    /**
+     * Log do PROCESSAMENTO INTERNO (diagnóstico da integração: encontrou/não encontrou
+     * especialidade/unidade/profissional/paciente + criação do agendamento). O resultado do envio ao Sistema de
+     * Gestão fica separado em {@link #logEnvio}.
+     */
     @Column(name = "log_integracao", columnDefinition = "TEXT")
     private String logIntegracao;
 
+    /** Log do ENVIO do XML ao Sistema de Gestão (resultado do último "Post XML"). Separado do processamento interno. */
+    @Column(name = "log_envio", columnDefinition = "TEXT")
+    private String logEnvio;
+
+    /** Status do envio do XML ao Sistema de Gestão (independente do agendamento). Padrão: nunca enviado. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_envio", nullable = false, length = 20)
+    private StatusEnvio statusEnvio = StatusEnvio.NAO_ENVIADO;
+
+    /** Data/hora da última tentativa de envio ao Sistema de Gestão (null = nunca tentado). */
+    @Column(name = "enviado_em")
+    private LocalDateTime enviadoEm;
+
     /**
      * URL (S3, pasta {@code siresp/}) do ARQUIVO XML ORIGINAL deste import — os bytes exatos recebidos no upload.
-     * É o que reenviamos ao cliente no "Post XML" (sem nenhuma divergência) e o que o botão de download baixa. A
+     * É o que reenviamos ao Sistema de Gestão no "Post XML" (sem divergência) e o que o botão de download baixa. A
      * mesma URL fica em TODAS as linhas do mesmo upload. Registros antigos (sem S3) ficam nulos — o envio então
      * reconstrói o XML a partir das colunas abaixo (fallback).
      */
@@ -73,7 +92,26 @@ public class Siresp {
     @Column(name = "agendamento_id")
     private Long agendamentoId;
 
+    /** Tipo do registro: CONSULTA (padrão) ou EXAME. Detectado na importação pela estrutura do XML. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_registro", nullable = false, length = 20)
+    private TipoRegistroSiresp tipoRegistro = TipoRegistroSiresp.CONSULTA;
+
+    /** Movimentação (TIPO_CONSULTA/TIPO_EXAME): AGENDAMENTO (padrão) / CANCELAMENTO / TRANSFERENCIA. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_movimento", nullable = false, length = 20)
+    private TipoMovimento tipoMovimento = TipoMovimento.AGENDAMENTO;
+
+    /**
+     * true quando o sistema PREENCHEU campos de exibição (paciente/CPF/data/hora/especialidade/profissional) a partir
+     * do horário encontrado no processamento — esses dados NÃO vieram do XML (típico de cancelamento/transferência,
+     * cujo XML é enxuto). Serve para avisar o usuário no detalhe e para tornar o registro pesquisável.
+     */
+    @Column(name = "dados_resolvidos", nullable = false)
+    private boolean dadosResolvidos = false;
+
     // ---------- Campos do XML (NewDataSet > Mensagem) — texto cru ----------
+    // Consulta e exame compartilham a tabela; os campos específicos de cada tipo ficam nulos no outro.
 
     @Column(name = "tipo_consulta", columnDefinition = "TEXT")
     private String tipoConsulta;
@@ -179,4 +217,36 @@ public class Siresp {
     private String numCns;
     @Column(name = "num_prontuario", columnDefinition = "TEXT")
     private String numProntuario;
+
+    // ---------- Campos específicos do EXAME (nulos quando o registro é CONSULTA) ----------
+    @Column(name = "tipo_exame", columnDefinition = "TEXT")
+    private String tipoExame;
+    /** Código do horário do exame no CROSS (análogo ao ID_AGE_CONSULTA_HOR da consulta). */
+    @Column(name = "id_age_exame_hor", columnDefinition = "TEXT")
+    private String idAgeExameHor;
+    /** Horário de ORIGEM na TRANSFERÊNCIA de consulta (ID_AGE_CONSULTA_HOR_ORIGEM) — o horário antigo a cancelar. */
+    @Column(name = "id_age_consulta_hor_origem", columnDefinition = "TEXT")
+    private String idAgeConsultaHorOrigem;
+    /** Horário de ORIGEM na TRANSFERÊNCIA de exame (ID_AGE_EXAME_HOR_ORIGEM) — o horário antigo a cancelar. */
+    @Column(name = "id_age_exame_hor_origem", columnDefinition = "TEXT")
+    private String idAgeExameHorOrigem;
+    /** Código da agenda do exame no CROSS (análogo ao ID_AGE_CONSULTA da consulta). */
+    @Column(name = "id_age_exame", columnDefinition = "TEXT")
+    private String idAgeExame;
+    /** Nome da agenda do exame (análogo ao AGE_CONSULTA_NOME da consulta). */
+    @Column(name = "age_exame_nome", columnDefinition = "TEXT")
+    private String ageExameNome;
+    @Column(name = "id_associacao", columnDefinition = "TEXT")
+    private String idAssociacao;
+    @Column(name = "nome_associacao", columnDefinition = "TEXT")
+    private String nomeAssociacao;
+    /** Código do exame no CROSS — casa com o cadastro de Exame (codigoIntegracao) para resolver o procedimento. */
+    @Column(name = "id_exame", columnDefinition = "TEXT")
+    private String idExame;
+    @Column(name = "cod_exame", columnDefinition = "TEXT")
+    private String codExame;
+    @Column(name = "nome_exame", columnDefinition = "TEXT")
+    private String nomeExame;
+    @Column(name = "tipo_tabela", columnDefinition = "TEXT")
+    private String tipoTabela;
 }

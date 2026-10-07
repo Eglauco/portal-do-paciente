@@ -52,6 +52,18 @@
           maxlength="60"
         />
       </div>
+      <div class="form-field">
+        <label class="label" for="procedimento">Procedimento (lançamento automático no SIRESP)</label>
+        <ng-select
+          id="procedimento"
+          formControlName="procedimentoId"
+          [items]="procedimentos()"
+          bindValue="id"
+          bindLabel="nome"
+          placeholder="Sem procedimento vinculado"
+        ></ng-select>
+        <span class="field-hint">Usado como procedimento do agendamento quando esta especialidade é importada do SIRESP. Opcional.</span>
+      </div>
     </div>
 
     <div class="form-actions">

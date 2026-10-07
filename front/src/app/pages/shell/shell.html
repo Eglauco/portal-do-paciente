@@ -165,6 +165,15 @@
         </a>
       }
 
+      @if (temTela('EXAME')) {
+        <a class="nav__link" [appRailTip]="menuRecolhido()" routerLink="/exames" routerLinkActive="is-active" ariaCurrentWhenActive="page">
+          <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 3h6" /><path d="M10 3v6l-4.5 8A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-3L14 9V3" /><path d="M8.5 14h7" />
+          </svg>
+          <span class="nav__label">Exames</span>
+        </a>
+      }
+
       @if (temTela('PROFISSIONAIS')) {
         <a class="nav__link" [appRailTip]="menuRecolhido()" routerLink="/profissionais" routerLinkActive="is-active" ariaCurrentWhenActive="page">
           <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

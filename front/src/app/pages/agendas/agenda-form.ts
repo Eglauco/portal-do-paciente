@@ -72,10 +72,13 @@ export class AgendaForm implements PodeSair {
     especialidadeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     procedimentoId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    nome: new FormControl<string>('', { nonNullable: true }),
   });
 
   protected readonly editando = signal(false);
   protected readonly codigo = signal<number | null>(null);
+  /** Código de integração da agenda, quando veio de um sistema externo — exibido só-leitura para rastreio. */
+  protected readonly codigoIntegracao = signal<string | null>(null);
   protected readonly salvando = signal(false);
   protected readonly erroCarregar = signal(false);
 
@@ -134,6 +137,7 @@ export class AgendaForm implements PodeSair {
       especialidadeId: v.especialidadeId!,
       procedimentoId: v.procedimentoId!,
       unidadeSaudeId: v.unidadeSaudeId!,
+      nome: v.nome?.trim() || null,
     };
     const req = this.editando() ? this.service.atualizar(this.codigo()!, dados) : this.service.criar(dados);
     req.subscribe({
@@ -165,10 +169,12 @@ export class AgendaForm implements PodeSair {
         this.carregando = true;
         this.profissionalSalvado.set(a.profissionalSaude);
         this.especialidadeSalvada.set(a.especialidade);
+        this.codigoIntegracao.set(a.codigoIntegracao ?? null);
         this.form.patchValue({
           data: a.data,
           profissionalSaudeId: a.profissionalSaude.id,
           procedimentoId: a.procedimento.id,
+          nome: a.nome ?? '',
         });
         this.form.controls.especialidadeId.setValue(a.especialidade.id);
         this.carregando = false;

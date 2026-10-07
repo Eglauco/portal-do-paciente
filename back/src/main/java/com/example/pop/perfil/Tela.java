@@ -25,6 +25,7 @@ public enum Tela {
     PRONTUARIO_MEDICO("Prontuário médico"),
     POSTAGENS("Rede Social"),
     ESPECIALIDADES("Especialidades"),
+    EXAME("Exames"),
     PROFISSIONAIS("Profissionais"),
     CONSELHOS("Conselhos"),
     PROCEDIMENTOS("Procedimentos"),

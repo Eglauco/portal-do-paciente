@@ -54,6 +54,22 @@ public class Horario {
     @JoinColumn(name = "agenda_id", nullable = false)
     private Agenda agenda;
 
+    /**
+     * Código do horário no sistema externo (CROSS {@code ID_AGE_CONSULTA_HOR}/{@code ID_AGE_EXAME_HOR}). Único por
+     * TIPO quando preenchido. Chave de rastreio da marcação importada do SIRESP; só-leitura. Null nas marcações manuais.
+     */
+    @Column(name = "codigo_integracao", length = 60)
+    private String codigoIntegracao;
+
+    /**
+     * Tipo de atendimento (CONSULTA/EXAME) — diferencia o {@code codigoIntegracao} entre os id-spaces do CROSS, que
+     * podem colidir numericamente. A identidade do horário importado é (tipoAtendimento + codigoIntegracao). Nulo nas
+     * marcações manuais (sem código).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_atendimento", length = 20)
+    private TipoAtendimento tipoAtendimento;
+
     /** Data e hora da marcação (timestamp cheio = dia da agenda + hora de início). */
     @Column(name = "data_hora", nullable = false)
     private LocalDateTime dataHora;

@@ -119,20 +119,36 @@ public class StorageService {
         return new UploadUrlResponse(uploadUrl, publicUrl);
     }
 
-    /** Gera uma URL pré-assinada (GET) temporária para visualizar/baixar o arquivo. */
+    /** Gera uma URL pré-assinada (GET) temporária para VISUALIZAR o arquivo (inline, sem forçar download). */
     public String gerarDownloadUrl(String url) {
+        return gerarDownloadUrl(url, null);
+    }
+
+    /**
+     * Gera uma URL pré-assinada (GET) temporária. Com {@code nomeArquivo} preenchido, a resposta vem com
+     * {@code Content-Disposition: attachment} — o navegador BAIXA o arquivo (com esse nome) em vez de abrir inline.
+     */
+    public String gerarDownloadUrl(String url, String nomeArquivo) {
         exigirConfiguracao();
         String chave = chaveDaUrl(url);
         if (chave == null) {
             return url;
         }
-        GetObjectRequest get = GetObjectRequest.builder().bucket(bucket).key(chave).build();
+        GetObjectRequest.Builder get = GetObjectRequest.builder().bucket(bucket).key(chave);
+        if (StringUtils.hasText(nomeArquivo)) {
+            get.responseContentDisposition("attachment; filename=\"" + nomeAnexoSeguro(nomeArquivo) + "\"");
+        }
         PresignedGetObjectRequest presigned = presigner().presignGetObject(
                 GetObjectPresignRequest.builder()
                         .signatureDuration(Duration.ofMinutes(10))
-                        .getObjectRequest(get)
+                        .getObjectRequest(get.build())
                         .build());
         return presigned.url().toString();
+    }
+
+    /** Remove aspas/quebras/controle do nome (evita injeção no header Content-Disposition). */
+    private static String nomeAnexoSeguro(String nome) {
+        return nome.replaceAll("[\"\\\\\\r\\n]", "").trim();
     }
 
     /**

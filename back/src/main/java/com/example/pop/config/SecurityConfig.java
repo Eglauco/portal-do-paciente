@@ -94,6 +94,7 @@ public class SecurityConfig {
                         // Back-office (admin): o front do admin envia o token em todas as chamadas.
                         .requestMatchers("/auth/**", "/paciente/**", "/prontuario/**", "/storage/**", "/usuario/**",
                                 "/agendamento/**", "/agenda/**", "/horario/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
+                                "/exame/**",
                                 "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
                                 "/tipo-documento-prontuario/**", "/uso-ia/**", "/coassinatura/**",

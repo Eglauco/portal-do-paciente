@@ -26,6 +26,8 @@ import { AgendaService } from './agenda.service';
     .add-row .form-field--hora { flex: 0 0 auto; width: 130px; }
     .add-row .btn { flex: 0 0 auto; }
     .status-pill { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand-deep, var(--brand)); white-space: nowrap; }
+    /* Código de integração (CROSS) — badge monoespaçado para rastreio. */
+    .cod { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 0.35rem; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand-deep, var(--brand)); }
   `],
 })
 export class AgendaDetalhe {

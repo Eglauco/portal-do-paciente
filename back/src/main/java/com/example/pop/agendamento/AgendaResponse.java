@@ -7,6 +7,8 @@ import java.util.List;
 public record AgendaResponse(
         Long id,
         LocalDate data,
+        String nome,
+        String codigoIntegracao,
         RefResponse especialidade,
         RefResponse profissionalSaude,
         RefResponse procedimento,
@@ -17,6 +19,8 @@ public record AgendaResponse(
         return new AgendaResponse(
                 a.getId(),
                 a.getData(),
+                a.getNome(),
+                a.getCodigoIntegracao(),
                 new RefResponse(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 new RefResponse(a.getProfissionalSaude().getId(), a.getProfissionalSaude().getNome()),
                 new RefResponse(a.getProcedimento().getId(), a.getProcedimento().getNome()),

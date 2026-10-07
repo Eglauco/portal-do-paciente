@@ -445,7 +445,13 @@ public class AgendamentoController {
     private void aplicar(Horario horario, AgendamentoRequest request) {
         horario.setDataHora(request.dataHora());
         // Modelo "booking" desta tela (Fase 1): cada horário tem a sua Agenda (slot). Cria na inclusão, atualiza na edição.
-        Agenda agenda = horario.getAgenda() != null ? horario.getAgenda() : new Agenda();
+        // PORÉM a Agenda pode ser COMPARTILHADA (a importação do SIRESP agrupa N horários numa agenda por
+        // ID_AGE_CONSULTA). Editar o slot por esta tela legada reescreveria a agenda dos OUTROS pacientes — então, se
+        // a agenda atual tem mais de um horário, DESTACA este horário numa agenda nova (slot próprio) em vez de mutar
+        // a compartilhada. Agenda 1:1 (o caso desta tela) continua sendo atualizada no lugar.
+        Agenda atual = horario.getAgenda();
+        boolean compartilhada = atual != null && repository.countByAgenda_Id(atual.getId()) > 1;
+        Agenda agenda = atual != null && !compartilhada ? atual : new Agenda();
         agenda.setData(request.dataHora().toLocalDate());
         agenda.setEspecialidade(especialidadeRepository.findById(request.especialidadeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
