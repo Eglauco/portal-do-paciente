@@ -19,6 +19,22 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
     /** Paciente pelo número do prontuário — único quando preenchido (localização na importação de agenda). */
     Optional<Paciente> findByProntuario(String prontuario);
 
+    /**
+     * Busca enxuta para seleção (typeahead da tela de agendamentos): casa NOME, PRONTUÁRIO ou CPF num único termo
+     * — só pacientes ATIVOS, ordenado por nome. {@code digitos} = só os dígitos do termo (vazio desliga o match por
+     * CPF, que é guardado só com dígitos). O limite vem do Pageable.
+     */
+    @Query("""
+            select p from Paciente p
+            where p.situacao = com.example.pop.paciente.SituacaoCadastro.ATIVO
+              and (lower(p.nome) like lower(concat('%', :termo, '%'))
+                   or lower(p.prontuario) like lower(concat('%', :termo, '%'))
+                   or (:digitos <> '' and p.cpf like concat('%', :digitos, '%')))
+            order by p.nome asc
+            """)
+    java.util.List<Paciente> buscarParaSelecao(@Param("termo") String termo, @Param("digitos") String digitos,
+            Pageable limite);
+
     /** Pacientes cujo número está na lista de telefones — usado na limpeza de testes (telefone não é chave). */
     @Query("select p from Paciente p join p.telefonesAdicionais t where t = :numero")
     java.util.List<Paciente> buscarPorTelefoneNaLista(@Param("numero") String numero);

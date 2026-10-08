@@ -1,0 +1,114 @@
+<div class="pp__search">
+  <label class="label" for="pp-pac">Paciente</label>
+  <ng-select
+    id="pp-pac"
+    [formControl]="pacienteCtrl"
+    [items]="sugestoes()"
+    bindLabel="nome"
+    [typeahead]="termo$"
+    [loading]="buscando()"
+    [minTermLength]="2"
+    [clearable]="true"
+    placeholder="Busque o paciente por nome, CPF ou prontuário"
+    typeToSearchText="Digite ao menos 2 caracteres"
+    loadingText="Buscando…"
+    notFoundText="Nenhum paciente encontrado"
+    (change)="selecionar($event)"
+  >
+    <ng-template ng-option-tmp let-item="item">
+      <div class="opt__nome">{{ item.nome }}</div>
+      <div class="opt__meta">
+        @if (item.cpf) { CPF {{ item.cpf }} }
+        @if (item.cpf && item.prontuario) { · }
+        @if (item.prontuario) { Prontuário {{ item.prontuario }} }
+        @if (!item.cpf && !item.prontuario) { — }
+      </div>
+    </ng-template>
+  </ng-select>
+</div>
+
+@if (!paciente()) {
+  <div class="state">
+    <span class="state__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+    </span>
+    <h3>Busque um paciente</h3>
+    <p>Digite o nome, CPF ou prontuário acima para ver as marcações dele nesta unidade.</p>
+  </div>
+} @else {
+  <div class="pac-head">
+    <div class="pac-head__av" aria-hidden="true">{{ iniciais() }}</div>
+    <div>
+      <div class="pac-head__nome">{{ paciente()!.nome }}</div>
+      <div class="pac-head__meta">
+        @if (paciente()!.cpf) { CPF {{ paciente()!.cpf }} }
+        @if (paciente()!.cpf && paciente()!.prontuario) { · }
+        @if (paciente()!.prontuario) { Prontuário {{ paciente()!.prontuario }} }
+      </div>
+    </div>
+    @if (!loading() && !error()) {
+      <span class="pac-head__count">{{ totalElements() }} marcação(ões)</span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando marcações…</p></div>
+  } @else if (error()) {
+    <div class="state">
+      <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+      <h3>Não foi possível carregar</h3>
+      <button type="button" class="btn btn--solid" (click)="tentarNovamente()">Tentar novamente</button>
+    </div>
+  } @else if (marcacoes().length === 0) {
+    <div class="state">
+      <span class="state__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+      </span>
+      <h3>Nenhuma marcação</h3>
+      <p>Este paciente não tem marcações nesta unidade.</p>
+    </div>
+  } @else {
+    <div class="marc-list">
+      @for (m of marcacoes(); track m.id) {
+        <a class="marc" [routerLink]="['/horarios', m.id]">
+          <div class="marc__data">
+            <div class="marc__dia">{{ m.data | date: 'dd/MM/yyyy' }}</div>
+            <div class="marc__hora">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              {{ m.horaInicio.slice(0, 5) }}@if (m.horaFim) {–{{ m.horaFim.slice(0, 5) }}}
+            </div>
+          </div>
+          <div class="marc__quem">
+            <div class="prof">{{ m.profissionalSaude?.nome }}</div>
+            <div class="esp">{{ m.especialidade?.nome }}</div>
+          </div>
+          <span [class]="'st ' + classeStatus(m.statusAgendamento)">{{ m.statusDescricao }}</span>
+          <svg class="marc__go" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+        </a>
+      }
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="pagination">
+        <div class="pagination__left">
+          <span class="pagination__info">{{ totalElements() }} marcação(ões)</span>
+        </div>
+        <nav class="pager" aria-label="Paginação">
+          <button type="button" class="pager__btn" [disabled]="first()" (click)="paginaAnterior()" aria-label="Página anterior">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+          </button>
+          @for (item of paginasVisiveis(); track $index) {
+            @if (item === 'ellipsis') {
+              <span class="pager__ellipsis" aria-hidden="true">…</span>
+            } @else {
+              <button type="button" class="pager__btn" [class.is-active]="item === page()" (click)="irParaPagina(item)">{{ item + 1 }}</button>
+            }
+          }
+          <button type="button" class="pager__btn" [disabled]="last()" (click)="proximaPagina()" aria-label="Próxima página">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+          </button>
+        </nav>
+      </div>
+    }
+  }
+}

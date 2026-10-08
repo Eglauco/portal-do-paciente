@@ -4,6 +4,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { AgendaImportModal } from './agenda-import-modal';
+import { AgendasPorPaciente } from './agendas-por-paciente';
 import { AgendaResumo } from './agenda.model';
 import { AgendaService } from './agenda.service';
 
@@ -12,8 +13,17 @@ export type PaginaItem = number | 'ellipsis';
 /** Lista de Agendas (slots) com filtros + botão "Nova agenda". Clica → detalhe (horários). */
 @Component({
   selector: 'app-agendas-list',
-  imports: [ReactiveFormsModule, DatePipe, RouterLink, AgendaImportModal],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink, AgendaImportModal, AgendasPorPaciente],
   templateUrl: './agendas-list.html',
+  styles: [
+    `
+      .mode-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 0.6rem; overflow: hidden; margin: 0 0 1.25rem; }
+      .mode-toggle button { border: 0; background: transparent; padding: 0.5rem 1.05rem; font-size: 0.9rem; font-weight: 600; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; }
+      .mode-toggle button + button { border-left: 1px solid var(--line); }
+      .mode-toggle button.is-active { background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand-deep, var(--brand)); }
+      .mode-toggle svg { width: 1.05rem; height: 1.05rem; }
+    `,
+  ],
 })
 export class AgendasList {
   private readonly service = inject(AgendaService);
@@ -26,6 +36,9 @@ export class AgendasList {
     profissionalNome: new FormControl<string>('', { nonNullable: true }),
     especialidadeNome: new FormControl<string>('', { nonNullable: true }),
   });
+
+  /** Modo da tela: lista de agendas (slots) ou busca por paciente (marcações). */
+  protected readonly modo = signal<'agenda' | 'paciente'>('agenda');
 
   /** Controla a modal de importação de agenda por Excel (Fase 1 — só preview). */
   protected readonly importAberto = signal(false);

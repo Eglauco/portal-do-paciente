@@ -4,6 +4,14 @@ export type Sexo = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 /** Situação do cadastro (soft-delete). Não confundir com `ativo` (acesso ao app). */
 export type SituacaoCadastro = 'ATIVO' | 'INATIVO';
 
+/** Paciente enxuto para o typeahead de seleção (nome + CPF + prontuário para desambiguar). */
+export interface PacienteSelecao {
+  id: number;
+  nome: string;
+  cpf?: string | null;
+  prontuario?: string | null;
+}
+
 /** Funcionalidade do app sujeita à permissão do responsável. */
 export type FuncionalidadeApp =
   | 'AGENDAMENTOS'

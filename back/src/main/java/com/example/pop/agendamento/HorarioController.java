@@ -2,6 +2,10 @@ package com.example.pop.agendamento;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +22,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.common.Pagina;
 import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.prontuario.TermoAssinaturaService;
@@ -64,6 +69,25 @@ public class HorarioController {
     /** URL de exibição (pré-assinada, 6h) da foto do paciente do horário; null quando não há foto. */
     private String fotoPaciente(Horario h) {
         return storageService.urlFotoPaciente(h.getPaciente().getFotoUrl());
+    }
+
+    /**
+     * Marcações de um paciente (tela "por paciente" do back-office): lista plana paginada, escopada pela unidade
+     * ativa ({@code unidadeId}), da mais recente para a mais antiga. Reusa o {@link HorarioResponse} dos horários.
+     */
+    @GetMapping("/por-paciente")
+    public Pagina<HorarioResponse> porPaciente(
+            @RequestParam Long pacienteId,
+            @RequestParam(required = false) Long unidadeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        int tamanho = Math.min(Math.max(size, 1), 100);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho,
+                Sort.by(Sort.Direction.DESC, "dataHora").and(Sort.by(Sort.Direction.DESC, "id")));
+        Page<Horario> resultado = repository.buscarPorPacienteNaUnidade(pacienteId, unidadeId, pageable);
+        List<HorarioResponse> content = resultado.getContent().stream().map(HorarioResponse::from).toList();
+        return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
+                resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
 
     @GetMapping("/{id}")

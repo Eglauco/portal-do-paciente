@@ -82,6 +82,22 @@ public class PacienteController {
     }
 
     /**
+     * Busca enxuta para o typeahead (seleção de paciente na tela de agendamentos): casa NOME, PRONTUÁRIO ou CPF
+     * num único termo, devolvendo poucos resultados (só ativos). Termo com menos de 2 caracteres devolve vazio.
+     */
+    @GetMapping("/buscar")
+    public List<PacienteSelecaoResponse> buscar(@RequestParam String termo) {
+        String t = (termo == null) ? "" : termo.trim();
+        if (t.length() < 2) {
+            return List.of();
+        }
+        String digitosTermo = t.replaceAll("\\D", "");
+        return repository.buscarParaSelecao(t, digitosTermo, PageRequest.of(0, 15)).stream()
+                .map(PacienteSelecaoResponse::from)
+                .toList();
+    }
+
+    /**
      * Lista pacientes de forma paginada, com filtros opcionais por código e nome.
      * O tamanho da página é limitado a {@value #TAMANHO_MAXIMO} registros.
      */

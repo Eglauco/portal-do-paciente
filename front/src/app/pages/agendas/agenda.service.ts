@@ -63,6 +63,18 @@ export class AgendaService {
     return this.http.delete<void>(`${this.baseHorario}/${id}`);
   }
 
+  /** Marcações de um paciente (visão "por paciente"), escopadas pela unidade ativa. */
+  marcacoesPorPaciente(
+    pacienteId: number,
+    unidadeId: number | null,
+    page = 0,
+    size = 20,
+  ): Observable<Pagina<Horario>> {
+    let params = new HttpParams().set('pacienteId', pacienteId).set('page', page).set('size', size);
+    if (unidadeId != null) params = params.set('unidadeId', unidadeId);
+    return this.http.get<Pagina<Horario>>(`${this.baseHorario}/por-paciente`, { params });
+  }
+
   logsHorario(id: number): Observable<AgendamentoLog[]> {
     return this.http.get<AgendamentoLog[]>(`${this.baseHorario}/${id}/logs`);
   }

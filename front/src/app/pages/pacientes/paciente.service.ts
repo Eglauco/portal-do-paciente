@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
-import { Pagina, Paciente, PacienteEntrada, PacienteFiltro, PacienteLog } from './paciente.model';
+import { Pagina, Paciente, PacienteEntrada, PacienteFiltro, PacienteLog, PacienteSelecao } from './paciente.model';
 
 @Injectable({ providedIn: 'root' })
 export class PacienteService {
@@ -49,6 +49,12 @@ export class PacienteService {
     for (const c of colunas) params = params.append('colunas', c);
     for (const o of ordenacoesParaParametros(ordenacoes)) params = params.append('ordenar', o);
     return this.http.get(`${this.base}/exportar`, { params, responseType: 'blob' });
+  }
+
+  /** Typeahead de seleção: casa nome, CPF ou prontuário num único termo (poucos resultados, só ativos). */
+  buscarParaSelecao(termo: string): Observable<PacienteSelecao[]> {
+    const params = new HttpParams().set('termo', termo);
+    return this.http.get<PacienteSelecao[]>(`${this.base}/buscar`, { params });
   }
 
   buscarPorId(id: number): Observable<Paciente> {
