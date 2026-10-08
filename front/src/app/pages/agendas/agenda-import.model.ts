@@ -38,3 +38,9 @@ export interface AgendaImportPreview {
   totalHorarios: number;
   totalErros: number;
 }
+
+/** Resultado da confirmação (Fase 2): a agenda criada + quantos horários foram gravados. */
+export interface AgendaImportResultado {
+  agendaId: number;
+  totalHorarios: number;
+}

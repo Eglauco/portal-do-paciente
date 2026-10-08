@@ -77,11 +77,29 @@ export class AgendaImportModal {
   /** Controla a exibição; o pai abre/fecha. */
   readonly aberto = input(false);
   readonly fechar = output<void>();
+  /** Emitido quando a importação é confirmada (gravada) — o pai recarrega a lista. */
+  readonly importou = output<void>();
 
   protected readonly baixando = signal(false);
   protected readonly enviando = signal(false);
+  protected readonly confirmando = signal(false);
   protected readonly arquivoNome = signal<string | null>(null);
+  /** O arquivo selecionado, guardado para reenviar na confirmação. */
+  protected readonly arquivo = signal<File | null>(null);
   protected readonly preview = signal<AgendaImportPreview | null>(null);
+
+  /** Habilita "Confirmar importação": preview sem erros, com horários, e nada em andamento. */
+  protected readonly podeConfirmar = computed(() => {
+    const p = this.preview();
+    return (
+      !!p &&
+      p.totalErros === 0 &&
+      p.totalHorarios > 0 &&
+      !!this.arquivo() &&
+      !this.enviando() &&
+      !this.confirmando()
+    );
+  });
 
   /** Campos do cabeçalho da agenda, já rotulados, para iterar no template. */
   protected readonly agendaCampos = computed<CampoAgenda[]>(() => {
@@ -125,6 +143,7 @@ export class AgendaImportModal {
     const input = event.target as HTMLInputElement;
     const arquivo = input.files?.[0];
     if (!arquivo) return;
+    this.arquivo.set(arquivo);
     this.arquivoNome.set(arquivo.name);
     this.enviando.set(true);
     this.service.preview(arquivo, this.auth.unidadeId()).subscribe({
@@ -140,13 +159,33 @@ export class AgendaImportModal {
     });
   }
 
+  /** Confirma a importação: grava a agenda + horários e notifica os pacientes. */
+  protected confirmar(): void {
+    const arquivo = this.arquivo();
+    if (!arquivo || !this.podeConfirmar()) return;
+    this.confirmando.set(true);
+    this.service.confirmar(arquivo, this.auth.unidadeId()).subscribe({
+      next: (r) => {
+        this.confirmando.set(false);
+        this.toastr.success(`Agenda importada com ${r.totalHorarios} horário(s).`);
+        this.limparPreview();
+        this.importou.emit();
+      },
+      error: (e) => {
+        this.confirmando.set(false);
+        this.toastr.error(e?.error?.message ?? 'Não foi possível confirmar a importação.');
+      },
+    });
+  }
+
   protected limparPreview(): void {
     this.preview.set(null);
     this.arquivoNome.set(null);
+    this.arquivo.set(null);
   }
 
   protected fecharModal(): void {
-    if (this.enviando()) return;
+    if (this.enviando() || this.confirmando()) return;
     this.limparPreview();
     this.fechar.emit();
   }

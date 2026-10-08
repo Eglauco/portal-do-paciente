@@ -137,11 +137,21 @@
       </div>
 
       <div class="modal__foot">
-        <span class="foot-note">A confirmação da importação (gravar) chega em breve (Fase 2).</span>
+        <span class="foot-note">
+          @if (preview(); as p) {
+            @if (p.totalErros === 0 && p.totalHorarios > 0) {
+              Confirmar grava a agenda e notifica os pacientes.
+            } @else {
+              Corrija os erros destacados para liberar a confirmação.
+            }
+          } @else {
+            Baixe o modelo, preencha e envie para ver o preview.
+          }
+        </span>
         <div class="modal__foot-actions">
-          <button type="button" class="btn btn--ghost" (click)="fecharModal()" [disabled]="enviando()">Fechar</button>
-          <button type="button" class="btn btn--solid" disabled title="Disponível em breve (Fase 2)">
-            Confirmar importação
+          <button type="button" class="btn btn--ghost" (click)="fecharModal()" [disabled]="enviando() || confirmando()">Fechar</button>
+          <button type="button" class="btn btn--solid" (click)="confirmar()" [disabled]="!podeConfirmar()">
+            {{ confirmando() ? 'Importando…' : 'Confirmar importação' }}
           </button>
         </div>
       </div>

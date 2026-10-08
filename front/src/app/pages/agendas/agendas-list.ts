@@ -70,6 +70,12 @@ export class AgendasList {
     this.carregar();
   }
 
+  /** Após confirmar a importação: fecha a modal e recarrega a lista (a nova agenda aparece). */
+  protected aoImportar(): void {
+    this.importAberto.set(false);
+    this.buscar();
+  }
+
   protected limpar(): void {
     this.filtro.reset({ data: '', profissionalNome: '', especialidadeNome: '' });
     this.page.set(0);

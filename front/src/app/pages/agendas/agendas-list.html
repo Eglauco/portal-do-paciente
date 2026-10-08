@@ -16,7 +16,7 @@
     </div>
   </header>
 
-  <app-agenda-import-modal [aberto]="importAberto()" (fechar)="importAberto.set(false)" />
+  <app-agenda-import-modal [aberto]="importAberto()" (fechar)="importAberto.set(false)" (importou)="aoImportar()" />
 
   <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
     <p class="section-label">Filtros</p>

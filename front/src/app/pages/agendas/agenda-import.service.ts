@@ -2,7 +2,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AgendaImportPreview } from './agenda-import.model';
+import { AgendaImportPreview, AgendaImportResultado } from './agenda-import.model';
 
 /** Importação de Agenda por Excel — Fase 1 (baixar modelo + preview; sem gravar). */
 @Injectable({ providedIn: 'root' })
@@ -25,5 +25,14 @@ export class AgendaImportService {
     let params = new HttpParams();
     if (unidadeId != null) params = params.set('unidadeId', unidadeId);
     return this.http.post<AgendaImportPreview>(`${this.base}/preview`, form, { params });
+  }
+
+  /** Confirma a importação (Fase 2): grava a agenda + horários e notifica os pacientes. Reenvia o arquivo. */
+  confirmar(arquivo: File, unidadeId: number | null): Observable<AgendaImportResultado> {
+    const form = new FormData();
+    form.append('arquivo', arquivo);
+    let params = new HttpParams();
+    if (unidadeId != null) params = params.set('unidadeId', unidadeId);
+    return this.http.post<AgendaImportResultado>(`${this.base}/confirmar`, form, { params });
   }
 }
