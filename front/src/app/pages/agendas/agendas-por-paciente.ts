@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,6 +8,7 @@ import { Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap,
 import { AuthService } from '../../core/auth.service';
 import { PacienteSelecao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
+import { AgendaBuscaStore } from './agenda-busca.store';
 import { Horario, StatusAgendamento } from './agenda.model';
 import { AgendaService } from './agenda.service';
 
@@ -72,6 +73,7 @@ export class AgendasPorPaciente {
   private readonly pacienteService = inject(PacienteService);
   private readonly service = inject(AgendaService);
   private readonly auth = inject(AuthService);
+  private readonly store = inject(AgendaBuscaStore);
 
   protected readonly pacienteCtrl = new FormControl<PacienteSelecao | null>(null);
   protected readonly termo$ = new Subject<string>();
@@ -131,11 +133,24 @@ export class AgendasPorPaciente {
         this.sugestoes.set(lista);
         this.buscando.set(false);
       });
+
+    // Restaura o paciente do último uso (ao voltar de um horário, a tela reabre onde estava).
+    afterNextRender(() => {
+      const salvo = this.store.paciente;
+      if (salvo) {
+        this.pacienteCtrl.setValue(salvo);
+        this.paciente.set(salvo);
+        this.page.set(this.store.pacientePage);
+        this.carregar();
+      }
+    });
   }
 
   protected selecionar(p: PacienteSelecao | undefined): void {
     this.paciente.set(p ?? null);
+    this.store.paciente = p ?? null;
     this.page.set(0);
+    this.store.pacientePage = 0;
     this.marcacoes.set([]);
     this.totalElements.set(0);
     this.totalPages.set(0);
@@ -177,6 +192,7 @@ export class AgendasPorPaciente {
         this.first.set(pagina.first);
         this.last.set(pagina.last);
         this.page.set(pagina.page);
+        this.store.pacientePage = pagina.page;
         this.loading.set(false);
       },
       error: () => {

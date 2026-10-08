@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { AgendaBuscaStore } from './agenda-busca.store';
 import { AgendaImportModal } from './agenda-import-modal';
 import { AgendasPorPaciente } from './agendas-por-paciente';
 import { AgendaResumo } from './agenda.model';
@@ -28,28 +29,29 @@ export type PaginaItem = number | 'ellipsis';
 export class AgendasList {
   private readonly service = inject(AgendaService);
   private readonly auth = inject(AuthService);
+  private readonly store = inject(AgendaBuscaStore);
 
   protected readonly tamanhos = AgendaService.TAMANHOS;
 
   protected readonly filtro = new FormGroup({
-    data: new FormControl<string>('', { nonNullable: true }),
-    profissionalNome: new FormControl<string>('', { nonNullable: true }),
-    especialidadeNome: new FormControl<string>('', { nonNullable: true }),
+    data: new FormControl<string>(this.store.data, { nonNullable: true }),
+    profissionalNome: new FormControl<string>(this.store.profissionalNome, { nonNullable: true }),
+    especialidadeNome: new FormControl<string>(this.store.especialidadeNome, { nonNullable: true }),
   });
 
-  /** Modo da tela: lista de agendas (slots) ou busca por paciente (marcações). */
-  protected readonly modo = signal<'agenda' | 'paciente'>('agenda');
+  /** Modo da tela: lista de agendas (slots) ou busca por paciente (marcações). Restaurado do último uso. */
+  protected readonly modo = signal<'agenda' | 'paciente'>(this.store.modo);
 
   /** Controla a modal de importação de agenda por Excel (Fase 1 — só preview). */
   protected readonly importAberto = signal(false);
 
-  protected readonly size = signal(AgendaService.TAMANHO_PADRAO);
+  protected readonly size = signal(this.store.size);
   protected readonly registros = signal<AgendaResumo[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
   protected readonly carregado = signal(false);
 
-  protected readonly page = signal(0);
+  protected readonly page = signal(this.store.page);
   protected readonly totalElements = signal(0);
   protected readonly totalPages = signal(0);
   protected readonly first = signal(true);
@@ -75,7 +77,17 @@ export class AgendasList {
   });
 
   constructor() {
-    afterNextRender(() => this.carregar());
+    // Só carrega a lista de agendas se a tela reabrir no modo "agenda" (no modo "paciente" o filho cuida de si).
+    afterNextRender(() => {
+      if (this.modo() === 'agenda') this.carregar();
+    });
+  }
+
+  /** Alterna o modo e lembra no store; ao entrar em "agenda" pela 1ª vez, carrega a lista. */
+  protected setModo(modo: 'agenda' | 'paciente'): void {
+    this.modo.set(modo);
+    this.store.modo = modo;
+    if (modo === 'agenda' && !this.carregado()) this.carregar();
   }
 
   protected buscar(): void {
@@ -91,6 +103,9 @@ export class AgendasList {
 
   protected limpar(): void {
     this.filtro.reset({ data: '', profissionalNome: '', especialidadeNome: '' });
+    this.store.data = '';
+    this.store.profissionalNome = '';
+    this.store.especialidadeNome = '';
     this.page.set(0);
     this.carregar();
   }
@@ -122,6 +137,12 @@ export class AgendasList {
       profissionalNome: v.profissionalNome || null,
       especialidadeNome: v.especialidadeNome || null,
     };
+    // Lembra o filtro/tamanho atuais para restaurar ao voltar à tela.
+    this.store.data = v.data;
+    this.store.profissionalNome = v.profissionalNome;
+    this.store.especialidadeNome = v.especialidadeNome;
+    this.store.size = this.size();
+    this.store.page = this.page();
     this.loading.set(true);
     this.error.set(false);
     this.service.listar(filtro, this.auth.unidadeId(), this.page(), this.size()).subscribe({
@@ -132,6 +153,7 @@ export class AgendasList {
         this.first.set(pagina.first);
         this.last.set(pagina.last);
         this.page.set(pagina.page);
+        this.store.page = pagina.page;
         this.loading.set(false);
         this.carregado.set(true);
       },
