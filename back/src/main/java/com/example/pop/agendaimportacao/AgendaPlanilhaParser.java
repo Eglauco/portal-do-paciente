@@ -21,16 +21,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Lê a planilha de importação de agenda (layout do {@link AgendaModeloPlanilha}: um bloco de cabeçalho
- * "DADOS DA AGENDA" com rótulo na coluna A / valor na coluna B, seguido de uma tabela "HORÁRIOS" com uma
- * linha por paciente). Só extrai as células como texto já normalizado para exibição — NÃO resolve ids/códigos
- * contra o banco nem valida regra de negócio; isso fica no {@link AgendaImportacaoService}, mantendo o parser
- * desacoplado das entidades.
+ * Lê a planilha de importação de agenda (layout do {@link AgendaModeloPlanilha}: um bloco "DADOS DA AGENDA"
+ * com rótulo na coluna A / valor na coluna B, seguido da tabela "HORÁRIOS" com uma linha por paciente).
+ * Só extrai as células como texto — NÃO resolve ids/códigos contra o banco nem valida regra; isso fica no
+ * {@link AgendaImportacaoService}, mantendo o parser desacoplado das entidades.
  *
- * <p>A planilha é toda por CÓDIGO/ID (nunca por nome, p/ não haver divergência): a agenda traz data +
- * profissional + especialidade + Configuração da Agenda (a unidade vem do usuário logado, não da planilha), e
- * cada horário traz só o identificador do paciente + hora início + hora fim (sem status — sempre entra como
- * "aguardando confirmação").
+ * <p>Tudo por CÓDIGO/ID, em colunas SEPARADAS por tipo de identificador (p/ não haver colisão id × código):
+ * cada cadastro tem uma coluna por tipo e o usuário preenche só uma. O parser apenas extrai cada coluna; o
+ * serviço é que exige "exatamente um preenchido" e resolve pelo tipo certo.
  *
  * <p>A leitura é tolerante: casa os rótulos por texto normalizado (sem acento, minúsculo, sem o "*").
  */
@@ -40,11 +38,16 @@ public class AgendaPlanilhaParser {
     private static final DateTimeFormatter DATA_PLANILHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA_PLANILHA = DateTimeFormatter.ofPattern("HH:mm");
 
-    /** Valores brutos (texto) extraídos da planilha, antes de qualquer resolução/validação. */
+    /**
+     * Valores brutos (texto) extraídos da planilha. Chaves do mapa {@code agenda}: {@code data},
+     * {@code profissionalId}, {@code profissionalCodigo}, {@code especialidadeId}, {@code especialidadeCodigo},
+     * {@code configId}, {@code nome}.
+     */
     public record Bruta(Map<String, String> agenda, List<LinhaBruta> horarios) {
     }
 
-    public record LinhaBruta(int linhaExcel, String paciente, String inicio, String fim) {
+    public record LinhaBruta(int linhaExcel, String pacienteId, String pacienteProntuario,
+            String pacienteCodigo, String inicio, String fim) {
     }
 
     public Bruta parse(byte[] bytes) {
@@ -79,7 +82,9 @@ public class AgendaPlanilhaParser {
                 }
             }
 
-            if (linhaCabecalhoHorarios < 0 || colunas == null || !colunas.containsKey("paciente")) {
+            boolean temColunaPaciente = colunas != null && (colunas.containsKey("pacienteId")
+                    || colunas.containsKey("pacienteProntuario") || colunas.containsKey("pacienteCodigo"));
+            if (linhaCabecalhoHorarios < 0 || !temColunaPaciente) {
                 throw invalida();
             }
 
@@ -89,13 +94,16 @@ public class AgendaPlanilhaParser {
                 if (row == null) {
                     continue;
                 }
-                String paciente = texto(celula(row, colunas, "paciente"));
+                String pacienteId = texto(celula(row, colunas, "pacienteId"));
+                String pacienteProntuario = texto(celula(row, colunas, "pacienteProntuario"));
+                String pacienteCodigo = texto(celula(row, colunas, "pacienteCodigo"));
                 String inicio = lerHora(celula(row, colunas, "inicio"));
                 String fim = lerHora(celula(row, colunas, "fim"));
-                if (paciente.isBlank() && inicio.isBlank() && fim.isBlank()) {
+                if (pacienteId.isBlank() && pacienteProntuario.isBlank() && pacienteCodigo.isBlank()
+                        && inicio.isBlank() && fim.isBlank()) {
                     continue; // linha totalmente vazia: ignora (não vira erro)
                 }
-                horarios.add(new LinhaBruta(r + 1, paciente, inicio, fim));
+                horarios.add(new LinhaBruta(r + 1, pacienteId, pacienteProntuario, pacienteCodigo, inicio, fim));
             }
 
             return new Bruta(agenda, horarios);
@@ -108,21 +116,24 @@ public class AgendaPlanilhaParser {
 
     // ---------------- Rótulos ----------------
 
+    /** Casa o rótulo da coluna A com a chave do campo (cadastro + tipo de identificador). */
     private static String chaveAgenda(String rotulo) {
-        if (rotulo.equals("data")) {
+        if (rotulo.startsWith("data")) {
             return "data";
-        }
-        if (rotulo.startsWith("profissional")) {
-            return "profissional";
-        }
-        if (rotulo.startsWith("especialidade")) {
-            return "especialidade";
-        }
-        if (rotulo.startsWith("configuracao")) {
-            return "config";
         }
         if (rotulo.startsWith("nome da agenda")) {
             return "nome";
+        }
+        if (rotulo.startsWith("profissional")) {
+            return rotulo.contains("codigo") ? "profissionalCodigo"
+                    : (rotulo.contains("id interno") ? "profissionalId" : null);
+        }
+        if (rotulo.startsWith("especialidade")) {
+            return rotulo.contains("codigo") ? "especialidadeCodigo"
+                    : (rotulo.contains("id interno") ? "especialidadeId" : null);
+        }
+        if (rotulo.startsWith("configuracao")) {
+            return "configId"; // Configuração da Agenda só tem id interno
         }
         return null;
     }
@@ -144,7 +155,13 @@ public class AgendaPlanilhaParser {
                 continue;
             }
             if (r.startsWith("paciente")) {
-                colunas.putIfAbsent("paciente", c.getColumnIndex());
+                if (r.contains("codigo")) {
+                    colunas.putIfAbsent("pacienteCodigo", c.getColumnIndex());
+                } else if (r.contains("prontuario")) {
+                    colunas.putIfAbsent("pacienteProntuario", c.getColumnIndex());
+                } else if (r.contains("id interno")) {
+                    colunas.putIfAbsent("pacienteId", c.getColumnIndex());
+                }
             } else if (r.contains("inicio")) {
                 colunas.putIfAbsent("inicio", c.getColumnIndex());
             } else if (r.contains("fim")) {
