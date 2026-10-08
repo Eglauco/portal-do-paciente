@@ -39,7 +39,7 @@ public class TwilioSmsService implements SmsService {
             @Value("${twilio.sms-from:}") String from) {
         this.temCredenciais = !accountSid.isBlank() && !authToken.isBlank();
         this.messagingServiceSid = messagingServiceSid == null ? "" : messagingServiceSid.trim();
-        this.from = from == null ? "" : from.trim();
+        this.from = normalizarRemetente(from);
 
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout((int) Duration.ofSeconds(5).toMillis());
@@ -93,5 +93,15 @@ public class TwilioSmsService implements SmsService {
     /** Mascara o telefone para log/auditoria: mantém só os 4 últimos dígitos. */
     private static String mascarar(String e164) {
         return e164 == null || e164.length() < 4 ? "***" : "***" + e164.substring(e164.length() - 4);
+    }
+
+    /**
+     * Normaliza o remetente: um número só com dígitos vira E.164 (prefixa {@code +}), tolerando
+     * quem configura sem o {@code +}. Um Sender ID alfanumérico (tem letras/espaços) fica intacto —
+     * nunca recebe {@code +}. Vazio continua vazio.
+     */
+    private static String normalizarRemetente(String valor) {
+        String v = valor == null ? "" : valor.trim();
+        return v.matches("\\d{6,}") ? "+" + v : v;
     }
 }
