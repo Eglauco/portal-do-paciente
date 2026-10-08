@@ -48,6 +48,7 @@ class HorarioEntregaServiceTest {
     @Mock private DispositivoRepository dispositivoRepository;
     @Mock private HorarioEntregaRepository entregaRepository;
     @Mock private HorarioRepository agendamentoRepository;
+    @Mock private ConviteAppService conviteAppService;
     @Mock private PlatformTransactionManager transactionManager;
     @InjectMocks private HorarioEntregaService service;
 
