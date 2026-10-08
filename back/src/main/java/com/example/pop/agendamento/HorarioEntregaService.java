@@ -55,12 +55,14 @@ public class HorarioEntregaService {
     private final DispositivoRepository dispositivoRepository;
     private final HorarioEntregaRepository entregaRepository;
     private final HorarioRepository agendamentoRepository;
+    private final ConviteAppService conviteAppService;
     private final TransactionTemplate transactionTemplate;
 
     public HorarioEntregaService(PushService pushService, NotificacaoService notificacaoService,
             ResponsavelRepository responsavelRepository, ContaAppRepository contaRepository,
             DispositivoRepository dispositivoRepository, HorarioEntregaRepository entregaRepository,
-            HorarioRepository agendamentoRepository, PlatformTransactionManager transactionManager) {
+            HorarioRepository agendamentoRepository, ConviteAppService conviteAppService,
+            PlatformTransactionManager transactionManager) {
         this.pushService = pushService;
         this.notificacaoService = notificacaoService;
         this.responsavelRepository = responsavelRepository;
@@ -68,6 +70,7 @@ public class HorarioEntregaService {
         this.dispositivoRepository = dispositivoRepository;
         this.entregaRepository = entregaRepository;
         this.agendamentoRepository = agendamentoRepository;
+        this.conviteAppService = conviteAppService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -139,6 +142,10 @@ public class HorarioEntregaService {
             agendamentoRepository.findById(a.getId())
                     .ifPresent(gerenciado -> gerenciado.setEntregaResumo(resumoFinal));
         });
+
+        // Convite por SMS para baixar o app (async + fail-open): envia a quem não tem o app,
+        // se o parâmetro global estiver ligado. Não interfere no push nem na gravação acima.
+        conviteAppService.convidarSeSemApp(pacienteId);
     }
 
     /** Estado da pessoa: sem token = sem app; algum token aceito = enviada; senão = sem notificação ativa. */

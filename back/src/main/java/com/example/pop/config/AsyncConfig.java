@@ -39,4 +39,16 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /** Pool do convite por SMS ao agendar (POST ao Twilio; pequeno, enfileirado e fail-open). */
+    @Bean(name = "smsConviteExecutor")
+    public Executor smsConviteExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("sms-convite-");
+        executor.initialize();
+        return executor;
+    }
 }

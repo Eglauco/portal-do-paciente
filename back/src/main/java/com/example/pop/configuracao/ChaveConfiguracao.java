@@ -207,4 +207,20 @@ public final class ChaveConfiguracao {
      * o arquivo original é reenviado ao Sistema de Gestão (só se houver {@link #SIRESP_POST_URL}). Desligado: só importa.
      */
     public static final String SIRESP_ENVIAR_AO_IMPORTAR = "SIRESP_ENVIAR_AO_IMPORTAR";
+
+    // ---------- Convite por SMS para baixar o app (disparado ao agendar) ----------
+
+    /**
+     * Liga/desliga GLOBAL do convite por SMS para baixar o app (BOOLEANO). Ligado = ao criar um Horário
+     * (manual ou importado do SIRESP), quem (paciente/responsável) não tem o app recebe um SMS com os
+     * links das lojas, em todos os celulares cadastrados. Começa desligado (semeado em V147). Só envia de
+     * fato com o Twilio Messaging configurado (credenciais/remetente em variáveis de ambiente).
+     */
+    public static final String SMS_CONVITE_APP_HABILITADO = "SMS_CONVITE_APP_HABILITADO";
+
+    /** Link da loja Android (Google Play) incluído no SMS de convite (TEXTO). Em branco = omitido. */
+    public static final String SMS_CONVITE_APP_LINK_ANDROID = "SMS_CONVITE_APP_LINK_ANDROID";
+
+    /** Link da loja iOS (App Store) incluído no SMS de convite (TEXTO). Em branco = omitido. */
+    public static final String SMS_CONVITE_APP_LINK_IOS = "SMS_CONVITE_APP_LINK_IOS";
 }
