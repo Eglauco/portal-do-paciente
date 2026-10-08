@@ -43,10 +43,12 @@ public class AgendaImportacaoController {
 
     /**
      * Recebe a planilha preenchida e devolve o PREVIEW: cabeçalho da agenda + todas as linhas de horário, com
-     * os campos resolvidos contra os cadastros e os erros por campo. Não grava nada.
+     * os cadastros localizados por id/código e os erros por campo. A unidade executante é a do usuário logado
+     * ({@code unidadeId}, enviado pelo front). Não grava nada.
      */
     @PostMapping("/preview")
-    public AgendaImportPreviewResponse preview(@RequestParam("arquivo") MultipartFile arquivo) {
+    public AgendaImportPreviewResponse preview(@RequestParam("arquivo") MultipartFile arquivo,
+            @RequestParam(required = false) Long unidadeId) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Selecione uma planilha .xlsx.");
         }
@@ -56,7 +58,7 @@ public class AgendaImportacaoController {
                     "A planilha precisa ser um arquivo .xlsx. Baixe a planilha de exemplo e preencha sobre ela.");
         }
         try {
-            return service.preview(arquivo.getBytes(), nome);
+            return service.preview(arquivo.getBytes(), nome, unidadeId);
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {

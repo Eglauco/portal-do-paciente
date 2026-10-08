@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -15,10 +15,15 @@ export class AgendaImportService {
     return this.http.get(`${this.base}/modelo`, { responseType: 'blob' });
   }
 
-  /** Sobe a planilha preenchida (multipart) e recebe o preview validado. */
-  preview(arquivo: File): Observable<AgendaImportPreview> {
+  /**
+   * Sobe a planilha preenchida (multipart) e recebe o preview validado. `unidadeId` é a unidade do usuário
+   * logado — vira a unidade executante da agenda (não vai na planilha).
+   */
+  preview(arquivo: File, unidadeId: number | null): Observable<AgendaImportPreview> {
     const form = new FormData();
     form.append('arquivo', arquivo);
-    return this.http.post<AgendaImportPreview>(`${this.base}/preview`, form);
+    let params = new HttpParams();
+    if (unidadeId != null) params = params.set('unidadeId', unidadeId);
+    return this.http.post<AgendaImportPreview>(`${this.base}/preview`, form, { params });
   }
 }

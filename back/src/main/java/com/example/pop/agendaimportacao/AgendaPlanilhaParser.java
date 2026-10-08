@@ -23,12 +23,16 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * Lê a planilha de importação de agenda (layout do {@link AgendaModeloPlanilha}: um bloco de cabeçalho
  * "DADOS DA AGENDA" com rótulo na coluna A / valor na coluna B, seguido de uma tabela "HORÁRIOS" com uma
- * linha por paciente). Só extrai as células como texto já normalizado para exibição — NÃO resolve nomes
+ * linha por paciente). Só extrai as células como texto já normalizado para exibição — NÃO resolve ids/códigos
  * contra o banco nem valida regra de negócio; isso fica no {@link AgendaImportacaoService}, mantendo o parser
- * desacoplado das entidades (reconciliável no merge com a renomeação paralela de Procedimento).
+ * desacoplado das entidades.
  *
- * <p>A leitura é tolerante: casa os rótulos por texto normalizado (sem acento, minúsculo, sem o "*"), então a
- * ordem das colunas de horário e pequenas variações de rótulo não quebram o import.
+ * <p>A planilha é toda por CÓDIGO/ID (nunca por nome, p/ não haver divergência): a agenda traz data +
+ * profissional + especialidade + Configuração da Agenda (a unidade vem do usuário logado, não da planilha), e
+ * cada horário traz só o identificador do paciente + hora início + hora fim (sem status — sempre entra como
+ * "aguardando confirmação").
+ *
+ * <p>A leitura é tolerante: casa os rótulos por texto normalizado (sem acento, minúsculo, sem o "*").
  */
 @Component
 public class AgendaPlanilhaParser {
@@ -40,7 +44,7 @@ public class AgendaPlanilhaParser {
     public record Bruta(Map<String, String> agenda, List<LinhaBruta> horarios) {
     }
 
-    public record LinhaBruta(int linhaExcel, String paciente, String cpf, String inicio, String fim, String status) {
+    public record LinhaBruta(int linhaExcel, String paciente, String inicio, String fim) {
     }
 
     public Bruta parse(byte[] bytes) {
@@ -59,7 +63,6 @@ public class AgendaPlanilhaParser {
                 if (row == null) {
                     continue;
                 }
-                String rotuloA = normalizar(texto(row.getCell(0)));
 
                 // Cabeçalho da tabela de horários: a partir daqui as linhas são marcações.
                 if (ehCabecalhoHorarios(row)) {
@@ -69,7 +72,7 @@ public class AgendaPlanilhaParser {
                 }
 
                 // Bloco da agenda: rótulo na coluna A, valor na coluna B.
-                String chave = chaveAgenda(rotuloA);
+                String chave = chaveAgenda(normalizar(texto(row.getCell(0))));
                 if (chave != null && !agenda.containsKey(chave)) {
                     Cell valor = row.getCell(1);
                     agenda.put(chave, "data".equals(chave) ? lerData(valor) : texto(valor));
@@ -87,14 +90,12 @@ public class AgendaPlanilhaParser {
                     continue;
                 }
                 String paciente = texto(celula(row, colunas, "paciente"));
-                String cpf = lerCpf(celula(row, colunas, "cpf"));
                 String inicio = lerHora(celula(row, colunas, "inicio"));
                 String fim = lerHora(celula(row, colunas, "fim"));
-                String status = texto(celula(row, colunas, "status"));
-                if (paciente.isBlank() && cpf.isBlank() && inicio.isBlank() && fim.isBlank() && status.isBlank()) {
+                if (paciente.isBlank() && inicio.isBlank() && fim.isBlank()) {
                     continue; // linha totalmente vazia: ignora (não vira erro)
                 }
-                horarios.add(new LinhaBruta(r + 1, paciente, cpf, inicio, fim, status));
+                horarios.add(new LinhaBruta(r + 1, paciente, inicio, fim));
             }
 
             return new Bruta(agenda, horarios);
@@ -120,9 +121,6 @@ public class AgendaPlanilhaParser {
         if (rotulo.startsWith("configuracao")) {
             return "config";
         }
-        if (rotulo.startsWith("unidade")) {
-            return "unidade";
-        }
         if (rotulo.startsWith("nome da agenda")) {
             return "nome";
         }
@@ -131,7 +129,7 @@ public class AgendaPlanilhaParser {
 
     private static boolean ehCabecalhoHorarios(Row row) {
         for (Cell c : row) {
-            if (normalizar(texto(c)).startsWith("nome do paciente")) {
+            if (normalizar(texto(c)).startsWith("paciente")) {
                 return true;
             }
         }
@@ -145,16 +143,12 @@ public class AgendaPlanilhaParser {
             if (r.isBlank()) {
                 continue;
             }
-            if (r.contains("paciente")) {
+            if (r.startsWith("paciente")) {
                 colunas.putIfAbsent("paciente", c.getColumnIndex());
-            } else if (r.contains("cpf")) {
-                colunas.putIfAbsent("cpf", c.getColumnIndex());
             } else if (r.contains("inicio")) {
                 colunas.putIfAbsent("inicio", c.getColumnIndex());
             } else if (r.contains("fim")) {
                 colunas.putIfAbsent("fim", c.getColumnIndex());
-            } else if (r.contains("status")) {
-                colunas.putIfAbsent("status", c.getColumnIndex());
             }
         }
         return colunas;
@@ -167,7 +161,7 @@ public class AgendaPlanilhaParser {
 
     // ---------------- Leitura de células ----------------
 
-    /** Texto genérico (nomes, códigos, CPF/hora digitados como texto). Número inteiro vira string sem casas. */
+    /** Texto genérico (ids/códigos, hora digitada como texto). Número inteiro vira string sem casas decimais. */
     private static String texto(Cell c) {
         if (c == null) {
             return "";
@@ -216,16 +210,6 @@ public class AgendaPlanilhaParser {
         if (c != null && c.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(c)) {
             LocalDateTime dt = c.getLocalDateTimeCellValue();
             return dt == null ? "" : dt.toLocalTime().format(HORA_PLANILHA);
-        }
-        return texto(c);
-    }
-
-    /** CPF digitado como número perde o zero à esquerda — recompõe com padding para 11 dígitos. */
-    private static String lerCpf(Cell c) {
-        if (c != null && c.getCellType() == CellType.NUMERIC && !DateUtil.isCellDateFormatted(c)) {
-            long v = (long) c.getNumericCellValue();
-            String s = Long.toString(v);
-            return s.length() < 11 ? "0".repeat(11 - s.length()) + s : s;
         }
         return texto(c);
     }

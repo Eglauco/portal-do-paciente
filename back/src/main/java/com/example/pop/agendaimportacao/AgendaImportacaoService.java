@@ -6,26 +6,33 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.especialidade.EspecialidadeRepository;
-import com.example.pop.paciente.Documentos;
+import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.UnidadeRepository;
 
 /**
  * Fase 1 da importação de agenda por Excel: dado o arquivo, PARSEIA (via {@link AgendaPlanilhaParser}) e
- * VALIDA cada campo, resolvendo profissional / especialidade / Configuração da Agenda / unidade contra os
- * cadastros existentes (por NOME ou CÓDIGO de integração) — apenas CONSULTA, nada é criado nem gravado.
- * Devolve o {@link AgendaImportPreviewResponse} com os campos resolvidos e os erros para o cliente corrigir a
- * planilha e reimportar. A gravação da agenda/horários fica para a Fase 2.
+ * VALIDA cada campo, LOCALIZANDO os cadastros por ID ou CÓDIGO (nunca por nome, p/ não haver divergência) —
+ * apenas CONSULTA, nada é criado nem gravado. Devolve o {@link AgendaImportPreviewResponse} com o que foi
+ * encontrado + os erros para o cliente corrigir a planilha. A gravação fica para a Fase 2.
  *
- * <p>"Configuração da Agenda" é a entidade {@link com.example.pop.configuracaoagenda.ConfiguracaoAgenda}
- * (ex-{@code Procedimento}): não tem código de integração, então casa só por nome.
+ * <p>Regras desta planilha (toda por código):
+ * <ul>
+ *   <li>Profissional e Especialidade: por <b>id interno OU código de integração</b> (código tem precedência).</li>
+ *   <li>Configuração da Agenda ({@link com.example.pop.configuracaoagenda.ConfiguracaoAgenda}): só por <b>id
+ *       interno</b> — a entidade não tem código de integração.</li>
+ *   <li>Unidade executante: NÃO vem da planilha — é a unidade do <b>usuário logado</b> (param {@code unidadeId}).</li>
+ *   <li>Paciente: localizado por <b>código de integração → prontuário → id interno</b> (nessa ordem).</li>
+ *   <li>Status: não existe — toda marcação entra como "Aguardando confirmação do paciente".</li>
+ * </ul>
  */
 @Service
 public class AgendaImportacaoService {
@@ -40,33 +47,36 @@ public class AgendaImportacaoService {
             DateTimeFormatter.ofPattern("H:mm"),
             DateTimeFormatter.ofPattern("HH:mm:ss"));
 
-    /** Status assumido quando a coluna fica em branco (marcação nova aguarda o paciente confirmar). */
-    private static final StatusAgendamento STATUS_PADRAO = StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE;
-
     private final AgendaPlanilhaParser parser;
     private final ProfissionalSaudeRepository profissionalRepository;
     private final EspecialidadeRepository especialidadeRepository;
     private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final UnidadeRepository unidadeRepository;
+    private final PacienteRepository pacienteRepository;
 
     public AgendaImportacaoService(AgendaPlanilhaParser parser,
             ProfissionalSaudeRepository profissionalRepository,
             EspecialidadeRepository especialidadeRepository,
             ConfiguracaoAgendaRepository configuracaoAgendaRepository,
-            UnidadeRepository unidadeRepository) {
+            UnidadeRepository unidadeRepository,
+            PacienteRepository pacienteRepository) {
         this.parser = parser;
         this.profissionalRepository = profissionalRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.unidadeRepository = unidadeRepository;
+        this.pacienteRepository = pacienteRepository;
     }
 
-    /** Referência de cadastro para casar por nome/código (id só para a Fase 2). */
+    /** Referência de cadastro para casar por id/código (id só para a Fase 2). {@code codigo} nulo = sem código. */
     private record RefCadastro(Long id, String nome, String codigo) {
     }
 
+    /**
+     * @param unidadeId unidade do usuário logado (vem do token/sessão no front) — é a unidade executante da agenda.
+     */
     @Transactional(readOnly = true)
-    public AgendaImportPreviewResponse preview(byte[] bytes, String arquivo) {
+    public AgendaImportPreviewResponse preview(byte[] bytes, String arquivo, Long unidadeId) {
         AgendaPlanilhaParser.Bruta bruta = parser.parse(bytes);
         Map<String, String> a = bruta.agenda();
 
@@ -74,18 +84,16 @@ public class AgendaImportacaoService {
                 .map(p -> new RefCadastro(p.getId(), p.getNome(), p.getCodigoIntegracao())).toList();
         List<RefCadastro> especialidades = especialidadeRepository.findAll().stream()
                 .map(e -> new RefCadastro(e.getId(), e.getNome(), e.getCodigoIntegracao())).toList();
-        List<RefCadastro> unidades = unidadeRepository.findAll().stream()
-                .map(u -> new RefCadastro(u.getId(), u.getNome(), u.getCodigoIntegracao())).toList();
-        // "Configuração da Agenda" (ConfiguracaoAgenda): não tem código de integração — casa só por nome.
+        // ConfiguracaoAgenda não tem código de integração — casa só por id.
         List<RefCadastro> configuracoes = configuracaoAgendaRepository.findAll().stream()
                 .map(c -> new RefCadastro(c.getId(), c.getNome(), null)).toList();
 
         AgendaPreview agenda = new AgendaPreview(
                 resolverData(a.get("data")),
-                resolverRef(a.get("profissional"), "Profissional", profissionais),
-                resolverRef(a.get("especialidade"), "Especialidade", especialidades),
-                resolverRef(a.get("config"), "Configuração da Agenda", configuracoes),
-                resolverRef(a.get("unidade"), "Unidade executante", unidades),
+                resolverPorIdOuCodigo(a.get("profissional"), "Profissional", profissionais),
+                resolverPorIdOuCodigo(a.get("especialidade"), "Especialidade", especialidades),
+                resolverPorIdOuCodigo(a.get("config"), "Configuração da Agenda", configuracoes),
+                resolverUnidadeDoUsuario(unidadeId),
                 CampoPreview.ok(a.getOrDefault("nome", ""))); // nome é opcional (rótulo livre)
 
         List<HorarioPreview> horarios = new ArrayList<>();
@@ -99,28 +107,71 @@ public class AgendaImportacaoService {
 
     // ---------------- Resolução de campos ----------------
 
-    private CampoPreview resolverRef(String valor, String rotulo, List<RefCadastro> refs) {
+    /** Casa por código de integração (precedência) e, se não houver, por id interno. Nunca por nome. */
+    private CampoPreview resolverPorIdOuCodigo(String valor, String rotulo, List<RefCadastro> refs) {
         String v = valor == null ? "" : valor.trim();
         if (v.isEmpty()) {
             return CampoPreview.erro("", rotulo + " é obrigatório(a).");
         }
-        // 1) casa por código de integração (quando o cadastro tem código).
         for (RefCadastro r : refs) {
             if (r.codigo() != null && !r.codigo().isBlank() && r.codigo().trim().equalsIgnoreCase(v)) {
                 return CampoPreview.ok(valor, r.nome());
             }
         }
-        // 2) casa por nome normalizado (sem acento/caixa).
-        String alvo = AgendaPlanilhaParser.normalizar(v);
-        List<RefCadastro> casam = refs.stream()
-                .filter(r -> AgendaPlanilhaParser.normalizar(r.nome()).equals(alvo)).toList();
-        if (casam.size() == 1) {
-            return CampoPreview.ok(valor, casam.get(0).nome());
+        Long id = parseLong(v);
+        if (id != null) {
+            for (RefCadastro r : refs) {
+                if (id.equals(r.id())) {
+                    return CampoPreview.ok(valor, r.nome());
+                }
+            }
         }
-        if (casam.isEmpty()) {
-            return CampoPreview.erro(valor, rotulo + " não encontrado(a) pelo nome ou código.");
+        return CampoPreview.erro(valor, rotulo + " não encontrado(a) pelo id ou código.");
+    }
+
+    /** Unidade executante = a do usuário logado (não vem da planilha). */
+    private CampoPreview resolverUnidadeDoUsuario(Long unidadeId) {
+        if (unidadeId == null) {
+            return CampoPreview.erro("", "Unidade do usuário logado não identificada.");
         }
-        return CampoPreview.erro(valor, "Mais de um(a) " + rotulo.toLowerCase() + " com esse nome — use o código.");
+        return unidadeRepository.findById(unidadeId)
+                .map(u -> CampoPreview.ok(u.getNome(), "unidade do usuário logado"))
+                .orElse(CampoPreview.erro(String.valueOf(unidadeId), "Unidade do usuário logado não encontrada."));
+    }
+
+    private HorarioPreview resolverHorario(AgendaPlanilhaParser.LinhaBruta l) {
+        CampoPreview paciente = resolverPaciente(l.paciente());
+        CampoPreview inicio = resolverHora(l.inicio(), "Hora início", true);
+        CampoPreview fim = resolverHora(l.fim(), "Hora fim", false);
+        // Coerência: fim depois do início (só quando ambos são válidos).
+        if (!inicio.erro() && !fim.erro() && !l.fim().isBlank()) {
+            LocalTime i = parseHora(l.inicio());
+            LocalTime f = parseHora(l.fim());
+            if (i != null && f != null && !f.isAfter(i)) {
+                fim = CampoPreview.erro(l.fim(), "Hora fim deve ser após a hora início.");
+            }
+        }
+        return new HorarioPreview(l.linhaExcel(), paciente, inicio, fim);
+    }
+
+    /** Localiza o paciente por código de integração → prontuário → id interno (nessa ordem). */
+    private CampoPreview resolverPaciente(String valor) {
+        String v = valor == null ? "" : valor.trim();
+        if (v.isEmpty()) {
+            return CampoPreview.erro("", "Identificador do paciente é obrigatório.");
+        }
+        Optional<Paciente> p = pacienteRepository.findByCodigoIntegracao(v);
+        if (p.isEmpty()) {
+            p = pacienteRepository.findByProntuario(v);
+        }
+        if (p.isEmpty()) {
+            Long id = parseLong(v);
+            if (id != null) {
+                p = pacienteRepository.findById(id);
+            }
+        }
+        return p.map(pac -> CampoPreview.ok(valor, pac.getNome()))
+                .orElse(CampoPreview.erro(valor, "Paciente não encontrado por id, prontuário ou código."));
     }
 
     private CampoPreview resolverData(String valor) {
@@ -134,36 +185,6 @@ public class AgendaImportacaoService {
                 : CampoPreview.ok(valor, data.format(DATA_SAIDA));
     }
 
-    private HorarioPreview resolverHorario(AgendaPlanilhaParser.LinhaBruta l) {
-        CampoPreview paciente = l.paciente().isBlank()
-                ? CampoPreview.erro("", "Nome do paciente é obrigatório.")
-                : CampoPreview.ok(l.paciente());
-        CampoPreview cpf = resolverCpf(l.cpf());
-        CampoPreview inicio = resolverHora(l.inicio(), "Hora início", true);
-        CampoPreview fim = resolverHora(l.fim(), "Hora fim", false);
-        // Coerência: fim depois do início (só quando ambos são válidos).
-        if (!inicio.erro() && !fim.erro() && !l.fim().isBlank()) {
-            LocalTime i = parseHora(l.inicio());
-            LocalTime f = parseHora(l.fim());
-            if (i != null && f != null && !f.isAfter(i)) {
-                fim = CampoPreview.erro(l.fim(), "Hora fim deve ser após a hora início.");
-            }
-        }
-        CampoPreview status = resolverStatus(l.status());
-        return new HorarioPreview(l.linhaExcel(), paciente, cpf, inicio, fim, status);
-    }
-
-    private CampoPreview resolverCpf(String valor) {
-        String v = valor == null ? "" : valor.trim();
-        if (v.isEmpty()) {
-            return CampoPreview.erro("", "CPF é obrigatório.");
-        }
-        if (!Documentos.cpfValido(v)) {
-            return CampoPreview.erro(valor, "CPF inválido.");
-        }
-        return CampoPreview.ok(valor, formatarCpf(Documentos.somenteDigitos(v)));
-    }
-
     private CampoPreview resolverHora(String valor, String rotulo, boolean obrigatorio) {
         String v = valor == null ? "" : valor.trim();
         if (v.isEmpty()) {
@@ -173,22 +194,6 @@ public class AgendaImportacaoService {
         return hora == null
                 ? CampoPreview.erro(valor, rotulo + " inválida (use HH:mm).")
                 : CampoPreview.ok(valor, hora.format(HORA_ACEITAS.get(0)));
-    }
-
-    private CampoPreview resolverStatus(String valor) {
-        String v = valor == null ? "" : valor.trim();
-        if (v.isEmpty()) {
-            // Em branco é aceito: assume o padrão (sem erro).
-            return CampoPreview.ok("", STATUS_PADRAO.getDescricao() + " (padrão)");
-        }
-        String alvo = AgendaPlanilhaParser.normalizar(v);
-        for (StatusAgendamento s : StatusAgendamento.values()) {
-            if (AgendaPlanilhaParser.normalizar(s.name()).equals(alvo)
-                    || AgendaPlanilhaParser.normalizar(s.getDescricao()).equals(alvo)) {
-                return CampoPreview.ok(valor, s.getDescricao());
-            }
-        }
-        return CampoPreview.erro(valor, "Status não reconhecido.");
     }
 
     // ---------------- Parse de data/hora ----------------
@@ -215,6 +220,14 @@ public class AgendaImportacaoService {
         return null;
     }
 
+    private static Long parseLong(String v) {
+        try {
+            return Long.valueOf(v.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     // ---------------- Helpers ----------------
 
     private static int contarErros(AgendaPreview a) {
@@ -222,7 +235,7 @@ public class AgendaImportacaoService {
     }
 
     private static int contarErros(HorarioPreview h) {
-        return conta(h.paciente(), h.cpf(), h.horaInicio(), h.horaFim(), h.status());
+        return conta(h.paciente(), h.horaInicio(), h.horaFim());
     }
 
     private static int conta(CampoPreview... campos) {
@@ -233,13 +246,5 @@ public class AgendaImportacaoService {
             }
         }
         return n;
-    }
-
-    private static String formatarCpf(String digitos) {
-        if (digitos == null || digitos.length() != 11) {
-            return digitos;
-        }
-        return digitos.substring(0, 3) + "." + digitos.substring(3, 6) + "."
-                + digitos.substring(6, 9) + "-" + digitos.substring(9);
     }
 }
