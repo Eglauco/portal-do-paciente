@@ -74,12 +74,9 @@ public class AgendaPlanilhaParser {
                     break;
                 }
 
-                // Bloco da agenda: rótulo na coluna A, valor na coluna B.
-                String chave = chaveAgenda(normalizar(texto(row.getCell(0))));
-                if (chave != null && !agenda.containsKey(chave)) {
-                    Cell valor = row.getCell(1);
-                    agenda.put(chave, "data".equals(chave) ? lerData(valor) : texto(valor));
-                }
+                // Bloco da agenda: rótulo na coluna A; valor na B — e, p/ profissional/especialidade,
+                // id interno na B e código de integração na C (duas colunas lado a lado).
+                lerLinhaAgenda(row, agenda);
             }
 
             boolean temColunaPaciente = colunas != null && (colunas.containsKey("pacienteId")
@@ -116,26 +113,26 @@ public class AgendaPlanilhaParser {
 
     // ---------------- Rótulos ----------------
 
-    /** Casa o rótulo da coluna A com a chave do campo (cadastro + tipo de identificador). */
-    private static String chaveAgenda(String rotulo) {
-        if (rotulo.startsWith("data")) {
-            return "data";
+    /**
+     * Lê uma linha do bloco DADOS DA AGENDA (rótulo na coluna A). Data/Configuração/Nome usam só a coluna B;
+     * Profissional e Especialidade usam B (id interno) + C (código de integração) — o serviço exige que só uma
+     * esteja preenchida. Linhas que não casam (título, cabeçalho das 2 colunas, nota) são ignoradas.
+     */
+    private static void lerLinhaAgenda(Row row, Map<String, String> agenda) {
+        String la = normalizar(texto(row.getCell(0)));
+        if (la.startsWith("data")) {
+            agenda.putIfAbsent("data", lerData(row.getCell(1)));
+        } else if (la.startsWith("nome da agenda")) {
+            agenda.putIfAbsent("nome", texto(row.getCell(1)));
+        } else if (la.startsWith("profissional")) {
+            agenda.putIfAbsent("profissionalId", texto(row.getCell(1)));
+            agenda.putIfAbsent("profissionalCodigo", texto(row.getCell(2)));
+        } else if (la.startsWith("especialidade")) {
+            agenda.putIfAbsent("especialidadeId", texto(row.getCell(1)));
+            agenda.putIfAbsent("especialidadeCodigo", texto(row.getCell(2)));
+        } else if (la.startsWith("configuracao")) {
+            agenda.putIfAbsent("configId", texto(row.getCell(1)));
         }
-        if (rotulo.startsWith("nome da agenda")) {
-            return "nome";
-        }
-        if (rotulo.startsWith("profissional")) {
-            return rotulo.contains("codigo") ? "profissionalCodigo"
-                    : (rotulo.contains("id interno") ? "profissionalId" : null);
-        }
-        if (rotulo.startsWith("especialidade")) {
-            return rotulo.contains("codigo") ? "especialidadeCodigo"
-                    : (rotulo.contains("id interno") ? "especialidadeId" : null);
-        }
-        if (rotulo.startsWith("configuracao")) {
-            return "configId"; // Configuração da Agenda só tem id interno
-        }
-        return null;
     }
 
     private static boolean ehCabecalhoHorarios(Row row) {

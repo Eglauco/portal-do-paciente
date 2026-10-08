@@ -47,52 +47,69 @@ public class AgendaModeloPlanilha {
     private void abaAgenda(XSSFWorkbook wb, Estilos e) {
         Sheet s = wb.createSheet("Agenda");
         s.setColumnWidth(0, 36 * 256);
-        s.setColumnWidth(1, 22 * 256);
-        s.setColumnWidth(2, 40 * 256);
-        s.setColumnWidth(3, 14 * 256);
+        s.setColumnWidth(1, 24 * 256);
+        s.setColumnWidth(2, 30 * 256);
+        s.setColumnWidth(3, 38 * 256);
         s.setColumnWidth(4, 12 * 256);
 
         // Título
         criar(s, 0, 0, "Modelo de importação de Agenda", e.titulo);
         mesclar(s, 0, 0, 4);
-        criar(s, 1, 0, "Um arquivo = uma agenda. Tudo por CÓDIGO/ID: cada cadastro tem colunas separadas por tipo e "
-                + "você preenche APENAS UMA. Campos com * são obrigatórios. Veja a aba \"Instruções\".", e.sub);
+        criar(s, 1, 0, "Um arquivo = uma agenda. Tudo por CÓDIGO/ID. Profissional e Especialidade têm as duas colunas "
+                + "(id interno e código de integração) — preencha APENAS UMA. Campos com * são obrigatórios. "
+                + "Veja a aba \"Instruções\".", e.sub);
         mesclar(s, 1, 0, 4);
 
         // Bloco DADOS DA AGENDA
         criar(s, 3, 0, "DADOS DA AGENDA (preencha uma vez)", e.secao);
         mesclar(s, 3, 0, 4);
-        linhaCampo(s, e, 4, "Data*", "25/03/2026", "Dia da agenda — dd/mm/aaaa");
-        linhaCampo(s, e, 5, "Profissional (id interno)", "", "Preencha APENAS UM: id interno OU código de integração");
-        linhaCampo(s, e, 6, "Profissional (código de integração)", "1023", "");
-        linhaCampo(s, e, 7, "Especialidade (id interno)", "15", "Preencha APENAS UM: id interno OU código de integração");
-        linhaCampo(s, e, 8, "Especialidade (código de integração)", "", "");
-        linhaCampo(s, e, 9, "Configuração da Agenda (id interno)*", "7", "Só id interno (esta entidade não tem código)");
-        linhaCampo(s, e, 10, "Nome da agenda", "Manhã — Cardiologia", "Opcional: um rótulo livre para a agenda");
-        criar(s, 11, 0, "A unidade executante NÃO vai aqui — é a unidade do usuário logado.", e.nota);
-        mesclar(s, 11, 0, 4);
+
+        // Data (valor na coluna B)
+        criar(s, 4, 0, "Data*", e.rotulo);
+        criar(s, 4, 1, "25/03/2026", e.exemplo);
+        criar(s, 4, 3, "dd/mm/aaaa", e.dica);
+
+        // Cabeçalho das DUAS colunas (id interno | código de integração), para Profissional e Especialidade.
+        criar(s, 5, 0, "", e.rotulo);
+        criar(s, 5, 1, "id interno", e.cabecalho);
+        criar(s, 5, 2, "código de integração", e.cabecalho);
+        criar(s, 5, 3, "← preencha APENAS UMA das duas", e.dica);
+
+        // Profissional (exemplo preenchido por código) e Especialidade (exemplo por id).
+        criar(s, 6, 0, "Profissional*", e.rotulo);
+        criar(s, 6, 1, "", e.exemplo);
+        criar(s, 6, 2, "1023", e.exemplo);
+
+        criar(s, 7, 0, "Especialidade*", e.rotulo);
+        criar(s, 7, 1, "15", e.exemplo);
+        criar(s, 7, 2, "", e.exemplo);
+
+        // Configuração da Agenda (só id interno) e Nome (opcional) — valor na coluna B.
+        criar(s, 8, 0, "Configuração da Agenda (id interno)*", e.rotulo);
+        criar(s, 8, 1, "7", e.exemplo);
+        criar(s, 8, 3, "só id interno (não tem código de integração)", e.dica);
+
+        criar(s, 9, 0, "Nome da agenda", e.rotulo);
+        criar(s, 9, 1, "Manhã — Cardiologia", e.exemplo);
+        criar(s, 9, 3, "opcional: um rótulo livre para a agenda", e.dica);
+
+        criar(s, 10, 0, "A unidade executante NÃO vai aqui — é a unidade do usuário logado.", e.nota);
+        mesclar(s, 10, 0, 4);
 
         // Bloco HORÁRIOS. As 2 primeiras linhas são exemplos (fictícios): o aviso fica no rótulo da seção,
         // NUNCA em uma linha abaixo da tabela — texto abaixo dos horários seria lido pelo parser como marcação.
-        criar(s, 13, 0, "HORÁRIOS (um paciente por linha — preencha UMA coluna de paciente; as 2 primeiras são exemplos)",
+        criar(s, 12, 0, "HORÁRIOS (um paciente por linha — preencha UMA coluna de paciente; as 2 primeiras são exemplos)",
                 e.secao);
-        mesclar(s, 13, 0, 4);
-        Row cab = s.createRow(14);
+        mesclar(s, 12, 0, 4);
+        Row cab = s.createRow(13);
         cabecalho(cab, e, 0, "Paciente (id interno)");
         cabecalho(cab, e, 1, "Paciente (prontuário)");
         cabecalho(cab, e, 2, "Paciente (código de integração)");
         cabecalho(cab, e, 3, "Hora início*");
         cabecalho(cab, e, 4, "Hora fim");
 
-        exemploHorario(s, e, 15, "", "1001", "", "08:00", "08:30");
-        exemploHorario(s, e, 16, "", "", "P-2002", "08:30", "09:00");
-    }
-
-    private void linhaCampo(Sheet s, Estilos e, int linha, String rotulo, String exemplo, String dica) {
-        Row r = s.createRow(linha);
-        criar(r, 0, rotulo, e.rotulo);
-        criar(r, 1, exemplo, e.exemplo);
-        criar(r, 2, dica, e.dica);
+        exemploHorario(s, e, 14, "", "1001", "", "08:00", "08:30");
+        exemploHorario(s, e, 15, "", "", "P-2002", "08:30", "09:00");
     }
 
     private void exemploHorario(Sheet s, Estilos e, int linha, String id, String prontuario, String codigo,
