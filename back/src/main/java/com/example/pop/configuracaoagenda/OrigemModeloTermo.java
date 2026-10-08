@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 /**
  * De onde vem o modelo do termo (TCLE):

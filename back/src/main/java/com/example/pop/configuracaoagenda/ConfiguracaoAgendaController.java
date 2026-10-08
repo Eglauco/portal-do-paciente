@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,8 +32,8 @@ import com.example.pop.export.FiltroAplicado;
 import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/procedimento")
-public class ProcedimentoController {
+@RequestMapping("/configuracao-agenda")
+public class ConfiguracaoAgendaController {
 
     /** Máximo de registros retornados por página. */
     private static final int TAMANHO_MAXIMO = 100;
@@ -45,20 +45,20 @@ public class ProcedimentoController {
     /** Ordenação usada quando nada é escolhido na tela. */
     private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
-    private final ProcedimentoRepository repository;
+    private final ConfiguracaoAgendaRepository repository;
     private final ExportacaoService exportacaoService;
 
-    public ProcedimentoController(ProcedimentoRepository repository, ExportacaoService exportacaoService) {
+    public ConfiguracaoAgendaController(ConfiguracaoAgendaRepository repository, ExportacaoService exportacaoService) {
         this.repository = repository;
         this.exportacaoService = exportacaoService;
     }
 
     /**
-     * Lista procedimentos de forma paginada, com filtros opcionais por código e nome.
+     * Lista configuracaoAgendas de forma paginada, com filtros opcionais por código e nome.
      * O tamanho da página é limitado a {@value #TAMANHO_MAXIMO} registros.
      */
     @GetMapping
-    public Pagina<Procedimento> listar(
+    public Pagina<ConfiguracaoAgenda> listar(
             @RequestParam(required = false) Long codigo,
             @RequestParam(required = false) String nome,
             @RequestParam(required = false) List<String> ordenar,
@@ -69,7 +69,7 @@ public class ProcedimentoController {
         String filtroNome = (nome == null) ? "" : nome.trim();
 
         Pageable pageable = PageRequest.of(pagina, tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
-        Page<Procedimento> resultado = repository.search(codigo, filtroNome, pageable);
+        Page<ConfiguracaoAgenda> resultado = repository.search(codigo, filtroNome, pageable);
 
         return new Pagina<>(
                 resultado.getContent(),
@@ -82,7 +82,7 @@ public class ProcedimentoController {
     }
 
     /**
-     * Exporta os procedimentos que batem com os MESMOS filtros da tela (todos os
+     * Exporta os configuracaoAgendas que batem com os MESMOS filtros da tela (todos os
      * registros, sem paginação) em Excel (padrão) ou PDF. Ordenados por código.
      */
     @GetMapping("/exportar")
@@ -93,16 +93,16 @@ public class ProcedimentoController {
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
         String filtroNome = (nome == null) ? "" : nome.trim();
-        List<Procedimento> dados = repository
+        List<ConfiguracaoAgenda> dados = repository
                 .search(codigo, filtroNome, Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO)))
                 .getContent();
-        List<ColunaExport<Procedimento>> cols = ExportacaoService.filtrar(colunasProcedimento(), colunas);
+        List<ColunaExport<ConfiguracaoAgenda>> cols = ExportacaoService.filtrar(colunasConfiguracaoAgenda(), colunas);
 
         boolean pdf = "pdf".equalsIgnoreCase(formato);
         byte[] arquivo = pdf
-                ? exportacaoService.pdf("Procedimentos", filtrosProcedimento(codigo, filtroNome), cols, dados)
-                : exportacaoService.excel("Procedimentos", cols, dados);
-        String arquivoNome = "procedimentos-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
+                ? exportacaoService.pdf("Configuração da Agenda", filtrosConfiguracaoAgenda(codigo, filtroNome), cols, dados)
+                : exportacaoService.excel("Configuração da Agenda", cols, dados);
+        String arquivoNome = "configuracao-agenda-" + LocalDate.now() + (pdf ? ".pdf" : ".xlsx");
 
         return ResponseEntity.ok()
                 .contentType(pdf ? MediaType.APPLICATION_PDF : MediaType.parseMediaType(ExportacaoService.TIPO_XLSX))
@@ -113,18 +113,18 @@ public class ProcedimentoController {
     /** Rótulos de todas as colunas disponíveis do relatório (para o modal de seleção). */
     @GetMapping("/exportar/colunas")
     public List<String> colunasDisponiveis() {
-        return colunasProcedimento().stream().map(ColunaExport::titulo).toList();
+        return colunasConfiguracaoAgenda().stream().map(ColunaExport::titulo).toList();
     }
 
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
-    private List<FiltroAplicado> filtrosProcedimento(Long codigo, String nome) {
+    private List<FiltroAplicado> filtrosConfiguracaoAgenda(Long codigo, String nome) {
         return List.of(
                 new FiltroAplicado("Código", codigo != null ? String.valueOf(codigo) : "Todos"),
                 new FiltroAplicado("Nome", nome != null && !nome.isBlank() ? nome : "Todos"));
     }
 
-    /** Todas as colunas disponíveis do procedimento (o usuário escolhe quais exportar). */
-    private static List<ColunaExport<Procedimento>> colunasProcedimento() {
+    /** Todas as colunas disponíveis do configuracaoAgenda (o usuário escolhe quais exportar). */
+    private static List<ColunaExport<ConfiguracaoAgenda>> colunasConfiguracaoAgenda() {
         return List.of(
                 ColunaExport.de("Código", p -> p.getId() == null ? "" : String.valueOf(p.getId())),
                 ColunaExport.de("Nome", p -> p.getNome() == null ? "" : p.getNome()),
@@ -136,7 +136,7 @@ public class ProcedimentoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Procedimento> buscar(@PathVariable Long id) {
+    public ResponseEntity<ConfiguracaoAgenda> buscar(@PathVariable Long id) {
         return repository.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -144,20 +144,20 @@ public class ProcedimentoController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Procedimento criar(@Valid @RequestBody Procedimento procedimento) {
-        procedimento.setId(null);
-        return repository.save(procedimento);
+    public ConfiguracaoAgenda criar(@Valid @RequestBody ConfiguracaoAgenda configuracaoAgenda) {
+        configuracaoAgenda.setId(null);
+        return repository.save(configuracaoAgenda);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Procedimento> atualizar(@PathVariable Long id,
-            @Valid @RequestBody Procedimento procedimento) {
+    public ResponseEntity<ConfiguracaoAgenda> atualizar(@PathVariable Long id,
+            @Valid @RequestBody ConfiguracaoAgenda configuracaoAgenda) {
         return repository.findById(id)
                 .map(existente -> {
-                    existente.setNome(procedimento.getNome());
-                    existente.setPreparo(procedimento.getPreparo());
-                    existente.setHorasCancelamento(procedimento.getHorasCancelamento());
-                    existente.setHorasNps(procedimento.getHorasNps());
+                    existente.setNome(configuracaoAgenda.getNome());
+                    existente.setPreparo(configuracaoAgenda.getPreparo());
+                    existente.setHorasCancelamento(configuracaoAgenda.getHorasCancelamento());
+                    existente.setHorasNps(configuracaoAgenda.getHorasNps());
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

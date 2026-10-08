@@ -39,7 +39,7 @@ class DashboardControllerTest {
         AgendamentoDashboard d = controller.agendamentos(unidade(), 30);
         assertNotNull(d);
         assertEquals(6, d.porStatus().size());
-        assertNotNull(d.topProcedimentos());
+        assertNotNull(d.topConfiguracaoAgendas());
         assertNotNull(d.topProfissionais());
         assertNotNull(d.porEspecialidade());
         assertNotNull(d.motivosFalta());

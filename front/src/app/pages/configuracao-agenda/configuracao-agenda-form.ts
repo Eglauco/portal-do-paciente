@@ -7,25 +7,25 @@ import { PodeSair } from '../../core/pending-changes.guard';
 import { StorageService } from '../prontuarios/storage.service';
 import { Lembrete } from './lembrete.model';
 import { LembreteService } from './lembrete.service';
-import { ProcedimentoService } from './procedimento.service';
+import { ConfiguracaoAgendaService } from './configuracao-agenda.service';
 import {
   ModeloZapSign,
   ModeloZapSignDetalhe,
   OrigemModeloTermo,
-  TermoProcedimento,
+  TermoConfiguracaoAgenda,
   VariavelTermo,
-} from './termo-procedimento.model';
-import { TermoProcedimentoService } from './termo-procedimento.service';
+} from './termo-configuracao-agenda.model';
+import { TermoConfiguracaoAgendaService } from './termo-configuracao-agenda.service';
 
-/** Abas do procedimento (na edição): dados + lembretes + termos de consentimento (TCLE). */
+/** Abas do configuracaoAgenda (na edição): dados + lembretes + termos de consentimento (TCLE). */
 type AbaId = 'dados' | 'lembretes' | 'tcle';
 
 @Component({
-  selector: 'app-procedimento-form',
+  selector: 'app-configuracao-agenda-form',
   imports: [ReactiveFormsModule],
-  templateUrl: './procedimento-form.html',
+  templateUrl: './configuracao-agenda-form.html',
   styles: [`
-    /* Abas do procedimento: separam Dados / Lembretes (uma visível por vez). */
+    /* Abas do configuracaoAgenda: separam Dados / Lembretes (uma visível por vez). */
     .form-tabs {
       display: flex; flex-wrap: wrap; gap: 0.35rem;
       margin-bottom: 1.25rem; border-bottom: 1px solid var(--line);
@@ -44,7 +44,7 @@ type AbaId = 'dados' | 'lembretes' | 'tcle';
       .form-tabs { gap: 0; }
       .form-tab { flex: 1 1 auto; justify-content: center; padding: 0.55rem 0.5rem; font-size: 0.82rem; }
     }
-    /* Aba TCLE: lista de documentos Word do procedimento. */
+    /* Aba TCLE: lista de documentos Word do configuracaoAgenda. */
     .tcle-lista { list-style: none; margin: 0 0 1.1rem; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
     .tcle-item {
       display: flex; align-items: center; gap: 0.75rem;
@@ -113,10 +113,10 @@ type AbaId = 'dados' | 'lembretes' | 'tcle';
     .check-linha--sub { margin-top: 0.6rem; margin-left: 1.55rem; font-weight: 600; }
   `],
 })
-export class ProcedimentoForm implements PodeSair {
-  private readonly service = inject(ProcedimentoService);
+export class ConfiguracaoAgendaForm implements PodeSair {
+  private readonly service = inject(ConfiguracaoAgendaService);
   private readonly lembreteService = inject(LembreteService);
-  private readonly termoService = inject(TermoProcedimentoService);
+  private readonly termoService = inject(TermoConfiguracaoAgendaService);
   private readonly storage = inject(StorageService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -142,7 +142,7 @@ export class ProcedimentoForm implements PodeSair {
   protected readonly excluindo = signal(false);
   protected readonly erroCarregar = signal(false);
 
-  /** Aba ativa (só aparece na edição): dados do procedimento ou lembretes. */
+  /** Aba ativa (só aparece na edição): dados do configuracaoAgenda ou lembretes. */
   protected readonly abaAtiva = signal<AbaId>('dados');
   protected selecionarAba(id: AbaId): void {
     this.abaAtiva.set(id);
@@ -152,7 +152,7 @@ export class ProcedimentoForm implements PodeSair {
   private resolverConfirmacao: ((resposta: boolean) => void) | null = null;
   private saidaAutorizada = false;
 
-  // Lembretes (só ao editar um procedimento existente).
+  // Lembretes (só ao editar um configuracaoAgenda existente).
   protected readonly lembretes = signal<Lembrete[]>([]);
   protected readonly carregandoLembretes = signal(false);
   protected readonly salvandoLembrete = signal(false);
@@ -163,8 +163,8 @@ export class ProcedimentoForm implements PodeSair {
     }),
   });
 
-  // Termos de Consentimento (TCLE) — só ao editar um procedimento existente.
-  protected readonly termos = signal<TermoProcedimento[]>([]);
+  // Termos de Consentimento (TCLE) — só ao editar um configuracaoAgenda existente.
+  protected readonly termos = signal<TermoConfiguracaoAgenda[]>([]);
   protected readonly carregandoTermos = signal(false);
   protected readonly salvandoTermo = signal(false);
   protected readonly substituindoId = signal<number | null>(null);
@@ -223,12 +223,12 @@ export class ProcedimentoForm implements PodeSair {
       this.editando.set(true);
       this.codigo.set(id);
       this.service.buscarPorId(id).subscribe({
-        next: (procedimento) =>
+        next: (configuracaoAgenda) =>
           this.form.patchValue({
-            nome: procedimento.nome,
-            preparo: procedimento.preparo ?? '',
-            horasCancelamento: procedimento.horasCancelamento ?? 24,
-            horasNps: procedimento.horasNps ?? 0,
+            nome: configuracaoAgenda.nome,
+            preparo: configuracaoAgenda.preparo ?? '',
+            horasCancelamento: configuracaoAgenda.horasCancelamento ?? 24,
+            horasNps: configuracaoAgenda.horasNps ?? 0,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -237,9 +237,9 @@ export class ProcedimentoForm implements PodeSair {
     }
   }
 
-  private carregarLembretes(procedimentoId: number): void {
+  private carregarLembretes(configuracaoAgendaId: number): void {
     this.carregandoLembretes.set(true);
-    this.lembreteService.listar(procedimentoId).subscribe({
+    this.lembreteService.listar(configuracaoAgendaId).subscribe({
       next: (lembretes) => {
         this.lembretes.set(lembretes);
         this.carregandoLembretes.set(false);
@@ -285,9 +285,9 @@ export class ProcedimentoForm implements PodeSair {
     });
   }
 
-  private carregarTermos(procedimentoId: number): void {
+  private carregarTermos(configuracaoAgendaId: number): void {
     this.carregandoTermos.set(true);
-    this.termoService.listar(procedimentoId).subscribe({
+    this.termoService.listar(configuracaoAgendaId).subscribe({
       next: (termos) => {
         this.termos.set(termos);
         this.carregandoTermos.set(false);
@@ -458,7 +458,7 @@ export class ProcedimentoForm implements PodeSair {
     }
   }
 
-  protected async substituirArquivo(termo: TermoProcedimento, event: Event): Promise<void> {
+  protected async substituirArquivo(termo: TermoConfiguracaoAgenda, event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const arquivo = input.files?.[0] ?? null;
     input.value = '';
@@ -491,7 +491,7 @@ export class ProcedimentoForm implements PodeSair {
     }
   }
 
-  protected async removerTermo(termo: TermoProcedimento): Promise<void> {
+  protected async removerTermo(termo: TermoConfiguracaoAgenda): Promise<void> {
     const confirmado = await this.confirmar('Deseja excluir este termo?');
     if (!confirmado) return;
     this.termoService.excluir(termo.id).subscribe({
@@ -503,7 +503,7 @@ export class ProcedimentoForm implements PodeSair {
     });
   }
 
-  protected async baixarTermo(termo: TermoProcedimento): Promise<void> {
+  protected async baixarTermo(termo: TermoConfiguracaoAgenda): Promise<void> {
     if (!termo.url) return; // termo por modelo do ZapSign não tem arquivo nosso
     try {
       const url = await this.storage.urlDownload(termo.url);
@@ -575,36 +575,36 @@ export class ProcedimentoForm implements PodeSair {
     requisicao.subscribe({
       next: () => {
         this.saidaAutorizada = true;
-        this.toastr.success('Procedimento salvo');
-        this.router.navigate(['/procedimentos']);
+        this.toastr.success('Configuração da Agenda salva');
+        this.router.navigate(['/configuracao-agenda']);
       },
       error: () => {
         this.salvando.set(false);
-        this.toastr.error('Não foi possível salvar o procedimento.');
+        this.toastr.error('Não foi possível salvar o configuracaoAgenda.');
       },
     });
   }
 
   protected async excluir(): Promise<void> {
     if (!this.editando() || this.codigo() == null) return;
-    const confirmado = await this.confirmar('Deseja excluir o procedimento?');
+    const confirmado = await this.confirmar('Deseja excluir o configuracaoAgenda?');
     if (!confirmado) return;
     this.excluindo.set(true);
     this.service.excluir(this.codigo()!).subscribe({
       next: () => {
         this.saidaAutorizada = true;
-        this.toastr.success('Procedimento excluído');
-        this.router.navigate(['/procedimentos']);
+        this.toastr.success('Configuração da Agenda excluída');
+        this.router.navigate(['/configuracao-agenda']);
       },
       error: () => {
         this.excluindo.set(false);
-        this.toastr.error('Não foi possível excluir o procedimento.');
+        this.toastr.error('Não foi possível excluir o configuracaoAgenda.');
       },
     });
   }
 
   protected cancelar(): void {
-    this.router.navigate(['/procedimentos']);
+    this.router.navigate(['/configuracao-agenda']);
   }
 
   private confirmar(mensagem: string): Promise<boolean> {

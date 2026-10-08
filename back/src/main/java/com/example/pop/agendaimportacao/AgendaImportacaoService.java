@@ -11,9 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.pop.agendamento.StatusAgendamento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.especialidade.EspecialidadeRepository;
 import com.example.pop.paciente.Documentos;
-import com.example.pop.procedimento.ProcedimentoRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.UnidadeRepository;
 
@@ -24,9 +24,8 @@ import com.example.pop.unidade.UnidadeRepository;
  * Devolve o {@link AgendaImportPreviewResponse} com os campos resolvidos e os erros para o cliente corrigir a
  * planilha e reimportar. A gravação da agenda/horários fica para a Fase 2.
  *
- * <p>O rótulo visível de "Procedimento" nesta tela é <b>Configuração da Agenda</b> — a entidade/repositório
- * ainda se chamam {@code Procedimento} neste branch (renomeação acontece em paralelo); aqui usamos os nomes
- * existentes no código e o rótulo novo só nas mensagens.
+ * <p>"Configuração da Agenda" é a entidade {@link com.example.pop.configuracaoagenda.ConfiguracaoAgenda}
+ * (ex-{@code Procedimento}): não tem código de integração, então casa só por nome.
  */
 @Service
 public class AgendaImportacaoService {
@@ -47,18 +46,18 @@ public class AgendaImportacaoService {
     private final AgendaPlanilhaParser parser;
     private final ProfissionalSaudeRepository profissionalRepository;
     private final EspecialidadeRepository especialidadeRepository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final UnidadeRepository unidadeRepository;
 
     public AgendaImportacaoService(AgendaPlanilhaParser parser,
             ProfissionalSaudeRepository profissionalRepository,
             EspecialidadeRepository especialidadeRepository,
-            ProcedimentoRepository procedimentoRepository,
+            ConfiguracaoAgendaRepository configuracaoAgendaRepository,
             UnidadeRepository unidadeRepository) {
         this.parser = parser;
         this.profissionalRepository = profissionalRepository;
         this.especialidadeRepository = especialidadeRepository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.unidadeRepository = unidadeRepository;
     }
 
@@ -77,9 +76,9 @@ public class AgendaImportacaoService {
                 .map(e -> new RefCadastro(e.getId(), e.getNome(), e.getCodigoIntegracao())).toList();
         List<RefCadastro> unidades = unidadeRepository.findAll().stream()
                 .map(u -> new RefCadastro(u.getId(), u.getNome(), u.getCodigoIntegracao())).toList();
-        // "Configuração da Agenda" (entidade Procedimento): não tem código de integração — casa só por nome.
-        List<RefCadastro> configuracoes = procedimentoRepository.findAll().stream()
-                .map(p -> new RefCadastro(p.getId(), p.getNome(), null)).toList();
+        // "Configuração da Agenda" (ConfiguracaoAgenda): não tem código de integração — casa só por nome.
+        List<RefCadastro> configuracoes = configuracaoAgendaRepository.findAll().stream()
+                .map(c -> new RefCadastro(c.getId(), c.getNome(), null)).toList();
 
         AgendaPreview agenda = new AgendaPreview(
                 resolverData(a.get("data")),

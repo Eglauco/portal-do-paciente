@@ -68,19 +68,19 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
             @Param("dataHora") LocalDateTime dataHora, @Param("tipo") TipoAtendimento tipo);
 
     /**
-     * Horários de um procedimento que estão na janela de disparo de um lembrete:
+     * Horários de um configuracaoAgenda que estão na janela de disparo de um lembrete:
      * status ativo (informado), ainda por acontecer (dataHora >= agora) e já dentro
      * da antecedência (dataHora <= limite = agora + horas). O job filtra os que ainda
      * não dispararam pelo registro de disparo.
      */
     @Query("""
             select a from Horario a
-            where a.agenda.procedimento.id = :procedimentoId
+            where a.agenda.configuracaoAgenda.id = :configuracaoAgendaId
               and a.statusAgendamento in :status
               and a.dataHora >= :agora
               and a.dataHora <= :limite
             """)
-    List<Horario> paraLembrete(@Param("procedimentoId") Long procedimentoId,
+    List<Horario> paraLembrete(@Param("configuracaoAgendaId") Long configuracaoAgendaId,
             @Param("status") List<StatusAgendamento> status,
             @Param("agora") LocalDateTime agora, @Param("limite") LocalDateTime limite);
 
@@ -155,13 +155,13 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
             @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
     @Query("""
-            select a.agenda.procedimento.nome, count(a) from Horario a
+            select a.agenda.configuracaoAgenda.nome, count(a) from Horario a
             where (:unidadeId is null or a.agenda.unidadeSaude.id = :unidadeId)
               and a.dataHora between :inicio and :fim
-            group by a.agenda.procedimento.id, a.agenda.procedimento.nome
-            order by count(a) desc, a.agenda.procedimento.nome asc
+            group by a.agenda.configuracaoAgenda.id, a.agenda.configuracaoAgenda.nome
+            order by count(a) desc, a.agenda.configuracaoAgenda.nome asc
             """)
-    List<Object[]> topProcedimentos(@Param("unidadeId") Long unidadeId,
+    List<Object[]> topConfiguracaoAgendas(@Param("unidadeId") Long unidadeId,
             @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
 
     @Query("""

@@ -4,21 +4,21 @@ import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
-import { Procedimento } from './procedimento.model';
-import { ProcedimentoBuscaStore } from './procedimento-busca.store';
-import { ProcedimentoService } from './procedimento.service';
+import { ConfiguracaoAgenda } from './configuracao-agenda.model';
+import { ConfiguracaoAgendaBuscaStore } from './configuracao-agenda-busca.store';
+import { ConfiguracaoAgendaService } from './configuracao-agenda.service';
 
 export type PaginaItem = number | 'ellipsis';
 
 @Component({
-  selector: 'app-procedimentos-list',
+  selector: 'app-configuracao-agenda-list',
   imports: [RouterLink, RelatorioColunasModal, Ordenavel],
-  templateUrl: './procedimentos-list.html',
+  templateUrl: './configuracao-agenda-list.html',
 })
-export class ProcedimentosList {
-  private readonly service = inject(ProcedimentoService);
+export class ConfiguracaoAgendasList {
+  private readonly service = inject(ConfiguracaoAgendaService);
   private readonly router = inject(Router);
-  private readonly store = inject(ProcedimentoBuscaStore);
+  private readonly store = inject(ConfiguracaoAgendaBuscaStore);
   private readonly toastr = inject(ToastrService);
 
   protected readonly exportando = signal<'xlsx' | 'pdf' | null>(null);
@@ -26,7 +26,7 @@ export class ProcedimentosList {
   protected readonly formatoModal = signal<'xlsx' | 'pdf' | null>(null);
   protected readonly base = this.service.base;
 
-  protected readonly tamanhos = ProcedimentoService.TAMANHOS;
+  protected readonly tamanhos = ConfiguracaoAgendaService.TAMANHOS;
   protected readonly size = signal(this.store.size);
 
   protected readonly codigo = signal(this.store.codigo);
@@ -34,7 +34,7 @@ export class ProcedimentosList {
   /** Ordenação multi-coluna (vazia = padrão do backend: Código crescente). */
   protected readonly ordenacoes = signal<Ordenacao[]>(this.store.ordenacoes);
 
-  protected readonly procedimentos = signal<Procedimento[]>([]);
+  protected readonly configuracaoAgendas = signal<ConfiguracaoAgenda[]>([]);
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
   protected readonly carregado = signal(false);
@@ -48,7 +48,7 @@ export class ProcedimentosList {
   protected readonly inicioFaixa = computed(() =>
     this.totalElements() === 0 ? 0 : this.page() * this.size() + 1,
   );
-  protected readonly fimFaixa = computed(() => this.page() * this.size() + this.procedimentos().length);
+  protected readonly fimFaixa = computed(() => this.page() * this.size() + this.configuracaoAgendas().length);
 
   protected readonly paginasVisiveis = computed<PaginaItem[]>(() => {
     const total = this.totalPages();
@@ -117,7 +117,7 @@ export class ProcedimentosList {
       .listar({ codigo: this.codigo(), nome: this.nome() }, this.page(), this.size(), this.ordenacoes())
       .subscribe({
       next: (pagina) => {
-        this.procedimentos.set(pagina.content);
+        this.configuracaoAgendas.set(pagina.content);
         this.totalElements.set(pagina.totalElements);
         this.totalPages.set(pagina.totalPages);
         this.first.set(pagina.first);
@@ -127,7 +127,7 @@ export class ProcedimentosList {
         this.carregado.set(true);
       },
       error: () => {
-        this.procedimentos.set([]);
+        this.configuracaoAgendas.set([]);
         this.error.set(true);
         this.loading.set(false);
         this.carregado.set(true);
@@ -135,8 +135,8 @@ export class ProcedimentosList {
     });
   }
 
-  protected editar(procedimento: Procedimento): void {
-    this.router.navigate(['/procedimentos', procedimento.id]);
+  protected editar(configuracaoAgenda: ConfiguracaoAgenda): void {
+    this.router.navigate(['/configuracao-agenda', configuracaoAgenda.id]);
   }
 
   /** Clique num cabeçalho: cicla asc→desc→nenhuma; com Shift, combina com as demais colunas. */
@@ -170,7 +170,7 @@ export class ProcedimentosList {
       .exportar(formato, { codigo: this.codigo(), nome: this.nome() }, colunas, this.ordenacoes())
       .subscribe({
       next: (blob) => {
-        this.baixar(blob, `procedimentos.${formato}`);
+        this.baixar(blob, `configuracaoAgendas.${formato}`);
         this.exportando.set(null);
       },
       error: () => {

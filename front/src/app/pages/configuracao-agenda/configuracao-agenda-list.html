@@ -1,8 +1,8 @@
 <section class="dash">
   <header class="page-head">
     <div>
-      <h1 class="page-title">Procedimentos</h1>
-      <p class="page-sub">Cadastre e organize os procedimentos disponíveis.</p>
+      <h1 class="page-title">Configuração da Agenda</h1>
+      <p class="page-sub">Cadastre e organize os configuracaoAgendas disponíveis.</p>
     </div>
     <div class="page-head__actions">
       <button type="button" class="btn btn--ghost" (click)="abrirExportacao('xlsx')" [disabled]="exportando() !== null">
@@ -17,11 +17,11 @@
         </svg>
         {{ exportando() === 'pdf' ? 'Exportando…' : 'PDF' }}
       </button>
-      <a class="btn btn--solid" routerLink="/procedimentos/novo">
+      <a class="btn btn--solid" routerLink="/configuracao-agenda/novo">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
         </svg>
-        Novo procedimento
+        Novo configuracaoAgenda
       </a>
     </div>
   </header>
@@ -79,7 +79,7 @@
     @if (loading()) {
       <div class="state">
         <span class="spinner" aria-hidden="true"></span>
-        <p>Carregando procedimentos…</p>
+        <p>Carregando configuracaoAgendas…</p>
       </div>
     } @else if (error()) {
       <div class="state">
@@ -88,16 +88,16 @@
         <p>Verifique se o servidor está disponível e tente novamente.</p>
         <button type="button" class="btn btn--solid" (click)="buscar()">Tentar novamente</button>
       </div>
-    } @else if (procedimentos().length === 0) {
+    } @else if (configuracaoAgendas().length === 0) {
       <div class="state">
         <span class="state__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" /><path d="M14 10h4a2 2 0 0 1 2 2v9" /><path d="M3 21h18" />
           </svg>
         </span>
-        <h3>Nenhum procedimento encontrado</h3>
-        <p>Ajuste os filtros ou cadastre um novo procedimento.</p>
-        <a class="btn btn--ghost" routerLink="/procedimentos/novo">Cadastrar procedimento</a>
+        <h3>Nenhum configuracaoAgenda encontrado</h3>
+        <p>Ajuste os filtros ou cadastre um novo configuracaoAgenda.</p>
+        <a class="btn btn--ghost" routerLink="/configuracao-agenda/novo">Cadastrar configuracaoAgenda</a>
       </div>
     } @else {
       <div class="table-wrap">
@@ -110,7 +110,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (u of procedimentos(); track u.id) {
+            @for (u of configuracaoAgendas(); track u.id) {
               <tr
                 tabindex="0"
                 role="button"

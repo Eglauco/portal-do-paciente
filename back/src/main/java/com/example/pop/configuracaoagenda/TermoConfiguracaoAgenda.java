@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import java.time.LocalDateTime;
 
@@ -18,24 +18,24 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Documento de Termo de Consentimento (TCLE) de um procedimento: o arquivo Word (.docx/.doc)
- * que a unidade já mantém, guardado no S3 (pasta "tcle"). Um procedimento pode ter vários.
+ * Documento de Termo de Consentimento (TCLE) de um configuracaoAgenda: o arquivo Word (.docx/.doc)
+ * que a unidade já mantém, guardado no S3 (pasta "tcle"). Um configuracaoAgenda pode ter vários.
  * A assinatura eletrônica (ZapSign) consome esses documentos numa etapa posterior.
  */
 @Entity
-@Table(name = "termo_procedimento")
+@Table(name = "termo_configuracao_agenda")
 @Getter
 @Setter
 @NoArgsConstructor
-public class TermoProcedimento {
+public class TermoConfiguracaoAgenda {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "procedimento_id", nullable = false)
-    private Procedimento procedimento;
+    @JoinColumn(name = "configuracao_agenda_id", nullable = false)
+    private ConfiguracaoAgenda configuracaoAgenda;
 
     /** Nome do termo (ex.: "TCLE — Endoscopia digestiva alta"). */
     @Column(nullable = false, length = 120)

@@ -53,16 +53,16 @@
         />
       </div>
       <div class="form-field">
-        <label class="label" for="procedimento">Procedimento (lançamento automático no SIRESP)</label>
+        <label class="label" for="configuracaoAgenda">Configuração da Agenda (lançamento automático no SIRESP)</label>
         <ng-select
-          id="procedimento"
-          formControlName="procedimentoId"
-          [items]="procedimentos()"
+          id="configuracaoAgenda"
+          formControlName="configuracaoAgendaId"
+          [items]="configuracaoAgendas()"
           bindValue="id"
           bindLabel="nome"
-          placeholder="Sem procedimento vinculado"
+          placeholder="Sem configuracaoAgenda vinculado"
         ></ng-select>
-        <span class="field-hint">Usado como procedimento do agendamento quando este exame é importado do SIRESP. Opcional.</span>
+        <span class="field-hint">Usado como configuracaoAgenda do agendamento quando este exame é importado do SIRESP. Opcional.</span>
       </div>
     </div>
 

@@ -30,8 +30,8 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 
 @RestController
 @RequestMapping("/especialidade")
@@ -48,13 +48,13 @@ public class EspecialidadeController {
     private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "nome", "id");
 
     private final EspecialidadeRepository repository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final ExportacaoService exportacaoService;
 
     public EspecialidadeController(EspecialidadeRepository repository,
-            ProcedimentoRepository procedimentoRepository, ExportacaoService exportacaoService) {
+            ConfiguracaoAgendaRepository configuracaoAgendaRepository, ExportacaoService exportacaoService) {
         this.repository = repository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.exportacaoService = exportacaoService;
     }
 
@@ -133,7 +133,7 @@ public class EspecialidadeController {
                 ColunaExport.de("Código", e -> e.getId() == null ? "" : String.valueOf(e.getId())),
                 ColunaExport.de("Nome", Especialidade::getNome),
                 ColunaExport.de("Cód. integração", e -> e.getCodigoIntegracao() == null ? "" : e.getCodigoIntegracao()),
-                ColunaExport.de("Procedimento (SIRESP)", e -> e.getProcedimento() == null ? "" : e.getProcedimento().getNome()));
+                ColunaExport.de("Configuração da Agenda (SIRESP)", e -> e.getConfiguracaoAgenda() == null ? "" : e.getConfiguracaoAgenda().getNome()));
     }
 
     @GetMapping("/{id}")
@@ -149,7 +149,7 @@ public class EspecialidadeController {
         especialidade.setId(null);
         especialidade.setNome(validarNome(especialidade.getNome()));
         especialidade.setCodigoIntegracao(limpar(especialidade.getCodigoIntegracao()));
-        especialidade.setProcedimento(resolverProcedimento(especialidade.getProcedimento()));
+        especialidade.setConfiguracaoAgenda(resolverConfiguracaoAgenda(especialidade.getConfiguracaoAgenda()));
         validarUnicidade(especialidade.getCodigoIntegracao(), -1L);
         return salvarUnico(especialidade);
     }
@@ -162,23 +162,23 @@ public class EspecialidadeController {
                     validarUnicidade(codigo, id);
                     existente.setNome(validarNome(especialidade.getNome()));
                     existente.setCodigoIntegracao(codigo);
-                    existente.setProcedimento(resolverProcedimento(especialidade.getProcedimento()));
+                    existente.setConfiguracaoAgenda(resolverConfiguracaoAgenda(especialidade.getConfiguracaoAgenda()));
                     return ResponseEntity.ok(salvarUnico(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     /**
-     * Resolve o procedimento vinculado a partir do que veio no corpo (só o id importa): null quando não informado;
-     * senão carrega o procedimento gerenciado (422 se o id não existir). Evita persistir um procedimento "solto".
+     * Resolve o Configuração da Agenda vinculada a partir do que veio no corpo (só o id importa): null quando não informado;
+     * senão carrega o configuracaoAgenda gerenciado (422 se o id não existir). Evita persistir um configuracaoAgenda "solto".
      */
-    private Procedimento resolverProcedimento(Procedimento doRequest) {
+    private ConfiguracaoAgenda resolverConfiguracaoAgenda(ConfiguracaoAgenda doRequest) {
         if (doRequest == null || doRequest.getId() == null) {
             return null;
         }
-        return procedimentoRepository.findById(doRequest.getId())
+        return configuracaoAgendaRepository.findById(doRequest.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
-                        "Procedimento vinculado não encontrado."));
+                        "Configuração da Agenda vinculada não encontrada."));
     }
 
     /**

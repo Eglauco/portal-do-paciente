@@ -97,7 +97,7 @@ public class HorarioController {
         }
         Horario salvo = repository.save(h);
         logService.registrarDaUnidade(salvo, anterior, salvo.getStatusAgendamento(), uidDoToken(jwt));
-        // Na presença: gera o NPS e dispara os termos (TCLE) do procedimento, best-effort.
+        // Na presença: gera o NPS e dispara os termos (TCLE) do configuracaoAgenda, best-effort.
         npsService.gerarSeNecessario(salvo);
         try {
             termoAssinaturaService.dispararSeNecessario(salvo);

@@ -7,14 +7,14 @@ import { Lembrete, LembreteRequest } from './lembrete.model';
 @Injectable({ providedIn: 'root' })
 export class LembreteService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/procedimento`;
+  private readonly base = `${environment.apiUrl}/configuracao-agenda`;
 
-  listar(procedimentoId: number): Observable<Lembrete[]> {
-    return this.http.get<Lembrete[]>(`${this.base}/${procedimentoId}/lembretes`);
+  listar(configuracaoAgendaId: number): Observable<Lembrete[]> {
+    return this.http.get<Lembrete[]>(`${this.base}/${configuracaoAgendaId}/lembretes`);
   }
 
-  criar(procedimentoId: number, req: LembreteRequest): Observable<Lembrete> {
-    return this.http.post<Lembrete>(`${this.base}/${procedimentoId}/lembretes`, req);
+  criar(configuracaoAgendaId: number, req: LembreteRequest): Observable<Lembrete> {
+    return this.http.post<Lembrete>(`${this.base}/${configuracaoAgendaId}/lembretes`, req);
   }
 
   excluir(id: number): Observable<void> {

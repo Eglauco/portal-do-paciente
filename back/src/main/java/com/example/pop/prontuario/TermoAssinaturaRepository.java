@@ -13,8 +13,8 @@ public interface TermoAssinaturaRepository extends JpaRepository<TermoAssinatura
     /** Termos a assinar de um prontuário (mais antigos primeiro), para exibir no app. */
     List<TermoAssinatura> findByProntuario_IdOrderByCriadoEmAsc(Long prontuarioId);
 
-    /** Idempotência: já existe pendência para este termo-de-procedimento neste prontuário? */
-    boolean existsByProntuario_IdAndTermoProcedimento_Id(Long prontuarioId, Long termoProcedimentoId);
+    /** Idempotência: já existe pendência para este termo-de-configuracaoAgenda neste prontuário? */
+    boolean existsByProntuario_IdAndTermoConfiguracaoAgenda_Id(Long prontuarioId, Long termoConfiguracaoAgendaId);
 
     /** Primeiro termo por chave do signatário do PACIENTE (Clicksign: pré-preencher os dados federais no widget). */
     Optional<TermoAssinatura> findFirstByProviderSignerId(String providerSignerId);

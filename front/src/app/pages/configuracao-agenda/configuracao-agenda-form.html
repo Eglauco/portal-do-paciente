@@ -1,11 +1,11 @@
 <section class="dash">
   <header class="page-head">
     <div>
-      <h1 class="page-title">{{ editando() ? 'Editar procedimento' : 'Cadastro de procedimento' }}</h1>
+      <h1 class="page-title">{{ editando() ? 'Editar configuração de agenda' : 'Cadastro de configuracaoAgenda' }}</h1>
       <p class="page-sub">
         {{ editando()
-          ? 'Atualize os dados deste procedimento.'
-          : 'Preencha os dados para cadastrar uma nova procedimento de saúde.' }}
+          ? 'Atualize os dados deste configuracaoAgenda.'
+          : 'Preencha os dados para cadastrar uma nova configuracaoAgenda de saúde.' }}
       </p>
     </div>
     @if (editando()) {
@@ -25,7 +25,7 @@
         [class.form-tab--ativa]="abaAtiva() === 'dados'"
         [attr.aria-selected]="abaAtiva() === 'dados'"
         (click)="selecionarAba('dados')"
-      >Dados do procedimento</button>
+      >Dados do configuracaoAgenda</button>
       <button
         type="button" role="tab" class="form-tab"
         [class.form-tab--ativa]="abaAtiva() === 'lembretes'"
@@ -57,7 +57,7 @@
           id="nome"
           class="input"
           formControlName="nome"
-          placeholder="Nome do procedimento"
+          placeholder="Nome do configuracaoAgenda"
           autocomplete="off"
           [class.input--error]="invalido('nome')"
           [attr.aria-invalid]="invalido('nome')"
@@ -118,9 +118,9 @@
         class="input input--area"
         formControlName="preparo"
         rows="4"
-        placeholder="Instruções de preparo para o procedimento (opcional). Ex.: jejum de 8h, levar pedido médico…"
+        placeholder="Instruções de preparo para o configuracaoAgenda (opcional). Ex.: jejum de 8h, levar pedido médico…"
       ></textarea>
-      <span class="field-hint">Deixe em branco caso o procedimento não exija preparo.</span>
+      <span class="field-hint">Deixe em branco caso o configuracaoAgenda não exija preparo.</span>
     </div>
 
     <div class="form-actions">
@@ -132,7 +132,7 @@
   </form>
   }
 
-  <!-- Lembretes (só ao editar um procedimento já existente) -->
+  <!-- Lembretes (só ao editar um configuracaoAgenda já existente) -->
   @if (editando() && abaAtiva() === 'lembretes') {
     <section class="panel form-card lembretes-panel">
       <div class="panel__head">
@@ -194,7 +194,7 @@
     </section>
   }
 
-  <!-- Termos de Consentimento (TCLE) — só ao editar um procedimento já existente -->
+  <!-- Termos de Consentimento (TCLE) — só ao editar um configuracaoAgenda já existente -->
   @if (editando() && abaAtiva() === 'tcle') {
     <section class="panel form-card">
       <div class="panel__head">
@@ -207,7 +207,7 @@
         </button>
       </div>
       <p class="field-hint">
-        Documentos em Word do termo deste procedimento. Use as <strong>variáveis dinâmicas</strong> (botão acima) dentro
+        Documentos em Word do termo deste configuracaoAgenda. Use as <strong>variáveis dinâmicas</strong> (botão acima) dentro
         do Word para o sistema preencher os dados do paciente na hora da assinatura — a substituição automática exige
         <strong>.docx</strong> (o .doc serve para termo sem variáveis).
       </p>

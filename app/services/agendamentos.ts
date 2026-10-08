@@ -13,7 +13,7 @@ interface AgendaRef {
   data: string;
   especialidade: Ref;
   profissionalSaude: Ref;
-  procedimento: Ref;
+  configuracaoAgenda: Ref;
   unidadeSaude: Ref;
 }
 
@@ -97,7 +97,7 @@ export interface InfoCancelamento {
   restanteMs: number;
 }
 
-/** Calcula o prazo de cancelamento; null quando o procedimento não define prazo. */
+/** Calcula o prazo de cancelamento; null quando a configuração da agenda não define prazo. */
 export function infoCancelamento(a: Agendamento, agoraMs: number): InfoCancelamento | null {
   if (a.horasCancelamento == null || !a.dataHoraIso) return null;
   const limite = new Date(a.dataHoraIso).getTime() - a.horasCancelamento * 3_600_000;

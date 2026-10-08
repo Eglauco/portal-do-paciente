@@ -3,7 +3,7 @@ package com.example.pop.agendamento;
 import java.time.LocalDate;
 
 import com.example.pop.especialidade.Especialidade;
-import com.example.pop.procedimento.Procedimento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
 import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.unidade.Unidade;
 
@@ -24,7 +24,7 @@ import lombok.Setter;
 
 /**
  * "Agenda" = o SLOT/sessão do profissional (nível superior do CROSS: {@code ID_AGE_CONSULTA}). Guarda o dia,
- * o profissional, a especialidade, o procedimento e a unidade. Uma Agenda tem N {@link Horario} (os pacientes
+ * o profissional, a especialidade, o configuracaoAgenda e a unidade. Uma Agenda tem N {@link Horario} (os pacientes
  * marcados). A hora específica de cada marcação fica no {@link Horario} ({@code dataHora}/{@code horaFim}).
  */
 @Entity
@@ -75,8 +75,8 @@ public class Agenda {
     private Especialidade especialidade;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    @JoinColumn(name = "procedimento_id", nullable = false)
-    private Procedimento procedimento;
+    @JoinColumn(name = "configuracao_agenda_id", nullable = false)
+    private ConfiguracaoAgenda configuracaoAgenda;
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "unidade_id", nullable = false)

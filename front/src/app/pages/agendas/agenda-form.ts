@@ -7,16 +7,16 @@ import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { Ref } from '../agendamentos/agendamento.model';
-import { Procedimento } from '../procedimentos/procedimento.model';
-import { ProcedimentoService } from '../procedimentos/procedimento.service';
+import { ConfiguracaoAgenda } from '../configuracao-agenda/configuracao-agenda.model';
+import { ConfiguracaoAgendaService } from '../configuracao-agenda/configuracao-agenda.service';
 import { ProfissionalSaude } from '../profissionais/profissional.model';
 import { ProfissionalSaudeService } from '../profissionais/profissional.service';
 import { AgendaRequest } from './agenda.model';
 import { AgendaService } from './agenda.service';
 
-type Campo = 'data' | 'especialidadeId' | 'profissionalSaudeId' | 'procedimentoId' | 'unidadeSaudeId';
+type Campo = 'data' | 'especialidadeId' | 'profissionalSaudeId' | 'configuracaoAgendaId' | 'unidadeSaudeId';
 
-/** Cadastro/edição de uma Agenda (slot): dia + profissional/especialidade/procedimento/unidade. */
+/** Cadastro/edição de uma Agenda (slot): dia + profissional/especialidade/configuracao-agenda/unidade. */
 @Component({
   selector: 'app-agenda-form',
   imports: [ReactiveFormsModule, NgSelectModule, RouterLink],
@@ -30,7 +30,7 @@ type Campo = 'data' | 'especialidadeId' | 'profissionalSaudeId' | 'procedimentoI
 export class AgendaForm implements PodeSair {
   private readonly service = inject(AgendaService);
   private readonly profissionalService = inject(ProfissionalSaudeService);
-  private readonly procedimentoService = inject(ProcedimentoService);
+  private readonly configuracaoAgendaService = inject(ConfiguracaoAgendaService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
@@ -39,7 +39,7 @@ export class AgendaForm implements PodeSair {
   protected readonly unidadeNome = this.auth.unidadeNome;
 
   protected readonly profissionais = signal<ProfissionalSaude[]>([]);
-  protected readonly procedimentos = signal<Procedimento[]>([]);
+  protected readonly configuracaoAgendas = signal<ConfiguracaoAgenda[]>([]);
 
   private readonly profissionalSelecionadoId = signal<number | null>(null);
   private readonly profissionalSalvado = signal<Ref | null>(null);
@@ -70,7 +70,7 @@ export class AgendaForm implements PodeSair {
     data: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     profissionalSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     especialidadeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
-    procedimentoId: new FormControl<number | null>(null, { validators: [Validators.required] }),
+    configuracaoAgendaId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     unidadeSaudeId: new FormControl<number | null>(null, { validators: [Validators.required] }),
     nome: new FormControl<string>('', { nonNullable: true }),
   });
@@ -135,7 +135,7 @@ export class AgendaForm implements PodeSair {
       data: v.data,
       profissionalSaudeId: v.profissionalSaudeId!,
       especialidadeId: v.especialidadeId!,
-      procedimentoId: v.procedimentoId!,
+      configuracaoAgendaId: v.configuracaoAgendaId!,
       unidadeSaudeId: v.unidadeSaudeId!,
       nome: v.nome?.trim() || null,
     };
@@ -160,7 +160,7 @@ export class AgendaForm implements PodeSair {
 
   private carregarOpcoes(): void {
     this.profissionalService.listar({}, 0, 100).subscribe({ next: (p) => this.profissionais.set(p.content) });
-    this.procedimentoService.listar({}, 0, 100).subscribe({ next: (p) => this.procedimentos.set(p.content) });
+    this.configuracaoAgendaService.listar({}, 0, 100).subscribe({ next: (p) => this.configuracaoAgendas.set(p.content) });
   }
 
   private carregarAgenda(): void {
@@ -173,7 +173,7 @@ export class AgendaForm implements PodeSair {
         this.form.patchValue({
           data: a.data,
           profissionalSaudeId: a.profissionalSaude.id,
-          procedimentoId: a.procedimento.id,
+          configuracaoAgendaId: a.configuracaoAgenda.id,
           nome: a.nome ?? '',
         });
         this.form.controls.especialidadeId.setValue(a.especialidade.id);

@@ -1,4 +1,4 @@
-export interface Procedimento {
+export interface ConfiguracaoAgenda {
   id?: number;
   nome: string;
   preparo?: string;
@@ -8,7 +8,7 @@ export interface Procedimento {
   horasNps: number;
 }
 
-export interface ProcedimentoFiltro {
+export interface ConfiguracaoAgendaFiltro {
   codigo?: string;
   nome?: string;
 }
