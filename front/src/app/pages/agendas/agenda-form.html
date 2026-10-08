@@ -3,7 +3,7 @@
     <div>
       <a class="btn btn--ghost btn--sm" routerLink="/agendas">← Voltar</a>
       <h1 class="page-title">{{ editando() ? 'Editar agenda' : 'Nova agenda' }}</h1>
-      <p class="page-sub">A agenda é o slot do profissional (dia + especialidade/procedimento). Os pacientes são adicionados como horários no detalhe.</p>
+      <p class="page-sub">A agenda é o slot do profissional (dia + especialidade/configuracao-agenda). Os pacientes são adicionados como horários no detalhe.</p>
     </div>
   </header>
 
@@ -68,17 +68,17 @@
         </div>
 
         <div class="form-field">
-          <label class="label" for="f-proc">Procedimento</label>
+          <label class="label" for="f-proc">Configuração da Agenda</label>
           <ng-select
             id="f-proc"
-            formControlName="procedimentoId"
-            [items]="procedimentos()"
+            formControlName="configuracaoAgendaId"
+            [items]="configuracaoAgendas()"
             bindValue="id"
             bindLabel="nome"
-            placeholder="Selecione o procedimento"
+            placeholder="Selecione o configuracaoAgenda"
             [clearable]="false"
           ></ng-select>
-          @if (invalido('procedimentoId')) { <span class="field-error">Selecione o procedimento.</span> }
+          @if (invalido('configuracaoAgendaId')) { <span class="field-error">Selecione o configuracaoAgenda.</span> }
         </div>
       </div>
 

@@ -139,7 +139,7 @@ public class DashboardService {
                 proximos,
                 serieDiaria(agendamentoRepository.serieDiaria(unidadeId, j.inicio(), j.fim()), j),
                 fatias(StatusAgendamento.values(), ag, StatusAgendamento::getDescricao),
-                itens(agendamentoRepository.topProcedimentos(unidadeId, j.inicio(), j.fim())),
+                itens(agendamentoRepository.topConfiguracaoAgendas(unidadeId, j.inicio(), j.fim())),
                 itens(agendamentoRepository.topProfissionais(unidadeId, j.inicio(), j.fim())),
                 itens(agendamentoRepository.porEspecialidade(unidadeId, j.inicio(), j.fim())),
                 itens(agendamentoRepository.agruparMotivosFalta(unidadeId, j.inicio(), j.fim())));

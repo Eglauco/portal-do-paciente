@@ -78,7 +78,7 @@ public class FichaPacienteService {
 
     private String descreverAgendamento(Horario a, LocalDateTime agora) {
         StringBuilder s = new StringBuilder("- ")
-                .append(a.getProcedimento().getNome())
+                .append(a.getConfiguracaoAgenda().getNome())
                 .append(" em ").append(a.getDataHora().format(DATA))
                 .append(" na unidade ").append(a.getUnidadeSaude().getNome());
         if (a.getProfissionalSaude() != null) {
@@ -86,13 +86,13 @@ public class FichaPacienteService {
         }
         s.append(" (status: ").append(a.getStatusAgendamento().getDescricao()).append(").");
 
-        String preparo = a.getProcedimento().getPreparo();
+        String preparo = a.getConfiguracaoAgenda().getPreparo();
         if (preparo != null && !preparo.isBlank()) {
             s.append(" Preparo: ").append(preparo.trim()).append(".");
         }
 
         List<Lembrete> lembretes = lembreteRepository
-                .findByProcedimentoIdOrderByHorasAntecedenciaDesc(a.getProcedimento().getId());
+                .findByConfiguracaoAgendaIdOrderByHorasAntecedenciaDesc(a.getConfiguracaoAgenda().getId());
         String orientacoes = lembretes.stream()
                 .map(Lembrete::getTexto)
                 .filter(t -> t != null && !t.isBlank())
@@ -111,7 +111,7 @@ public class FichaPacienteService {
         if (a.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             return "Cancelamento pelo app: só é possível quando o agendamento está confirmado pelo paciente.";
         }
-        Integer horas = a.getProcedimento().getHorasCancelamento();
+        Integer horas = a.getConfiguracaoAgenda().getHorasCancelamento();
         if (horas == null) {
             return "Cancelamento pelo app: permitido.";
         }

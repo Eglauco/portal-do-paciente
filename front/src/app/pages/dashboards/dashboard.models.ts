@@ -58,7 +58,7 @@ export interface AgendamentoDashboard {
   proximos7Dias: number;
   porDia: SerieDiaria[];
   porStatus: Fatia[];
-  topProcedimentos: ItemContagem[];
+  topConfiguracaoAgendas: ItemContagem[];
   topProfissionais: ItemContagem[];
   porEspecialidade: ItemContagem[];
   motivosFalta: ItemContagem[];

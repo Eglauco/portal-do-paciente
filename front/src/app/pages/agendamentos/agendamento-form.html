@@ -92,18 +92,18 @@
       </div>
 
       <div class="form-field">
-        <label class="label" for="procedimento">Procedimento <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="configuracaoAgenda">Configuração da Agenda <span class="req" aria-hidden="true">*</span></label>
         <ng-select
-          labelForId="procedimento"
-          formControlName="procedimentoId"
-          [items]="procedimentos()"
+          labelForId="configuracaoAgenda"
+          formControlName="configuracaoAgendaId"
+          [items]="configuracaoAgendas()"
           bindLabel="nome"
           bindValue="id"
-          placeholder="Selecione o procedimento"
-          notFoundText="Nenhum procedimento encontrado"
+          placeholder="Selecione o configuracaoAgenda"
+          notFoundText="Nenhum configuracaoAgenda encontrado"
         ></ng-select>
-        @if (invalido('procedimentoId')) {
-          <span class="field-error">Selecione o procedimento.</span>
+        @if (invalido('configuracaoAgendaId')) {
+          <span class="field-error">Selecione o configuracaoAgenda.</span>
         }
       </div>
 

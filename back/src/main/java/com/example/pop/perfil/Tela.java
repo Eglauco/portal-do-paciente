@@ -28,7 +28,7 @@ public enum Tela {
     EXAME("Exames"),
     PROFISSIONAIS("Profissionais"),
     CONSELHOS("Conselhos"),
-    PROCEDIMENTOS("Procedimentos"),
+    CONFIGURACAO_AGENDA("Configuração da Agenda"),
     MOTIVOS_FALTA("Motivos de falta"),
     UNIDADES("Unidades"),
     USUARIOS("Usuários"),

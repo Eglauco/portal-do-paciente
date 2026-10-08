@@ -111,7 +111,7 @@ public class MeusHorariosController {
     /**
      * Cancelamento pelo paciente: move o status para CANCELADO_PELO_PACIENTE.
      * Só é permitido em agendamento CONFIRMADO (regra de negócio) e dentro do prazo
-     * de cancelamento do procedimento — fora disso, 409.
+     * de cancelamento do configuracaoAgenda — fora disso, 409.
      */
     @PostMapping("/{id}/cancelar")
     @Transactional
@@ -122,7 +122,7 @@ public class MeusHorariosController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Só é possível cancelar um agendamento confirmado.");
         }
-        Integer horas = agendamento.getProcedimento().getHorasCancelamento();
+        Integer horas = agendamento.getConfiguracaoAgenda().getHorasCancelamento();
         if (horas != null) {
             LocalDateTime prazo = agendamento.getDataHora().minusHours(horas);
             if (LocalDateTime.now(FUSO).isAfter(prazo)) {

@@ -54,7 +54,7 @@ class ExportacaoServiceTest {
     @Test
     void amostraPremiumParaConferencia() throws Exception {
         record Ag(String dataHora, String paciente, String unidade, String especialidade,
-                String profissional, String procedimento, String status, String justificativa) {
+                String profissional, String configuracaoAgenda, String status, String justificativa) {
         }
         List<ColunaExport<Ag>> colunas = List.of(
                 ColunaExport.de("Data/Hora", Ag::dataHora),
@@ -62,7 +62,7 @@ class ExportacaoServiceTest {
                 ColunaExport.de("Unidade", Ag::unidade),
                 ColunaExport.de("Especialidade", Ag::especialidade),
                 ColunaExport.de("Profissional", Ag::profissional),
-                ColunaExport.de("Procedimento", Ag::procedimento),
+                ColunaExport.de("ConfiguracaoAgenda", Ag::configuracaoAgenda),
                 ColunaExport.de("Status", Ag::status),
                 ColunaExport.de("Justificativa", Ag::justificativa));
 
@@ -71,7 +71,7 @@ class ExportacaoServiceTest {
                 "João Pedro Castro", "Larissa Ramos", "Marcelo Tavares" };
         String[] especialidades = { "Cardiologia", "Dermatologia", "Clínica Geral", "Ortopedia", "Pediatria" };
         String[] profissionais = { "Dr. Rafael Lima", "Dra. Marina Alves", "Dr. Paulo Nunes", "Dra. Sofia Reis" };
-        String[] procedimentos = { "Consulta", "Retorno", "Exame de sangue", "Ultrassonografia", "Eletrocardiograma" };
+        String[] configuracaoAgendas = { "Consulta", "Retorno", "Exame de sangue", "Ultrassonografia", "Eletrocardiograma" };
         String[] status = { "Aguardando confirmação do paciente", "Paciente confirmou", "Presença do paciente",
                 "Falta do paciente" };
         String[] justificativas = { "", "", "", "Trânsito intenso na região", "", "Imprevisto de trabalho", "" };
@@ -81,7 +81,7 @@ class ExportacaoServiceTest {
             String dh = String.format("%02d/09/2026 %02d:%02d", (i % 28) + 1, 8 + (i % 9), (i % 2) * 30);
             dados.add(new Ag(dh, pacientes[i % pacientes.length], "Unidade de Saúde Central",
                     especialidades[i % especialidades.length], profissionais[i % profissionais.length],
-                    procedimentos[i % procedimentos.length], status[i % status.length],
+                    configuracaoAgendas[i % configuracaoAgendas.length], status[i % status.length],
                     justificativas[i % justificativas.length]));
         }
 

@@ -154,7 +154,7 @@ public class NpsController {
                 ColunaExport.de("Unidade", n -> n.getHorario().getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", n -> n.getHorario().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", n -> n.getHorario().getProfissionalSaude().getNome()),
-                ColunaExport.de("Procedimento", n -> n.getHorario().getProcedimento().getNome()),
+                ColunaExport.de("Configuração da Agenda", n -> n.getHorario().getConfiguracaoAgenda().getNome()),
                 ColunaExport.de("Status do atendimento", n -> n.getHorario().getStatusAgendamento().getDescricao()),
                 ColunaExport.de("Média", n -> n.getMedia() == null ? "" : String.format(Locale.forLanguageTag("pt-BR"), "%.1f", n.getMedia())),
                 ColunaExport.de("Nota (legado)", n -> n.getNota() == null ? "" : String.valueOf(n.getNota())),

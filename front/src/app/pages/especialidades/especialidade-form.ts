@@ -4,8 +4,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
-import { Procedimento } from '../procedimentos/procedimento.model';
-import { ProcedimentoService } from '../procedimentos/procedimento.service';
+import { ConfiguracaoAgenda } from '../configuracao-agenda/configuracao-agenda.model';
+import { ConfiguracaoAgendaService } from '../configuracao-agenda/configuracao-agenda.service';
 import { EspecialidadeService } from './especialidade.service';
 
 @Component({
@@ -15,12 +15,12 @@ import { EspecialidadeService } from './especialidade.service';
 })
 export class EspecialidadeForm implements PodeSair {
   private readonly service = inject(EspecialidadeService);
-  private readonly procedimentoService = inject(ProcedimentoService);
+  private readonly configuracaoAgendaService = inject(ConfiguracaoAgendaService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
 
-  protected readonly procedimentos = signal<Procedimento[]>([]);
+  protected readonly configuracaoAgendas = signal<ConfiguracaoAgenda[]>([]);
 
   protected readonly form = new FormGroup({
     nome: new FormControl('', {
@@ -28,7 +28,7 @@ export class EspecialidadeForm implements PodeSair {
       validators: [Validators.required, Validators.minLength(3)],
     }),
     codigoIntegracao: new FormControl('', { nonNullable: true }),
-    procedimentoId: new FormControl<number | null>(null),
+    configuracaoAgendaId: new FormControl<number | null>(null),
   });
 
   protected readonly editando = signal(false);
@@ -42,8 +42,8 @@ export class EspecialidadeForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
-    this.procedimentoService.listar({}, 0, 100).subscribe({
-      next: (p) => this.procedimentos.set(p.content),
+    this.configuracaoAgendaService.listar({}, 0, 100).subscribe({
+      next: (p) => this.configuracaoAgendas.set(p.content),
     });
 
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -56,7 +56,7 @@ export class EspecialidadeForm implements PodeSair {
           this.form.patchValue({
             nome: especialidade.nome,
             codigoIntegracao: especialidade.codigoIntegracao ?? '',
-            procedimentoId: especialidade.procedimento?.id ?? null,
+            configuracaoAgendaId: especialidade.configuracaoAgenda?.id ?? null,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -81,11 +81,11 @@ export class EspecialidadeForm implements PodeSair {
     }
     this.salvando.set(true);
     const codigo = this.form.controls.codigoIntegracao.value.trim();
-    const procId = this.form.controls.procedimentoId.value;
+    const procId = this.form.controls.configuracaoAgendaId.value;
     const dados = {
       nome: this.form.controls.nome.value,
       codigoIntegracao: codigo || null,
-      procedimento: procId ? { id: procId } : null,
+      configuracaoAgenda: procId ? { id: procId } : null,
     };
     const requisicao = this.editando()
       ? this.service.atualizar(this.codigo()!, dados)

@@ -3,7 +3,7 @@ package com.example.pop.prontuario;
 import java.time.LocalDateTime;
 
 import com.example.pop.assinatura.ProvedorAssinatura;
-import com.example.pop.procedimento.TermoProcedimento;
+import com.example.pop.configuracaoagenda.TermoConfiguracaoAgenda;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -22,8 +22,8 @@ import lombok.Setter;
 
 /**
  * Termo de Consentimento (TCLE) a assinar, gerado no prontuário quando o paciente registra presença
- * (se o procedimento tiver termos vinculados). É uma pendência de assinatura: guarda um snapshot do
- * nome/arquivo (congelado) e aponta para o {@link TermoProcedimento} de origem. A assinatura em si
+ * (se o configuracaoAgenda tiver termos vinculados). É uma pendência de assinatura: guarda um snapshot do
+ * nome/arquivo (congelado) e aponta para o {@link TermoConfiguracaoAgenda} de origem. A assinatura em si
  * (ZapSign) preenche os campos futuros. NÃO entra na coleção {@code documentos} do Prontuário — é
  * gerido pelo seu próprio repositório (evita o merge-por-URL/orphanRemoval do prontuário).
  */
@@ -42,10 +42,10 @@ public class TermoAssinatura {
     @JoinColumn(name = "prontuario_id", nullable = false)
     private Prontuario prontuario;
 
-    /** Termo do procedimento que originou esta pendência (rastreio; nulo se a origem sumir). */
+    /** Termo do configuracaoAgenda que originou esta pendência (rastreio; nulo se a origem sumir). */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "termo_procedimento_id")
-    private TermoProcedimento termoProcedimento;
+    @JoinColumn(name = "termo_configuracao_agenda_id")
+    private TermoConfiguracaoAgenda termoConfiguracaoAgenda;
 
     /** Snapshot do nome do termo no momento da geração. */
     @Column(nullable = false, length = 120)

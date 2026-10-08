@@ -1,0 +1,472 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">{{ editando() ? 'Editar configuração de agenda' : 'Cadastro de configuracaoAgenda' }}</h1>
+      <p class="page-sub">
+        {{ editando()
+          ? 'Atualize os dados deste configuracaoAgenda.'
+          : 'Preencha os dados para cadastrar uma nova configuracaoAgenda de saúde.' }}
+      </p>
+    </div>
+    @if (editando()) {
+      <button type="button" class="btn btn--danger" (click)="excluir()" [disabled]="excluindo()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+        </svg>
+        {{ excluindo() ? 'Excluindo…' : 'Excluir' }}
+      </button>
+    }
+  </header>
+
+  @if (editando()) {
+    <div class="form-tabs" role="tablist" aria-label="Seções do cadastro">
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'dados'"
+        [attr.aria-selected]="abaAtiva() === 'dados'"
+        (click)="selecionarAba('dados')"
+      >Dados do configuracaoAgenda</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'lembretes'"
+        [attr.aria-selected]="abaAtiva() === 'lembretes'"
+        (click)="selecionarAba('lembretes')"
+      >Lembretes</button>
+      <button
+        type="button" role="tab" class="form-tab"
+        [class.form-tab--ativa]="abaAtiva() === 'tcle'"
+        [attr.aria-selected]="abaAtiva() === 'tcle'"
+        (click)="selecionarAba('tcle')"
+      >Termo de Consentimento</button>
+    </div>
+  }
+
+  @if (!editando() || abaAtiva() === 'dados') {
+  <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
+    @if (editando()) {
+      <div class="form-field form-field--sm">
+        <label class="label" for="codigo">Código</label>
+        <input id="codigo" class="input input--readonly" [value]="codigo()" readonly tabindex="-1" />
+      </div>
+    }
+
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="label" for="nome">Nome <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="nome"
+          class="input"
+          formControlName="nome"
+          placeholder="Nome do configuracaoAgenda"
+          autocomplete="off"
+          [class.input--error]="invalido('nome')"
+          [attr.aria-invalid]="invalido('nome')"
+          aria-describedby="nome-erro"
+        />
+        @if (invalido('nome')) {
+          <span id="nome-erro" class="field-error">Informe o nome (mínimo 3 caracteres).</span>
+        }
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="horasCancelamento">
+          Prazo p/ cancelar (horas antes) <span class="req" aria-hidden="true">*</span>
+        </label>
+        <input
+          id="horasCancelamento"
+          class="input"
+          type="number"
+          min="0"
+          formControlName="horasCancelamento"
+          placeholder="Ex.: 24"
+          [class.input--error]="invalido('horasCancelamento')"
+          [attr.aria-invalid]="invalido('horasCancelamento')"
+          aria-describedby="horas-hint horas-erro"
+        />
+        @if (invalido('horasCancelamento')) {
+          <span id="horas-erro" class="field-error">Informe as horas (0 ou mais).</span>
+        }
+        <span id="horas-hint" class="field-hint">Quantas horas antes da consulta o paciente ainda pode cancelar.</span>
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="horasNps">
+          Disparar NPS (horas após presença) <span class="req" aria-hidden="true">*</span>
+        </label>
+        <input
+          id="horasNps"
+          class="input"
+          type="number"
+          min="0"
+          formControlName="horasNps"
+          placeholder="Ex.: 24 (0 = na hora)"
+          [class.input--error]="invalido('horasNps')"
+          [attr.aria-invalid]="invalido('horasNps')"
+          aria-describedby="nps-hint nps-erro"
+        />
+        @if (invalido('horasNps')) {
+          <span id="nps-erro" class="field-error">Informe as horas (0 ou mais).</span>
+        }
+        <span id="nps-hint" class="field-hint">Quantas horas após a presença do paciente o NPS é enviado. 0 = dispara na hora.</span>
+      </div>
+    </div>
+
+    <div class="form-field">
+      <label class="label" for="preparo">Preparo</label>
+      <textarea
+        id="preparo"
+        class="input input--area"
+        formControlName="preparo"
+        rows="4"
+        placeholder="Instruções de preparo para o configuracaoAgenda (opcional). Ex.: jejum de 8h, levar pedido médico…"
+      ></textarea>
+      <span class="field-hint">Deixe em branco caso o configuracaoAgenda não exija preparo.</span>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
+      <button type="submit" class="btn btn--solid" [disabled]="salvando()">
+        {{ salvando() ? 'Salvando…' : 'Salvar' }}
+      </button>
+    </div>
+  </form>
+  }
+
+  <!-- Lembretes (só ao editar um configuracaoAgenda já existente) -->
+  @if (editando() && abaAtiva() === 'lembretes') {
+    <section class="panel form-card lembretes-panel">
+      <div class="panel__head">
+        <h2 class="panel__title">Lembretes</h2>
+      </div>
+      <p class="field-hint lembretes-sub">
+        Mensagens enviadas ao paciente antes do agendamento (push + notificação), conforme a antecedência em horas.
+      </p>
+
+      @if (carregandoLembretes()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando lembretes…</p></div>
+      } @else if (lembretes().length === 0) {
+        <p class="lembretes-vazio">Nenhum lembrete cadastrado ainda.</p>
+      } @else {
+        <ul class="lembretes-lista">
+          @for (l of lembretes(); track l.id) {
+            <li class="lembrete-item">
+              <span class="lembrete-item__horas">{{ l.horasAntecedencia }}h antes</span>
+              <span class="lembrete-item__texto">{{ l.texto }}</span>
+              <button
+                type="button"
+                class="lembrete-item__excluir"
+                (click)="removerLembrete(l)"
+                [attr.aria-label]="'Excluir lembrete: ' + l.texto"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+
+      <form class="lembrete-add" [formGroup]="lembreteForm" (submit)="adicionarLembrete(); $event.preventDefault()">
+        <div class="form-grid">
+          <div class="form-field">
+            <label class="label" for="lembrete-texto">Mensagem <span class="req" aria-hidden="true">*</span></label>
+            <input
+              id="lembrete-texto"
+              class="input"
+              formControlName="texto"
+              placeholder="Ex.: Sua consulta é amanhã. Não esqueça o preparo."
+              maxlength="300"
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-field form-field--sm">
+            <label class="label" for="lembrete-horas">Antecedência (horas) <span class="req" aria-hidden="true">*</span></label>
+            <input id="lembrete-horas" class="input" type="number" min="1" max="8760" formControlName="horasAntecedencia" placeholder="Ex.: 24" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn--solid" [disabled]="salvandoLembrete() || lembreteForm.invalid">
+            {{ salvandoLembrete() ? 'Adicionando…' : 'Adicionar lembrete' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+
+  <!-- Termos de Consentimento (TCLE) — só ao editar um configuracaoAgenda já existente -->
+  @if (editando() && abaAtiva() === 'tcle') {
+    <section class="panel form-card">
+      <div class="panel__head">
+        <h2 class="panel__title">Termo de Consentimento</h2>
+        <button type="button" class="btn btn--ghost var-btn" (click)="abrirVariaveis()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 6 3 12l5 6M16 6l5 6-5 6" />
+          </svg>
+          Variáveis dinâmicas
+        </button>
+      </div>
+      <p class="field-hint">
+        Documentos em Word do termo deste configuracaoAgenda. Use as <strong>variáveis dinâmicas</strong> (botão acima) dentro
+        do Word para o sistema preencher os dados do paciente na hora da assinatura — a substituição automática exige
+        <strong>.docx</strong> (o .doc serve para termo sem variáveis).
+      </p>
+
+      @if (carregandoTermos()) {
+        <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando termos…</p></div>
+      } @else if (termos().length === 0) {
+        <p class="tcle-vazio">Nenhum termo cadastrado ainda.</p>
+      } @else {
+        <ul class="tcle-lista">
+          @for (t of termos(); track t.id) {
+            <li class="tcle-item">
+              <div class="tcle-item__info">
+                <div class="tcle-item__nome">{{ t.nome }}</div>
+                @if (t.origemModelo === 'ZAPSIGN_MODELO') {
+                  <div class="tcle-item__meta">
+                    <span class="tcle-tag">Modelo ZapSign</span>
+                    @if (t.modeloProviderNome) { {{ t.modeloProviderNome }} }
+                  </div>
+                } @else {
+                  <div class="tcle-item__meta">Documento Word</div>
+                }
+                @if (t.profissionalAssina) {
+                  <div class="tcle-item__meta">
+                    <span class="tcle-tag">Profissional também assina{{ t.profissionalCertificado ? ' · certificado' : '' }}</span>
+                  </div>
+                }
+              </div>
+              <div class="tcle-item__acoes">
+                @if (t.origemModelo === 'ARQUIVO') {
+                  <button type="button" class="tcle-btn" (click)="baixarTermo(t)">Baixar</button>
+                  <label class="tcle-btn">
+                    {{ substituindoId() === t.id ? 'Enviando…' : 'Substituir' }}
+                    <input
+                      type="file"
+                      accept=".doc,.docx"
+                      (change)="substituirArquivo(t, $event)"
+                      [disabled]="substituindoId() === t.id"
+                    />
+                  </label>
+                }
+                <button
+                  type="button"
+                  class="tcle-btn tcle-btn--danger"
+                  (click)="removerTermo(t)"
+                  [attr.aria-label]="'Excluir termo: ' + t.nome"
+                >Excluir</button>
+              </div>
+            </li>
+          }
+        </ul>
+      }
+
+      <h3 class="tcle-add-titulo">Adicionar termo</h3>
+
+      <!-- Seletor de origem OCULTO por ora (modeloZapsignHabilitado=false): código pronto, será liberado depois.
+           Com o seletor oculto, a origem fica sempre ARQUIVO (upload do .docx), que é o comportamento atual. -->
+      @if (modeloZapsignHabilitado) {
+        <div class="form-field">
+          <span class="label" id="origem-label">Origem do modelo</span>
+          <div class="origem-toggle" role="group" aria-labelledby="origem-label">
+            <button
+              type="button"
+              class="origem-opt"
+              [class.origem-opt--ativa]="origemTermo() === 'ARQUIVO'"
+              [attr.aria-pressed]="origemTermo() === 'ARQUIVO'"
+              (click)="selecionarOrigem('ARQUIVO')"
+            >Arquivo Word (.docx)</button>
+            <button
+              type="button"
+              class="origem-opt"
+              [class.origem-opt--ativa]="origemTermo() === 'ZAPSIGN_MODELO'"
+              [attr.aria-pressed]="origemTermo() === 'ZAPSIGN_MODELO'"
+              (click)="selecionarOrigem('ZAPSIGN_MODELO')"
+            >Modelo do ZapSign</button>
+          </div>
+          <span class="field-hint">
+            @if (origemTermo() === 'ZAPSIGN_MODELO') {
+              O modelo é configurado no ZapSign; enviamos só as variáveis. Este termo só será assinado pelo
+              provedor <strong>ZapSign</strong>.
+            } @else {
+              O .docx fica no sistema e funciona com qualquer provedor de assinatura.
+            }
+          </span>
+        </div>
+      }
+
+      <div class="form-field">
+        <label class="label" for="tcle-nome">Nome do termo <span class="req" aria-hidden="true">*</span></label>
+        <input
+          id="tcle-nome"
+          class="input"
+          [formControl]="termoNome"
+          placeholder="Ex.: TCLE — Endoscopia digestiva alta"
+          autocomplete="off"
+          maxlength="120"
+        />
+      </div>
+
+      @if (origemTermo() === 'ARQUIVO') {
+        <div class="form-field">
+          <label class="label" for="tcle-arquivo">Arquivo Word (.docx/.doc) <span class="req" aria-hidden="true">*</span></label>
+          <input id="tcle-arquivo" class="input" type="file" accept=".doc,.docx" (change)="onArquivoTermo($event)" />
+          @if (nomeArquivoTermo(); as nome) {
+            <span class="tcle-arquivo">Selecionado: {{ nome }}</span>
+          }
+        </div>
+      } @else {
+        <div class="form-field">
+          <label class="label" for="tcle-modelo">Modelo do ZapSign <span class="req" aria-hidden="true">*</span></label>
+          @if (carregandoModelos()) {
+            <div class="state state--inline"><span class="spinner" aria-hidden="true"></span><p>Carregando modelos…</p></div>
+          } @else if (erroModelos()) {
+            <p class="tcle-vazio">Não foi possível listar os modelos do ZapSign (verifique se o token está configurado).</p>
+          } @else if (modelosZapsign().length === 0) {
+            <p class="tcle-vazio">Nenhum modelo encontrado na conta do ZapSign.</p>
+          } @else {
+            <select id="tcle-modelo" class="input" (change)="aoSelecionarModelo($event)">
+              <option value="">Selecione um modelo…</option>
+              @for (m of modelosZapsign(); track m.token) {
+                <option [value]="m.token" [selected]="modeloSelecionadoToken() === m.token">
+                  {{ m.nome }}{{ m.ativo ? '' : ' (inativo)' }}
+                </option>
+              }
+            </select>
+          }
+
+          @if (carregandoDetalhe()) {
+            <div class="state state--inline"><span class="spinner" aria-hidden="true"></span><p>Lendo as variáveis do modelo…</p></div>
+          } @else if (modeloDetalhe(); as d) {
+            <div class="modelo-vars">
+              <div class="modelo-vars__titulo">Variáveis do modelo</div>
+              @if (d.variaveis.length === 0) {
+                <p class="field-hint">Este modelo não declara variáveis.</p>
+              } @else {
+                <div class="modelo-vars__chips">
+                  @for (v of d.variaveis; track $index) {
+                    <span class="modelo-chip" [class.modelo-chip--alerta]="!v.conhecida" [title]="v.label">
+                      {{ v.variable }}{{ v.conhecida ? '' : ' ⚠' }}
+                    </span>
+                  }
+                </div>
+              }
+              @if (variaveisDesconhecidas().length > 0) {
+                <p class="modelo-aviso">
+                  ⚠ O sistema não sabe preencher {{ variaveisDesconhecidas().length }} variável(is) deste modelo
+                  (marcadas acima) — elas ficarão em branco no documento. Use os nomes do catálogo
+                  <strong>Variáveis dinâmicas</strong> ao montar o modelo no ZapSign.
+                </p>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <div class="form-field">
+        <label class="check-linha">
+          <input type="checkbox" [checked]="profissionalAssinaTermo()" (change)="aoMarcarAssinaProfissional($any($event.target).checked)" />
+          <span>Profissional de saúde também assina (após o paciente)</span>
+        </label>
+        <span class="field-hint">
+          O profissional do atendimento coassina pelo painel (não pelo app). Ele precisa estar vinculado a um usuário.
+        </span>
+        @if (profissionalAssinaTermo()) {
+          <label class="check-linha check-linha--sub">
+            <input type="checkbox" [checked]="profissionalCertificadoTermo()" (change)="profissionalCertificadoTermo.set($any($event.target).checked)" />
+            <span>Assinar com certificado digital (ICP-Brasil)</span>
+          </label>
+          <span class="field-hint">
+            Assinatura qualificada por certificado (A1/A3) do profissional — maior validade jurídica. Exige que
+            o profissional tenha certificado; há custo por assinatura no provedor.
+          </span>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn--solid" (click)="adicionarTermo()" [disabled]="salvandoTermo()">
+          {{ salvandoTermo() ? 'Adicionando…' : 'Adicionar termo' }}
+        </button>
+      </div>
+    </section>
+  }
+</section>
+
+<!-- Diálogo de confirmação (Sim / Não) -->
+@if (confirmacao(); as mensagem) {
+  <div class="modal-backdrop" (click)="responderConfirmacao(false)">
+    <div
+      class="modal"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-msg"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 9v4M12 17h.01" />
+          <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        </svg>
+      </div>
+      <p id="confirm-msg" class="modal__message">{{ mensagem }}</p>
+      <div class="modal__actions">
+        <button type="button" class="btn btn--ghost" (click)="responderConfirmacao(false)">Não</button>
+        <button type="button" class="btn btn--solid" (click)="responderConfirmacao(true)">Sim</button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- Modal: catálogo de variáveis dinâmicas do TCLE -->
+@if (mostrarVariaveis()) {
+  <div class="modal-backdrop" (click)="fecharVariaveis()">
+    <div
+      class="modal var-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="var-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="var-modal__head">
+        <div>
+          <h2 id="var-title" class="var-modal__title">Variáveis dinâmicas</h2>
+          <p class="var-modal__sub">
+            Copie e cole estes campos dentro do documento Word (.docx). Ao enviar para a assinatura, o sistema
+            substitui cada um pelos dados reais do paciente/atendimento.
+          </p>
+        </div>
+        <button type="button" class="var-modal__close" (click)="fecharVariaveis()" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="var-modal__body">
+        @if (carregandoVariaveis()) {
+          <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando variáveis…</p></div>
+        } @else {
+          @for (g of variaveisPorGrupo(); track g.grupo) {
+            <div class="var-grupo">
+              <h3 class="var-grupo__titulo">{{ g.grupo }}</h3>
+              <div class="var-lista">
+                @for (v of g.itens; track v.token) {
+                  <div class="var-item">
+                    <div class="var-item__info">
+                      <div class="var-item__token">{{ v.token }}</div>
+                      <div class="var-item__desc">{{ v.descricao }} — ex.: {{ v.exemplo }}</div>
+                    </div>
+                    <button
+                      type="button"
+                      class="var-copiar"
+                      [class.var-copiar--ok]="tokenCopiado() === v.token"
+                      (click)="copiarVariavel(v.token)"
+                    >
+                      {{ tokenCopiado() === v.token ? 'Copiado ✓' : 'Copiar' }}
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  </div>
+}

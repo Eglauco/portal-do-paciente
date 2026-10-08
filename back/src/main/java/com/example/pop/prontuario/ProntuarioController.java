@@ -173,7 +173,7 @@ public class ProntuarioController {
                                 .map(ProntuarioController::formatarTelefone).collect(java.util.stream.Collectors.joining("; "))),
                 ColunaExport.de("Especialidade", p -> p.getHorario().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", p -> p.getHorario().getProfissionalSaude().getNome()),
-                ColunaExport.de("Procedimento", p -> p.getHorario().getProcedimento().getNome()),
+                ColunaExport.de("Configuração da Agenda", p -> p.getHorario().getConfiguracaoAgenda().getNome()),
                 ColunaExport.de("Unidade", p -> p.getHorario().getUnidadeSaude().getNome()),
                 ColunaExport.de("Atendimento",
                         p -> p.getHorario().getDataHora() == null ? "" : p.getHorario().getDataHora().format(DATA_HORA)),

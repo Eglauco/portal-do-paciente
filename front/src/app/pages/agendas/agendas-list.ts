@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
+import { AgendaImportModal } from './agenda-import-modal';
 import { AgendaResumo } from './agenda.model';
 import { AgendaService } from './agenda.service';
 
@@ -11,7 +12,7 @@ export type PaginaItem = number | 'ellipsis';
 /** Lista de Agendas (slots) com filtros + botão "Nova agenda". Clica → detalhe (horários). */
 @Component({
   selector: 'app-agendas-list',
-  imports: [ReactiveFormsModule, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink, AgendaImportModal],
   templateUrl: './agendas-list.html',
 })
 export class AgendasList {
@@ -25,6 +26,9 @@ export class AgendasList {
     profissionalNome: new FormControl<string>('', { nonNullable: true }),
     especialidadeNome: new FormControl<string>('', { nonNullable: true }),
   });
+
+  /** Controla a modal de importação de agenda por Excel (Fase 1 — só preview). */
+  protected readonly importAberto = signal(false);
 
   protected readonly size = signal(AgendaService.TAMANHO_PADRAO);
   protected readonly registros = signal<AgendaResumo[]>([]);

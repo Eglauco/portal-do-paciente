@@ -71,7 +71,7 @@ public class NpsService {
             return;
         }
         LocalDateTime agora = LocalDateTime.now(FUSO);
-        int horas = agendamento.getProcedimento().getHorasNps();
+        int horas = agendamento.getConfiguracaoAgenda().getHorasNps();
         LocalDateTime dispararEm = agora.plusHours(horas);
 
         Nps nps = new Nps();

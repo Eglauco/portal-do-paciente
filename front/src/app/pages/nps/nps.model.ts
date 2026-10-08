@@ -36,7 +36,7 @@ export interface NpsDetalhe {
   unidadeSaude: Ref;
   especialidade: Ref;
   profissionalSaude: Ref;
-  procedimento: Ref;
+  configuracaoAgenda: Ref;
   dataHora: string;
   status: StatusNps;
   statusDescricao: string;

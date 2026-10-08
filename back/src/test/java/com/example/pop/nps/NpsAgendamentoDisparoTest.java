@@ -19,9 +19,9 @@ import com.example.pop.agendamento.HorarioRepository;
 import com.example.pop.agendamento.AgendamentoRequest;
 import com.example.pop.agendamento.AgendamentoResponse;
 import com.example.pop.agendamento.StatusAgendamento;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoController;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaController;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.push.PushService;
 
 @SpringBootTest
@@ -34,9 +34,9 @@ class NpsAgendamentoDisparoTest {
     @Autowired
     private HorarioRepository agendamentoRepository;
     @Autowired
-    private ProcedimentoController procedimentoController;
+    private ConfiguracaoAgendaController configuracaoAgendaController;
     @Autowired
-    private ProcedimentoRepository procedimentoRepository;
+    private ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     @Autowired
     private NpsService npsService;
     @Autowired
@@ -57,12 +57,12 @@ class NpsAgendamentoDisparoTest {
     private void limpar(Long agId, Long procId) {
         npsRepository.findByHorarioId(agId).ifPresent(n -> npsRepository.deleteById(n.getId()));
         agendamentoRepository.deleteById(agId);
-        procedimentoRepository.deleteById(procId);
+        configuracaoAgendaRepository.deleteById(procId);
     }
 
     @Test
     void horasZeroDisparaNaHora() {
-        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc NPS 0h", null, 24, 0));
+        ConfiguracaoAgenda proc = configuracaoAgendaController.criar(new ConfiguracaoAgenda(null, "Proc NPS 0h", null, 24, 0));
         AgendamentoResponse ag = presenca(proc.getId());
         try {
             Nps nps = npsRepository.findByHorarioId(ag.id()).orElseThrow();
@@ -75,7 +75,7 @@ class NpsAgendamentoDisparoTest {
 
     @Test
     void horasPositivasAgendaEDisparaNoHorario() {
-        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc NPS 2h", null, 24, 2));
+        ConfiguracaoAgenda proc = configuracaoAgendaController.criar(new ConfiguracaoAgenda(null, "Proc NPS 2h", null, 24, 2));
         AgendamentoResponse ag = presenca(proc.getId());
         try {
             Nps nps = npsRepository.findByHorarioId(ag.id()).orElseThrow();
@@ -99,7 +99,7 @@ class NpsAgendamentoDisparoTest {
 
     @Test
     void cancelaSeSaiuDePresencaAntesDeDisparar() {
-        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc NPS cancela", null, 24, 2));
+        ConfiguracaoAgenda proc = configuracaoAgendaController.criar(new ConfiguracaoAgenda(null, "Proc NPS cancela", null, 24, 2));
         AgendamentoResponse ag = presenca(proc.getId());
         Long procId = proc.getId();
         try {

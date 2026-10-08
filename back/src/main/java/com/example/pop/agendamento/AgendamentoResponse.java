@@ -8,7 +8,7 @@ public record AgendamentoResponse(
         LocalDateTime dataHora,
         RefResponse especialidade,
         RefResponse profissionalSaude,
-        RefResponse procedimento,
+        RefResponse configuracaoAgenda,
         RefResponse paciente,
         RefResponse unidadeSaude,
         StatusAgendamento statusAgendamento,
@@ -27,7 +27,7 @@ public record AgendamentoResponse(
                 a.getDataHora(),
                 new RefResponse(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 new RefResponse(a.getProfissionalSaude().getId(), a.getProfissionalSaude().getNome()),
-                new RefResponse(a.getProcedimento().getId(), a.getProcedimento().getNome()),
+                new RefResponse(a.getConfiguracaoAgenda().getId(), a.getConfiguracaoAgenda().getNome()),
                 new RefResponse(a.getPaciente().getId(), a.getPaciente().getNome()),
                 new RefResponse(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 a.getStatusAgendamento(),
@@ -37,7 +37,7 @@ public record AgendamentoResponse(
                 a.getMotivosFalta().stream()
                         .map(m -> new RefResponse(m.getId(), m.getMotivo()))
                         .toList(),
-                a.getProcedimento().getHorasCancelamento(),
+                a.getConfiguracaoAgenda().getHorasCancelamento(),
                 entrega,
                 entrega != null ? entrega.getDescricao() : null);
     }

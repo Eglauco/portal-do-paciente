@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface LembreteRepository extends JpaRepository<Lembrete, Long> {
 
-    /** Lembretes de um procedimento (para o CRUD do admin). */
-    List<Lembrete> findByProcedimentoIdOrderByHorasAntecedenciaDesc(Long procedimentoId);
+    /** Lembretes de um configuracaoAgenda (para o CRUD do admin). */
+    List<Lembrete> findByConfiguracaoAgendaIdOrderByHorasAntecedenciaDesc(Long configuracaoAgendaId);
 }

@@ -74,7 +74,7 @@ public class Nps {
     @Column(name = "respondido_em")
     private LocalDateTime respondidoEm;
 
-    /** Momento agendado para disparar o NPS ao paciente (presença + horas do procedimento). */
+    /** Momento agendado para disparar o NPS ao paciente (presença + horas do configuracaoAgenda). */
     @Column(name = "disparar_em")
     private LocalDateTime dispararEm;
 

@@ -70,7 +70,7 @@ const TELA_ROTA: ReadonlyArray<readonly [string, string]> = [
   ['EXAME', '/exames'],
   ['PROFISSIONAIS', '/profissionais'],
   ['CONSELHOS', '/conselhos'],
-  ['PROCEDIMENTOS', '/procedimentos'],
+  ['CONFIGURACAO_AGENDA', '/configuracao-agenda'],
   ['MOTIVOS_FALTA', '/motivos-falta'],
   ['UNIDADES', '/unidades'],
   ['USUARIOS', '/usuarios'],

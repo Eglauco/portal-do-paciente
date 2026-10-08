@@ -240,7 +240,7 @@ public class Siresp {
     private String idAssociacao;
     @Column(name = "nome_associacao", columnDefinition = "TEXT")
     private String nomeAssociacao;
-    /** Código do exame no CROSS — casa com o cadastro de Exame (codigoIntegracao) para resolver o procedimento. */
+    /** Código do exame no CROSS — casa com o cadastro de Exame (codigoIntegracao) para resolver o configuracaoAgenda. */
     @Column(name = "id_exame", columnDefinition = "TEXT")
     private String idExame;
     @Column(name = "cod_exame", columnDefinition = "TEXT")

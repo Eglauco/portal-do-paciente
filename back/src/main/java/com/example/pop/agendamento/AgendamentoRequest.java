@@ -8,7 +8,7 @@ public record AgendamentoRequest(
         @NotNull LocalDateTime dataHora,
         @NotNull Long especialidadeId,
         @NotNull Long profissionalSaudeId,
-        @NotNull Long procedimentoId,
+        @NotNull Long configuracaoAgendaId,
         @NotNull Long pacienteId,
         @NotNull Long unidadeSaudeId,
         StatusAgendamento statusAgendamento) {

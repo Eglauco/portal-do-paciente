@@ -21,9 +21,9 @@ import com.example.pop.agendamento.StatusAgendamento;
 import com.example.pop.notificacao.Notificacao;
 import com.example.pop.notificacao.NotificacaoRepository;
 import com.example.pop.notificacao.TipoNotificacao;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoController;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaController;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.push.PushService;
 
 @SpringBootTest
@@ -36,9 +36,9 @@ class LembreteFlowTest {
     @Autowired
     private HorarioRepository agendamentoRepository;
     @Autowired
-    private ProcedimentoController procedimentoController;
+    private ConfiguracaoAgendaController configuracaoAgendaController;
     @Autowired
-    private ProcedimentoRepository procedimentoRepository;
+    private ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     @Autowired
     private LembreteController lembreteController;
     @Autowired
@@ -53,10 +53,10 @@ class LembreteFlowTest {
 
     @Test
     void disparaUmaVezGeraPopupComCancelamentoEReconhece() {
-        // Procedimento com prazo de cancelamento de 1h (para o pop-up poder cancelar).
-        Procedimento proc = procedimentoController.criar(new Procedimento(null, "Proc Lembrete Teste", null, 1, 0));
+        // ConfiguracaoAgenda com prazo de cancelamento de 1h (para o pop-up poder cancelar).
+        ConfiguracaoAgenda proc = configuracaoAgendaController.criar(new ConfiguracaoAgenda(null, "Proc Lembrete Teste", null, 1, 0));
 
-        // Horario CONFIRMADO daqui a 2h nesse procedimento (paciente/unidade/etc. do seed = id 1).
+        // Horario CONFIRMADO daqui a 2h nesse configuracaoAgenda (paciente/unidade/etc. do seed = id 1).
         LocalDateTime dh = LocalDateTime.now(FUSO).plusHours(2).withNano(0);
         AgendamentoResponse ag = agendamentoController.criar(
                 new AgendamentoRequest(dh, 1L, 1L, proc.getId(), 1L, 1L, null), null);
@@ -99,7 +99,7 @@ class LembreteFlowTest {
         } finally {
             agendamentoRepository.deleteById(ag.id()); // remove o disparo por cascade
             lembreteRepository.deleteById(lem.id());
-            procedimentoRepository.deleteById(proc.getId());
+            configuracaoAgendaRepository.deleteById(proc.getId());
             if (notifId != null) {
                 notificacaoRepository.deleteById(notifId);
             }

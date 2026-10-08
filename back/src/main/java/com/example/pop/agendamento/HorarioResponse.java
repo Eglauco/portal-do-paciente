@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Horário (marcação de um paciente numa Agenda) — na lista de horários da agenda e no detalhe do horário.
- * Traz também o contexto da Agenda (data + especialidade/profissional/procedimento/unidade) para a tela do horário
+ * Traz também o contexto da Agenda (data + especialidade/profissional/configuracaoAgenda/unidade) para a tela do horário
  * ser auto-suficiente.
  */
 public record HorarioResponse(
@@ -25,7 +25,7 @@ public record HorarioResponse(
         String pacienteFotoUrl,
         RefResponse especialidade,
         RefResponse profissionalSaude,
-        RefResponse procedimento,
+        RefResponse configuracaoAgenda,
         RefResponse unidadeSaude,
         StatusAgendamento statusAgendamento,
         String statusDescricao,
@@ -66,14 +66,14 @@ public record HorarioResponse(
                 pacienteFotoUrl,
                 new RefResponse(ag.getEspecialidade().getId(), ag.getEspecialidade().getNome()),
                 new RefResponse(ag.getProfissionalSaude().getId(), ag.getProfissionalSaude().getNome()),
-                new RefResponse(ag.getProcedimento().getId(), ag.getProcedimento().getNome()),
+                new RefResponse(ag.getConfiguracaoAgenda().getId(), ag.getConfiguracaoAgenda().getNome()),
                 new RefResponse(ag.getUnidadeSaude().getId(), ag.getUnidadeSaude().getNome()),
                 h.getStatusAgendamento(),
                 h.getStatusAgendamento().getDescricao(),
                 h.getFaltaJustificadaEm() != null,
                 h.getJustificativaFalta(),
                 h.getMotivosFalta().stream().map(m -> new RefResponse(m.getId(), m.getMotivo())).toList(),
-                h.getProcedimento().getHorasCancelamento(),
+                h.getConfiguracaoAgenda().getHorasCancelamento(),
                 entrega,
                 entrega != null ? entrega.getDescricao() : null);
     }

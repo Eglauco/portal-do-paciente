@@ -16,38 +16,38 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 
 import jakarta.validation.Valid;
 
-/** CRUD dos lembretes de um procedimento (back-office). Sob /procedimento/** → ADMIN. */
+/** CRUD dos lembretes de um configuracaoAgenda (back-office). Sob /configuracaoAgenda/** → ADMIN. */
 @RestController
-@RequestMapping("/procedimento")
+@RequestMapping("/configuracao-agenda")
 public class LembreteController {
 
     private final LembreteRepository repository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
 
-    public LembreteController(LembreteRepository repository, ProcedimentoRepository procedimentoRepository) {
+    public LembreteController(LembreteRepository repository, ConfiguracaoAgendaRepository configuracaoAgendaRepository) {
         this.repository = repository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
     }
 
-    /** Lembretes de um procedimento (maior antecedência primeiro). */
-    @GetMapping("/{procedimentoId}/lembretes")
-    public List<LembreteResponse> listar(@PathVariable Long procedimentoId) {
-        return repository.findByProcedimentoIdOrderByHorasAntecedenciaDesc(procedimentoId)
+    /** Lembretes de um configuracaoAgenda (maior antecedência primeiro). */
+    @GetMapping("/{configuracaoAgendaId}/lembretes")
+    public List<LembreteResponse> listar(@PathVariable Long configuracaoAgendaId) {
+        return repository.findByConfiguracaoAgendaIdOrderByHorasAntecedenciaDesc(configuracaoAgendaId)
                 .stream().map(LembreteResponse::from).toList();
     }
 
-    @PostMapping("/{procedimentoId}/lembretes")
+    @PostMapping("/{configuracaoAgendaId}/lembretes")
     @ResponseStatus(HttpStatus.CREATED)
-    public LembreteResponse criar(@PathVariable Long procedimentoId, @Valid @RequestBody LembreteRequest request) {
-        Procedimento procedimento = procedimentoRepository.findById(procedimentoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Procedimento não encontrado"));
+    public LembreteResponse criar(@PathVariable Long configuracaoAgendaId, @Valid @RequestBody LembreteRequest request) {
+        ConfiguracaoAgenda configuracaoAgenda = configuracaoAgendaRepository.findById(configuracaoAgendaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Configuração da Agenda não encontrada"));
         Lembrete l = new Lembrete();
-        l.setProcedimento(procedimento);
+        l.setConfiguracaoAgenda(configuracaoAgenda);
         l.setTexto(request.texto().trim());
         l.setHorasAntecedencia(request.horasAntecedencia());
         l.setCriadoEm(LocalDateTime.now());

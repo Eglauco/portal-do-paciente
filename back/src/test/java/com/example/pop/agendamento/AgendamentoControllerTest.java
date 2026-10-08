@@ -90,7 +90,7 @@ class AgendamentoControllerTest {
                 LocalDateTime.of(2026, 10, 1, 9, 0),
                 1L, // especialidadeId
                 1L, // profissionalSaudeId
-                1L, // procedimentoId
+                1L, // configuracaoAgendaId
                 1L, // pacienteId
                 1L, // unidadeSaudeId
                 StatusAgendamento.PRESENCA_PACIENTE); // deve ser ignorado na criação

@@ -2,7 +2,7 @@ package com.example.pop.lembrete;
 
 import java.time.LocalDateTime;
 
-import com.example.pop.procedimento.Procedimento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -17,7 +17,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Lembrete de um procedimento: mensagem + antecedência (horas) do agendamento. */
+/** Lembrete de um configuracaoAgenda: mensagem + antecedência (horas) do agendamento. */
 @Entity
 @Table(name = "lembrete")
 @Getter
@@ -30,8 +30,8 @@ public class Lembrete {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "procedimento_id", nullable = false)
-    private Procedimento procedimento;
+    @JoinColumn(name = "configuracao_agenda_id", nullable = false)
+    private ConfiguracaoAgenda configuracaoAgenda;
 
     /** Texto mostrado ao paciente (push, pop-up e lista de notificações). */
     @Column(nullable = false, length = 300)

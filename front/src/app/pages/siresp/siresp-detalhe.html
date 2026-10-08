@@ -87,9 +87,9 @@
           <div class="log__txt">
             @for (linha of logInternoLinhas(); track $index) {
               @if (linha.rota) {
-                <a class="log__linha log__link" [href]="linha.rota" target="_blank" rel="noopener">{{ linha.texto }}</a>
+                <span class="log__linha"><a class="log__link" [href]="linha.rota" target="_blank" rel="noopener">{{ linha.rotulo }}</a>{{ linha.resto }}</span>
               } @else {
-                <span class="log__linha">{{ linha.texto }}</span>
+                <span class="log__linha">{{ linha.resto }}</span>
               }
             }
           </div>

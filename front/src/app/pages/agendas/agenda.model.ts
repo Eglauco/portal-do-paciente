@@ -13,7 +13,7 @@ export interface AgendaResumo {
   codigoIntegracao?: string | null;
   especialidade: Ref;
   profissionalSaude: Ref;
-  procedimento: Ref;
+  configuracaoAgenda: Ref;
   unidadeSaude: Ref;
   totalHorarios: number;
 }
@@ -40,7 +40,7 @@ export interface Horario {
   pacienteFotoUrl?: string | null;
   especialidade?: Ref;
   profissionalSaude?: Ref;
-  procedimento?: Ref;
+  configuracaoAgenda?: Ref;
   unidadeSaude?: Ref;
   statusAgendamento: StatusAgendamento;
   statusDescricao?: string;
@@ -62,7 +62,7 @@ export interface Agenda {
   codigoIntegracao?: string | null;
   especialidade: Ref;
   profissionalSaude: Ref;
-  procedimento: Ref;
+  configuracaoAgenda: Ref;
   unidadeSaude: Ref;
   horarios: Horario[];
 }
@@ -71,7 +71,7 @@ export interface AgendaRequest {
   data: string;
   profissionalSaudeId: number;
   especialidadeId: number;
-  procedimentoId: number;
+  configuracaoAgendaId: number;
   unidadeSaudeId: number;
   /** Nome da agenda (rótulo editável). O código de integração não é editável aqui. */
   nome?: string | null;

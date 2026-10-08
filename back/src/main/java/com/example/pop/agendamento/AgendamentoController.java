@@ -44,7 +44,7 @@ import com.example.pop.motivofalta.MotivoFaltaRepository;
 import com.example.pop.nps.NpsService;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.prontuario.TermoAssinaturaService;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.push.PushService;
 import com.example.pop.unidade.UnidadeRepository;
@@ -64,7 +64,7 @@ public class AgendamentoController {
             "paciente", "paciente.nome",
             "especialidade", "especialidade.nome",
             "profissional", "profissionalSaude.nome",
-            "procedimento", "procedimento.nome",
+            "configuracaoAgenda", "configuracaoAgenda.nome",
             "status", "statusAgendamento",
             "entregaResumo", "entregaResumo");
     /** Ordenação usada quando nada é escolhido na tela (mais recentes primeiro, desempate por id). */
@@ -77,7 +77,7 @@ public class AgendamentoController {
     private final UnidadeRepository unidadeRepository;
     private final EspecialidadeRepository especialidadeRepository;
     private final ProfissionalSaudeRepository profissionalRepository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final MotivoFaltaRepository motivoFaltaRepository;
     private final NpsService npsService;
     private final PushService pushService;
@@ -90,7 +90,7 @@ public class AgendamentoController {
     public AgendamentoController(HorarioRepository repository, AgendaRepository agendaRepository,
             PacienteRepository pacienteRepository,
             UnidadeRepository unidadeRepository, EspecialidadeRepository especialidadeRepository,
-            ProfissionalSaudeRepository profissionalRepository, ProcedimentoRepository procedimentoRepository,
+            ProfissionalSaudeRepository profissionalRepository, ConfiguracaoAgendaRepository configuracaoAgendaRepository,
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
             ExportacaoService exportacaoService, HorarioLogService logService,
             HorarioEntregaService entregaService, HorarioEntregaRepository entregaRepository,
@@ -101,7 +101,7 @@ public class AgendamentoController {
         this.unidadeRepository = unidadeRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.profissionalRepository = profissionalRepository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.motivoFaltaRepository = motivoFaltaRepository;
         this.npsService = npsService;
         this.pushService = pushService;
@@ -262,7 +262,7 @@ public class AgendamentoController {
                 ColunaExport.de("Unidade", a -> a.getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", a -> a.getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", a -> a.getProfissionalSaude().getNome()),
-                ColunaExport.de("Procedimento", a -> a.getProcedimento().getNome()),
+                ColunaExport.de("Configuração da Agenda", a -> a.getConfiguracaoAgenda().getNome()),
                 ColunaExport.de("Status", a -> a.getStatusAgendamento().getDescricao()),
                 ColunaExport.de("Falta justificada", a -> a.getFaltaJustificadaEm() != null ? "Sim" : "Não"),
                 ColunaExport.de("Justificada em",
@@ -349,7 +349,7 @@ public class AgendamentoController {
                     logService.registrarDaUnidade(salvo, anterior, salvo.getStatusAgendamento(), uidDoToken(jwt));
                     // Regra: ao registrar a presença do paciente, gera o NPS vinculado ao atendimento.
                     npsService.gerarSeNecessario(salvo);
-                    // Regra: na presença, se o procedimento tiver termos (TCLE), gera as pendências de
+                    // Regra: na presença, se o configuracaoAgenda tiver termos (TCLE), gera as pendências de
                     // assinatura no prontuário (best-effort — não bloqueia o registro da presença).
                     try {
                         termoAssinaturaService.dispararSeNecessario(salvo);
@@ -457,8 +457,8 @@ public class AgendamentoController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
         agenda.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional não encontrado")));
-        agenda.setProcedimento(procedimentoRepository.findById(request.procedimentoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Procedimento não encontrado")));
+        agenda.setConfiguracaoAgenda(configuracaoAgendaRepository.findById(request.configuracaoAgendaId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Configuração da Agenda não encontrada")));
         agenda.setUnidadeSaude(unidadeRepository.findById(request.unidadeSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não encontrada")));
         horario.setAgenda(agendaRepository.save(agenda));
