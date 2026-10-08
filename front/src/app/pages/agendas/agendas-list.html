@@ -5,12 +5,18 @@
       <p class="page-sub">Agendas (slots do profissional). Abra uma agenda para ver e adicionar os horários (pacientes).</p>
     </div>
     <div class="page-head__actions">
+      <button type="button" class="btn btn--ghost" (click)="importAberto.set(true)">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V9m0 0 4 4m-4-4-4 4M5 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" /></svg>
+        Importar agenda (Excel)
+      </button>
       <a class="btn btn--solid" routerLink="/agendas/nova">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
         Nova agenda
       </a>
     </div>
   </header>
+
+  <app-agenda-import-modal [aberto]="importAberto()" (fechar)="importAberto.set(false)" />
 
   <form class="filters" [formGroup]="filtro" (submit)="buscar(); $event.preventDefault()">
     <p class="section-label">Filtros</p>

@@ -1,0 +1,178 @@
+@if (aberto()) {
+  <div class="modal__overlay" (click)="fecharModal()">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Importar agenda por Excel"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal__head">
+        <div>
+          <h2 class="modal__title">Importar agenda (Excel)</h2>
+          <p class="modal__sub">
+            Baixe a planilha de exemplo, preencha e envie. Você verá um preview com os erros destacados antes de
+            confirmar. <b>Um arquivo = uma agenda.</b>
+          </p>
+        </div>
+        <button type="button" class="modal__x" (click)="fecharModal()" aria-label="Fechar">×</button>
+      </div>
+
+      <div class="modal__body">
+        <div class="passos">
+          <button type="button" class="btn btn--ghost" (click)="baixarModelo()" [disabled]="baixando()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" /></svg>
+            {{ baixando() ? 'Baixando…' : 'Baixar planilha de exemplo' }}
+          </button>
+          <span class="passos__sep" aria-hidden="true">•</span>
+          <input
+            #fileInput
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            hidden
+            (change)="aoSelecionarArquivo($event)"
+          />
+          <button type="button" class="btn btn--solid" (click)="escolherArquivo(fileInput)" [disabled]="enviando()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21V9m0 0 4 4m-4-4-4 4M5 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2" /></svg>
+            {{ enviando() ? 'Lendo planilha…' : preview() ? 'Enviar outra planilha' : 'Enviar planilha preenchida' }}
+          </button>
+          @if (arquivoNome()) { <span class="arquivo">{{ arquivoNome() }}</span> }
+        </div>
+
+        @if (enviando()) {
+          <div class="state"><span class="spinner" aria-hidden="true"></span><p>Lendo e validando a planilha…</p></div>
+        } @else if (preview(); as p) {
+          <div class="resumo">
+            @if (p.totalErros === 0) {
+              <span class="pill pill--ok">Sem erros</span>
+            } @else {
+              <span class="pill pill--erro">{{ p.totalErros }} erro(s)</span>
+            }
+            <span>{{ p.totalHorarios }} horário(s)</span>
+            @if (p.totalErros > 0) {
+              <span class="arquivo">Corrija os campos destacados na planilha e envie de novo.</span>
+            } @else {
+              <span class="arquivo">Tudo certo! A gravação da importação chega na próxima fase.</span>
+            }
+          </div>
+
+          <p class="section-label">Dados da agenda</p>
+          <div class="agenda-grid">
+            @for (c of agendaCampos(); track c.rotulo) {
+              <div class="campo" [class.is-erro]="c.campo.erro">
+                <div class="campo__rot">{{ c.rotulo }}</div>
+                <div class="campo__val">
+                  @if (c.campo.valor) {
+                    {{ c.campo.valor }}
+                  } @else if (c.campo.resolvido) {
+                    <span class="vazio">{{ c.campo.resolvido }}</span>
+                  } @else {
+                    <span class="vazio">—</span>
+                  }
+                </div>
+                @if (!c.campo.erro && c.campo.valor && c.campo.resolvido && c.campo.resolvido !== c.campo.valor) {
+                  <div class="campo__resolvido">→ {{ c.campo.resolvido }}</div>
+                }
+                @if (c.campo.erro) { <div class="campo__msg">{{ c.campo.mensagem }}</div> }
+              </div>
+            }
+          </div>
+
+          <p class="section-label">Horários ({{ p.totalHorarios }})</p>
+          @if (p.horarios.length === 0) {
+            <div class="dropzone">
+              <p>Nenhum horário na planilha. Preencha ao menos uma linha na tabela HORÁRIOS e envie de novo.</p>
+            </div>
+          } @else {
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th class="col-linha">Linha</th>
+                    <th>Paciente</th>
+                    <th>CPF</th>
+                    <th>Hora início</th>
+                    <th>Hora fim</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (h of p.horarios; track h.linha) {
+                    <tr>
+                      <td class="col-linha">{{ h.linha }}</td>
+
+                      <td class="cell" [class.is-erro]="h.paciente.erro">
+                        <div class="cell__val">
+                          @if (h.paciente.valor) { {{ h.paciente.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (!h.paciente.erro && h.paciente.resolvido && h.paciente.resolvido !== h.paciente.valor) {
+                          <div class="cell__resolvido">{{ h.paciente.resolvido }}</div>
+                        }
+                        @if (h.paciente.erro) { <div class="cell__msg">{{ h.paciente.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.cpf.erro">
+                        <div class="cell__val">
+                          @if (h.cpf.valor) { {{ h.cpf.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (!h.cpf.erro && h.cpf.resolvido && h.cpf.resolvido !== h.cpf.valor) {
+                          <div class="cell__resolvido">{{ h.cpf.resolvido }}</div>
+                        }
+                        @if (h.cpf.erro) { <div class="cell__msg">{{ h.cpf.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.horaInicio.erro">
+                        <div class="cell__val">
+                          @if (h.horaInicio.valor) { {{ h.horaInicio.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (h.horaInicio.erro) { <div class="cell__msg">{{ h.horaInicio.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.horaFim.erro">
+                        <div class="cell__val">
+                          @if (h.horaFim.valor) { {{ h.horaFim.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (h.horaFim.erro) { <div class="cell__msg">{{ h.horaFim.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.status.erro">
+                        <div class="cell__val">
+                          @if (h.status.valor) {
+                            {{ h.status.valor }}
+                          } @else if (h.status.resolvido) {
+                            <span class="vazio">{{ h.status.resolvido }}</span>
+                          } @else {
+                            <span class="vazio">—</span>
+                          }
+                        </div>
+                        @if (!h.status.erro && h.status.valor && h.status.resolvido && h.status.resolvido !== h.status.valor) {
+                          <div class="cell__resolvido">{{ h.status.resolvido }}</div>
+                        }
+                        @if (h.status.erro) { <div class="cell__msg">{{ h.status.mensagem }}</div> }
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        } @else {
+          <div class="dropzone">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="34" height="34"><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" /><path d="M9 13h6M9 17h4" /></svg>
+            <p>Envie a planilha preenchida para ver o preview. Nada é gravado agora — é só conferência.</p>
+          </div>
+        }
+      </div>
+
+      <div class="modal__foot">
+        <span class="foot-note">A confirmação da importação (gravar) chega em breve (Fase 2).</span>
+        <div class="modal__foot-actions">
+          <button type="button" class="btn btn--ghost" (click)="fecharModal()" [disabled]="enviando()">Fechar</button>
+          <button type="button" class="btn btn--solid" disabled title="Disponível em breve (Fase 2)">
+            Confirmar importação
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
