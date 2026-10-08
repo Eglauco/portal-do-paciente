@@ -26,14 +26,14 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
     @Query(value = """
             select a from Agenda a
             where (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
-              and (:data is null or a.data = :data)
+              and a.data = coalesce(:data, a.data)
               and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome)
               and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome)
             """,
             countQuery = """
             select count(a) from Agenda a
             where (:unidadeId is null or a.unidadeSaude.id = :unidadeId)
-              and (:data is null or a.data = :data)
+              and a.data = coalesce(:data, a.data)
               and (:profissionalNome is null or lower(a.profissionalSaude.nome) like :profissionalNome)
               and (:especialidadeNome is null or lower(a.especialidade.nome) like :especialidadeNome)
             """)
