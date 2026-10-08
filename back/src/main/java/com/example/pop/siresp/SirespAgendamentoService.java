@@ -32,7 +32,7 @@ import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.Responsavel;
 import com.example.pop.paciente.Sexo;
-import com.example.pop.procedimento.Procedimento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
 import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.push.PushService;
@@ -43,7 +43,7 @@ import com.example.pop.unidade.UnidadeRepository;
  * Regra de criação do AGENDAMENTO a partir de um registro do SIRESP. Dois passos:
  * <ol>
  *   <li>{@link #avaliar(Siresp)} — resolve, pelo CÓDIGO DE INTEGRAÇÃO, TODAS as informações necessárias
- *       (especialidade, unidade executante, profissional, paciente, data/hora e o procedimento padrão) e diz o
+ *       (especialidade, unidade executante, profissional, paciente, data/hora e o configuracaoAgenda padrão) e diz o
  *       que falta. Nada é criado se faltar algo (não gera "registro pela metade").</li>
  *   <li>{@link #processarRegistro(Long, Long)} — recalcula o diagnóstico e, se estiver tudo completo e ainda não
  *       houver horário para este registro, cria o horário (deduplicando por {@code ID_AGE_CONSULTA_HOR}),
@@ -119,10 +119,10 @@ public class SirespAgendamentoService {
 
     /** As peças necessárias ao agendamento + as linhas do diagnóstico. {@code completo()} = tudo resolvido. */
     public record Avaliacao(Especialidade especialidade, Unidade unidade, ProfissionalSaude profissional,
-            Paciente paciente, LocalDateTime dataHora, Procedimento procedimento, List<String> linhas) {
+            Paciente paciente, LocalDateTime dataHora, ConfiguracaoAgenda configuracaoAgenda, List<String> linhas) {
         public boolean completo() {
             return especialidade != null && unidade != null && profissional != null
-                    && paciente != null && dataHora != null && procedimento != null;
+                    && paciente != null && dataHora != null && configuracaoAgenda != null;
         }
     }
 
@@ -173,31 +173,31 @@ public class SirespAgendamentoService {
         linhas.add(dataHora.map(d -> "Data/hora: OK — " + d.format(DATA_HORA_FMT) + ".")
                 .orElse("Data/hora: inválida ou ausente (DATA_AGENDA / HOR_INI)."));
 
-        // Procedimento (o XML do CROSS não traz procedimento): na CONSULTA vem do vínculo da ESPECIALIDADE;
+        // ConfiguracaoAgenda (o XML do CROSS não traz configuracaoAgenda): na CONSULTA vem do vínculo da ESPECIALIDADE;
         // no EXAME vem do cadastro de EXAME (casado pelo ID_EXAME → codigoIntegracao).
-        Procedimento proc;
+        ConfiguracaoAgenda proc;
         if (s.getTipoRegistro() == TipoRegistroSiresp.EXAME) {
             String codExame = trim(s.getIdExame());
             Exame exame = codExame.isEmpty() ? null : exameRepository.findByCodigoIntegracao(codExame).orElse(null);
-            proc = exame == null ? null : exame.getProcedimento();
+            proc = exame == null ? null : exame.getConfiguracaoAgenda();
             linhas.add(codExame.isEmpty()
-                    ? "Exame/Procedimento: código do exame (ID_EXAME) não informado no XML."
+                    ? "Exame/Configuração da Agenda: código do exame (ID_EXAME) não informado no XML."
                     : exame == null
-                            ? "Exame/Procedimento: exame não encontrado pelo código de integração (" + codExame
-                                    + ") — cadastre o exame e vincule um procedimento."
+                            ? "Exame/Configuração da Agenda: exame não encontrado pelo código de integração (" + codExame
+                                    + ") — cadastre o exame e vincule uma Configuração da Agenda."
                             : proc == null
-                                    ? "Exame/Procedimento: o exame \"" + exame.getNome()
-                                            + "\" não tem procedimento vinculado — vincule-o no cadastro de Exame."
-                                    : "Exame/Procedimento: OK — " + proc.getNome() + " (vinculado ao exame "
+                                    ? "Exame/Configuração da Agenda: o exame \"" + exame.getNome()
+                                            + "\" não tem Configuração da Agenda vinculada — vincule-o no cadastro de Exame."
+                                    : "Exame/Configuração da Agenda: OK — " + proc.getNome() + " (vinculado ao exame "
                                             + exame.getNome() + ").");
         } else {
-            proc = esp == null ? null : esp.getProcedimento();
+            proc = esp == null ? null : esp.getConfiguracaoAgenda();
             linhas.add(proc != null
-                    ? "Procedimento: OK — " + proc.getNome() + " (vinculado à especialidade)."
+                    ? "Configuração da Agenda: OK — " + proc.getNome() + " (vinculado à especialidade)."
                     : esp == null
-                            ? "Procedimento: depende da especialidade — resolva a especialidade primeiro."
-                            : "Procedimento: a especialidade \"" + esp.getNome()
-                                    + "\" não tem procedimento vinculado — vincule-o no cadastro da Especialidade.");
+                            ? "Configuração da Agenda: depende da especialidade — resolva a especialidade primeiro."
+                            : "Configuração da Agenda: a especialidade \"" + esp.getNome()
+                                    + "\" não tem Configuração da Agenda vinculada — vincule-o no cadastro da Especialidade.");
         }
 
         return new Avaliacao(esp, uni, prof, pac, dataHora.orElse(null), proc, linhas);
@@ -310,7 +310,7 @@ public class SirespAgendamentoService {
         // Paciente não resolvido pelo XML enxuto → herda do horário de origem (é o mesmo paciente da transferência).
         if (a.paciente() == null && antigo != null && antigo.getPaciente() != null) {
             a = new Avaliacao(a.especialidade(), a.unidade(), a.profissional(), antigo.getPaciente(),
-                    a.dataHora(), a.procedimento(), a.linhas());
+                    a.dataHora(), a.configuracaoAgenda(), a.linhas());
         }
 
         // Regra: numa transferência o paciente NÃO muda. Se o XML informou/resolveu um paciente e ele é DIFERENTE do
@@ -712,7 +712,7 @@ public class SirespAgendamentoService {
         agenda.setData(a.dataHora().toLocalDate());
         agenda.setEspecialidade(a.especialidade());
         agenda.setProfissionalSaude(a.profissional());
-        agenda.setProcedimento(a.procedimento());
+        agenda.setConfiguracaoAgenda(a.configuracaoAgenda());
         agenda.setUnidadeSaude(a.unidade());
         return agendaRepository.save(agenda);
     }
@@ -756,7 +756,7 @@ public class SirespAgendamentoService {
 
     private String montarLog(Avaliacao a, String nota) {
         StringBuilder sb = new StringBuilder(a.completo()
-                ? "Tudo OK — especialidade, unidade, profissional, paciente, data/hora e procedimento encontrados."
+                ? "Tudo OK — especialidade, unidade, profissional, paciente, data/hora e configuração da agenda encontrados."
                 : String.join("\n", a.linhas()));
         if (nota != null && !nota.isBlank()) {
             sb.append("\n").append(nota);

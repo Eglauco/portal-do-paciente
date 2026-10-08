@@ -1,8 +1,8 @@
 /** Origem do modelo do termo: arquivo .docx nosso (qualquer provedor) ou modelo pronto no ZapSign. */
 export type OrigemModeloTermo = 'ARQUIVO' | 'ZAPSIGN_MODELO';
 
-/** Documento de Termo de Consentimento (TCLE) de um procedimento. */
-export interface TermoProcedimento {
+/** Documento de Termo de Consentimento (TCLE) de um configuracaoAgenda. */
+export interface TermoConfiguracaoAgenda {
   id: number;
   nome: string;
   origemModelo: OrigemModeloTermo;
@@ -17,7 +17,7 @@ export interface TermoProcedimento {
   criadoEm: string;
 }
 
-export interface TermoProcedimentoRequest {
+export interface TermoConfiguracaoAgendaRequest {
   nome: string;
   origemModelo: OrigemModeloTermo;
   url: string | null;

@@ -139,7 +139,7 @@
               <th appOrdenavel="paciente" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Paciente</th>
               <th appOrdenavel="especialidade" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Especialidade</th>
               <th appOrdenavel="profissional" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Profissional</th>
-              <th appOrdenavel="procedimento" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Procedimento</th>
+              <th appOrdenavel="configuracaoAgenda" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Configuração da Agenda</th>
               <th appOrdenavel="status" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Status</th>
               <th appOrdenavel="entregaResumo" [ordenacoes]="ordenacoes()" (alternar)="aoAlternar($event)">Notificação</th>
               <th class="col-act"><span class="sr-only">Ações</span></th>
@@ -158,7 +158,7 @@
                 <td><b>{{ a.paciente.nome }}</b></td>
                 <td class="muted-cell">{{ a.especialidade.nome }}</td>
                 <td class="muted-cell">{{ a.profissionalSaude.nome }}</td>
-                <td class="muted-cell">{{ a.procedimento.nome }}</td>
+                <td class="muted-cell">{{ a.configuracaoAgenda.nome }}</td>
                 <td>
                   <span class="status-pill" [attr.data-st]="a.statusAgendamento">
                     {{ rotuloStatus(a.statusAgendamento) }}

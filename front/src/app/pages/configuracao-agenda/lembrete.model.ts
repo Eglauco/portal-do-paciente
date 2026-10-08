@@ -1,4 +1,4 @@
-/** Lembrete de um procedimento (texto + antecedência em horas). */
+/** Lembrete de um configuracaoAgenda (texto + antecedência em horas). */
 export interface Lembrete {
   id: number;
   texto: string;

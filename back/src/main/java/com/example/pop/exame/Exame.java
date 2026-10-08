@@ -1,6 +1,6 @@
 package com.example.pop.exame;
 
-import com.example.pop.procedimento.Procedimento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -36,12 +36,12 @@ public class Exame {
     private String codigoIntegracao;
 
     /**
-     * Procedimento vinculado ao exame — usado no LANÇAMENTO AUTOMÁTICO do agendamento na importação do SIRESP
-     * (o XML do CROSS não traz procedimento; o exame importado é mapeado, por código, para o procedimento).
-     * Opcional: um exame sem procedimento não gera agendamento automático (o diagnóstico acusa a falta). EAGER para
-     * a entidade serializar o procedimento sem sessão aberta (open-in-view=false) e para o SIRESP lê-lo fora de tx.
+     * ConfiguracaoAgenda vinculado ao exame — usado no LANÇAMENTO AUTOMÁTICO do agendamento na importação do SIRESP
+     * (o XML do CROSS não traz configuracaoAgenda; o exame importado é mapeado, por código, para o configuracaoAgenda).
+     * Opcional: um exame sem configuracaoAgenda não gera agendamento automático (o diagnóstico acusa a falta). EAGER para
+     * a entidade serializar o configuracaoAgenda sem sessão aberta (open-in-view=false) e para o SIRESP lê-lo fora de tx.
      */
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "procedimento_id")
-    private Procedimento procedimento;
+    @JoinColumn(name = "configuracao_agenda_id")
+    private ConfiguracaoAgenda configuracaoAgenda;
 }

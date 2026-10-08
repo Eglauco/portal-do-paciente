@@ -39,7 +39,7 @@ const ICONE = {
   especialidade: svg('<path d="M8 3v4a4 4 0 0 0 8 0V3"/><path d="M6 7a6 6 0 0 0 12 0"/><path d="M12 11v4a5 5 0 0 0 5 5 3 3 0 1 0 0-6"/><circle cx="6" cy="18" r="2"/>'),
   exame: svg('<path d="M9 3h6"/><path d="M10 3v6l-4.5 8A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-3L14 9V3"/><path d="M8.5 14h7"/>'),
   profissional: svg('<circle cx="12" cy="7" r="3.2"/><path d="M6 21a6 6 0 0 1 12 0"/><path d="M12 13v3M10.5 14.5h3"/>'),
-  procedimento: svg('<path d="M9 3h6v4H9z"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M12 11v6M9 14h6"/>'),
+  configuracaoAgenda: svg('<path d="M9 3h6v4H9z"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M12 11v6M9 14h6"/>'),
   alerta: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'),
   prontuario: svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9z"/><path d="M12 10v5M9.5 12.5h5"/>'),
   prontuarioMedico: svg('<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3h6v3H9z"/><path d="M8 13h2l1.2-2.5L13 15l1-2h2"/>'),
@@ -80,7 +80,7 @@ export const FUNCIONALIDADES: readonly Funcionalidade[] = [
   { tela: 'EXAME', rotulo: 'Exames', rota: '/exames', grupo: 'Cadastros', icone: ICONE.exame, palavras: ['cadastro', 'exame', 'siresp', 'cross', 'laboratório', 'procedimento'] },
   { tela: 'PROFISSIONAIS', rotulo: 'Profissionais', rota: '/profissionais', grupo: 'Cadastros', icone: ICONE.profissional, palavras: ['médico', 'profissional de saúde', 'cadastro'] },
   { tela: 'CONSELHOS', rotulo: 'Conselhos', rota: '/conselhos', grupo: 'Cadastros', icone: ICONE.estrela, palavras: ['crm', 'coren', 'classe', 'conselho'] },
-  { tela: 'PROCEDIMENTOS', rotulo: 'Procedimentos', rota: '/procedimentos', grupo: 'Cadastros', icone: ICONE.procedimento, palavras: ['exame', 'serviço', 'cadastro'] },
+  { tela: 'CONFIGURACAO_AGENDA', rotulo: 'Configuração da Agenda', rota: '/configuracao-agenda', grupo: 'Cadastros', icone: ICONE.configuracaoAgenda, palavras: ['exame', 'serviço', 'cadastro', 'procedimento', 'agenda', 'regra'] },
   { tela: 'MOTIVOS_FALTA', rotulo: 'Motivos de falta', rota: '/motivos-falta', grupo: 'Cadastros', icone: ICONE.alerta, palavras: ['ausência', 'falta', 'justificativa'] },
 
   // Conteúdo.

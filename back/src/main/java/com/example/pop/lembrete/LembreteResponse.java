@@ -1,6 +1,6 @@
 package com.example.pop.lembrete;
 
-/** Item do cadastro de lembretes de um procedimento (admin). */
+/** Item do cadastro de lembretes de um configuracaoAgenda (admin). */
 public record LembreteResponse(Long id, String texto, Integer horasAntecedencia) {
 
     public static LembreteResponse from(Lembrete l) {

@@ -17,24 +17,29 @@ interface GrupoDef {
   campos: CampoDef[];
 }
 
-/** Uma linha do log de integração + a rota do cadastro relacionado (null = sem link). */
+/**
+ * Uma linha do log de integração quebrada em: {@code rotulo} (nome do recurso — vira link quando há rota) e
+ * {@code resto} (o restante do texto, comum/selecionável, para copiar códigos etc.). {@code rota} null = sem link
+ * (a linha inteira fica em {@code resto}).
+ */
 interface LinhaLog {
-  texto: string;
+  rotulo: string;
+  resto: string;
   rota: string | null;
 }
 
 /**
  * Prefixo de cada linha do diagnóstico → rota do cadastro onde se resolve/consulta aquela entidade (atalho pra abrir
- * em nova aba, sem procurar no menu). "Procedimento:" (consulta) aponta para Especialidade, pois o procedimento é
- * vinculado lá; "Exame/Procedimento:" (exame) aponta para Exames.
+ * em nova aba, sem procurar no menu). "ConfiguracaoAgenda:" (consulta) aponta para Especialidade, pois o configuracaoAgenda é
+ * vinculado lá; "Exame/ConfiguracaoAgenda:" (exame) aponta para Exames.
  */
 const ROTA_POR_PREFIXO: { prefixo: string; rota: string }[] = [
   { prefixo: 'Especialidade:', rota: '/especialidades' },
   { prefixo: 'Unidade de saúde:', rota: '/unidades' },
   { prefixo: 'Profissional:', rota: '/profissionais' },
   { prefixo: 'Paciente:', rota: '/pacientes' },
-  { prefixo: 'Exame/Procedimento:', rota: '/exames' },
-  { prefixo: 'Procedimento:', rota: '/especialidades' },
+  { prefixo: 'Exame/Configuração da Agenda:', rota: '/exames' },
+  { prefixo: 'Configuração da Agenda:', rota: '/especialidades' },
 ];
 
 /** Detalhe (somente leitura) de um registro do SIRESP: todos os campos do XML, agrupados. */
@@ -70,7 +75,8 @@ const ROTA_POR_PREFIXO: { prefixo: string; rota: string }[] = [
       .log__tit { margin: 0; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.02em; color: var(--muted); }
       .log__txt { margin: 0; font-size: 0.9rem; line-height: 1.45; white-space: pre-line; color: var(--ink); }
       .log__meta { margin: 0.4rem 0 0; font-size: 0.78rem; color: var(--muted); }
-      /* Linhas do log com atalho para o cadastro (abre em nova aba). */
+      /* Linhas do log com atalho para o cadastro (abre em nova aba). Só o rótulo do recurso é link; o resto da
+         linha é texto comum (selecionável/copiável). */
       .log__linha { display: block; }
       .log__link { color: var(--brand-deep, var(--brand)); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
       .log__link:hover { text-decoration: none; }
@@ -354,19 +360,26 @@ export class SirespDetalheComponent {
 
   /**
    * Log de integração (processamento interno) quebrado em linhas, cada uma com a rota do cadastro relacionado quando
-   * houver — assim as linhas de entidade (Especialidade/Unidade/Profissional/Paciente/Procedimento/Exame) viram links
+   * houver — assim as linhas de entidade (Especialidade/Unidade/Profissional/Paciente/ConfiguracaoAgenda/Exame) viram links
    * que abrem a tela em nova aba.
    */
   protected readonly logInternoLinhas = computed<LinhaLog[]>(() => {
     const log = this.detalhe()?.logIntegracao;
     if (!log) return [];
-    return log.split('\n').map((texto) => ({ texto, rota: this.rotaDaLinha(texto) }));
+    return log.split('\n').map((linha) => this.quebrarLinha(linha));
   });
 
-  /** Rota do cadastro para uma linha do diagnóstico (pelo prefixo), ou null quando a linha não é de entidade. */
-  private rotaDaLinha(linha: string): string | null {
+  /**
+   * Quebra a linha do diagnóstico em rótulo (nome do recurso — vira link quando casa com um prefixo conhecido) e
+   * resto (o restante do texto, comum/selecionável). Sem match → tudo em {@code resto}, sem link.
+   */
+  private quebrarLinha(linha: string): LinhaLog {
     const achado = ROTA_POR_PREFIXO.find(({ prefixo }) => linha.startsWith(prefixo));
-    return achado ? achado.rota : null;
+    if (!achado) {
+      return { rotulo: '', resto: linha, rota: null };
+    }
+    const rotulo = achado.prefixo.slice(0, -1); // remove o ":" final do prefixo → só o nome do recurso
+    return { rotulo, resto: linha.slice(rotulo.length), rota: achado.rota };
   }
 
   /**

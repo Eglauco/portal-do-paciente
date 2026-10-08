@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,12 +14,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "procedimento")
+@Table(name = "configuracao_agenda")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Procedimento {
+public class ConfiguracaoAgenda {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

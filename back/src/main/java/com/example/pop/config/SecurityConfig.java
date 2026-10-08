@@ -95,7 +95,7 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**", "/paciente/**", "/prontuario/**", "/storage/**", "/usuario/**",
                                 "/agendamento/**", "/agenda/**", "/horario/**", "/nps/**", "/chat/**", "/unidade/**", "/especialidade/**",
                                 "/exame/**",
-                                "/procedimento/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
+                                "/configuracao-agenda/**", "/profissional/**", "/conselho/**", "/motivo-falta/**",
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
                                 "/tipo-documento-prontuario/**", "/uso-ia/**", "/coassinatura/**",
                                 "/provedores-assinatura/**", "/siresp/**",

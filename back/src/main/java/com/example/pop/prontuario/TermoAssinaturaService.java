@@ -8,57 +8,57 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.pop.agendamento.Horario;
 import com.example.pop.agendamento.StatusAgendamento;
-import com.example.pop.procedimento.TermoProcedimento;
-import com.example.pop.procedimento.TermoProcedimentoRepository;
+import com.example.pop.configuracaoagenda.TermoConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.TermoConfiguracaoAgendaRepository;
 
 /**
  * Regra de disparo dos termos (TCLE) para assinatura. Ao registrar a PRESENÇA do paciente, se o
- * procedimento do agendamento tiver termos vinculados, garante um prontuário para o atendimento e
- * gera nele uma pendência de assinatura por termo (idempotente). Sem termos no procedimento, não
+ * configuracaoAgenda do agendamento tiver termos vinculados, garante um prontuário para o atendimento e
+ * gera nele uma pendência de assinatura por termo (idempotente). Sem termos no configuracaoAgenda, não
  * registra nada. A assinatura em si (ZapSign) é um passo posterior.
  */
 @Service
 public class TermoAssinaturaService {
 
     private final ProntuarioRepository prontuarioRepository;
-    private final TermoProcedimentoRepository termoProcedimentoRepository;
+    private final TermoConfiguracaoAgendaRepository termoConfiguracaoAgendaRepository;
     private final TermoAssinaturaRepository termoAssinaturaRepository;
 
     public TermoAssinaturaService(ProntuarioRepository prontuarioRepository,
-            TermoProcedimentoRepository termoProcedimentoRepository,
+            TermoConfiguracaoAgendaRepository termoConfiguracaoAgendaRepository,
             TermoAssinaturaRepository termoAssinaturaRepository) {
         this.prontuarioRepository = prontuarioRepository;
-        this.termoProcedimentoRepository = termoProcedimentoRepository;
+        this.termoConfiguracaoAgendaRepository = termoConfiguracaoAgendaRepository;
         this.termoAssinaturaRepository = termoAssinaturaRepository;
     }
 
     /**
      * Gera as pendências de assinatura quando o agendamento está em PRESENÇA do paciente e o
-     * procedimento tem termos. Idempotente: pode ser chamado a cada atualização do agendamento.
+     * configuracaoAgenda tem termos. Idempotente: pode ser chamado a cada atualização do agendamento.
      */
     @Transactional
     public void dispararSeNecessario(Horario agendamento) {
         if (agendamento == null || agendamento.getStatusAgendamento() != StatusAgendamento.PRESENCA_PACIENTE) {
             return;
         }
-        Long procedimentoId = agendamento.getProcedimento() == null ? null : agendamento.getProcedimento().getId();
-        if (procedimentoId == null) {
+        Long configuracaoAgendaId = agendamento.getConfiguracaoAgenda() == null ? null : agendamento.getConfiguracaoAgenda().getId();
+        if (configuracaoAgendaId == null) {
             return;
         }
-        List<TermoProcedimento> termos =
-                termoProcedimentoRepository.findByProcedimentoIdOrderByCriadoEmDesc(procedimentoId);
+        List<TermoConfiguracaoAgenda> termos =
+                termoConfiguracaoAgendaRepository.findByConfiguracaoAgendaIdOrderByCriadoEmDesc(configuracaoAgendaId);
         if (termos.isEmpty()) {
-            return; // procedimento sem termos vinculados: não registra nada
+            return; // configuracaoAgenda sem termos vinculados: não registra nada
         }
         Prontuario prontuario = obterOuCriarProntuario(agendamento);
         LocalDateTime agora = LocalDateTime.now();
-        for (TermoProcedimento termo : termos) {
-            if (termoAssinaturaRepository.existsByProntuario_IdAndTermoProcedimento_Id(prontuario.getId(), termo.getId())) {
+        for (TermoConfiguracaoAgenda termo : termos) {
+            if (termoAssinaturaRepository.existsByProntuario_IdAndTermoConfiguracaoAgenda_Id(prontuario.getId(), termo.getId())) {
                 continue; // já gerado (idempotência)
             }
             TermoAssinatura pendencia = new TermoAssinatura();
             pendencia.setProntuario(prontuario);
-            pendencia.setTermoProcedimento(termo);
+            pendencia.setTermoConfiguracaoAgenda(termo);
             pendencia.setNome(termo.getNome());
             pendencia.setUrl(termo.getUrl());
             pendencia.setContentType(termo.getContentType());

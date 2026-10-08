@@ -65,7 +65,7 @@ public class LembreteService {
         List<Runnable> pushes = new ArrayList<>();
         for (Lembrete l : lembreteRepository.findAll()) {
             LocalDateTime limite = agora.plusHours(l.getHorasAntecedencia());
-            for (Horario a : agendamentoRepository.paraLembrete(l.getProcedimento().getId(), ATIVOS, agora, limite)) {
+            for (Horario a : agendamentoRepository.paraLembrete(l.getConfiguracaoAgenda().getId(), ATIVOS, agora, limite)) {
                 if (disparoRepository.existsByLembreteIdAndHorarioId(l.getId(), a.getId())) {
                     continue;
                 }
@@ -110,7 +110,7 @@ public class LembreteService {
         if (a.getStatusAgendamento() != StatusAgendamento.PACIENTE_CONFIRMOU) {
             return false;
         }
-        Integer horas = a.getProcedimento().getHorasCancelamento();
+        Integer horas = a.getConfiguracaoAgenda().getHorasCancelamento();
         return horas == null || !agora.isAfter(a.getDataHora().minusHours(horas));
     }
 

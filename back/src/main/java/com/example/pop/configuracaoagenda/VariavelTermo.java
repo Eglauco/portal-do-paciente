@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 /**
  * Catálogo ÚNICO das variáveis dinâmicas que o backend substitui no documento Word do TCLE ao
@@ -36,9 +36,9 @@ public enum VariavelTermo {
     PROFISSIONAL("profissional", "Nome do profissional de saúde", "Dr. Carlos Lima", Grupo.ATENDIMENTO),
     REGISTRO_PROFISSIONAL("registro_profissional", "Registro do profissional (conselho + número)", "CRM 123456", Grupo.ATENDIMENTO),
 
-    // Procedimento
-    NOME_PROCEDIMENTO("nome_procedimento", "Nome do procedimento", "Endoscopia digestiva alta", Grupo.PROCEDIMENTO),
-    PREPARO_PROCEDIMENTO("preparo_procedimento", "Instruções de preparo do procedimento", "Jejum de 8 horas...", Grupo.PROCEDIMENTO),
+    // Configuração da Agenda
+    NOME_CONFIGURACAO_AGENDA("nome_configuracao_agenda", "Nome da configuração da agenda", "Endoscopia digestiva alta", Grupo.CONFIGURACAO_AGENDA),
+    PREPARO_CONFIGURACAO_AGENDA("preparo_configuracao_agenda", "Instruções de preparo da configuração da agenda", "Jejum de 8 horas...", Grupo.CONFIGURACAO_AGENDA),
 
     // Unidade de saúde
     UNIDADE("unidade", "Nome da unidade de saúde", "UBS Central", Grupo.UNIDADE),
@@ -56,7 +56,7 @@ public enum VariavelTermo {
     public enum Grupo {
         PACIENTE("Paciente"),
         ATENDIMENTO("Atendimento"),
-        PROCEDIMENTO("Procedimento"),
+        CONFIGURACAO_AGENDA("Configuração da Agenda"),
         UNIDADE("Unidade de saúde"),
         ASSINANTE("Assinante / Responsável"),
         DATA("Data");

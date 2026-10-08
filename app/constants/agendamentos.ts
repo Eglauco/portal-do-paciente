@@ -31,7 +31,7 @@ export interface Agendamento {
   unidade: string;
   /** Data/hora crua (ISO) do agendamento — usada para calcular o prazo de cancelamento. */
   dataHoraIso: string;
-  /** Antecedência (horas) para poder cancelar; do procedimento. null = sem prazo. */
+  /** Antecedência (horas) para poder cancelar; da configuração da agenda. null = sem prazo. */
   horasCancelamento: number | null;
   status: StatusAgendamento;
   /** Rótulo do status vindo do back-end (ex.: "Aguardando confirmação do paciente"). */

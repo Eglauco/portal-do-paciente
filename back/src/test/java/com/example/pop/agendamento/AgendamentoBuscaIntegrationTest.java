@@ -20,8 +20,8 @@ import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.Unidade;
@@ -35,7 +35,7 @@ class AgendamentoBuscaIntegrationTest {
     @Autowired private HorarioRepository agendamentoRepository;
     @Autowired private AgendaRepository agendaRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
-    @Autowired private ProcedimentoRepository procedimentoRepository;
+    @Autowired private ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     @Autowired private ProfissionalSaudeRepository profissionalRepository;
     @Autowired private UnidadeRepository unidadeRepository;
     @Autowired private PacienteController pacienteController;
@@ -56,7 +56,7 @@ class AgendamentoBuscaIntegrationTest {
         if (espCardio != null) especialidadeRepository.deleteById(espCardio);
         if (espDermato != null) especialidadeRepository.deleteById(espDermato);
         if (profId != null) profissionalRepository.deleteById(profId);
-        if (procId != null) procedimentoRepository.deleteById(procId);
+        if (procId != null) configuracaoAgendaRepository.deleteById(procId);
         if (uniId != null) unidadeRepository.deleteById(uniId);
     }
 
@@ -68,7 +68,7 @@ class AgendamentoBuscaIntegrationTest {
         espCardio = salvarEspecialidade(nomeCardio);
         espDermato = salvarEspecialidade(nomeDermato);
         profId = salvarProfissional();
-        procId = salvarProcedimento();
+        procId = salvarConfiguracaoAgenda();
         uniId = salvarUnidade();
 
         LocalDateTime hoje = LocalDateTime.now();
@@ -105,7 +105,7 @@ class AgendamentoBuscaIntegrationTest {
         String nomeCardio = "CardioDiaZZ";
         espCardio = salvarEspecialidade(nomeCardio);
         profId = salvarProfissional();
-        procId = salvarProcedimento();
+        procId = salvarConfiguracaoAgenda();
         uniId = salvarUnidade();
 
         LocalDate hoje = LocalDate.now();
@@ -129,7 +129,7 @@ class AgendamentoBuscaIntegrationTest {
         String nomeDermato = "DermatoSubZZ";
         espDermato = salvarEspecialidade(nomeDermato);
         profId = salvarProfissional();
-        procId = salvarProcedimento();
+        procId = salvarConfiguracaoAgenda();
         uniId = salvarUnidade();
 
         Horario comSublinhado = criar("Zeta_Um", espDermato, LocalDateTime.now().plusHours(3));
@@ -160,7 +160,7 @@ class AgendamentoBuscaIntegrationTest {
         agenda.setData(dataHora.toLocalDate());
         agenda.setEspecialidade(especialidadeRepository.findById(especialidadeId).orElseThrow());
         agenda.setProfissionalSaude(profissionalRepository.findById(profId).orElseThrow());
-        agenda.setProcedimento(procedimentoRepository.findById(procId).orElseThrow());
+        agenda.setConfiguracaoAgenda(configuracaoAgendaRepository.findById(procId).orElseThrow());
         agenda.setUnidadeSaude(unidadeRepository.findById(uniId).orElseThrow());
         agenda = agendaRepository.save(agenda);
         Horario a = new Horario();
@@ -185,12 +185,12 @@ class AgendamentoBuscaIntegrationTest {
         return profissionalRepository.save(p).getId();
     }
 
-    private Long salvarProcedimento() {
-        Procedimento p = new Procedimento();
+    private Long salvarConfiguracaoAgenda() {
+        ConfiguracaoAgenda p = new ConfiguracaoAgenda();
         p.setNome("Consulta");
         p.setHorasCancelamento(24);
         p.setHorasNps(48);
-        return procedimentoRepository.save(p).getId();
+        return configuracaoAgendaRepository.save(p).getId();
     }
 
     private Long salvarUnidade() {

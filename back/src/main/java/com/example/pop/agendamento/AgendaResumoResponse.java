@@ -10,7 +10,7 @@ public record AgendaResumoResponse(
         String codigoIntegracao,
         RefResponse especialidade,
         RefResponse profissionalSaude,
-        RefResponse procedimento,
+        RefResponse configuracaoAgenda,
         RefResponse unidadeSaude,
         long totalHorarios) {
 
@@ -22,7 +22,7 @@ public record AgendaResumoResponse(
                 a.getCodigoIntegracao(),
                 new RefResponse(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 new RefResponse(a.getProfissionalSaude().getId(), a.getProfissionalSaude().getNome()),
-                new RefResponse(a.getProcedimento().getId(), a.getProcedimento().getNome()),
+                new RefResponse(a.getConfiguracaoAgenda().getId(), a.getConfiguracaoAgenda().getNome()),
                 new RefResponse(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 totalHorarios);
     }

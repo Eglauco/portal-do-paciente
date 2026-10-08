@@ -5,26 +5,26 @@ import { environment } from '../../../environments/environment';
 import {
   ModeloZapSign,
   ModeloZapSignDetalhe,
-  TermoProcedimento,
-  TermoProcedimentoRequest,
+  TermoConfiguracaoAgenda,
+  TermoConfiguracaoAgendaRequest,
   VariavelTermo,
-} from './termo-procedimento.model';
+} from './termo-configuracao-agenda.model';
 
 @Injectable({ providedIn: 'root' })
-export class TermoProcedimentoService {
+export class TermoConfiguracaoAgendaService {
   private readonly http = inject(HttpClient);
-  private readonly base = `${environment.apiUrl}/procedimento`;
+  private readonly base = `${environment.apiUrl}/configuracao-agenda`;
 
-  listar(procedimentoId: number): Observable<TermoProcedimento[]> {
-    return this.http.get<TermoProcedimento[]>(`${this.base}/${procedimentoId}/termos`);
+  listar(configuracaoAgendaId: number): Observable<TermoConfiguracaoAgenda[]> {
+    return this.http.get<TermoConfiguracaoAgenda[]>(`${this.base}/${configuracaoAgendaId}/termos`);
   }
 
-  criar(procedimentoId: number, req: TermoProcedimentoRequest): Observable<TermoProcedimento> {
-    return this.http.post<TermoProcedimento>(`${this.base}/${procedimentoId}/termos`, req);
+  criar(configuracaoAgendaId: number, req: TermoConfiguracaoAgendaRequest): Observable<TermoConfiguracaoAgenda> {
+    return this.http.post<TermoConfiguracaoAgenda>(`${this.base}/${configuracaoAgendaId}/termos`, req);
   }
 
-  atualizar(id: number, req: TermoProcedimentoRequest): Observable<TermoProcedimento> {
-    return this.http.put<TermoProcedimento>(`${this.base}/termos/${id}`, req);
+  atualizar(id: number, req: TermoConfiguracaoAgendaRequest): Observable<TermoConfiguracaoAgenda> {
+    return this.http.put<TermoConfiguracaoAgenda>(`${this.base}/termos/${id}`, req);
   }
 
   excluir(id: number): Observable<void> {

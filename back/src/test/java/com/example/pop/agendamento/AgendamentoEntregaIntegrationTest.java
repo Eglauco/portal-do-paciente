@@ -21,8 +21,8 @@ import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteController;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.push.PushService;
@@ -42,7 +42,7 @@ class HorarioEntregaIntegrationTest {
     @Autowired private AgendaRepository agendaRepository;
     @Autowired private HorarioEntregaRepository entregaRepository;
     @Autowired private EspecialidadeRepository especialidadeRepository;
-    @Autowired private ProcedimentoRepository procedimentoRepository;
+    @Autowired private ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     @Autowired private ProfissionalSaudeRepository profissionalRepository;
     @Autowired private UnidadeRepository unidadeRepository;
     @Autowired private PacienteController pacienteController;
@@ -71,7 +71,7 @@ class HorarioEntregaIntegrationTest {
             profissionalRepository.deleteById(profId);
         }
         if (procId != null) {
-            procedimentoRepository.deleteById(procId);
+            configuracaoAgendaRepository.deleteById(procId);
         }
         if (uniId != null) {
             unidadeRepository.deleteById(uniId);
@@ -140,11 +140,11 @@ class HorarioEntregaIntegrationTest {
         profissionalRepository.save(prof);
         profId = prof.getId();
 
-        Procedimento proc = new Procedimento();
+        ConfiguracaoAgenda proc = new ConfiguracaoAgenda();
         proc.setNome("Consulta");
         proc.setHorasCancelamento(24);
         proc.setHorasNps(48);
-        procedimentoRepository.save(proc);
+        configuracaoAgendaRepository.save(proc);
         procId = proc.getId();
 
         Unidade uni = new Unidade();
@@ -156,7 +156,7 @@ class HorarioEntregaIntegrationTest {
         agenda.setData(LocalDateTime.now().plusDays(1).toLocalDate());
         agenda.setEspecialidade(esp);
         agenda.setProfissionalSaude(prof);
-        agenda.setProcedimento(proc);
+        agenda.setConfiguracaoAgenda(proc);
         agenda.setUnidadeSaude(uni);
         agenda = agendaRepository.save(agenda);
         Horario a = new Horario();

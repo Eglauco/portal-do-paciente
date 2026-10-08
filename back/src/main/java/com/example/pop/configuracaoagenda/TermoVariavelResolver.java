@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,8 +61,8 @@ public class TermoVariavelResolver {
             case ESPECIALIDADE: return ag.getEspecialidade() == null ? "" : nn(ag.getEspecialidade().getNome());
             case PROFISSIONAL: return ag.getProfissionalSaude() == null ? "" : nn(ag.getProfissionalSaude().getNome());
             case REGISTRO_PROFISSIONAL: return ag.getProfissionalSaude() == null ? "" : nn(ag.getProfissionalSaude().getNumeroConselho());
-            case NOME_PROCEDIMENTO: return ag.getProcedimento() == null ? "" : nn(ag.getProcedimento().getNome());
-            case PREPARO_PROCEDIMENTO: return ag.getProcedimento() == null ? "" : nn(ag.getProcedimento().getPreparo());
+            case NOME_CONFIGURACAO_AGENDA: return ag.getConfiguracaoAgenda() == null ? "" : nn(ag.getConfiguracaoAgenda().getNome());
+            case PREPARO_CONFIGURACAO_AGENDA: return ag.getConfiguracaoAgenda() == null ? "" : nn(ag.getConfiguracaoAgenda().getPreparo());
             case UNIDADE: return ag.getUnidadeSaude() == null ? "" : nn(ag.getUnidadeSaude().getNome());
             case NOME_RESPONSAVEL: return ""; // signatário é o próprio paciente por ora
             case CPF_RESPONSAVEL: return "";

@@ -70,7 +70,7 @@
               <th>Nome</th>
               <th>Profissional</th>
               <th>Especialidade</th>
-              <th>Procedimento</th>
+              <th>Configuração da Agenda</th>
               <th>Pacientes</th>
               <th class="col-act"><span class="sr-only">Ver</span></th>
             </tr>
@@ -84,7 +84,7 @@
                 </td>
                 <td>{{ a.profissionalSaude.nome }}</td>
                 <td>{{ a.especialidade.nome }}</td>
-                <td class="muted-cell">{{ a.procedimento.nome }}</td>
+                <td class="muted-cell">{{ a.configuracaoAgenda.nome }}</td>
                 <td class="muted-cell">{{ a.totalHorarios }}</td>
                 <td class="col-act"><a class="btn btn--ghost btn--sm" [routerLink]="[a.id]">Ver</a></td>
               </tr>

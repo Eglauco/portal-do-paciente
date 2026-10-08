@@ -16,10 +16,10 @@ import com.example.pop.assinatura.AssinaturaProvider;
 import com.example.pop.assinatura.AssinaturaProviderFactory;
 import com.example.pop.assinatura.ProvedorAssinatura;
 import com.example.pop.paciente.Paciente;
-import com.example.pop.procedimento.OrigemModeloTermo;
-import com.example.pop.procedimento.TermoProcedimento;
-import com.example.pop.procedimento.TermoProcedimentoRepository;
-import com.example.pop.procedimento.TermoVariavelResolver;
+import com.example.pop.configuracaoagenda.OrigemModeloTermo;
+import com.example.pop.configuracaoagenda.TermoConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.TermoConfiguracaoAgendaRepository;
+import com.example.pop.configuracaoagenda.TermoVariavelResolver;
 import com.example.pop.storage.StorageService;
 
 /**
@@ -37,18 +37,18 @@ public class AssinaturaTermoService {
             List.of(StatusTermoAssinatura.PENDENTE, StatusTermoAssinatura.TENTAR_NOVAMENTE);
 
     private final TermoAssinaturaRepository termoRepository;
-    private final TermoProcedimentoRepository termoProcedimentoRepository;
+    private final TermoConfiguracaoAgendaRepository termoConfiguracaoAgendaRepository;
     private final DocumentoRepository documentoRepository;
     private final StorageService storageService;
     private final TermoVariavelResolver variavelResolver;
     private final AssinaturaProviderFactory providerFactory;
 
     public AssinaturaTermoService(TermoAssinaturaRepository termoRepository,
-            TermoProcedimentoRepository termoProcedimentoRepository, DocumentoRepository documentoRepository,
+            TermoConfiguracaoAgendaRepository termoConfiguracaoAgendaRepository, DocumentoRepository documentoRepository,
             StorageService storageService, TermoVariavelResolver variavelResolver,
             AssinaturaProviderFactory providerFactory) {
         this.termoRepository = termoRepository;
-        this.termoProcedimentoRepository = termoProcedimentoRepository;
+        this.termoConfiguracaoAgendaRepository = termoConfiguracaoAgendaRepository;
         this.documentoRepository = documentoRepository;
         this.storageService = storageService;
         this.variavelResolver = variavelResolver;
@@ -102,7 +102,7 @@ public class AssinaturaTermoService {
 
         List<AssinaturaProvider.TermoParaAssinar> entradas = new ArrayList<>();
         for (TermoAssinatura t : termos) {
-            TermoProcedimento tp = t.getTermoProcedimento();
+            TermoConfiguracaoAgenda tp = t.getTermoConfiguracaoAgenda();
             String templateToken = garantirModelo(tp, provider);
             entradas.add(new AssinaturaProvider.TermoParaAssinar(
                     t.getId(), t.getNome(), tp == null ? null : tp.getUrl(),
@@ -533,7 +533,7 @@ public class AssinaturaTermoService {
      * Garante o modelo do termo para o provedor: exige {@code .docx}; para provedor com modelo remoto (ZapSign)
      * usa/registra o token; para provedor que renderiza local (Autentique) devolve null (usa o próprio .docx).
      */
-    private String garantirModelo(TermoProcedimento tp, AssinaturaProvider provider) {
+    private String garantirModelo(TermoConfiguracaoAgenda tp, AssinaturaProvider provider) {
         if (tp == null) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Termo indisponível para assinatura (origem removida).");
@@ -568,7 +568,7 @@ public class AssinaturaTermoService {
         }
         String token = provider.registrarModelo(tp.getNome(), bytes);
         tp.setProviderTemplateToken(token);
-        termoProcedimentoRepository.save(tp);
+        termoConfiguracaoAgendaRepository.save(tp);
         return token;
     }
 

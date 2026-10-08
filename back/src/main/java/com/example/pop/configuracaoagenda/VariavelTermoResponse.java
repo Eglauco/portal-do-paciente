@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 /** Uma variável dinâmica do TCLE para a tela (token a copiar + descrição + exemplo + grupo). */
 public record VariavelTermoResponse(String token, String descricao, String exemplo, String grupo) {

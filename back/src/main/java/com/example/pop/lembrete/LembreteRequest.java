@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Cadastro/edição de um lembrete do procedimento (admin). */
+/** Cadastro/edição de um lembrete do configuracaoAgenda (admin). */
 public record LembreteRequest(
         @NotBlank @Size(max = 300) String texto,
         // Antecedência em horas: de 1h até 8760h (~1 ano).

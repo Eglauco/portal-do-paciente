@@ -27,14 +27,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
 
 /**
- * Tela "Agendas" (back-office): o SLOT do profissional (dia + especialidade/procedimento/unidade). Os pacientes
+ * Tela "Agendas" (back-office): o SLOT do profissional (dia + especialidade/configuracaoAgenda/unidade). Os pacientes
  * marcados ficam nos {@link Horario} (tela/endpoints {@code /horario}). Escopada pela unidade ativa.
  */
 @RestController
@@ -48,17 +48,17 @@ public class AgendaController {
     private final HorarioRepository horarioRepository;
     private final EspecialidadeRepository especialidadeRepository;
     private final ProfissionalSaudeRepository profissionalRepository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final UnidadeRepository unidadeRepository;
 
     public AgendaController(AgendaRepository repository, HorarioRepository horarioRepository,
             EspecialidadeRepository especialidadeRepository, ProfissionalSaudeRepository profissionalRepository,
-            ProcedimentoRepository procedimentoRepository, UnidadeRepository unidadeRepository) {
+            ConfiguracaoAgendaRepository configuracaoAgendaRepository, UnidadeRepository unidadeRepository) {
         this.repository = repository;
         this.horarioRepository = horarioRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.profissionalRepository = profissionalRepository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.unidadeRepository = unidadeRepository;
     }
 
@@ -135,8 +135,8 @@ public class AgendaController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Especialidade não encontrada")));
         a.setProfissionalSaude(profissionalRepository.findById(request.profissionalSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profissional não encontrado")));
-        a.setProcedimento(procedimentoRepository.findById(request.procedimentoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Procedimento não encontrado")));
+        a.setConfiguracaoAgenda(configuracaoAgendaRepository.findById(request.configuracaoAgendaId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Configuração da Agenda não encontrada")));
         a.setUnidadeSaude(unidadeRepository.findById(request.unidadeSaudeId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unidade não encontrada")));
     }

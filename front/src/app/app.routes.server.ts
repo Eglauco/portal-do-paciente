@@ -67,7 +67,7 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
-    path: 'procedimentos/:id',
+    path: 'configuracao-agenda/:id',
     renderMode: RenderMode.Server,
   },
   {

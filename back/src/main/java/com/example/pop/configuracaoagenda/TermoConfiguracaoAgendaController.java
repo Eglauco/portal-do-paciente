@@ -1,4 +1,4 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -27,28 +27,28 @@ import com.example.pop.zapsign.ZapSignClient;
 import jakarta.validation.Valid;
 
 /**
- * CRUD dos documentos de Termo de Consentimento (TCLE) de um procedimento (back-office).
- * Sob /procedimento/** → ADMIN.
+ * CRUD dos documentos de Termo de Consentimento (TCLE) de um configuracaoAgenda (back-office).
+ * Sob /configuracaoAgenda/** → ADMIN.
  *
  * <p>Duas origens de modelo (ver {@link OrigemModeloTermo}): {@code ARQUIVO} (o .docx nosso, no S3 pasta
  * "tcle", serve qualquer provedor) ou {@code ZAPSIGN_MODELO} (modelo já pronto no ZapSign — só o ZapSign
  * assina). Os endpoints {@code /zapsign/modelos} listam/detalham os modelos do ZapSign para o seletor da tela.
  */
 @RestController
-@RequestMapping("/procedimento")
-public class TermoProcedimentoController {
+@RequestMapping("/configuracao-agenda")
+public class TermoConfiguracaoAgendaController {
 
-    private final TermoProcedimentoRepository repository;
-    private final ProcedimentoRepository procedimentoRepository;
+    private final TermoConfiguracaoAgendaRepository repository;
+    private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final StorageService storageService;
     private final AssinaturaProviderFactory providerFactory;
     private final ZapSignClient zapSignClient;
 
-    public TermoProcedimentoController(TermoProcedimentoRepository repository,
-            ProcedimentoRepository procedimentoRepository, StorageService storageService,
+    public TermoConfiguracaoAgendaController(TermoConfiguracaoAgendaRepository repository,
+            ConfiguracaoAgendaRepository configuracaoAgendaRepository, StorageService storageService,
             AssinaturaProviderFactory providerFactory, ZapSignClient zapSignClient) {
         this.repository = repository;
-        this.procedimentoRepository = procedimentoRepository;
+        this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.storageService = storageService;
         this.providerFactory = providerFactory;
         this.zapSignClient = zapSignClient;
@@ -90,42 +90,42 @@ public class TermoProcedimentoController {
         return new ModeloZapSignDetalheResponse(d.token(), d.nome(), vars);
     }
 
-    /** Documentos TCLE de um procedimento (mais recentes primeiro). */
-    @GetMapping("/{procedimentoId}/termos")
-    public List<TermoProcedimentoResponse> listar(@PathVariable Long procedimentoId) {
-        return repository.findByProcedimentoIdOrderByCriadoEmDesc(procedimentoId)
-                .stream().map(TermoProcedimentoResponse::from).toList();
+    /** Documentos TCLE de um configuracaoAgenda (mais recentes primeiro). */
+    @GetMapping("/{configuracaoAgendaId}/termos")
+    public List<TermoConfiguracaoAgendaResponse> listar(@PathVariable Long configuracaoAgendaId) {
+        return repository.findByConfiguracaoAgendaIdOrderByCriadoEmDesc(configuracaoAgendaId)
+                .stream().map(TermoConfiguracaoAgendaResponse::from).toList();
     }
 
-    @PostMapping("/{procedimentoId}/termos")
+    @PostMapping("/{configuracaoAgendaId}/termos")
     @ResponseStatus(HttpStatus.CREATED)
-    public TermoProcedimentoResponse criar(@PathVariable Long procedimentoId,
-            @Valid @RequestBody TermoProcedimentoRequest request) {
-        Procedimento procedimento = procedimentoRepository.findById(procedimentoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Procedimento não encontrado"));
-        TermoProcedimento t = new TermoProcedimento();
-        t.setProcedimento(procedimento);
+    public TermoConfiguracaoAgendaResponse criar(@PathVariable Long configuracaoAgendaId,
+            @Valid @RequestBody TermoConfiguracaoAgendaRequest request) {
+        ConfiguracaoAgenda configuracaoAgenda = configuracaoAgendaRepository.findById(configuracaoAgendaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Configuração da Agenda não encontrada"));
+        TermoConfiguracaoAgenda t = new TermoConfiguracaoAgenda();
+        t.setConfiguracaoAgenda(configuracaoAgenda);
         t.setNome(request.nome().trim());
         aplicarOrigem(t, request, null);
         t.setCriadoEm(LocalDateTime.now());
-        return TermoProcedimentoResponse.from(repository.save(t));
+        return TermoConfiguracaoAgendaResponse.from(repository.save(t));
     }
 
     /** Substitui/renomeia/troca a origem de um documento. Se o arquivo antigo saiu de cena, remove do S3. */
     @PutMapping("/termos/{id}")
-    public ResponseEntity<TermoProcedimentoResponse> atualizar(@PathVariable Long id,
-            @Valid @RequestBody TermoProcedimentoRequest request) {
+    public ResponseEntity<TermoConfiguracaoAgendaResponse> atualizar(@PathVariable Long id,
+            @Valid @RequestBody TermoConfiguracaoAgendaRequest request) {
         return repository.findById(id)
                 .map(t -> {
                     String urlAntiga = t.getUrl();
                     t.setNome(request.nome().trim());
                     aplicarOrigem(t, request, urlAntiga);
-                    TermoProcedimento salvo = repository.save(t);
+                    TermoConfiguracaoAgenda salvo = repository.save(t);
                     // O arquivo antigo saiu (troca de arquivo OU virou modelo ZapSign): apaga do S3 (best-effort).
                     if (urlAntiga != null && !urlAntiga.equals(salvo.getUrl())) {
                         excluirNoS3(urlAntiga);
                     }
-                    return ResponseEntity.ok(TermoProcedimentoResponse.from(salvo));
+                    return ResponseEntity.ok(TermoConfiguracaoAgendaResponse.from(salvo));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -150,7 +150,7 @@ public class TermoProcedimentoController {
      * </ul>
      * {@code urlAntiga} = url antes da alteração (null no cadastro) — usada para decidir o re-registro.
      */
-    private void aplicarOrigem(TermoProcedimento t, TermoProcedimentoRequest request, String urlAntiga) {
+    private void aplicarOrigem(TermoConfiguracaoAgenda t, TermoConfiguracaoAgendaRequest request, String urlAntiga) {
         t.setProfissionalAssina(request.profissionalAssinaEfetivo());
         t.setProfissionalCertificado(request.profissionalCertificadoEfetivo());
         OrigemModeloTermo origem = request.origemEfetiva();

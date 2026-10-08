@@ -12,7 +12,7 @@ public record AgendamentoDashboard(
         long proximos7Dias,
         List<SerieDiaria> porDia,
         List<Fatia> porStatus,
-        List<ItemContagem> topProcedimentos,
+        List<ItemContagem> topConfiguracaoAgendas,
         List<ItemContagem> topProfissionais,
         List<ItemContagem> porEspecialidade,
         List<ItemContagem> motivosFalta) {

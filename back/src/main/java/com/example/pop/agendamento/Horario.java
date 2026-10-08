@@ -8,7 +8,7 @@ import java.util.List;
 import com.example.pop.especialidade.Especialidade;
 import com.example.pop.motivofalta.MotivoFalta;
 import com.example.pop.paciente.Paciente;
-import com.example.pop.procedimento.Procedimento;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
 import com.example.pop.profissional.ProfissionalSaude;
 import com.example.pop.unidade.Unidade;
 
@@ -34,8 +34,8 @@ import lombok.Setter;
  * Guarda o paciente, o status + histórico, os destinatários da notificação e a falta. A data/hora específica da
  * marcação fica aqui ({@code dataHora}, timestamp cheio = dia da agenda + hora de início; {@code horaFim} opcional).
  *
- * <p>Os campos de SLOT (especialidade, profissional, procedimento, unidade) moram na {@link Agenda}; os getters
- * {@code getEspecialidade()/getProfissionalSaude()/getProcedimento()/getUnidadeSaude()} aqui delegam para a agenda
+ * <p>Os campos de SLOT (especialidade, profissional, configuracaoAgenda, unidade) moram na {@link Agenda}; os getters
+ * {@code getEspecialidade()/getProfissionalSaude()/getConfiguracaoAgenda()/getUnidadeSaude()} aqui delegam para a agenda
  * (conveniência para o código que lê — a agenda é EAGER). Era a entidade {@code Horario}.
  */
 @Entity
@@ -121,8 +121,8 @@ public class Horario {
         return agenda == null ? null : agenda.getProfissionalSaude();
     }
 
-    public Procedimento getProcedimento() {
-        return agenda == null ? null : agenda.getProcedimento();
+    public ConfiguracaoAgenda getConfiguracaoAgenda() {
+        return agenda == null ? null : agenda.getConfiguracaoAgenda();
     }
 
     public Unidade getUnidadeSaude() {

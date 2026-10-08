@@ -27,7 +27,7 @@
         <span>Data: <b>{{ a.data | date: 'dd/MM/yyyy' }}</b></span>
         <span>Profissional: <b>{{ a.profissionalSaude.nome }}</b></span>
         <span>Especialidade: <b>{{ a.especialidade.nome }}</b></span>
-        <span>Procedimento: <b>{{ a.procedimento.nome }}</b></span>
+        <span>Configuração da Agenda: <b>{{ a.configuracaoAgenda.nome }}</b></span>
         <span>Unidade: <b>{{ a.unidadeSaude.nome }}</b></span>
         @if (a.nome) { <span>Nome: <b>{{ a.nome }}</b></span> }
         @if (a.codigoIntegracao) { <span>Cód. integração: <b class="cod">{{ a.codigoIntegracao }}</b></span> }

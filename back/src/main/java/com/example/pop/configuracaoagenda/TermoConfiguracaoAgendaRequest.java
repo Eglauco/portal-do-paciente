@@ -1,10 +1,10 @@
-package com.example.pop.procedimento;
+package com.example.pop.configuracaoagenda;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Cadastro/edição de um documento TCLE do procedimento (admin).
+ * Cadastro/edição de um documento TCLE do configuracaoAgenda (admin).
  *
  * <p>Duas origens (o controller valida conforme {@code origemModelo}):
  * <ul>
@@ -13,7 +13,7 @@ import jakarta.validation.constraints.Size;
  *       ZapSign) e, para exibição, o {@code modeloProviderNome}.</li>
  * </ul>
  */
-public record TermoProcedimentoRequest(
+public record TermoConfiguracaoAgendaRequest(
         @NotBlank @Size(max = 120) String nome,
         OrigemModeloTermo origemModelo,
         String url,

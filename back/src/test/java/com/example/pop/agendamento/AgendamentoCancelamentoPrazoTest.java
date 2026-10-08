@@ -23,8 +23,8 @@ import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
-import com.example.pop.procedimento.Procedimento;
-import com.example.pop.procedimento.ProcedimentoRepository;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgenda;
+import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
 import com.example.pop.verificacao.VerificacaoService;
 
 @SpringBootTest
@@ -42,7 +42,7 @@ class AgendamentoCancelamentoPrazoTest {
     @Autowired
     private HorarioRepository agendamentoRepository;
     @Autowired
-    private ProcedimentoRepository procedimentoRepository;
+    private ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     @Autowired
     private PacienteController pacienteController;
     @Autowired
@@ -55,7 +55,7 @@ class AgendamentoCancelamentoPrazoTest {
     private VerificacaoService verificacao;
 
     private Long pacienteId;
-    private Long procedimentoId;
+    private Long configuracaoAgendaId;
     private Jwt jwt;
 
     @BeforeEach
@@ -68,15 +68,15 @@ class AgendamentoCancelamentoPrazoTest {
         pacienteRepository.findById(pacienteId).ifPresent(p -> { p.setCpf(CPF); p.setDataNascimento(DOB); pacienteRepository.save(p); });
         when(verificacao.checar(anyString(), anyString())).thenReturn(true);
         jwt = jwtDecoder.decode(authController.ativar(new AtivarPacienteRequest(CPF, DOB, "000000", "dev-prazo", TEL)).token());
-        // Procedimento com prazo de 24h de antecedência.
-        procedimentoId = procedimentoRepository.save(new Procedimento(null, "Proc Prazo Teste", null, 24, 0)).getId();
+        // ConfiguracaoAgenda com prazo de 24h de antecedência.
+        configuracaoAgendaId = configuracaoAgendaRepository.save(new ConfiguracaoAgenda(null, "Proc Prazo Teste", null, 24, 0)).getId();
     }
 
     @AfterEach
     void limpar() {
         apagarAgendamentos(pacienteId);
         pacienteRepository.deleteById(pacienteId);
-        procedimentoRepository.deleteById(procedimentoId);
+        configuracaoAgendaRepository.deleteById(configuracaoAgendaId);
     }
 
     private void apagarAgendamentos(Long pid) {
@@ -87,7 +87,7 @@ class AgendamentoCancelamentoPrazoTest {
 
     private Long criarAgendamento(LocalDateTime dataHora) {
         return agendamentoController.criar(
-                new AgendamentoRequest(dataHora, 1L, 1L, procedimentoId, pacienteId, 1L, null), null).id();
+                new AgendamentoRequest(dataHora, 1L, 1L, configuracaoAgendaId, pacienteId, 1L, null), null).id();
     }
 
     @Test

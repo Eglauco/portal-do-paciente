@@ -24,7 +24,7 @@ export interface Agendamento {
   dataHora: string;
   especialidade: Ref;
   profissionalSaude: Ref;
-  procedimento: Ref;
+  configuracaoAgenda: Ref;
   paciente: Ref;
   unidadeSaude: Ref;
   statusAgendamento: StatusAgendamento;
@@ -85,7 +85,7 @@ export interface AgendamentoRequest {
   dataHora: string;
   especialidadeId: number;
   profissionalSaudeId: number;
-  procedimentoId: number;
+  configuracaoAgendaId: number;
   pacienteId: number;
   unidadeSaudeId: number;
   statusAgendamento?: StatusAgendamento;

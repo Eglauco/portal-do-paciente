@@ -185,7 +185,7 @@ public class ProntuarioMedicoService {
             sb.append("\n- Atendimento ")
                     .append(a.getDataHora() == null ? "(sem data)" : a.getDataHora().format(DATA))
                     .append(" · ").append(nome(a.getEspecialidade() == null ? null : a.getEspecialidade().getNome()))
-                    .append(" · ").append(nome(a.getProcedimento() == null ? null : a.getProcedimento().getNome()))
+                    .append(" · ").append(nome(a.getConfiguracaoAgenda() == null ? null : a.getConfiguracaoAgenda().getNome()))
                     .append(" · ").append(nome(a.getUnidadeSaude() == null ? null : a.getUnidadeSaude().getNome()));
             if (p.getStatusAlerta() != null) {
                 sb.append(" [").append(p.getStatusAlerta().getDescricao()).append("]");
