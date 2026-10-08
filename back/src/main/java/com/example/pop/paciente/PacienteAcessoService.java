@@ -51,13 +51,14 @@ public class PacienteAcessoService {
     private final DispositivoRepository dispositivoRepository;
     private final VerificacaoService verificacao;
     private final TelasAppService telasAppService;
+    private final PacienteLogService logService;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     /** Rate-limit por CPF (em memória) para evitar SMS bombing e abuso de custo. */
     private final Map<String, Deque<Long>> enviosPorCpf = new ConcurrentHashMap<>();
 
     public PacienteAcessoService(PacienteRepository repository, ContaAppRepository contaRepository,
             ResponsavelRepository responsavelRepository, DispositivoRepository dispositivoRepository,
-            VerificacaoService verificacao, TelasAppService telasAppService,
+            VerificacaoService verificacao, TelasAppService telasAppService, PacienteLogService logService,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.contaRepository = contaRepository;
@@ -65,6 +66,7 @@ public class PacienteAcessoService {
         this.dispositivoRepository = dispositivoRepository;
         this.verificacao = verificacao;
         this.telasAppService = telasAppService;
+        this.logService = logService;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -117,6 +119,11 @@ public class PacienteAcessoService {
         contaRepository.save(conta);
         // Compat: espelha ativo/dispositivo no paciente próprio (chat/WebSocket/dashboard leem isso).
         repository.findByCpf(cpf).ifPresent(p -> {
+            // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão de conta): o espelho de sessão
+            // (ativo/dispositivo que o admin/chat/dashboard leem) tem de continuar revogado.
+            if (p.getSituacao() == SituacaoCadastro.INATIVO) {
+                return;
+            }
             p.setAtivo(true);
             p.setDispositivoAtivo(dispositivoId);
             repository.save(p);
@@ -217,7 +224,8 @@ public class PacienteAcessoService {
         }
         Set<String> cpfs = new LinkedHashSet<>();
         String proprio = p.getCpf(); // já é só dígitos
-        if (proprio != null && !proprio.isEmpty()) {
+        // Cadastro INATIVO (ex.: auto-exclusão): deixa de ser alvo de push do próprio perfil.
+        if (proprio != null && !proprio.isEmpty() && p.getSituacao() != SituacaoCadastro.INATIVO) {
             cpfs.add(proprio); // o próprio paciente sempre recebe
         }
         for (Responsavel r : responsavelRepository.findByPaciente_Id(pacienteId)) {
@@ -251,7 +259,8 @@ public class PacienteAcessoService {
         if (paciente == null) {
             return false;
         }
-        if (paciente.isAtivo() && paciente.getDispositivoAtivo() != null) {
+        if (paciente.getSituacao() != SituacaoCadastro.INATIVO
+                && paciente.isAtivo() && paciente.getDispositivoAtivo() != null) {
             return true; // sessão própria ativa
         }
         Set<String> cpfs = new LinkedHashSet<>();
@@ -404,6 +413,11 @@ public class PacienteAcessoService {
         conta.setSenhaTentativas(0);
         contaRepository.save(conta);
         repository.findByCpf(cpf).ifPresent(p -> {
+            // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão de conta): o espelho de sessão
+            // (ativo/dispositivo que o admin/chat/dashboard leem) tem de continuar revogado.
+            if (p.getSituacao() == SituacaoCadastro.INATIVO) {
+                return;
+            }
             p.setAtivo(true);
             p.setDispositivoAtivo(dispositivoId);
             repository.save(p);
@@ -644,6 +658,46 @@ public class PacienteAcessoService {
                 dispositivoRepository.saveAll(aparelhos);
             });
         }
+    }
+
+    /**
+     * Exclusão de conta pelo PRÓPRIO usuário (app — requisito das lojas: Apple 5.1.1(v) / Google). Apaga o LOGIN
+     * (conta do CPF) e revoga TODO o acesso desta pessoa: inativa o cadastro de paciente próprio — o registro
+     * clínico (prontuário/agendamentos) é RETIDO por obrigação legal (CFM/LGPD) — e desativa os vínculos de
+     * responsável (perde o acesso aos dependentes; os dependentes NÃO são apagados). Reversível pelo admin
+     * (reativar o cadastro). Auditado (LGPD). Após OTP futuro a conta renasce, mas sem perfis ativos.
+     */
+    @Transactional
+    public void excluirConta(Jwt jwt) {
+        ContaApp conta = contaParaTroca(jwt); // valida cid + aparelho
+        String cpf = conta.getCpf();
+        // 1) Inativa o paciente próprio (se o CPF for de um paciente). O prontuário/agendamentos ficam retidos.
+        repository.findByCpf(cpf).ifPresent(p -> {
+            PacienteLogService.SnapshotPaciente antes = logService.snapshot(p);
+            p.setSituacao(SituacaoCadastro.INATIVO);
+            p.setAtivo(false);
+            p.setDispositivoAtivo(null);
+            Paciente salvo = repository.save(p);
+            logService.registrarAlteracaoPeloApp(antes, salvo, null); // autor = o próprio paciente (auto-exclusão)
+            // Devices LEGADOS (contaId nulo, pré-migração) deste paciente não são achados por contaId
+            // abaixo — desvincula-os aqui por pacienteId para não sobrar alvo residual de push.
+            List<Dispositivo> legados = dispositivoRepository.findByPacienteIdAndContaIdIsNull(p.getId());
+            legados.forEach(d -> d.setPacienteId(null));
+            dispositivoRepository.saveAll(legados);
+        });
+        // 2) Desativa os vínculos de responsável deste CPF → perde acesso aos dependentes (que NÃO são apagados).
+        for (Responsavel r : responsavelRepository.findByCpfAndAtivoTrue(cpf)) {
+            r.setAtivo(false);
+            responsavelRepository.save(r);
+        }
+        // 3) Desvincula os aparelhos (corta o push) e APAGA a conta — o login some.
+        List<Dispositivo> aparelhos = dispositivoRepository.findByContaId(conta.getId());
+        aparelhos.forEach(d -> {
+            d.setContaId(null);
+            d.setPacienteId(null);
+        });
+        dispositivoRepository.saveAll(aparelhos);
+        contaRepository.delete(conta);
     }
 
     /** Monta o E.164 assumindo Brasil (+55) quando o número não vem com o país. */

@@ -150,3 +150,15 @@ export async function trocarFoto(uri: string, nomeArquivo: string, contentType: 
 export async function excluirFoto(): Promise<MeuPerfil> {
   return comoJson<MeuPerfil>(await fetchMeu('/meu/perfil/foto', { method: 'DELETE' }));
 }
+
+/**
+ * Exclui a CONTA do usuário logado (requisito das lojas Apple/Google). O backend remove o login
+ * e revoga o acesso: o cadastro de paciente próprio é inativado e os vínculos de responsável são
+ * desativados. O prontuário/agendamentos são RETIDOS por obrigação legal. 204 sem corpo.
+ */
+export async function excluirConta(): Promise<void> {
+  const resposta = await fetchMeu('/meu/perfil', { method: 'DELETE' });
+  if (!resposta.ok) {
+    throw new Error(await mensagemErro(resposta, 'Não foi possível excluir sua conta. Tente novamente.'));
+  }
+}

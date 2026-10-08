@@ -28,6 +28,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleTeamId": "3P7GB28VS6"
+      }
+    }
   }
 }

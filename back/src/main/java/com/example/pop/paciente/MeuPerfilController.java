@@ -77,6 +77,18 @@ public class MeuPerfilController {
     }
 
     /**
+     * Exclusão de conta pelo PRÓPRIO usuário (app) — requisito das lojas (Apple 5.1.1(v) / Google). Remove o
+     * login e revoga todo o acesso: o paciente próprio é inativado (prontuário/agendamentos RETIDOS por lei) e
+     * os vínculos de responsável são desativados (dependentes não são apagados). É operação da CONTA (não passa
+     * pela trava de MEU_PERFIL — vale p/ paciente e responsável). Irreversível pelo usuário; só o admin reativa.
+     */
+    @DeleteMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    public void excluirConta(@AuthenticationPrincipal Jwt jwt) {
+        acessoService.excluirConta(jwt);
+    }
+
+    /**
      * Altera/define o PIN de acesso da CONTA logada (para entrar sem SMS). É credencial da conta
      * (não dado do perfil), então não passa pela trava de MEU_PERFIL — vale para paciente e
      * responsável. Quando já existe senha, exige a senha atual.

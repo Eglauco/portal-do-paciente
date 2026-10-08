@@ -10,7 +10,7 @@ import { SemAcesso } from '@/components/sem-acesso';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
-import { carregarPerfil, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
+import { carregarPerfil, excluirConta, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
 import { ehPerfilProprio, podeLancar, podeVer } from '@/services/sessao';
 
 const SEXO_LABEL: Record<SexoPaciente, string> = {
@@ -119,7 +119,7 @@ export default function PerfilScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
-  const { sessao } = useSessao();
+  const { sessao, sair } = useSessao();
   const { definirFoto } = usePerfilFoto();
   // Travas do perfil dependente: ver os dados vs. lançar (alterar foto e editar dados).
   // Editar e trocar foto exigem "Ver e lançar"; o perfil próprio sempre pode.
@@ -130,6 +130,7 @@ export default function PerfilScreen() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
 
   const carregar = useCallback(
     async (comSpinner = true) => {
@@ -226,6 +227,38 @@ export default function PerfilScreen() {
         : []),
       { text: 'Cancelar', style: 'cancel' as const },
     ]);
+  }
+
+  /**
+   * Exclusão de conta pelo próprio usuário (requisito das lojas). Confirmação clara dos efeitos
+   * (acesso removido; prontuário retido por lei; irreversível), depois chama o backend e desloga
+   * — a sessão zerada leva o app de volta ao login.
+   */
+  function confirmarExclusao() {
+    if (excluindo) return;
+    Alert.alert(
+      'Excluir minha conta',
+      'Isso remove seu acesso ao app — o seu perfil e os dependentes que você gerencia. ' +
+        'Seu prontuário e agendamentos são mantidos por obrigação legal. ' +
+        'Esta ação é irreversível: só a sua unidade de saúde pode reativar depois.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir conta',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setExcluindo(true);
+              await excluirConta();
+              await sair(); // limpa a sessão → o app volta para a tela de login
+            } catch (e) {
+              setExcluindo(false);
+              Alert.alert('Não foi possível excluir', e instanceof Error ? e.message : 'Tente novamente.');
+            }
+          },
+        },
+      ],
+    );
   }
 
   const nome = perfil?.nome ?? sessao?.nome ?? 'Paciente';
@@ -372,6 +405,22 @@ export default function PerfilScreen() {
           <Ionicons name="people-outline" size={20} color={t.brandDeep} />
           <Text style={styles.selecionarTxt}>Selecionar perfil</Text>
         </Pressable>
+
+        {/* Exclusão de conta pelo próprio usuário (exigência das lojas Apple/Google). */}
+        <Pressable
+          style={({ pressed }) => [styles.excluir, pressed && styles.excluirPressed]}
+          onPress={confirmarExclusao}
+          disabled={excluindo}
+          accessibilityRole="button"
+          accessibilityLabel="Excluir minha conta"
+          accessibilityState={{ busy: excluindo }}>
+          {excluindo ? (
+            <ActivityIndicator size="small" color="#C0392B" />
+          ) : (
+            <Ionicons name="trash-outline" size={19} color="#C0392B" />
+          )}
+          <Text style={styles.excluirTxt}>{excluindo ? 'Excluindo…' : 'Excluir minha conta'}</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -510,4 +559,18 @@ const criarEstilos = (t: Tema) =>
     },
     selecionarPressed: { backgroundColor: t.brandTint },
     selecionarTxt: { fontSize: 15, fontWeight: '700', color: t.brandDeep },
+    excluir: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: t.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: '#F0C9C4',
+      paddingVertical: 15,
+      marginTop: 18,
+    },
+    excluirPressed: { backgroundColor: '#FBECEA' },
+    excluirTxt: { fontSize: 15, fontWeight: '700', color: '#C0392B' },
   });
