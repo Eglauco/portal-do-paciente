@@ -89,11 +89,9 @@
                 <thead>
                   <tr>
                     <th class="col-linha">Linha</th>
-                    <th>Paciente</th>
-                    <th>CPF</th>
+                    <th>Paciente (id/prontuário/código)</th>
                     <th>Hora início</th>
                     <th>Hora fim</th>
-                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -111,16 +109,6 @@
                         @if (h.paciente.erro) { <div class="cell__msg">{{ h.paciente.mensagem }}</div> }
                       </td>
 
-                      <td class="cell" [class.is-erro]="h.cpf.erro">
-                        <div class="cell__val">
-                          @if (h.cpf.valor) { {{ h.cpf.valor }} } @else { <span class="vazio">—</span> }
-                        </div>
-                        @if (!h.cpf.erro && h.cpf.resolvido && h.cpf.resolvido !== h.cpf.valor) {
-                          <div class="cell__resolvido">{{ h.cpf.resolvido }}</div>
-                        }
-                        @if (h.cpf.erro) { <div class="cell__msg">{{ h.cpf.mensagem }}</div> }
-                      </td>
-
                       <td class="cell" [class.is-erro]="h.horaInicio.erro">
                         <div class="cell__val">
                           @if (h.horaInicio.valor) { {{ h.horaInicio.valor }} } @else { <span class="vazio">—</span> }
@@ -133,22 +121,6 @@
                           @if (h.horaFim.valor) { {{ h.horaFim.valor }} } @else { <span class="vazio">—</span> }
                         </div>
                         @if (h.horaFim.erro) { <div class="cell__msg">{{ h.horaFim.mensagem }}</div> }
-                      </td>
-
-                      <td class="cell" [class.is-erro]="h.status.erro">
-                        <div class="cell__val">
-                          @if (h.status.valor) {
-                            {{ h.status.valor }}
-                          } @else if (h.status.resolvido) {
-                            <span class="vazio">{{ h.status.resolvido }}</span>
-                          } @else {
-                            <span class="vazio">—</span>
-                          }
-                        </div>
-                        @if (!h.status.erro && h.status.valor && h.status.resolvido && h.status.resolvido !== h.status.valor) {
-                          <div class="cell__resolvido">{{ h.status.resolvido }}</div>
-                        }
-                        @if (h.status.erro) { <div class="cell__msg">{{ h.status.mensagem }}</div> }
                       </td>
                     </tr>
                   }

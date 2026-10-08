@@ -8,25 +8,26 @@ export interface CampoPreview {
   mensagem?: string | null;
 }
 
-/** Cabeçalho da agenda (o slot) — preenchido uma vez na planilha. */
+/** Cabeçalho da agenda (o slot) — preenchido uma vez na planilha. Resolvido por id/código (nunca por nome). */
 export interface AgendaPreview {
   data: CampoPreview;
   profissional: CampoPreview;
   especialidade: CampoPreview;
-  /** Rótulo visível de "Procedimento" nesta tela. */
   configuracaoAgenda: CampoPreview;
+  /** Unidade executante — vem do usuário logado (não da planilha). */
   unidade: CampoPreview;
   nome: CampoPreview;
 }
 
-/** Uma marcação (um paciente) da planilha. `linha` é o número da linha no Excel para localizar/corrigir. */
+/**
+ * Uma marcação (um paciente) da planilha. `linha` é o número da linha no Excel para localizar/corrigir.
+ * O paciente é localizado por id/prontuário/código; `paciente.resolvido` traz o nome encontrado.
+ */
 export interface HorarioPreview {
   linha: number;
   paciente: CampoPreview;
-  cpf: CampoPreview;
   horaInicio: CampoPreview;
   horaFim: CampoPreview;
-  status: CampoPreview;
 }
 
 /** Preview completo devolvido pelo backend. */

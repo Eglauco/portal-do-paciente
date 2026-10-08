@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
+import { AuthService } from '../../core/auth.service';
 import { AgendaImportPreview, CampoPreview } from './agenda-import.model';
 import { AgendaImportService } from './agenda-import.service';
 
@@ -71,6 +72,7 @@ interface CampoAgenda {
 export class AgendaImportModal {
   private readonly service = inject(AgendaImportService);
   private readonly toastr = inject(ToastrService);
+  private readonly auth = inject(AuthService);
 
   /** Controla a exibição; o pai abre/fecha. */
   readonly aberto = input(false);
@@ -125,7 +127,7 @@ export class AgendaImportModal {
     if (!arquivo) return;
     this.arquivoNome.set(arquivo.name);
     this.enviando.set(true);
-    this.service.preview(arquivo).subscribe({
+    this.service.preview(arquivo, this.auth.unidadeId()).subscribe({
       next: (p) => {
         this.preview.set(p);
         this.enviando.set(false);

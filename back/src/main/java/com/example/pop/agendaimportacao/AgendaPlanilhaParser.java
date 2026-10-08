@@ -21,14 +21,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Lê a planilha de importação de agenda (layout do {@link AgendaModeloPlanilha}: um bloco de cabeçalho
- * "DADOS DA AGENDA" com rótulo na coluna A / valor na coluna B, seguido de uma tabela "HORÁRIOS" com uma
- * linha por paciente). Só extrai as células como texto já normalizado para exibição — NÃO resolve nomes
- * contra o banco nem valida regra de negócio; isso fica no {@link AgendaImportacaoService}, mantendo o parser
- * desacoplado das entidades (reconciliável no merge com a renomeação paralela de Procedimento).
+ * Lê a planilha de importação de agenda (layout do {@link AgendaModeloPlanilha}: um bloco "DADOS DA AGENDA"
+ * com rótulo na coluna A / valor na coluna B, seguido da tabela "HORÁRIOS" com uma linha por paciente).
+ * Só extrai as células como texto — NÃO resolve ids/códigos contra o banco nem valida regra; isso fica no
+ * {@link AgendaImportacaoService}, mantendo o parser desacoplado das entidades.
  *
- * <p>A leitura é tolerante: casa os rótulos por texto normalizado (sem acento, minúsculo, sem o "*"), então a
- * ordem das colunas de horário e pequenas variações de rótulo não quebram o import.
+ * <p>Tudo por CÓDIGO/ID, em colunas SEPARADAS por tipo de identificador (p/ não haver colisão id × código):
+ * cada cadastro tem uma coluna por tipo e o usuário preenche só uma. O parser apenas extrai cada coluna; o
+ * serviço é que exige "exatamente um preenchido" e resolve pelo tipo certo.
+ *
+ * <p>A leitura é tolerante: casa os rótulos por texto normalizado (sem acento, minúsculo, sem o "*").
  */
 @Component
 public class AgendaPlanilhaParser {
@@ -36,11 +38,16 @@ public class AgendaPlanilhaParser {
     private static final DateTimeFormatter DATA_PLANILHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter HORA_PLANILHA = DateTimeFormatter.ofPattern("HH:mm");
 
-    /** Valores brutos (texto) extraídos da planilha, antes de qualquer resolução/validação. */
+    /**
+     * Valores brutos (texto) extraídos da planilha. Chaves do mapa {@code agenda}: {@code data},
+     * {@code profissionalId}, {@code profissionalCodigo}, {@code especialidadeId}, {@code especialidadeCodigo},
+     * {@code configId}, {@code nome}.
+     */
     public record Bruta(Map<String, String> agenda, List<LinhaBruta> horarios) {
     }
 
-    public record LinhaBruta(int linhaExcel, String paciente, String cpf, String inicio, String fim, String status) {
+    public record LinhaBruta(int linhaExcel, String pacienteId, String pacienteProntuario,
+            String pacienteCodigo, String inicio, String fim) {
     }
 
     public Bruta parse(byte[] bytes) {
@@ -59,7 +66,6 @@ public class AgendaPlanilhaParser {
                 if (row == null) {
                     continue;
                 }
-                String rotuloA = normalizar(texto(row.getCell(0)));
 
                 // Cabeçalho da tabela de horários: a partir daqui as linhas são marcações.
                 if (ehCabecalhoHorarios(row)) {
@@ -69,14 +75,16 @@ public class AgendaPlanilhaParser {
                 }
 
                 // Bloco da agenda: rótulo na coluna A, valor na coluna B.
-                String chave = chaveAgenda(rotuloA);
+                String chave = chaveAgenda(normalizar(texto(row.getCell(0))));
                 if (chave != null && !agenda.containsKey(chave)) {
                     Cell valor = row.getCell(1);
                     agenda.put(chave, "data".equals(chave) ? lerData(valor) : texto(valor));
                 }
             }
 
-            if (linhaCabecalhoHorarios < 0 || colunas == null || !colunas.containsKey("paciente")) {
+            boolean temColunaPaciente = colunas != null && (colunas.containsKey("pacienteId")
+                    || colunas.containsKey("pacienteProntuario") || colunas.containsKey("pacienteCodigo"));
+            if (linhaCabecalhoHorarios < 0 || !temColunaPaciente) {
                 throw invalida();
             }
 
@@ -86,15 +94,16 @@ public class AgendaPlanilhaParser {
                 if (row == null) {
                     continue;
                 }
-                String paciente = texto(celula(row, colunas, "paciente"));
-                String cpf = lerCpf(celula(row, colunas, "cpf"));
+                String pacienteId = texto(celula(row, colunas, "pacienteId"));
+                String pacienteProntuario = texto(celula(row, colunas, "pacienteProntuario"));
+                String pacienteCodigo = texto(celula(row, colunas, "pacienteCodigo"));
                 String inicio = lerHora(celula(row, colunas, "inicio"));
                 String fim = lerHora(celula(row, colunas, "fim"));
-                String status = texto(celula(row, colunas, "status"));
-                if (paciente.isBlank() && cpf.isBlank() && inicio.isBlank() && fim.isBlank() && status.isBlank()) {
+                if (pacienteId.isBlank() && pacienteProntuario.isBlank() && pacienteCodigo.isBlank()
+                        && inicio.isBlank() && fim.isBlank()) {
                     continue; // linha totalmente vazia: ignora (não vira erro)
                 }
-                horarios.add(new LinhaBruta(r + 1, paciente, cpf, inicio, fim, status));
+                horarios.add(new LinhaBruta(r + 1, pacienteId, pacienteProntuario, pacienteCodigo, inicio, fim));
             }
 
             return new Bruta(agenda, horarios);
@@ -107,31 +116,31 @@ public class AgendaPlanilhaParser {
 
     // ---------------- Rótulos ----------------
 
+    /** Casa o rótulo da coluna A com a chave do campo (cadastro + tipo de identificador). */
     private static String chaveAgenda(String rotulo) {
-        if (rotulo.equals("data")) {
+        if (rotulo.startsWith("data")) {
             return "data";
-        }
-        if (rotulo.startsWith("profissional")) {
-            return "profissional";
-        }
-        if (rotulo.startsWith("especialidade")) {
-            return "especialidade";
-        }
-        if (rotulo.startsWith("configuracao")) {
-            return "config";
-        }
-        if (rotulo.startsWith("unidade")) {
-            return "unidade";
         }
         if (rotulo.startsWith("nome da agenda")) {
             return "nome";
+        }
+        if (rotulo.startsWith("profissional")) {
+            return rotulo.contains("codigo") ? "profissionalCodigo"
+                    : (rotulo.contains("id interno") ? "profissionalId" : null);
+        }
+        if (rotulo.startsWith("especialidade")) {
+            return rotulo.contains("codigo") ? "especialidadeCodigo"
+                    : (rotulo.contains("id interno") ? "especialidadeId" : null);
+        }
+        if (rotulo.startsWith("configuracao")) {
+            return "configId"; // Configuração da Agenda só tem id interno
         }
         return null;
     }
 
     private static boolean ehCabecalhoHorarios(Row row) {
         for (Cell c : row) {
-            if (normalizar(texto(c)).startsWith("nome do paciente")) {
+            if (normalizar(texto(c)).startsWith("paciente")) {
                 return true;
             }
         }
@@ -145,16 +154,18 @@ public class AgendaPlanilhaParser {
             if (r.isBlank()) {
                 continue;
             }
-            if (r.contains("paciente")) {
-                colunas.putIfAbsent("paciente", c.getColumnIndex());
-            } else if (r.contains("cpf")) {
-                colunas.putIfAbsent("cpf", c.getColumnIndex());
+            if (r.startsWith("paciente")) {
+                if (r.contains("codigo")) {
+                    colunas.putIfAbsent("pacienteCodigo", c.getColumnIndex());
+                } else if (r.contains("prontuario")) {
+                    colunas.putIfAbsent("pacienteProntuario", c.getColumnIndex());
+                } else if (r.contains("id interno")) {
+                    colunas.putIfAbsent("pacienteId", c.getColumnIndex());
+                }
             } else if (r.contains("inicio")) {
                 colunas.putIfAbsent("inicio", c.getColumnIndex());
             } else if (r.contains("fim")) {
                 colunas.putIfAbsent("fim", c.getColumnIndex());
-            } else if (r.contains("status")) {
-                colunas.putIfAbsent("status", c.getColumnIndex());
             }
         }
         return colunas;
@@ -167,7 +178,7 @@ public class AgendaPlanilhaParser {
 
     // ---------------- Leitura de células ----------------
 
-    /** Texto genérico (nomes, códigos, CPF/hora digitados como texto). Número inteiro vira string sem casas. */
+    /** Texto genérico (ids/códigos, hora digitada como texto). Número inteiro vira string sem casas decimais. */
     private static String texto(Cell c) {
         if (c == null) {
             return "";
@@ -216,16 +227,6 @@ public class AgendaPlanilhaParser {
         if (c != null && c.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(c)) {
             LocalDateTime dt = c.getLocalDateTimeCellValue();
             return dt == null ? "" : dt.toLocalTime().format(HORA_PLANILHA);
-        }
-        return texto(c);
-    }
-
-    /** CPF digitado como número perde o zero à esquerda — recompõe com padding para 11 dígitos. */
-    private static String lerCpf(Cell c) {
-        if (c != null && c.getCellType() == CellType.NUMERIC && !DateUtil.isCellDateFormatted(c)) {
-            long v = (long) c.getNumericCellValue();
-            String s = Long.toString(v);
-            return s.length() < 11 ? "0".repeat(11 - s.length()) + s : s;
         }
         return texto(c);
     }
