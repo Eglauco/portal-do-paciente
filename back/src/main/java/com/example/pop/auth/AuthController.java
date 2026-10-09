@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.inquilino.InquilinoService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.Usuario;
@@ -36,17 +37,19 @@ public class AuthController {
     private final UnidadeRepository unidadeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
+    private final InquilinoService inquilinoService;
     private final long expiracaoHoras;
     /** Hash de referência (mesmo custo dos reais) para igualar o tempo quando a conta não existe. */
     private final String hashFicticio;
 
     public AuthController(UsuarioRepository usuarioRepository, UnidadeRepository unidadeRepository,
-            PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder,
+            PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder, InquilinoService inquilinoService,
             @Value("${app.jwt.expiration-hours:8}") long expiracaoHoras) {
         this.usuarioRepository = usuarioRepository;
         this.unidadeRepository = unidadeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
+        this.inquilinoService = inquilinoService;
         this.expiracaoHoras = expiracaoHoras;
         this.hashFicticio = passwordEncoder.encode("timing-guard-nao-usar");
     }
@@ -73,6 +76,7 @@ public class AuthController {
                 .claim("nome", usuario.getNome())
                 .claim("uid", usuario.getId())
                 .claim("role", "ADMIN")
+                .claim("inq", inquilinoService.idPadrao())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

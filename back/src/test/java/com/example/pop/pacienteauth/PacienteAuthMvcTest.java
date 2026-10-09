@@ -100,6 +100,10 @@ class PacienteAuthMvcTest {
                 .andExpect(status().isOk()).andReturn();
         String token = res.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
         assertFalse(token.isBlank());
+        // Fase 0.2 (multi-inquilino): o token carrega o inquilino no claim "inq".
+        String payload = new String(java.util.Base64.getUrlDecoder().decode(token.split("\\.")[1]),
+                java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(payload.contains("\"inq\""), "token do paciente deve carregar o claim do inquilino");
 
         // Sem token → 401
         mvc.perform(get("/paciente-auth/me")).andExpect(status().isUnauthorized());

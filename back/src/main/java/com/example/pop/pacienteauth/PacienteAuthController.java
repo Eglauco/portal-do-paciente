@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.inquilino.InquilinoService;
 import com.example.pop.paciente.ContaApp;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
@@ -40,13 +41,16 @@ public class PacienteAuthController {
     private final PacienteAcessoService acessoService;
     private final StorageService storageService;
     private final JwtEncoder jwtEncoder;
+    private final InquilinoService inquilinoService;
     private final long expiracaoDias;
 
     public PacienteAuthController(PacienteAcessoService acessoService, StorageService storageService,
-            JwtEncoder jwtEncoder, @Value("${app.jwt.paciente-expiration-days:365}") long expiracaoDias) {
+            JwtEncoder jwtEncoder, InquilinoService inquilinoService,
+            @Value("${app.jwt.paciente-expiration-days:365}") long expiracaoDias) {
         this.acessoService = acessoService;
         this.storageService = storageService;
         this.jwtEncoder = jwtEncoder;
+        this.inquilinoService = inquilinoService;
         this.expiracaoDias = expiracaoDias;
     }
 
@@ -152,6 +156,7 @@ public class PacienteAuthController {
                 .claim("dev", dispositivoId)
                 .claim("role", "PACIENTE")
                 .claim("nome", perfil.getNome())
+                .claim("inq", inquilinoService.idPadrao())
                 .build();
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
         return jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();

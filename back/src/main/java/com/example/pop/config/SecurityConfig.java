@@ -30,8 +30,11 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.tenant.TenantFilter;
 import com.example.pop.usuario.Usuario;
 import com.example.pop.usuario.UsuarioRepository;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
@@ -54,7 +57,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, InquilinoService inquilinoService) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -103,7 +106,9 @@ public class SecurityConfig {
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));
+                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                // Define o inquilino da requisição a partir do claim "inq" do JWT (após a autenticação Bearer).
+                .addFilterAfter(new TenantFilter(inquilinoService), BearerTokenAuthenticationFilter.class);
         return http.build();
     }
 
