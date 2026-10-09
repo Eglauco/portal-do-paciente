@@ -12,16 +12,19 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const ehApi = req.url.startsWith(environment.apiUrl);
   const ehLogin = req.url.includes('/auth/login');
+  // Console do super-admin: fica FORA da sessão do admin — não leva o Bearer e um 401 (chave errada)
+  // é tratado na própria tela, nunca derruba a sessão do admin para o /login.
+  const ehSuperadmin = req.url.includes('/superadmin/');
   const token = auth.token();
 
   const requisicao =
-    token && ehApi && !ehLogin
+    token && ehApi && !ehLogin && !ehSuperadmin
       ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
       : req;
 
   return next(requisicao).pipe(
     catchError((erro: HttpErrorResponse) => {
-      if (erro.status === 401 && ehApi && !ehLogin) {
+      if (erro.status === 401 && ehApi && !ehLogin && !ehSuperadmin) {
         auth.logout();
       }
       return throwError(() => erro);

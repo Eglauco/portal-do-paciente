@@ -16,6 +16,13 @@ export const routes: Routes = [
     title: 'Selecione a unidade',
   },
   {
+    // Console do super-admin: acessado "por fora" do sistema dos inquilinos (sem authGuard/Shell),
+    // protegido por um segredo digitado na própria tela e enviado no header de cada chamada.
+    path: 'superadmin',
+    loadComponent: () => import('./pages/superadmin/superadmin').then((m) => m.Superadmin),
+    title: 'Console da plataforma',
+  },
+  {
     path: '',
     loadComponent: () => import('./pages/shell/shell').then((m) => m.Shell),
     canActivate: [authGuard],

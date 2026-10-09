@@ -1,0 +1,186 @@
+<main class="sa">
+  @if (!autenticado()) {
+    <!-- Portão: a chave de super-admin -->
+    <section class="sa__gate">
+      <div class="sa__brand">
+        <span class="sa__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+        </span>
+        <div>
+          <h1 class="sa__title">Console da plataforma</h1>
+          <p class="sa__sub">Gestão de inquilinos · acesso restrito</p>
+        </div>
+      </div>
+
+      <form class="sa__gate-form" (submit)="entrar($event)" novalidate>
+        <div class="form-field form-field--full">
+          <label class="label" for="segredo">Chave de super-admin <span class="req" aria-hidden="true">*</span></label>
+          <input
+            id="segredo"
+            class="input"
+            type="password"
+            name="segredo"
+            autocomplete="off"
+            placeholder="••••••••••••"
+            [value]="segredo()"
+            (input)="atualizarSegredo($event)"
+          />
+        </div>
+
+        @if (erroAcesso(); as msg) {
+          <p class="sa__erro" role="alert">{{ msg }}</p>
+        }
+
+        <button type="submit" class="btn btn--solid" [disabled]="carregando()">
+          {{ carregando() ? 'Validando…' : 'Entrar' }}
+        </button>
+      </form>
+    </section>
+  } @else {
+    <!-- Console -->
+    <section class="dash">
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Inquilinos</h1>
+          <p class="page-sub">Cadastre e pesquise os inquilinos (clientes) da plataforma.</p>
+        </div>
+        <div class="sa__actions">
+          <button type="button" class="btn btn--ghost" (click)="recarregar()" [disabled]="carregando()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+            </svg>
+            Recarregar
+          </button>
+          <button type="button" class="btn btn--solid" (click)="abrirForm()">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Novo inquilino
+          </button>
+          <button type="button" class="btn btn--ghost" (click)="sair()">Sair</button>
+        </div>
+      </header>
+
+      <!-- Cadastro (painel recolhível) -->
+      @if (mostrarForm()) {
+        <form class="panel sa__form" [formGroup]="form" (submit)="criar($event)">
+          <div class="panel__head">
+            <h2 class="panel__title">Novo inquilino</h2>
+          </div>
+          <p class="sa__hint">
+            Cria o schema isolado, provisiona o banco (baseline limpo) e semeia a 1ª unidade + o 1º administrador,
+            que já consegue entrar no sistema do inquilino.
+          </p>
+
+          <div class="form-grid">
+            <div class="form-field">
+              <label class="label" for="nome">Nome do inquilino <span class="req" aria-hidden="true">*</span></label>
+              <input id="nome" class="input" formControlName="nome" placeholder="Ex.: Clínica São Lucas"
+                     autocomplete="off" [class.input--error]="invalido('nome')" />
+              @if (invalido('nome')) { <span class="field-error">Informe o nome do inquilino.</span> }
+            </div>
+            <div class="form-field">
+              <label class="label" for="schemaName">Nome do schema <span class="req" aria-hidden="true">*</span></label>
+              <input id="schemaName" class="input" formControlName="schemaName" placeholder="ex.: sao_lucas"
+                     autocomplete="off" inputmode="latin" [class.input--error]="invalido('schemaName')" />
+              @if (invalido('schemaName')) {
+                <span class="field-error">Minúsculo, começa por letra ou _, só letras/números/_ (até 63).</span>
+              } @else {
+                <span class="sa__field-hint">Identificador do banco — não dá para mudar depois.</span>
+              }
+            </div>
+            <div class="form-field form-field--full">
+              <label class="label" for="unidadeNome">Nome da 1ª unidade <span class="req" aria-hidden="true">*</span></label>
+              <input id="unidadeNome" class="input" formControlName="unidadeNome" placeholder="Ex.: Unidade Central"
+                     autocomplete="off" [class.input--error]="invalido('unidadeNome')" />
+              @if (invalido('unidadeNome')) { <span class="field-error">Informe o nome da unidade.</span> }
+            </div>
+            <div class="form-field">
+              <label class="label" for="adminNome">Nome do 1º admin <span class="req" aria-hidden="true">*</span></label>
+              <input id="adminNome" class="input" formControlName="adminNome" placeholder="Nome completo"
+                     autocomplete="off" [class.input--error]="invalido('adminNome')" />
+              @if (invalido('adminNome')) { <span class="field-error">Informe o nome do administrador.</span> }
+            </div>
+            <div class="form-field">
+              <label class="label" for="adminEmail">E-mail do 1º admin <span class="req" aria-hidden="true">*</span></label>
+              <input id="adminEmail" class="input" type="email" formControlName="adminEmail" placeholder="admin@clinica.com"
+                     autocomplete="off" [class.input--error]="invalido('adminEmail')" />
+              @if (invalido('adminEmail')) { <span class="field-error">Informe um e-mail válido.</span> }
+            </div>
+            <div class="form-field">
+              <label class="label" for="adminSenha">Senha do 1º admin <span class="req" aria-hidden="true">*</span></label>
+              <input id="adminSenha" class="input" type="password" formControlName="adminSenha" placeholder="Mínimo 6 caracteres"
+                     autocomplete="new-password" [class.input--error]="invalido('adminSenha')" />
+              @if (invalido('adminSenha')) { <span class="field-error">Mínimo de 6 caracteres.</span> }
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn--ghost" (click)="fecharForm()" [disabled]="criando()">Cancelar</button>
+            <button type="submit" class="btn btn--solid" [disabled]="criando()">
+              {{ criando() ? 'Provisionando…' : 'Cadastrar e provisionar' }}
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- Lista -->
+      <section class="panel">
+        <div class="panel__head">
+          <h2 class="panel__title">Dados</h2>
+          <div class="panel__head-right">
+            <span class="result-count">{{ inquilinosFiltrados().length }} inquilino(s)</span>
+          </div>
+        </div>
+
+        <div class="sa__search">
+          <input
+            class="input"
+            type="search"
+            placeholder="Pesquisar por nome ou schema"
+            aria-label="Pesquisar inquilinos"
+            [value]="busca()"
+            (input)="atualizarBusca($event)"
+          />
+        </div>
+
+        @if (carregando()) {
+          <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando inquilinos…</p></div>
+        } @else if (inquilinosFiltrados().length === 0) {
+          <div class="state">
+            <h3>Nenhum inquilino encontrado</h3>
+            <p>{{ busca() ? 'Ajuste a pesquisa.' : 'Cadastre o primeiro inquilino da plataforma.' }}</p>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th class="col-cod">ID</th>
+                  <th>Nome</th>
+                  <th>Schema</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (i of inquilinosFiltrados(); track i.id) {
+                  <tr>
+                    <td class="mono">{{ i.id }}</td>
+                    <td><b>{{ i.nome }}</b></td>
+                    <td class="mono">{{ i.schemaName }}</td>
+                    <td>
+                      <span class="sa__badge" [class.sa__badge--off]="i.situacao !== 'ATIVO'">{{ i.situacao }}</span>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </section>
+  }
+</main>

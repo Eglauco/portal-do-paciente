@@ -1,0 +1,135 @@
+/* Página "por fora" (sem o Shell do admin): o próprio wrapper dá fundo, padding e altura. */
+.sa {
+  display: block;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  padding: 2rem 1.5rem 3rem;
+}
+
+/* Portão do segredo (centralizado) */
+.sa__gate {
+  max-width: 440px;
+  margin: 8vh auto 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  padding: 2rem 1.75rem;
+  box-shadow: var(--shadow);
+}
+
+.sa__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.sa__mark {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  flex-shrink: 0;
+  border-radius: 0.85rem;
+  color: var(--on-brand);
+  background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+}
+
+.sa__mark svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.sa__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+}
+
+.sa__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.sa__gate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sa__gate-form .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.sa__erro {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.6rem;
+  font-size: 0.88rem;
+  color: #8a1c1c;
+  background: #fdecec;
+  border: 1px solid #f5c2c2;
+}
+
+/* Console */
+.sa__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.sa__form {
+  margin-bottom: 1.5rem;
+}
+
+.sa__hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.sa__field-hint {
+  margin-top: 0.3rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sa__search {
+  margin-bottom: 1.1rem;
+}
+
+.sa__search .input {
+  max-width: 360px;
+}
+
+/* Pílula de situação */
+.sa__badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--brand-deep);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.sa__badge--off {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 16%, transparent);
+}
+
+@media (max-width: 640px) {
+  .sa {
+    padding: 1.25rem 1rem 2rem;
+  }
+  .sa__search .input {
+    max-width: none;
+  }
+}
