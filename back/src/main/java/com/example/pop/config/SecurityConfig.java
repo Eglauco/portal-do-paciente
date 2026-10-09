@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.tenant.TenantContext;
 import com.example.pop.tenant.TenantFilter;
 import com.example.pop.usuario.Usuario;
 import com.example.pop.usuario.UsuarioRepository;
@@ -128,18 +129,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(UsuarioRepository usuarioRepository) {
+    JwtDecoder jwtDecoder(UsuarioRepository usuarioRepository, InquilinoService inquilinoService) {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(chaveJwt).build();
         // Além da validação padrão (expiração), rejeita tokens ADMIN emitidos ANTES da
         // última troca de senha do usuário — trocar a senha derruba todas as sessões.
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefault(),
-                tokenNaoRevogado(usuarioRepository)));
+                tokenNaoRevogado(usuarioRepository, inquilinoService)));
         return decoder;
     }
 
     /** Invalida tokens ADMIN cujo "iat" é anterior ao credenciaisAlteradasEm do usuário. */
-    private static OAuth2TokenValidator<Jwt> tokenNaoRevogado(UsuarioRepository usuarioRepository) {
+    private static OAuth2TokenValidator<Jwt> tokenNaoRevogado(UsuarioRepository usuarioRepository,
+            InquilinoService inquilinoService) {
         return jwt -> {
             if (!"ADMIN".equals(jwt.getClaimAsString("role"))) {
                 return OAuth2TokenValidatorResult.success(); // só o admin tem versionamento de senha
@@ -149,14 +151,29 @@ public class SecurityConfig {
             if (!(uid instanceof Number numero) || emitidoEm == null) {
                 return OAuth2TokenValidatorResult.success();
             }
-            Instant alteradaEm = usuarioRepository.findById(numero.longValue())
-                    .map(Usuario::getCredenciaisAlteradasEm)
-                    .orElse(null);
-            if (alteradaEm != null && emitidoEm.isBefore(alteradaEm)) {
-                return OAuth2TokenValidatorResult.failure(
-                        new OAuth2Error("invalid_token", "Sessão encerrada por troca de senha", null));
+            // 'usuario' vive no schema do inquilino: resolve o schema pelo claim "inq" do PRÓPRIO token
+            // ANTES da consulta. Este validador roda no DECODE, ANTES do TenantFilter — e uma falha de
+            // auth pode nem chegar ao filtro — então é self-contained: salva e restaura o contexto.
+            String anterior = TenantContext.atualBruto();
+            try {
+                if (jwt.getClaim("inq") instanceof Number inq) {
+                    TenantContext.definir(inquilinoService.schemaPorId(inq.longValue()));
+                }
+                Instant alteradaEm = usuarioRepository.findById(numero.longValue())
+                        .map(Usuario::getCredenciaisAlteradasEm)
+                        .orElse(null);
+                if (alteradaEm != null && emitidoEm.isBefore(alteradaEm)) {
+                    return OAuth2TokenValidatorResult.failure(
+                            new OAuth2Error("invalid_token", "Sessão encerrada por troca de senha", null));
+                }
+                return OAuth2TokenValidatorResult.success();
+            } finally {
+                if (anterior != null) {
+                    TenantContext.definir(anterior);
+                } else {
+                    TenantContext.limpar();
+                }
             }
-            return OAuth2TokenValidatorResult.success();
         };
     }
 

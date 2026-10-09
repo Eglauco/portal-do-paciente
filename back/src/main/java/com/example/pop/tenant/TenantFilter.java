@@ -2,6 +2,7 @@ package com.example.pop.tenant;
 
 import java.io.IOException;
 
+import org.slf4j.MDC;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -42,10 +43,13 @@ public class TenantFilter extends OncePerRequestFilter {
         try {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             if (auth != null && auth.getPrincipal() instanceof Jwt jwt && jwt.getClaim("inq") instanceof Number inq) {
-                TenantContext.definir(inquilinoService.schemaPorId(inq.longValue()));
+                String schema = inquilinoService.schemaPorId(inq.longValue());
+                TenantContext.definir(schema);
+                MDC.put("inquilino", schema); // rastreabilidade: o inquilino aparece nos logs da requisição
             }
             chain.doFilter(request, response);
         } finally {
+            MDC.remove("inquilino");
             TenantContext.limpar();
         }
     }

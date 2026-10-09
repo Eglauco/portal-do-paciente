@@ -35,6 +35,11 @@ public final class TenantContext {
         return schema != null ? schema : SCHEMA_PADRAO;
     }
 
+    /** Valor cru do ThreadLocal (pode ser {@code null} se nada foi definido) — para salvar/restaurar. */
+    public static String atualBruto() {
+        return ATUAL.get();
+    }
+
     /** Remove o schema da thread atual (chamar SEMPRE no finally para não vazar entre requests). */
     public static void limpar() {
         ATUAL.remove();
