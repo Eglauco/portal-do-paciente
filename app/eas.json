@@ -30,7 +30,10 @@
   "submit": {
     "production": {
       "ios": {
-        "appleTeamId": "3P7GB28VS6"
+        "appleTeamId": "3P7GB28VS6",
+        "ascApiKeyPath": "./credentials/AuthKey_93X7642DP4.p8",
+        "ascApiKeyId": "93X7642DP4",
+        "ascApiKeyIssuerId": "7088abd2-8d5d-46d6-807d-20ba19ebfb9e"
       }
     }
   }
