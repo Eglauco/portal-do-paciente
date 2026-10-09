@@ -83,6 +83,8 @@ public class SecurityConfig {
                         .requestMatchers("/clicksign/webhook", "/dev/clicksign/**", "/assinatura/clicksign/widget").permitAll()
                         // DocuSign: webhook (Connect) + dev + a página de retorno da cerimônia (aberta no WebView, sem JWT).
                         .requestMatchers("/docusign/webhook", "/dev/docusign/**", "/assinatura/docusign/retorno").permitAll()
+                        // Super-admin (gestão de inquilinos): protegido por segredo fixo no controller (padrão /dev).
+                        .requestMatchers("/superadmin/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/postagem/*/comentarios").permitAll()
                         // Feed agora é do paciente logado (filtrado pelas unidades vinculadas a ele).
                         .requestMatchers("/feed", "/feed/**").hasRole("PACIENTE")
