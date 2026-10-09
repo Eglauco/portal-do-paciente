@@ -3,10 +3,13 @@ package com.example.pop.paciente;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,8 +18,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.tenant.TenantContext;
 
-/** Kill-switch global das telas: leitura da config com FAIL-OPEN e telas sem chave sempre ligadas. */
+/** Kill-switch global das telas: leitura da config (por inquilino) com FAIL-OPEN e telas sem chave sempre ligadas. */
 @ExtendWith(MockitoExtension.class)
 class TelasAppServiceTest {
 
@@ -25,6 +29,17 @@ class TelasAppServiceTest {
 
     @InjectMocks
     private TelasAppService telasAppService;
+
+    @BeforeEach
+    void comInquilino() {
+        // Com um inquilino resolvido, habilitada() lê a config (o pré-login/public tem teste próprio).
+        TenantContext.definir("inq_teste_telas");
+    }
+
+    @AfterEach
+    void limpar() {
+        TenantContext.limpar();
+    }
 
     @Test
     void habilitadaRefleteAConfig() {
@@ -49,6 +64,15 @@ class TelasAppServiceTest {
                 .thenThrow(new IllegalStateException("chave sem valor"));
 
         assertTrue(telasAppService.habilitada(FuncionalidadeApp.CHAT));
+    }
+
+    @Test
+    void preLoginTodasHabilitadasSemLerConfig() {
+        // Sem inquilino (schema public = plataforma): pré-login → todas habilitadas, SEM tocar a config.
+        TenantContext.limpar();
+        assertTrue(telasAppService.habilitada(FuncionalidadeApp.NPS), "pré-login: tela habilitada por padrão");
+        assertTrue(telasAppService.habilitada(FuncionalidadeApp.CHAT));
+        verifyNoInteractions(configuracaoService);
     }
 
     @Test

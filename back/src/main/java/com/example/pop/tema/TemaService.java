@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Deriva a paleta do tema a partir de UMA cor semente (a configuração
@@ -33,6 +34,12 @@ public class TemaService {
 
     /** Paleta da cor primária configurada; cai no verde padrão se a config faltar/quebrar. */
     public PaletaTema tema() {
+        // Pré-login: sem inquilino (schema public = plataforma), serve o tema NEUTRO da plataforma sem ler
+        // a config de nenhum inquilino (o tema do inquilino vem após o login). Evita a exceção por-request
+        // quando o public não tiver mais a tabela de configuração (Design B).
+        if (TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual())) {
+            return derivar(COR_PADRAO);
+        }
         String semente;
         try {
             semente = configuracaoService.lerCor(ChaveConfiguracao.COR_PRIMARIA_PLATAFORMA);

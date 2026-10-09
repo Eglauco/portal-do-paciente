@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.storage.StorageService;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Resolve os textos de marca (white-label) das configurações, com fail-safe para os
@@ -63,6 +64,9 @@ public class MarcaService {
 
     /** URL canônica salva na config de imagem (não assinada); null se ausente/vazia/erro. */
     private String imagemBruta(String chave) {
+        if (semInquilino()) {
+            return null; // pré-login: sem imagem de inquilino (marca neutra de plataforma)
+        }
         try {
             String url = configuracaoService.lerImagem(chave);
             return url == null || url.isBlank() ? null : url;
@@ -77,11 +81,23 @@ public class MarcaService {
     }
 
     private String lerTextoOu(String chave, String padrao) {
+        if (semInquilino()) {
+            return padrao; // pré-login: marca neutra de plataforma, sem ler config de inquilino
+        }
         try {
             String valor = configuracaoService.lerTexto(chave);
             return valor == null || valor.isBlank() ? padrao : valor;
         } catch (RuntimeException e) {
             return padrao; // config ausente (faltou migration) ou tipo divergente → padrão
         }
+    }
+
+    /**
+     * Sem inquilino resolvido (schema public = plataforma): pré-login. Serve a marca NEUTRA sem ler a
+     * config de nenhum inquilino; o branding do inquilino só aparece após o login (request com tenant).
+     * Evita também a exceção por-request quando o public não tiver mais a tabela de configuração (Design B).
+     */
+    private static boolean semInquilino() {
+        return TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual());
     }
 }

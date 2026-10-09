@@ -3,10 +3,13 @@ package com.example.pop.marca;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Read-path da marca. Os testes rodam contra o banco de DEV real (que o admin altera:
@@ -22,12 +25,17 @@ class MarcaServiceTest {
 
     @Test
     void marcaSempreDevolveTextosNaoVazios() {
+        TenantContext.limpar(); // pré-login (public = plataforma): marca NEUTRA, sem config de inquilino
         MarcaResponse m = marcaService.marca();
         assertNotNull(m.nomePlataforma());
         assertFalse(m.nomePlataforma().isBlank(), "nome nunca vazio (cai no padrão)");
         assertFalse(m.loginTitulo().isBlank(), "título nunca vazio (cai no padrão)");
         assertFalse(m.loginSubtitulo().isBlank(), "subtítulo nunca vazio (cai no padrão)");
-        // logoUrl / loginFundoUrl podem existir (admin enviou imagens) ou ser null — sem asserção de valor.
+        // #6: pré-login serve a marca NEUTRA de plataforma (defaults), sem ler config de inquilino.
+        assertEquals(MarcaService.NOME_PADRAO, m.nomePlataforma(), "pré-login: nome padrão da plataforma");
+        assertEquals(MarcaService.TITULO_PADRAO, m.loginTitulo());
+        assertNull(m.logoUrl(), "pré-login: sem logo de inquilino");
+        assertNull(m.loginFundoUrl(), "pré-login: sem imagem de fundo de inquilino");
     }
 
     @Test

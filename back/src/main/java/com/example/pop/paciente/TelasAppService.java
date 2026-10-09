@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Habilitação GLOBAL das telas do app (kill switch por {@link FuncionalidadeApp}). Lê a config
@@ -44,6 +45,11 @@ public class TelasAppService {
         String chave = funcionalidade == null ? null : CHAVE.get(funcionalidade);
         if (chave == null) {
             return true; // sem toggle (ex.: MEU_PERFIL): sempre visível
+        }
+        // Pré-login: sem inquilino (schema public = plataforma), nenhuma config de inquilino para ler →
+        // todas as telas habilitadas (default de plataforma). O kill-switch do inquilino vale após o login.
+        if (TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual())) {
+            return true;
         }
         try {
             return configuracaoService.lerBooleano(chave);
