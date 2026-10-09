@@ -74,6 +74,16 @@ public class ProvisionamentoService {
         limparDadosDemo(validar(schema));
     }
 
+    /** Dropa o schema do inquilino (CASCADE) — usado no rollback de um provisionamento falho. */
+    public void dropSchema(String schema) {
+        String nome = validar(schema);
+        try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("DROP SCHEMA IF EXISTS \"" + nome + "\" CASCADE");
+        } catch (SQLException e) {
+            throw new IllegalStateException("Falha ao dropar o schema do inquilino: " + nome, e);
+        }
+    }
+
     /**
      * Apaga os dados de demo/transacionais do schema, mantendo só as tabelas de referência/config.
      * Usa {@code session_replication_role = replica} para DESLIGAR a verificação de FK na sessão —

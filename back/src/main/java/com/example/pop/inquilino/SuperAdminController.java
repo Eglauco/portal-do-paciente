@@ -19,11 +19,12 @@ import jakarta.validation.Valid;
 
 /**
  * Gestão de inquilinos pelo SUPER-ADMIN (acessado "por fora" do sistema dos inquilinos). Opera
- * sempre no schema {@code public} (a tabela {@code inquilino} é da plataforma). Protegido por um
- * segredo fixo no header {@code X-SuperAdmin-Secret} (mesmo padrão dos endpoints {@code /dev/**}).
+ * sempre no schema {@code public} (as tabelas {@code inquilino}/{@code usuario_login} são da
+ * plataforma). Protegido por um segredo fixo no header {@code X-SuperAdmin-Secret} (mesmo padrão
+ * dos endpoints {@code /dev/**}).
  *
- * <p>Endurecer depois (Fase posterior): login próprio, IP allowlist, auditoria de ações,
- * rate-limit, e atomicidade/rollback do provisionamento.
+ * <p>Endurecer depois: login próprio, IP allowlist, auditoria de ações, rate-limit, e atomicidade
+ * real do provisionamento.
  */
 @RestController
 @RequestMapping("/superadmin/inquilinos")
@@ -31,13 +32,18 @@ public class SuperAdminController {
 
     private final byte[] segredo;
     private final InquilinoRepository inquilinoRepository;
+    private final UsuarioLoginRepository usuarioLoginRepository;
     private final ProvisionamentoService provisionamentoService;
+    private final SeedInicialService seedInicialService;
 
     public SuperAdminController(@Value("${app.superadmin.secret}") String segredo,
-            InquilinoRepository inquilinoRepository, ProvisionamentoService provisionamentoService) {
+            InquilinoRepository inquilinoRepository, UsuarioLoginRepository usuarioLoginRepository,
+            ProvisionamentoService provisionamentoService, SeedInicialService seedInicialService) {
         this.segredo = segredo.getBytes(StandardCharsets.UTF_8);
         this.inquilinoRepository = inquilinoRepository;
+        this.usuarioLoginRepository = usuarioLoginRepository;
         this.provisionamentoService = provisionamentoService;
+        this.seedInicialService = seedInicialService;
     }
 
     /** Lista os inquilinos cadastrados. */
@@ -48,7 +54,7 @@ public class SuperAdminController {
         return inquilinoRepository.findAll().stream().map(InquilinoResponse::from).toList();
     }
 
-    /** Cadastra um inquilino e PROVISIONA o schema dele (baseline limpo). */
+    /** Cadastra um inquilino, PROVISIONA o schema (baseline limpo) e SEMEIA a 1ª unidade + o 1º admin. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public InquilinoResponse criar(@RequestHeader(value = "X-SuperAdmin-Secret", required = false) String secret,
@@ -61,21 +67,45 @@ public class SuperAdminController {
         if (inquilinoRepository.findBySchemaName(schema).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um inquilino com esse schema.");
         }
+        if (usuarioLoginRepository.findByEmailIgnoreCase(request.adminEmail().trim()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um login com esse e-mail.");
+        }
 
-        // Registra primeiro (a unicidade do schema_name no public barra duplicata concorrente),
-        // depois provisiona. Se o provisionamento falhar, desfaz o registro (best-effort).
+        // Registra o inquilino (unicidade do schema no public barra duplicata concorrente), provisiona e semeia.
+        // Se qualquer etapa falhar, desfaz tudo (best-effort — atomicidade real fica para uma fase posterior).
         Inquilino inquilino = new Inquilino();
         inquilino.setNome(request.nome().trim());
         inquilino.setSchemaName(schema);
         inquilinoRepository.save(inquilino);
         try {
             provisionamentoService.provisionarInquilino(schema);
+            seedInicialService.semear(inquilino.getId(), schema, request.unidadeNome(),
+                    request.adminNome(), request.adminEmail(), request.adminSenha());
         } catch (RuntimeException e) {
-            inquilinoRepository.delete(inquilino);
+            desfazer(inquilino, schema, request.adminEmail().trim());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Falha ao provisionar o inquilino: " + e.getMessage(), e);
+                    "Falha ao provisionar/semear o inquilino: " + e.getMessage(), e);
         }
         return InquilinoResponse.from(inquilino);
+    }
+
+    /** Rollback best-effort de um provisionamento falho. */
+    private void desfazer(Inquilino inquilino, String schema, String email) {
+        try {
+            usuarioLoginRepository.findByEmailIgnoreCase(email).ifPresent(usuarioLoginRepository::delete);
+        } catch (RuntimeException ignore) {
+            // best-effort
+        }
+        try {
+            provisionamentoService.dropSchema(schema);
+        } catch (RuntimeException ignore) {
+            // best-effort
+        }
+        try {
+            inquilinoRepository.delete(inquilino);
+        } catch (RuntimeException ignore) {
+            // best-effort
+        }
     }
 
     /** Confere o segredo do super-admin em tempo constante; 401 se ausente/errado. */
