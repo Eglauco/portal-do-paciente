@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
@@ -23,6 +24,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
+import com.example.pop.tenant.TenantContext;
 import com.example.pop.usuario.Usuario;
 import com.example.pop.usuario.UsuarioRepository;
 
@@ -50,8 +52,13 @@ public class ConfiguracaoService {
     private final UsuarioRepository usuarioRepository;
     private final SegredoCripto cripto;
 
-    /** Cache por chave (snapshot desanexado). Null = precisa recarregar. */
-    private volatile Map<String, Configuracao> cachePorChave;
+    /**
+     * Cache de config POR INQUILINO: schema (do {@link TenantContext}) → (chave → Configuracao). Config é
+     * por-tenant (cada schema tem a sua, inclusive os SEGREDOs de provedores de assinatura), então o cache
+     * NUNCA pode ser único/global — senão a config do 1º inquilino a carregar vazaria para os demais.
+     * Entrada ausente = recarrega sob demanda (findAll roda no schema do inquilino atual).
+     */
+    private final Map<String, Map<String, Configuracao>> cachePorInquilino = new ConcurrentHashMap<>();
 
     public ConfiguracaoService(ConfiguracaoRepository repository, UsuarioRepository usuarioRepository,
             SegredoCripto cripto) {
@@ -113,15 +120,18 @@ public class ConfiguracaoService {
 
     /** Invalida o cache após o commit da transação (ou já, se não houver transação ativa). */
     private void invalidarCacheAposCommit() {
+        // Captura o inquilino DESTA transação agora (o afterCommit roda ainda nesta thread/contexto) —
+        // deixa explícito QUAL schema invalidar, nunca o cache de outros inquilinos.
+        String schema = TenantContext.atual();
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    invalidarCache();
+                    invalidarCache(schema);
                 }
             });
         } else {
-            invalidarCache();
+            invalidarCache(schema);
         }
     }
 
@@ -260,23 +270,21 @@ public class ConfiguracaoService {
         return c;
     }
 
+    /** Config do inquilino ATUAL (pelo {@link TenantContext}), carregada sob demanda e cacheada por schema. */
     private Map<String, Configuracao> cache() {
-        Map<String, Configuracao> local = cachePorChave;
-        if (local == null) {
-            synchronized (this) {
-                local = cachePorChave;
-                if (local == null) {
-                    local = repository.findAll().stream()
-                            .collect(Collectors.toMap(Configuracao::getChave, c -> c));
-                    cachePorChave = local;
-                }
-            }
-        }
-        return local;
+        return cachePorInquilino.computeIfAbsent(TenantContext.atual(), schema ->
+                repository.findAll().stream()
+                        .collect(Collectors.toMap(Configuracao::getChave, c -> c)));
     }
 
+    /** Invalida o cache do inquilino ATUAL (após salvar uma config dele). */
     public void invalidarCache() {
-        cachePorChave = null;
+        cachePorInquilino.remove(TenantContext.atual());
+    }
+
+    /** Invalida o cache de um schema específico (o pós-commit captura o schema e chama por aqui). */
+    private void invalidarCache(String schema) {
+        cachePorInquilino.remove(schema);
     }
 
     // ---------- auxiliares ----------
