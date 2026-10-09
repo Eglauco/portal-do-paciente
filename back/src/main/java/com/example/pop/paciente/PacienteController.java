@@ -39,6 +39,8 @@ import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.inquilino.RoteamentoPacienteService;
 import com.example.pop.storage.StorageService;
 
 import jakarta.validation.Valid;
@@ -67,11 +69,14 @@ public class PacienteController {
     private final PacienteLogService logService;
     private final ResponsavelLancamentoService lancamentoService;
     private final com.example.pop.unidade.UnidadeRepository unidadeRepository;
+    private final RoteamentoPacienteService roteamentoPacienteService;
+    private final InquilinoService inquilinoService;
 
     public PacienteController(PacienteRepository repository, PacienteAcessoService acessoService,
             ExportacaoService exportacaoService, StorageService storageService, PacienteLogService logService,
             ResponsavelLancamentoService lancamentoService,
-            com.example.pop.unidade.UnidadeRepository unidadeRepository) {
+            com.example.pop.unidade.UnidadeRepository unidadeRepository,
+            RoteamentoPacienteService roteamentoPacienteService, InquilinoService inquilinoService) {
         this.repository = repository;
         this.acessoService = acessoService;
         this.exportacaoService = exportacaoService;
@@ -79,6 +84,8 @@ public class PacienteController {
         this.logService = logService;
         this.lancamentoService = lancamentoService;
         this.unidadeRepository = unidadeRepository;
+        this.roteamentoPacienteService = roteamentoPacienteService;
+        this.inquilinoService = inquilinoService;
     }
 
     /**
@@ -315,6 +322,13 @@ public class PacienteController {
         // Auditoria (LGPD): quem cadastrou e quais campos preencheu. Na mesma transação:
         // se o log falhar, o cadastro inteiro é desfeito (não há alteração sem trilha).
         logService.registrarCriacao(salvo, uidDoToken(jwt));
+        // Roteamento multi-inquilino: registra o CPF do paciente e dos responsáveis -> inquilino do
+        // admin (public), para o login do app achar o schema. Na mesma transação do cadastro.
+        Long inquilinoId = inquilinoDoToken(jwt);
+        roteamentoPacienteService.registrar(salvo.getCpf(), inquilinoId);
+        for (Responsavel responsavel : salvo.getResponsaveis()) {
+            roteamentoPacienteService.registrar(responsavel.getCpf(), inquilinoId);
+        }
         return salvo;
     }
 
@@ -613,6 +627,14 @@ public class PacienteController {
     /** uid do atendente logado (nulo se não houver token — ex.: chamadas diretas em teste). */
     private static Long uidDoToken(Jwt jwt) {
         return jwt != null && jwt.getClaim("uid") instanceof Number numero ? numero.longValue() : null;
+    }
+
+    /** Inquilino do admin logado (claim inq); fallback = inquilino padrão (chamadas sem token / legado). */
+    private Long inquilinoDoToken(Jwt jwt) {
+        if (jwt != null && jwt.getClaim("inq") instanceof Number numero) {
+            return numero.longValue();
+        }
+        return inquilinoService.idPadrao();
     }
 
     private Paciente salvarUnico(Paciente paciente) {
