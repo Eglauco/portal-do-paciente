@@ -28,6 +28,7 @@ import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.PacienteRequest;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
+import com.example.pop.tenant.TenantContext;
 import com.example.pop.verificacao.VerificacaoService;
 
 /**
@@ -109,13 +110,17 @@ class ChatWebSocketAuthTest {
 
         assertTrue(accessor.getUser() instanceof ChatPrincipal, "deveria ter definido o principal");
         assertEquals(pacienteId, ((ChatPrincipal) accessor.getUser()).id());
+        // #4a: o interceptor resolve o inquilino do claim "inq" e guarda o schema no principal (aqui, o
+        // paciente de teste não tem ponteiro → inquilino padrão = public).
+        assertEquals(TenantContext.SCHEMA_PADRAO, ((ChatPrincipal) accessor.getUser()).schema());
     }
 
     @Test
     void pacienteNaoAssinaConversaDeOutro() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws",
+                TenantContext.SCHEMA_PADRAO);
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }
@@ -124,7 +129,7 @@ class ChatWebSocketAuthTest {
     void adminAssinaQualquerConversa() {
         Chat alheio = chatRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem chat semeado para testar");
-        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L, null, null);
+        Principal admin = new ChatPrincipal("ADMIN:1", "ADMIN", 1L, null, null, TenantContext.SCHEMA_PADRAO);
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/" + alheio.getId(), null, admin);
         assertDoesNotThrow(() -> interceptor.preSend(m, null));
     }
@@ -133,7 +138,8 @@ class ChatWebSocketAuthTest {
     void pacienteNaoAssinaComCuringa() {
         // /topic/chat/** não casa a regex numérica, mas o broker (AntPathMatcher) o
         // registraria como PADRÃO e casaria toda conversa: deve ser rejeitado (deny-by-default).
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws",
+                TenantContext.SCHEMA_PADRAO);
         Message<byte[]> m = frame(StompCommand.SUBSCRIBE, "/topic/chat/**", null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }
@@ -141,7 +147,8 @@ class ChatWebSocketAuthTest {
     @Test
     void pacienteNaoPublicaEmDestinoDeBroker() {
         // SEND direto a /topic/** é proibido (impede forjar mensagem/impersonar a unidade).
-        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws");
+        Principal paciente = new ChatPrincipal("PACIENTE:" + pacienteId, "PACIENTE", pacienteId, contaId, "dev-ws",
+                TenantContext.SCHEMA_PADRAO);
         Message<byte[]> m = frame(StompCommand.SEND, "/topic/chat/" + pacienteId, null, paciente);
         assertThrows(MessagingException.class, () -> interceptor.preSend(m, null));
     }

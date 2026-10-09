@@ -15,10 +15,12 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Component;
 
+import com.example.pop.inquilino.InquilinoService;
 import com.example.pop.paciente.FuncionalidadeApp;
 import com.example.pop.paciente.NivelAcessoResponsavel;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteAcessoService;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Segurança do chat em tempo real (STOMP): autentica o CONNECT pelo token (Bearer
@@ -35,12 +37,14 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
     private final JwtDecoder jwtDecoder;
     private final PacienteAcessoService acessoService;
     private final ChatRepository chatRepository;
+    private final InquilinoService inquilinoService;
 
     public ChatChannelInterceptor(JwtDecoder jwtDecoder, PacienteAcessoService acessoService,
-            ChatRepository chatRepository) {
+            ChatRepository chatRepository, InquilinoService inquilinoService) {
         this.jwtDecoder = jwtDecoder;
         this.acessoService = acessoService;
         this.chatRepository = chatRepository;
+        this.inquilinoService = inquilinoService;
     }
 
     @Override
@@ -70,18 +74,27 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         } catch (RuntimeException e) {
             throw new MessagingException("Chat: token inválido");
         }
+        // A thread do WebSocket não passa pelo TenantFilter: resolve o inquilino do claim "inq" aqui e o
+        // guarda no principal (schema) para fixar o tenant nas consultas de cada frame (abaixo e em autorizar).
+        String schema = inquilinoService.schemaPorId(jwt.getClaim("inq") instanceof Number inq ? inq.longValue() : null);
         String papel = jwt.getClaimAsString("role");
         if ("PACIENTE".equals(papel)) {
-            Paciente paciente = acessoService.pacienteDoToken(jwt); // valida a conta (própria ou dependente) + aparelho
-            Object cid = jwt.getClaim("cid");
-            Long contaId = cid instanceof Number numero ? numero.longValue() : null;
-            return new ChatPrincipal("PACIENTE:" + paciente.getId(), "PACIENTE", paciente.getId(),
-                    contaId, jwt.getClaimAsString("dev"));
+            String anterior = TenantContext.atualBruto();
+            TenantContext.definir(schema);
+            try {
+                Paciente paciente = acessoService.pacienteDoToken(jwt); // valida a conta + aparelho (no schema do inquilino)
+                Object cid = jwt.getClaim("cid");
+                Long contaId = cid instanceof Number numero ? numero.longValue() : null;
+                return new ChatPrincipal("PACIENTE:" + paciente.getId(), "PACIENTE", paciente.getId(),
+                        contaId, jwt.getClaimAsString("dev"), schema);
+            } finally {
+                restaurar(anterior);
+            }
         }
         if ("ADMIN".equals(papel)) {
             Object uid = jwt.getClaim("uid");
             Long id = uid instanceof Number numero ? numero.longValue() : null;
-            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id, null, null);
+            return new ChatPrincipal("ADMIN:" + id, "ADMIN", id, null, null, schema);
         }
         throw new MessagingException("Chat: papel inválido");
     }
@@ -91,51 +104,68 @@ public class ChatChannelInterceptor implements ChannelInterceptor {
         if (!(accessor.getUser() instanceof ChatPrincipal principal)) {
             throw new MessagingException("Chat: não autenticado");
         }
-        String destino = accessor.getDestination();
-        // Clientes só publicam em /app/** (ex.: /app/chat/{id}/digitando). SEND para
-        // destinos de broker (/topic/**) é proibido — impede forjar mensagem/impersonar
-        // a unidade e spam no sinal de lista.
-        if (StompCommand.SEND.equals(accessor.getCommand()) && (destino == null || !destino.startsWith("/app/"))) {
-            throw new MessagingException("Chat: publicação só é permitida em /app");
-        }
-        if (destino == null) {
-            return;
-        }
-        // Deny-by-default para CURINGAS. O cliente sempre assina/publica destinos
-        // concretos; um padrão STOMP (ex.: /topic/chat/**, /topic/chat/*) NÃO casa a
-        // regex numérica e cairia no `return` liberado abaixo — mas o broker
-        // (AntPathMatcher) o registraria como PADRÃO e entregaria TODA mensagem de
-        // /topic/chat/{id}, furando a checagem de posse (vazamento de conversas ao vivo).
-        if (ehPadrao(destino)) {
-            throw new MessagingException("Chat: destino com curinga não é permitido");
-        }
-        Matcher m = DESTINO_CHAT.matcher(destino);
-        if (!m.matches()) {
-            // Deny-by-default no namespace por conversa: qualquer /topic/chat/... ou
-            // /app/chat/... fora do formato numérico estrito é rejeitado (não cai no
-            // `return` liberado). /topic/chats (sinal de lista) não casa esse prefixo.
-            if (destino.startsWith("/topic/chat/") || destino.startsWith("/app/chat/")) {
-                throw new MessagingException("Chat: destino inválido");
+        // Fixa o inquilino desta conexão (schema resolvido no CONNECT, guardado no principal) para as
+        // consultas de domínio — a thread do WS não passa pelo TenantFilter. Restaura no finally.
+        String anterior = TenantContext.atualBruto();
+        TenantContext.definir(principal.schema());
+        try {
+            String destino = accessor.getDestination();
+            // Clientes só publicam em /app/** (ex.: /app/chat/{id}/digitando). SEND para
+            // destinos de broker (/topic/**) é proibido — impede forjar mensagem/impersonar
+            // a unidade e spam no sinal de lista.
+            if (StompCommand.SEND.equals(accessor.getCommand()) && (destino == null || !destino.startsWith("/app/"))) {
+                throw new MessagingException("Chat: publicação só é permitida em /app");
             }
-            return; // /topic/chats e demais destinos concretos: liberado para autenticados
+            if (destino == null) {
+                return;
+            }
+            // Deny-by-default para CURINGAS. O cliente sempre assina/publica destinos
+            // concretos; um padrão STOMP (ex.: /topic/chat/**, /topic/chat/*) NÃO casa a
+            // regex numérica e cairia no `return` liberado abaixo — mas o broker
+            // (AntPathMatcher) o registraria como PADRÃO e entregaria TODA mensagem de
+            // /topic/chat/{id}, furando a checagem de posse (vazamento de conversas ao vivo).
+            if (ehPadrao(destino)) {
+                throw new MessagingException("Chat: destino com curinga não é permitido");
+            }
+            Matcher m = DESTINO_CHAT.matcher(destino);
+            if (!m.matches()) {
+                // Deny-by-default no namespace por conversa: qualquer /topic/chat/... ou
+                // /app/chat/... fora do formato numérico estrito é rejeitado (não cai no
+                // `return` liberado). /topic/chats (sinal de lista) não casa esse prefixo.
+                if (destino.startsWith("/topic/chat/") || destino.startsWith("/app/chat/")) {
+                    throw new MessagingException("Chat: destino inválido");
+                }
+                return; // /topic/chats e demais destinos concretos: liberado para autenticados
+            }
+            if ("ADMIN".equals(principal.role())) {
+                return; // back-office enxerga todas as conversas
+            }
+            // Paciente: revalida a sessão a cada assinatura (respeita revogação/troca de aparelho)
+            // e confere a posse da conversa. Perfil próprio ou dependente: a conta (cid) valida
+            // ambos; sem cid (token antigo), cai no modelo legado do próprio paciente.
+            acessoService.revalidarSessaoPaciente(principal.cid(), principal.id(), principal.dev());
+            Long chatId = Long.valueOf(m.group(1));
+            Long dono = chatRepository.findPacienteIdById(chatId).orElse(null);
+            if (dono == null || !dono.equals(principal.id())) {
+                throw new MessagingException("Chat: sem acesso a esta conversa");
+            }
+            // Trava por funcionalidade: um responsável SEM_ACESSO ao Chat deste perfil não
+            // assina o tempo real (perfil próprio/legado passa: nível total).
+            if (acessoService.nivelPorContaEPerfil(principal.cid(), principal.id(), FuncionalidadeApp.CHAT)
+                    == NivelAcessoResponsavel.SEM_ACESSO) {
+                throw new MessagingException("Chat: sem acesso a esta funcionalidade");
+            }
+        } finally {
+            restaurar(anterior);
         }
-        if ("ADMIN".equals(principal.role())) {
-            return; // back-office enxerga todas as conversas
-        }
-        // Paciente: revalida a sessão a cada assinatura (respeita revogação/troca de aparelho)
-        // e confere a posse da conversa. Perfil próprio ou dependente: a conta (cid) valida
-        // ambos; sem cid (token antigo), cai no modelo legado do próprio paciente.
-        acessoService.revalidarSessaoPaciente(principal.cid(), principal.id(), principal.dev());
-        Long chatId = Long.valueOf(m.group(1));
-        Long dono = chatRepository.findPacienteIdById(chatId).orElse(null);
-        if (dono == null || !dono.equals(principal.id())) {
-            throw new MessagingException("Chat: sem acesso a esta conversa");
-        }
-        // Trava por funcionalidade: um responsável SEM_ACESSO ao Chat deste perfil não
-        // assina o tempo real (perfil próprio/legado passa: nível total).
-        if (acessoService.nivelPorContaEPerfil(principal.cid(), principal.id(), FuncionalidadeApp.CHAT)
-                == NivelAcessoResponsavel.SEM_ACESSO) {
-            throw new MessagingException("Chat: sem acesso a esta funcionalidade");
+    }
+
+    /** Restaura o schema anterior da thread (valor cru, que pode ser {@code null}). */
+    private static void restaurar(String anterior) {
+        if (anterior != null) {
+            TenantContext.definir(anterior);
+        } else {
+            TenantContext.limpar();
         }
     }
 
