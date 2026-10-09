@@ -53,6 +53,19 @@ public class DocusignProvider implements AssinaturaProvider {
         return ProvedorAssinatura.DOCUSIGN;
     }
 
+    /**
+     * No DocuSign o WEBHOOK traz só o {@code envelopeId}, mas o token salvo é {@code envelopeId/documentId};
+     * a chave de roteamento é o envelope (o prefixo antes da {@code /}).
+     */
+    @Override
+    public String chaveRoteamento(String providerDocToken) {
+        if (providerDocToken == null) {
+            return null;
+        }
+        int barra = providerDocToken.indexOf('/');
+        return barra >= 0 ? providerDocToken.substring(0, barra) : providerDocToken;
+    }
+
     @Override
     public boolean disponivel() {
         return client.temCredenciais();

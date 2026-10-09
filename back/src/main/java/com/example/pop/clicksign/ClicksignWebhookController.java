@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +41,7 @@ public class ClicksignWebhookController {
 
     private static final int MAX_EVENTOS = 30;
     private static final int MAX_BODY = 4000;
+    private static final Logger log = LoggerFactory.getLogger(ClicksignWebhookController.class);
 
     private final ClicksignProvider provider;
     private final ClicksignClient client;
@@ -64,21 +67,23 @@ public class ClicksignWebhookController {
     @PostMapping("/clicksign/webhook")
     public ResponseEntity<Void> webhook(@RequestHeader Map<String, String> headers,
             @RequestBody(required = false) String corpoBruto) {
-        AssinaturaProvider.EventoWebhook ev = provider.parseWebhook(headers, corpoBruto);
-        registrar(new EventoWebhook(LocalDateTime.now(), ev.autentico(), ev.tipo().name(),
-                String.join(",", ev.docTokens()), truncar(corpoBruto)));
-        if (!ev.autentico()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+        // Multi-inquilino: o webhook chega SEM JWT (tenant em public). Guarda anti-crash (ver memória
+        // assinatura-webhooks-multi-inquilino): se parseWebhook/processar tocar config/domínio do public
+        // (ausente após o drop), não derruba o app nem pede retry — loga e responde 200.
         try {
+            AssinaturaProvider.EventoWebhook ev = provider.parseWebhook(headers, corpoBruto);
+            registrar(new EventoWebhook(LocalDateTime.now(), ev.autentico(), ev.tipo().name(),
+                    String.join(",", ev.docTokens()), truncar(corpoBruto)));
+            if (!ev.autentico()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
             if (ev.tipo() == AssinaturaProvider.TipoEvento.ASSINADO) {
                 assinaturaTermoService.processarAssinados(provider, ev.docTokens());
             } else if (ev.tipo() == AssinaturaProvider.TipoEvento.RECUSADO) {
                 assinaturaTermoService.processarRecusa(ev.docTokens());
             }
         } catch (RuntimeException e) {
-            registrar(new EventoWebhook(LocalDateTime.now(), true, "PROC_ERROR:" + e.getClass().getSimpleName(),
-                    null, null));
+            log.warn("Webhook Clicksign falhou (ignorado): {}", e.toString());
         }
         return ResponseEntity.ok().build();
     }

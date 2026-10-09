@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.agendamento.Horario;
 import com.example.pop.assinatura.AssinaturaProvider;
 import com.example.pop.assinatura.AssinaturaProviderFactory;
+import com.example.pop.assinatura.AssinaturaRoteamentoService;
 import com.example.pop.assinatura.ProvedorAssinatura;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.configuracaoagenda.OrigemModeloTermo;
@@ -21,6 +22,7 @@ import com.example.pop.configuracaoagenda.TermoConfiguracaoAgenda;
 import com.example.pop.configuracaoagenda.TermoConfiguracaoAgendaRepository;
 import com.example.pop.configuracaoagenda.TermoVariavelResolver;
 import com.example.pop.storage.StorageService;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Assinatura eletrônica de termos (TCLE) — INDEPENDENTE de provedor. {@code iniciar}/{@code iniciarLote}
@@ -42,17 +44,19 @@ public class AssinaturaTermoService {
     private final StorageService storageService;
     private final TermoVariavelResolver variavelResolver;
     private final AssinaturaProviderFactory providerFactory;
+    private final AssinaturaRoteamentoService roteamentoService;
 
     public AssinaturaTermoService(TermoAssinaturaRepository termoRepository,
             TermoConfiguracaoAgendaRepository termoConfiguracaoAgendaRepository, DocumentoRepository documentoRepository,
             StorageService storageService, TermoVariavelResolver variavelResolver,
-            AssinaturaProviderFactory providerFactory) {
+            AssinaturaProviderFactory providerFactory, AssinaturaRoteamentoService roteamentoService) {
         this.termoRepository = termoRepository;
         this.termoConfiguracaoAgendaRepository = termoConfiguracaoAgendaRepository;
         this.documentoRepository = documentoRepository;
         this.storageService = storageService;
         this.variavelResolver = variavelResolver;
         this.providerFactory = providerFactory;
+        this.roteamentoService = roteamentoService;
     }
 
     /** Links da cerimônia + provedor usado (o app decide a UX de conclusão conforme o provedor). */
@@ -130,6 +134,9 @@ public class AssinaturaTermoService {
                 t.setProvedor(provider.id());
                 termoRepository.save(t);
             }
+            // Multi-inquilino: indexa a chave do documento -> schema atual (public.assinatura_roteamento),
+            // para o WEBHOOK (que chega sem JWT) achar o inquilino dono do termo. Uma vez por documento.
+            roteamentoService.registrar(provider.chaveRoteamento(d.providerDocToken()), TenantContext.atual());
             if (d.signUrl() != null && !d.signUrl().isBlank() && !urls.contains(d.signUrl())) {
                 urls.add(d.signUrl());
             }

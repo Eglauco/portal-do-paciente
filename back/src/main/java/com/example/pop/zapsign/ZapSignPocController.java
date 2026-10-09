@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -45,6 +47,7 @@ import com.example.pop.prontuario.AssinaturaTermoService;
 public class ZapSignPocController {
 
     private static final int MAX_EVENTOS = 50;
+    private static final Logger log = LoggerFactory.getLogger(ZapSignPocController.class);
 
     private final ZapSignClient zapSign;
     private final ZapSignProvider zapSignProvider;
@@ -116,19 +119,23 @@ public class ZapSignPocController {
     @PostMapping("/zapsign/webhook")
     public ResponseEntity<Void> webhook(@RequestHeader Map<String, String> headers,
             @RequestBody(required = false) String corpoBruto) {
-        AssinaturaProvider.EventoWebhook ev = zapSignProvider.parseWebhook(headers, corpoBruto);
-        if (!ev.autentico()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        registrar(new EventoWebhook(LocalDateTime.now(), ev.tipo().name(), String.join(",", ev.docTokens()), null, false));
+        // Multi-inquilino: o webhook chega SEM JWT (tenant em public). Enquanto a resolução por-inquilino
+        // do webhook não é feita (ver memória assinatura-webhooks-multi-inquilino), envolve tudo numa guarda:
+        // se parseWebhook/processar tocar config/domínio do public (ausente após o drop), não derruba o app
+        // nem pede retry — loga e responde 200.
         try {
+            AssinaturaProvider.EventoWebhook ev = zapSignProvider.parseWebhook(headers, corpoBruto);
+            if (!ev.autentico()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            registrar(new EventoWebhook(LocalDateTime.now(), ev.tipo().name(), String.join(",", ev.docTokens()), null, false));
             if (ev.tipo() == AssinaturaProvider.TipoEvento.ASSINADO) {
                 assinaturaTermoService.processarAssinados(zapSignProvider, ev.docTokens());
             } else if (ev.tipo() == AssinaturaProvider.TipoEvento.RECUSADO) {
                 assinaturaTermoService.processarRecusa(ev.docTokens());
             }
         } catch (RuntimeException e) {
-            registrar(new EventoWebhook(LocalDateTime.now(), "PROC_ERROR:" + e.getClass().getSimpleName(), null, null, false));
+            log.warn("Webhook ZapSign falhou (ignorado): {}", e.toString());
         }
         return ResponseEntity.ok().build();
     }

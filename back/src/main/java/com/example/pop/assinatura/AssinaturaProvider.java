@@ -91,6 +91,16 @@ public interface AssinaturaProvider {
     /** Valida a autenticidade do webhook (cada provedor do seu jeito) e normaliza o evento. */
     EventoWebhook parseWebhook(Map<String, String> headers, String rawBody);
 
+    /**
+     * Chave de ROTEAMENTO do documento (multi-inquilino): converte o {@code providerDocToken} salvo no termo
+     * para a forma como a chave chega no WEBHOOK, usada no índice {@code public.assinatura_roteamento}
+     * (chave → schema). Default: o próprio token. O DocuSign sobrescreve (o webhook traz só o envelope,
+     * enquanto o token salvo é {@code envelope/documento}).
+     */
+    default String chaveRoteamento(String providerDocToken) {
+        return providerDocToken;
+    }
+
     // ---------- Coassinatura do profissional (2º signatário, após o paciente) ----------
 
     /** true se o provedor suporta adicionar um 2º signatário (coassinatura) — ZapSign/DocuSign/Autentique. */
