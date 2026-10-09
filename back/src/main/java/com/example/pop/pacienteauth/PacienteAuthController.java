@@ -68,12 +68,11 @@ public class PacienteAuthController {
                 acessoService.solicitarCodigo(request.cpf(), request.dataNascimento(), request.telefone()));
     }
 
-    /** Login por SENHA (sem SMS): identidade + PIN → sessão (mesmo formato do OTP). */
+    /** Login por SENHA (sem SMS): CPF + PIN → sessão (mesmo formato do OTP). */
     @PostMapping("/login-senha")
     public AtivarResponse loginSenha(@Valid @RequestBody LoginSenhaRequest request) {
         String dispositivoId = request.dispositivoId().trim();
-        ContaApp conta = acessoService.loginPorSenha(request.cpf(), request.dataNascimento(), request.telefone(),
-                request.senha(), dispositivoId);
+        ContaApp conta = acessoService.loginPorSenha(request.cpf(), request.senha(), dispositivoId);
         return montarResposta(conta, dispositivoId, false);
     }
 

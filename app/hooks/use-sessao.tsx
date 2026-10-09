@@ -26,8 +26,8 @@ interface SessaoContexto {
    * (para entrar sem SMS) e se o login por senha está bloqueado por tentativas.
    */
   iniciarLogin: (cpf: string, dataNascimento: string, telefone: string) => Promise<InicioLogin>;
-  /** Login por senha (PIN), sem SMS. Guarda a sessão (leva à tela de perfis). */
-  loginPorSenha: (cpf: string, dataNascimento: string, telefone: string, senha: string) => Promise<void>;
+  /** Login por senha (PIN), sem SMS: só CPF + senha. Guarda a sessão (leva à tela de perfis). */
+  loginPorSenha: (cpf: string, senha: string) => Promise<void>;
   /**
    * Pede o código de ativação por SMS a partir do telefone + CPF + data de nascimento
    * (ISO "AAAA-MM-DD"); devolve o telefone mascarado do dono.
@@ -76,8 +76,8 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     return iniciarLoginServico(cpf, dataNascimento, telefone);
   }
 
-  async function loginPorSenha(cpf: string, dataNascimento: string, telefone: string, senha: string) {
-    setSessao(await loginPorSenhaServico(cpf, dataNascimento, telefone, senha));
+  async function loginPorSenha(cpf: string, senha: string) {
+    setSessao(await loginPorSenhaServico(cpf, senha));
   }
 
   async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string) {

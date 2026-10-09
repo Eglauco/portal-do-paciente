@@ -90,15 +90,19 @@ public class PacienteAcessoService {
     }
 
     /**
-     * Login por SENHA (sem SMS): confere a identidade + o PIN e amarra o aparelho. Bloqueia após
-     * {@link #MAX_TENTATIVAS_SENHA} erros (aí só por OTP). 401 genérico na identidade.
+     * Login por SENHA (sem SMS): autentica por CPF + PIN e amarra o aparelho. O PIN é a prova de
+     * identidade — o CPF apenas identifica a conta (telefone/data não entram: é o login rápido de
+     * quem já ativou). Bloqueia após {@link #MAX_TENTATIVAS_SENHA} erros (aí só por OTP). Mensagem
+     * genérica quando não há senha/conta (não confirma o CPF).
      */
-    @Transactional
-    public ContaApp loginPorSenha(String cpfBruto, LocalDate dataNascimento, String telefoneBruto, String pin,
-            String dispositivoId) {
+    // noRollbackFor: o ramo de PIN errado INCREMENTA senhaTentativas e lança 401 — sem isto o
+    // rollback padrão do Spring (ResponseStatusException é RuntimeException) desfaz o incremento e
+    // a trava de MAX_TENTATIVAS_SENHA nunca dispararia (força-bruta ilimitada no caminho CPF+PIN).
+    // Os outros ramos que lançam (conta sem senha, já bloqueada) o fazem ANTES de qualquer mutação.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public ContaApp loginPorSenha(String cpfBruto, String pin, String dispositivoId) {
         String cpf = normalizarCpf(cpfBruto);
-        conferirIdentidade(cpf, dataNascimento, telefoneBruto);
-        ContaApp conta = contaRepository.findByCpf(cpf).orElse(null);
+        ContaApp conta = cpf == null || cpf.isEmpty() ? null : contaRepository.findByCpf(cpf).orElse(null);
         if (conta == null || conta.getSenhaHash() == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
                     "Você ainda não cadastrou uma senha. Entre com o código por SMS.");

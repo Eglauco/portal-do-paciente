@@ -1,15 +1,14 @@
 package com.example.pop.pacienteauth;
 
-import java.time.LocalDate;
-
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
-/** Login por senha (sem SMS): identidade (telefone + CPF + data) + PIN + id do aparelho. */
+/**
+ * Login por senha (sem SMS): CPF + PIN + id do aparelho. O PIN é a prova de identidade; o CPF
+ * apenas identifica a conta (telefone e data de nascimento não entram neste caminho — é o login
+ * rápido de quem já ativou e definiu a senha).
+ */
 public record LoginSenhaRequest(
         @NotBlank String cpf,
-        @NotNull LocalDate dataNascimento,
-        @NotBlank String telefone,
         @NotBlank String senha,
         @NotBlank String dispositivoId) {
 }

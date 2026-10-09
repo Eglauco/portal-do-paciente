@@ -314,25 +314,20 @@ export async function iniciarLogin(cpf: string, dataNascimento: string, telefone
 }
 
 /**
- * Login por SENHA (sem SMS): telefone + CPF + data de nascimento + PIN + id do aparelho. Guarda a
- * sessão (mesmo formato do OTP) já sem precisar definir senha. Erros do backend sobem com a mensagem
- * exata (senha incorreta, muitas tentativas, sem senha cadastrada) para a tela orientar o usuário.
+ * Login por SENHA (sem SMS): CPF + PIN + id do aparelho. O PIN é a prova de identidade (o CPF só
+ * identifica a conta — telefone e data não entram neste caminho). Guarda a sessão (mesmo formato do
+ * OTP) já sem precisar definir senha. Erros do backend sobem com a mensagem exata (senha incorreta,
+ * muitas tentativas, sem senha cadastrada) para a tela orientar o usuário.
  */
-export async function loginPorSenha(
-  cpf: string,
-  dataNascimento: string,
-  telefone: string,
-  senha: string,
-): Promise<SessaoPaciente> {
+export async function loginPorSenha(cpf: string, senha: string): Promise<SessaoPaciente> {
   const dispositivoId = await obterDispositivoId();
   const cpfLimpo = cpf.replace(/\D/g, '');
-  const telLimpo = telefone.replace(/\D/g, '');
   let resposta: Response;
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/login-senha`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo, senha, dispositivoId }),
+      body: JSON.stringify({ cpf: cpfLimpo, senha, dispositivoId }),
     });
   } catch {
     throw new Error('Sem conexão. Verifique a internet e tente novamente.');
