@@ -22,6 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.inquilino.UsuarioLogin;
+import com.example.pop.inquilino.UsuarioLoginRepository;
+import com.example.pop.tenant.TenantContext;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
 import com.example.pop.usuario.Usuario;
@@ -38,18 +41,21 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
     private final InquilinoService inquilinoService;
+    private final UsuarioLoginRepository usuarioLoginRepository;
     private final long expiracaoHoras;
     /** Hash de referência (mesmo custo dos reais) para igualar o tempo quando a conta não existe. */
     private final String hashFicticio;
 
     public AuthController(UsuarioRepository usuarioRepository, UnidadeRepository unidadeRepository,
             PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder, InquilinoService inquilinoService,
+            UsuarioLoginRepository usuarioLoginRepository,
             @Value("${app.jwt.expiration-hours:8}") long expiracaoHoras) {
         this.usuarioRepository = usuarioRepository;
         this.unidadeRepository = unidadeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
         this.inquilinoService = inquilinoService;
+        this.usuarioLoginRepository = usuarioLoginRepository;
         this.expiracaoHoras = expiracaoHoras;
         this.hashFicticio = passwordEncoder.encode("timing-guard-nao-usar");
     }
@@ -57,35 +63,52 @@ public class AuthController {
     /** Autentica por e-mail + senha e devolve um JWT assinado. */
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
-        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.email().trim()).orElse(null);
-        boolean temHash = usuario != null && usuario.getSenhaHash() != null;
-        // Sempre compara (contra um hash fictício quando a conta não existe) para não
-        // vazar, pelo tempo de resposta, se o e-mail existe (evita enumerar contas).
-        boolean senhaConfere = passwordEncoder.matches(request.senha(), temHash ? usuario.getSenhaHash() : hashFicticio);
-        if (!temHash || !senhaConfere) {
-            // Mesma mensagem para usuário inexistente e senha errada.
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos");
+        String email = request.email().trim();
+        // Login em 2 fases (multi-inquilino): acha o inquilino pelo e-mail no public (usuario_login) e
+        // entra no schema dele ANTES de autenticar. Fallback: inquilino padrão (public) para os admins
+        // legados que ainda não têm linha de roteamento. O inquilino NUNCA vem do request.
+        Long inquilinoId = usuarioLoginRepository.findByEmailIgnoreCase(email)
+                .map(UsuarioLogin::getInquilinoId).orElseGet(inquilinoService::idPadrao);
+        String schemaAnterior = TenantContext.atualBruto();
+        TenantContext.definir(inquilinoService.schemaPorId(inquilinoId));
+        try {
+            Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email).orElse(null);
+            boolean temHash = usuario != null && usuario.getSenhaHash() != null;
+            // Sempre compara (contra um hash fictício quando a conta não existe) para não
+            // vazar, pelo tempo de resposta, se o e-mail existe (evita enumerar contas).
+            boolean senhaConfere = passwordEncoder.matches(request.senha(),
+                    temHash ? usuario.getSenhaHash() : hashFicticio);
+            if (!temHash || !senhaConfere) {
+                // Mesma mensagem para usuário inexistente e senha errada.
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "E-mail ou senha inválidos");
+            }
+
+            Instant agora = Instant.now();
+            Instant expira = agora.plus(Duration.ofHours(expiracaoHoras));
+            JwtClaimsSet claims = JwtClaimsSet.builder()
+                    .subject(usuario.getEmail())
+                    .issuedAt(agora)
+                    .expiresAt(expira)
+                    .claim("nome", usuario.getNome())
+                    .claim("uid", usuario.getId())
+                    .claim("role", "ADMIN")
+                    .claim("inq", inquilinoId)
+                    .build();
+            JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
+            String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+
+            Unidade ativa = Permissoes.unidadeAtivaEfetiva(usuario);
+            Long unidadeId = ativa == null ? null : ativa.getId();
+            String unidadeNome = ativa == null ? null : ativa.getNome();
+            return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira,
+                    Permissoes.telas(usuario), Permissoes.unidades(usuario), usuario.getProfissionalSaudeId() != null);
+        } finally {
+            if (schemaAnterior != null) {
+                TenantContext.definir(schemaAnterior);
+            } else {
+                TenantContext.limpar();
+            }
         }
-
-        Instant agora = Instant.now();
-        Instant expira = agora.plus(Duration.ofHours(expiracaoHoras));
-        JwtClaimsSet claims = JwtClaimsSet.builder()
-                .subject(usuario.getEmail())
-                .issuedAt(agora)
-                .expiresAt(expira)
-                .claim("nome", usuario.getNome())
-                .claim("uid", usuario.getId())
-                .claim("role", "ADMIN")
-                .claim("inq", inquilinoService.idPadrao())
-                .build();
-        JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();
-        String token = jwtEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
-
-        Unidade ativa = Permissoes.unidadeAtivaEfetiva(usuario);
-        Long unidadeId = ativa == null ? null : ativa.getId();
-        String unidadeNome = ativa == null ? null : ativa.getNome();
-        return new LoginResponse(token, usuario.getNome(), usuario.getEmail(), unidadeId, unidadeNome, expira,
-                Permissoes.telas(usuario), Permissoes.unidades(usuario), usuario.getProfissionalSaudeId() != null);
     }
 
     /** Dados do usuário autenticado (recarrega do banco para refletir a unidade atual). */

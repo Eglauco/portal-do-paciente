@@ -82,6 +82,12 @@ class SuperAdminControllerTest {
         assertTrue(usuarioLoginRepository.findByEmailIgnoreCase(ADMIN_EMAIL).isPresent(),
                 "ponteiro de roteamento (usuario_login) criado no public");
         assertEquals(1, contarUsuarioNoTenant(ADMIN_EMAIL), "o admin foi semeado no schema do inquilino");
+
+        // 1.2b: o admin semeado CONSEGUE LOGAR — o /auth/login resolve o inquilino pelo usuario_login
+        // (login em 2 fases) e autentica no schema certo.
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + ADMIN_EMAIL + "\",\"senha\":\"senha-admin-123\"}"))
+                .andExpect(status().isOk());
     }
 
     private boolean schemaExiste(String schema) throws Exception {
