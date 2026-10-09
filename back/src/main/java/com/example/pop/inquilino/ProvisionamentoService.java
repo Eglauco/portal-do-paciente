@@ -19,10 +19,15 @@ import org.springframework.stereotype.Service;
  * programático sobre o MESMO datasource — a conexão volta ao pool e o {@code search_path} é
  * re-setado pelo {@code SchemaMultiTenantConnectionProvider} em cada uso do Hibernate).
  *
- * <p>Embrião do motor de provisionamento da Fase 1 — que ainda vai: separar um BASELINE limpo dos
- * seeds de demo (hoje roda TODAS as migrations, inclusive os inserts de demonstração), semear o 1º
- * admin + o registro no public, e ganhar atomicidade/rollback e tratamento de concorrência. Por ora
- * é suficiente para a PROVA de isolamento (Fase 0.4).
+ * <p>Aplica SOMENTE as migrations de TENANT ({@code classpath:db/migration} — o domínio por-inquilino:
+ * paciente, usuário, agendamento, configuração, perfis…). As migrations de PLATAFORMA
+ * ({@code classpath:db/platform}: inquilino/usuario_login/paciente_login) NÃO rodam aqui — essas
+ * tabelas vivem só no {@code public} e são aplicadas apenas pelo app principal (ver
+ * {@code spring.flyway.locations}). Assim o {@code flyway_schema_history} do inquilino fica limpo (só
+ * o domínio) e migrations de plataforma futuras não rodam por-tenant.
+ *
+ * <p>Dívidas da Fase 1+: atomicidade/rollback real e tratamento de concorrência no provisionamento;
+ * reset de sequences no baseline.
  */
 @Service
 public class ProvisionamentoService {
@@ -57,6 +62,7 @@ public class ProvisionamentoService {
                 .dataSource(dataSource)
                 .schemas(nome)
                 .defaultSchema(nome)
+                // SÓ as migrations de tenant — as de plataforma (db/platform) ficam no public.
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(false)
                 .load()
