@@ -168,7 +168,7 @@ public class ProntuarioMedicoService {
     private List<Prontuario> carregarProntuarios(Long pacienteId) {
         return prontuarioRepository
                 .search("", pacienteId, null, "", null,
-                        Pageable.unpaged(Sort.by(Sort.Direction.DESC, "agendamento.dataHora")))
+                        Pageable.unpaged(Sort.by(Sort.Direction.DESC, "horario.dataHora")))
                 .getContent();
     }
 

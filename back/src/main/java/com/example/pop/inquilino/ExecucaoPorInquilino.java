@@ -12,9 +12,10 @@ import com.example.pop.tenant.TenantContext;
  * Executa uma ação uma vez POR INQUILINO ATIVO, com o {@link TenantContext} fixado no schema de cada um.
  *
  * <p>Usado pelos jobs {@code @Scheduled} (e qualquer trabalho fora de request): eles rodam sem inquilino
- * resolvido, então, sem isto, operariam só no schema {@code public}. Pula o inquilino PADRÃO (schema
- * {@code public}) — ele é PLATAFORMA, não um inquilino com dados de domínio. Isola falhas: o erro de um
- * inquilino é logado e NÃO impede os demais; o contexto da thread é restaurado no fim.
+ * resolvido, então, sem isto, operariam só no schema padrão. Processa TODOS os inquilinos ATIVO com
+ * dados de domínio — inclusive o {@code principal} (o inquilino padrão/fallback, que TEM domínio); só
+ * pula um eventual registro cujo schema seja {@code public} (a PLATAFORMA pura, sem tabelas de domínio).
+ * Isola falhas: o erro de um inquilino é logado e NÃO impede os demais; o contexto é restaurado no fim.
  */
 @Component
 public class ExecucaoPorInquilino {
@@ -27,7 +28,7 @@ public class ExecucaoPorInquilino {
         this.repository = repository;
     }
 
-    /** Roda {@code acao} (recebe o schema) para cada inquilino ATIVO ≠ public, com o tenant fixado. */
+    /** Roda {@code acao} (recebe o schema) para cada inquilino ATIVO com domínio (≠ public), com o tenant fixado. */
     public void paraCadaInquilinoAtivo(Consumer<String> acao) {
         String anterior = TenantContext.atualBruto();
         try {
@@ -36,8 +37,9 @@ public class ExecucaoPorInquilino {
                     continue;
                 }
                 String schema = inquilino.getSchemaName();
-                // O inquilino padrão (public) é plataforma — jobs de domínio não rodam nele.
-                if (TenantContext.SCHEMA_PADRAO.equals(schema)) {
+                // Pula só o 'public' (plataforma pura, sem tabelas de domínio). O 'principal' (schema padrão)
+                // É um inquilino de domínio real e DEVE receber os jobs — não confundir com a plataforma.
+                if ("public".equals(schema)) {
                     continue;
                 }
                 TenantContext.definir(schema);

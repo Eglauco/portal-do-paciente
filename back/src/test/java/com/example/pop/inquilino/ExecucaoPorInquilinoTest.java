@@ -17,14 +17,18 @@ import com.example.pop.tenant.TenantContext;
 
 /**
  * Execução por inquilino (Fase 2 #3): os jobs @Scheduled rodam sem request (sem inquilino). O
- * {@link ExecucaoPorInquilino} deve rodar a ação uma vez por inquilino ATIVO, com o {@link TenantContext}
- * fixado no schema de cada um, PULANDO o inquilino inativo e o padrão (public = plataforma).
+ * {@link ExecucaoPorInquilino} roda a ação uma vez por inquilino ATIVO com DOMÍNIO, com o
+ * {@link TenantContext} fixado no schema de cada um: pula o INATIVO e um eventual registro de schema
+ * {@code public} (a PLATAFORMA pura), mas PROCESSA o inquilino padrão {@code principal} (que é um tenant
+ * de domínio real, não a plataforma).
  */
 @SpringBootTest
 class ExecucaoPorInquilinoTest {
 
     private static final String SCHEMA_ATIVO = "inq_teste_exec_ativo";
     private static final String SCHEMA_INATIVO = "inq_teste_exec_inativo";
+    /** Registro com schema "public": a plataforma pura, que DEVE ser pulada (não tem domínio). */
+    private static final String SCHEMA_PLATAFORMA = "public";
 
     @Autowired
     private ExecucaoPorInquilino execucaoPorInquilino;
@@ -36,6 +40,10 @@ class ExecucaoPorInquilinoTest {
         limpar();
         repository.save(inquilino("Ativo", SCHEMA_ATIVO, "ATIVO"));
         repository.save(inquilino("Inativo", SCHEMA_INATIVO, "INATIVO"));
+        // "public" ATIVO só para provar que a plataforma é pulada (criado direto, sem provisionar nada).
+        if (repository.findBySchemaName(SCHEMA_PLATAFORMA).isEmpty()) {
+            repository.save(inquilino("Plataforma", SCHEMA_PLATAFORMA, "ATIVO"));
+        }
     }
 
     @AfterEach
@@ -44,8 +52,8 @@ class ExecucaoPorInquilinoTest {
     }
 
     @Test
-    void rodaSoNosAtivosForaDoPublicComOContextoCerto() {
-        TenantContext.limpar(); // estado inicial conhecido (público) para a asserção de restauração
+    void rodaNosAtivosComDominioFixandoOContexto() {
+        TenantContext.limpar(); // estado inicial conhecido para a asserção de restauração
         // schema do inquilino -> TenantContext.atual() visto DENTRO da ação
         Map<String, String> contextoPorSchema = new ConcurrentHashMap<>();
         execucaoPorInquilino.paraCadaInquilinoAtivo(schema -> contextoPorSchema.put(schema, TenantContext.atual()));
@@ -54,8 +62,11 @@ class ExecucaoPorInquilinoTest {
         assertEquals(SCHEMA_ATIVO, contextoPorSchema.get(SCHEMA_ATIVO),
                 "o TenantContext foi fixado no schema do inquilino");
         assertFalse(contextoPorSchema.containsKey(SCHEMA_INATIVO), "NÃO roda em inquilino inativo");
-        assertFalse(contextoPorSchema.containsKey(TenantContext.SCHEMA_PADRAO),
-                "NÃO roda no schema de plataforma (public)");
+        assertFalse(contextoPorSchema.containsKey(SCHEMA_PLATAFORMA),
+                "NÃO roda no schema 'public' (plataforma pura, sem domínio)");
+        // O inquilino padrão 'principal' É um tenant de domínio (não a plataforma) → DEVE ser processado.
+        assertTrue(contextoPorSchema.containsKey(TenantContext.SCHEMA_PADRAO),
+                "roda no inquilino padrão 'principal' (tenant de domínio, não plataforma)");
 
         // O contexto da thread foi restaurado após a execução.
         assertEquals(TenantContext.SCHEMA_PADRAO, TenantContext.atual(), "contexto restaurado ao fim");
@@ -72,5 +83,6 @@ class ExecucaoPorInquilinoTest {
     private void limpar() {
         repository.findBySchemaName(SCHEMA_ATIVO).ifPresent(repository::delete);
         repository.findBySchemaName(SCHEMA_INATIVO).ifPresent(repository::delete);
+        repository.findBySchemaName(SCHEMA_PLATAFORMA).ifPresent(repository::delete);
     }
 }

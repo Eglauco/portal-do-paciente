@@ -7,7 +7,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-/** Integração: a config semeada (V77) flui até o endpoint /tema com a paleta derivada. */
+/**
+ * Integração: a config de cor flui até o endpoint {@code /tema} com a paleta DERIVADA. Roda sem
+ * inquilino resolvido (pré-login), então o {@code /tema} serve a cor da PLATAFORMA — que o super-admin
+ * edita no banco de dev — por isso NÃO se asserta um hex exato, só o contrato: a paleta é bem-formada
+ * (todos os tons são {@code #RRGGBB} válidos, derivados no backend) e o {@code preview} NÃO persiste.
+ */
 @SpringBootTest
 class TemaControllerTest {
 
@@ -15,20 +20,23 @@ class TemaControllerTest {
     private TemaController controller;
 
     @Test
-    void temaDevolveAPaletaDaCorSemeada() {
+    void temaDevolveUmaPaletaBemFormada() {
         PaletaTema p = controller.tema();
-        // V77 semeia COR_PRIMARIA_PLATAFORMA = #0E8C7F (o verde atual).
-        assertEquals("#0E8C7F", p.brand());
-        assertEquals("#FFFFFF", p.onBrand());
-        assertTrue(p.brandDeep().matches("^#[0-9A-F]{6}$"));
-        assertTrue(p.glow().matches("^#[0-9A-F]{6}$"));
+        assertTrue(p.brand().matches("^#[0-9A-F]{6}$"), "brand deve ser #RRGGBB");
+        assertTrue(p.brandDeep().matches("^#[0-9A-F]{6}$"), "brandDeep deve ser #RRGGBB");
+        assertTrue(p.brandPine().matches("^#[0-9A-F]{6}$"), "brandPine deve ser #RRGGBB");
+        assertTrue(p.glow().matches("^#[0-9A-F]{6}$"), "glow deve ser #RRGGBB");
+        assertTrue(p.bg().matches("^#[0-9A-F]{6}$"), "bg deve ser #RRGGBB");
+        assertTrue(p.brandRgb().matches("^\\d{1,3}, \\d{1,3}, \\d{1,3}$"), "brandRgb no formato \"r, g, b\"");
+        // onBrand é branco OU o escuro de marca, conforme o contraste calculado na derivação.
+        assertTrue(p.onBrand().equals("#FFFFFF") || p.onBrand().equals("#0C1F1C"), "onBrand branco ou escuro");
     }
 
     @Test
-    void previewDerivaSemSalvar() {
-        assertEquals("#0E8C7F", controller.tema().brand(), "preview não deve alterar o valor salvo");
+    void previewNaoPersiste() {
+        String antes = controller.tema().brand();
         PaletaTema azul = controller.preview("#3F8CFF");
-        assertTrue(azul.brand().matches("^#[0-9A-F]{6}$"));
-        assertEquals("#0E8C7F", controller.tema().brand(), "preview não persiste");
+        assertTrue(azul.brand().matches("^#[0-9A-F]{6}$"), "preview deriva uma paleta válida");
+        assertEquals(antes, controller.tema().brand(), "preview NÃO altera o valor servido pelo /tema");
     }
 }

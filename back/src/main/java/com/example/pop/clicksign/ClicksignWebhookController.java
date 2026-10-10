@@ -103,7 +103,13 @@ public class ClicksignWebhookController {
      * widget (ex.: envelope fora de "running", documento ainda em processamento, ou id/ambiente errados).
      */
     @GetMapping("/dev/clicksign/inspecionar")
-    public List<Map<String, Object>> inspecionar() {
+    public List<Map<String, Object>> inspecionar(@RequestHeader(value = "X-Poc-Secret", required = false) String poc) {
+        // Gate de segredo (mesmo de eventos()): o endpoint bate AO VIVO na Clicksign e devolve PII dos
+        // signatários (nome/CPF/e-mail) — NUNCA pode ficar anônimo (/dev/clicksign/** é permitAll).
+        String segredo = configuracaoService.lerSegredo(ChaveConfiguracao.CLICKSIGN_WEBHOOK_SECRET);
+        if (segredo == null || segredo.isBlank() || !segredo.equals(poc)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Segredo inválido.");
+        }
         List<Map<String, Object>> out = new ArrayList<>();
         for (TermoAssinatura t : termoRepository.findTop10ByProvedorOrderByIdDesc(ProvedorAssinatura.CLICKSIGN)) {
             Map<String, Object> m = new LinkedHashMap<>();

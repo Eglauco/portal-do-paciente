@@ -62,9 +62,11 @@ public class AgendamentoController {
     private static final Map<String, String> ORDENAVEIS = Map.of(
             "dataHora", "dataHora",
             "paciente", "paciente.nome",
-            "especialidade", "especialidade.nome",
-            "profissional", "profissionalSaude.nome",
-            "configuracaoAgenda", "configuracaoAgenda.nome",
+            // especialidade/profissional/configuracaoAgenda vivem na AGENDA (slot) após o split
+            // Agenda/Horario — a query é "select a from Horario a", então o path passa por agenda.*.
+            "especialidade", "agenda.especialidade.nome",
+            "profissional", "agenda.profissionalSaude.nome",
+            "configuracaoAgenda", "agenda.configuracaoAgenda.nome",
             "status", "statusAgendamento",
             "entregaResumo", "entregaResumo");
     /** Ordenação usada quando nada é escolhido na tela (mais recentes primeiro, desempate por id). */

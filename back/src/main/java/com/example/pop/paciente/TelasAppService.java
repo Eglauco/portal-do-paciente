@@ -46,9 +46,11 @@ public class TelasAppService {
         if (chave == null) {
             return true; // sem toggle (ex.: MEU_PERFIL): sempre visível
         }
-        // Pré-login: sem inquilino (schema public = plataforma), nenhuma config de inquilino para ler →
-        // todas as telas habilitadas (default de plataforma). O kill-switch do inquilino vale após o login.
-        if (TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual())) {
+        // Pré-login: NENHUM inquilino resolvido na thread (atualBruto()==null) → serve o default (habilitada).
+        // Usa atualBruto() (não atual()) para distinguir o pré-login do inquilino cujo schema é o padrão
+        // ('principal') LOGADO — este deve ter seus próprios toggles lidos, não cair no default. (Mesmo
+        // tratamento de TemaService/MarcaService.) O kill-switch do inquilino vale após o login.
+        if (TenantContext.atualBruto() == null) {
             return true;
         }
         try {

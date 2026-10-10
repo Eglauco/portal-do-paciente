@@ -514,8 +514,12 @@ public class AssinaturaTermoService {
             List<TermoAssinatura> irmaos = termoRepository
                     .findByProntuario_IdOrderByCriadoEmAsc(refs.get(0).getProntuario().getId());
             for (TermoAssinatura t : irmaos) {
+                // AGUARDANDO_PROFISSIONAL incluso: se o profissional RECUSA a coassinatura (após o paciente já
+                // ter assinado), o termo tem que voltar a TENTAR_NOVAMENTE — senão fica preso nesse status
+                // para sempre (a conferência ativa só coleta assinados, nunca detecta a recusa).
                 if (t.getStatus() == StatusTermoAssinatura.EM_CONFIRMACAO
-                        || t.getStatus() == StatusTermoAssinatura.PENDENTE) {
+                        || t.getStatus() == StatusTermoAssinatura.PENDENTE
+                        || t.getStatus() == StatusTermoAssinatura.AGUARDANDO_PROFISSIONAL) {
                     t.setStatus(StatusTermoAssinatura.TENTAR_NOVAMENTE);
                     termoRepository.save(t);
                 }
