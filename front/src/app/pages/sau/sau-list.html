@@ -29,8 +29,9 @@
         <input class="input" type="text" formControlName="nome" placeholder="Nome do paciente" aria-label="Nome do paciente" />
       </div>
       <div class="form-field">
-        <label class="label">Tipo</label>
+        <label class="label" for="f-sau-tipo">Tipo</label>
         <ng-select
+          labelForId="f-sau-tipo"
           formControlName="tipoId"
           [items]="tipos()"
           bindLabel="nome"
@@ -39,8 +40,9 @@
         ></ng-select>
       </div>
       <div class="form-field">
-        <label class="label">Status</label>
+        <label class="label" for="f-sau-status">Status</label>
         <ng-select
+          labelForId="f-sau-status"
           formControlName="status"
           [items]="statusOpcoes"
           bindLabel="label"

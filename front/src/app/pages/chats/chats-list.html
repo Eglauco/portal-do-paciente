@@ -29,8 +29,9 @@
     <p class="section-label">Filtros</p>
     <div class="filters__chat">
       <div class="form-field">
-        <label class="label">Paciente</label>
+        <label class="label" for="f-chat-paciente">Paciente</label>
         <ng-select
+          labelForId="f-chat-paciente"
           formControlName="pacienteId"
           [items]="pacientes()"
           bindLabel="nome"
@@ -39,8 +40,9 @@
         ></ng-select>
       </div>
       <div class="form-field">
-        <label class="label">Responsável</label>
+        <label class="label" for="f-chat-responsavel">Responsável</label>
         <ng-select
+          labelForId="f-chat-responsavel"
           formControlName="responsavelId"
           [items]="usuarios()"
           bindLabel="nome"
@@ -49,8 +51,9 @@
         ></ng-select>
       </div>
       <div class="form-field">
-        <label class="label">Status</label>
+        <label class="label" for="f-chat-status">Status</label>
         <ng-select
+          labelForId="f-chat-status"
           formControlName="status"
           [items]="statusOpcoes"
           bindLabel="label"

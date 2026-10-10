@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
@@ -42,25 +42,31 @@ export class ExameForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
-    this.configuracaoAgendaService.listar({}, 0, 100).subscribe({
-      next: (p) => this.configuracaoAgendas.set(p.content),
-    });
-
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
-      const id = Number(idParam);
       this.editando.set(true);
-      this.codigo.set(id);
-      this.service.buscarPorId(id).subscribe({
-        next: (exame) =>
-          this.form.patchValue({
-            nome: exame.nome,
-            codigoIntegracao: exame.codigoIntegracao ?? '',
-            configuracaoAgendaId: exame.configuracaoAgenda?.id ?? null,
-          }),
-        error: () => this.erroCarregar.set(true),
-      });
+      this.codigo.set(Number(idParam));
     }
+    // SSR-safe: as chamadas HTTP só rodam no navegador (não no prerender de /novo nem no SSR),
+    // com tratamento de erro — evita falha em tempo de build e padroniza com paciente/profissional.
+    afterNextRender(() => {
+      this.configuracaoAgendaService.listar({}, 0, 100).subscribe({
+        next: (p) => this.configuracaoAgendas.set(p.content),
+        error: () => {},
+      });
+      const id = this.codigo();
+      if (id != null) {
+        this.service.buscarPorId(id).subscribe({
+          next: (exame) =>
+            this.form.patchValue({
+              nome: exame.nome,
+              codigoIntegracao: exame.codigoIntegracao ?? '',
+              configuracaoAgendaId: exame.configuracaoAgenda?.id ?? null,
+            }),
+          error: () => this.erroCarregar.set(true),
+        });
+      }
+    });
   }
 
   podeSair(): boolean | Promise<boolean> {
