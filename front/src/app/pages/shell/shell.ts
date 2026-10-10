@@ -10,7 +10,7 @@ import { TrocarSenhaModal } from './trocar-senha-modal';
 /** Chave do localStorage que guarda se o menu está recolhido. */
 const CHAVE_MENU_RECOLHIDO = 'pop.menu.recolhido';
 
-/** Item simples do menu: um link direto, liberado por uma tela (RBAC). */
+/** Item de menu: um link direto, liberado por uma tela (RBAC). */
 interface ItemMenu {
   /** Chave da tela que libera o item (ver AuthService.temTela). */
   readonly tela: string;
@@ -18,72 +18,100 @@ interface ItemMenu {
   readonly rota: string;
   /** Rótulo exibido. */
   readonly label: string;
-  /** Chave do ícone (ver o @switch no template). */
-  readonly icone: string;
 }
 
-/** Seção do menu: um cabeçalho discreto + seus itens. */
+/** Seção do menu: um submenu colapsável (cabeçalho com ícone + itens). */
 interface GrupoMenu {
+  /** Chave estável (controla o estado aberto/fechado). */
+  readonly id: string;
+  /** Rótulo da seção (cabeçalho). */
   readonly titulo: string;
+  /** Chave do ícone da seção (ver o @switch no template). */
+  readonly icone: string;
+  /** Itens do submenu (links de texto). */
   readonly itens: readonly ItemMenu[];
 }
 
 /**
- * Seções fixas da barra lateral (a ordem aqui é a ordem de exibição). Cada item
- * só aparece quando o usuário tem a tela liberada (temTela); o cabeçalho da seção
- * some quando nenhum item dela está visível (grupoVisivel). O grupo "Dashboard"
- * (submenu com flyout) e "Meus termos para assinar" (gated por ehProfissional)
- * ficam fora desta lista por terem comportamento próprio.
+ * Seções fixas da barra lateral (a ordem aqui é a ordem de exibição). Cada seção
+ * é um submenu colapsável: o cabeçalho (ícone + título) abre/fecha os itens, e
+ * cada item só aparece quando o usuário tem a tela liberada (temTela). Uma seção
+ * some por completo quando nenhum item dela está visível (grupoVisivel). "Meus
+ * termos para assinar" (gated por ehProfissional) fica fora daqui, como link solto.
  */
 const GRUPOS_MENU: readonly GrupoMenu[] = [
   {
+    id: 'dashboards',
+    titulo: 'Dashboards',
+    icone: 'dashboards',
+    itens: [
+      { tela: 'DASHBOARD_GERAL', rota: '/dashboards/geral', label: 'Visão geral' },
+      { tela: 'DASHBOARD_AGENDAMENTOS', rota: '/dashboards/agendamentos', label: 'Agendamentos' },
+      { tela: 'DASHBOARD_CHATS', rota: '/dashboards/chats', label: 'Chats ao vivo' },
+      { tela: 'DASHBOARD_SAU', rota: '/dashboards/sau', label: 'SAU' },
+      { tela: 'DASHBOARD_NPS', rota: '/dashboards/nps', label: 'NPS' },
+    ],
+  },
+  {
+    id: 'atendimento',
     titulo: 'Atendimento',
+    icone: 'atendimento',
     itens: [
-      { tela: 'AGENDAMENTOS', rota: '/agendas', label: 'Agendamentos', icone: 'agendamentos' },
-      { tela: 'CHATS', rota: '/chats', label: 'Chats ao vivo', icone: 'chats' },
-      { tela: 'SAU', rota: '/sau', label: 'SAU', icone: 'sau' },
-      { tela: 'NPS', rota: '/nps', label: 'NPS', icone: 'nps' },
+      { tela: 'AGENDAMENTOS', rota: '/agendas', label: 'Agendamentos' },
+      { tela: 'CHATS', rota: '/chats', label: 'Chats ao vivo' },
+      { tela: 'SAU', rota: '/sau', label: 'SAU' },
+      { tela: 'NPS', rota: '/nps', label: 'NPS' },
     ],
   },
   {
+    id: 'prontuario',
     titulo: 'Prontuário',
+    icone: 'prontuario',
     itens: [
-      { tela: 'PRONTUARIOS', rota: '/prontuarios', label: 'Prontuários', icone: 'prontuarios' },
-      { tela: 'PRONTUARIO_MEDICO', rota: '/prontuario-medico', label: 'Prontuário Médico', icone: 'prontuario-medico' },
-      { tela: 'PRONTUARIOS', rota: '/tipos-documento-prontuario', label: 'Tipos de Documento', icone: 'tipos-documento' },
+      { tela: 'PRONTUARIOS', rota: '/prontuarios', label: 'Prontuários' },
+      { tela: 'PRONTUARIO_MEDICO', rota: '/prontuario-medico', label: 'Prontuário Médico' },
     ],
   },
   {
+    id: 'rede-social',
     titulo: 'Rede social',
-    itens: [{ tela: 'POSTAGENS', rota: '/postagens', label: 'Rede Social', icone: 'postagens' }],
+    icone: 'rede-social',
+    itens: [{ tela: 'POSTAGENS', rota: '/postagens', label: 'Rede Social' }],
   },
   {
+    id: 'cadastros',
     titulo: 'Cadastros',
+    icone: 'cadastros',
     itens: [
-      { tela: 'PACIENTES', rota: '/pacientes', label: 'Pacientes', icone: 'pacientes' },
-      { tela: 'PROFISSIONAIS', rota: '/profissionais', label: 'Profissionais', icone: 'profissionais' },
-      { tela: 'ESPECIALIDADES', rota: '/especialidades', label: 'Especialidades', icone: 'especialidades' },
-      { tela: 'EXAME', rota: '/exames', label: 'Exames', icone: 'exames' },
-      { tela: 'CONSELHOS', rota: '/conselhos', label: 'Conselhos', icone: 'conselhos' },
-      { tela: 'CONFIGURACAO_AGENDA', rota: '/configuracao-agenda', label: 'Configuração da Agenda', icone: 'configuracao-agenda' },
-      { tela: 'MOTIVOS_FALTA', rota: '/motivos-falta', label: 'Motivos de falta', icone: 'motivos-falta' },
-      { tela: 'TIPOS_MANIFESTACAO', rota: '/tipos-manifestacao', label: 'Tipos de Manifestação', icone: 'tipos-manifestacao' },
-      { tela: 'CATEGORIAS_NPS', rota: '/categorias-nps', label: 'Categorias de NPS', icone: 'categorias-nps' },
-      { tela: 'UNIDADES', rota: '/unidades', label: 'Unidades de Saúde', icone: 'unidades' },
-      { tela: 'USUARIOS', rota: '/usuarios', label: 'Usuários', icone: 'usuarios' },
+      { tela: 'PACIENTES', rota: '/pacientes', label: 'Pacientes' },
+      { tela: 'PROFISSIONAIS', rota: '/profissionais', label: 'Profissionais' },
+      { tela: 'ESPECIALIDADES', rota: '/especialidades', label: 'Especialidades' },
+      { tela: 'EXAME', rota: '/exames', label: 'Exames' },
+      { tela: 'CONSELHOS', rota: '/conselhos', label: 'Conselhos' },
+      { tela: 'CONFIGURACAO_AGENDA', rota: '/configuracao-agenda', label: 'Configuração da Agenda' },
+      { tela: 'MOTIVOS_FALTA', rota: '/motivos-falta', label: 'Motivos de falta' },
+      { tela: 'TIPOS_MANIFESTACAO', rota: '/tipos-manifestacao', label: 'Tipos de Manifestação' },
+      { tela: 'CATEGORIAS_NPS', rota: '/categorias-nps', label: 'Categorias de NPS' },
+      { tela: 'UNIDADES', rota: '/unidades', label: 'Unidades de Saúde' },
+      { tela: 'PRONTUARIOS', rota: '/tipos-documento-prontuario', label: 'Tipos de Documento' },
     ],
   },
   {
+    id: 'integracoes',
     titulo: 'Integrações',
-    itens: [{ tela: 'SIRESP', rota: '/siresp', label: 'SIRESP', icone: 'siresp' }],
+    icone: 'integracoes',
+    itens: [{ tela: 'SIRESP', rota: '/siresp', label: 'SIRESP' }],
   },
   {
+    id: 'sistema',
     titulo: 'Sistema',
+    icone: 'sistema',
     itens: [
-      { tela: 'PERFIS', rota: '/perfis', label: 'Perfis', icone: 'perfis' },
-      { tela: 'CONFIGURACOES', rota: '/configuracoes', label: 'Configurações', icone: 'configuracoes' },
-      { tela: 'PROVEDORES_ASSINATURA', rota: '/provedores-assinatura', label: 'Provedores de assinatura', icone: 'provedores-assinatura' },
-      { tela: 'USO_IA', rota: '/uso-ia', label: 'Uso de IA', icone: 'uso-ia' },
+      { tela: 'USUARIOS', rota: '/usuarios', label: 'Usuários' },
+      { tela: 'PERFIS', rota: '/perfis', label: 'Perfis' },
+      { tela: 'CONFIGURACOES', rota: '/configuracoes', label: 'Configurações' },
+      { tela: 'PROVEDORES_ASSINATURA', rota: '/provedores-assinatura', label: 'Provedores de assinatura' },
+      { tela: 'USO_IA', rota: '/uso-ia', label: 'Uso de IA' },
     ],
   },
 ];
@@ -120,14 +148,14 @@ export class Shell {
    */
   protected readonly pronto = signal(false);
 
-  /** Submenu "Dashboard" (aberto por padrão para ser descoberto). */
-  protected readonly menuDashAberto = signal(true);
+  /** Ids das seções abertas (accordion). Começa vazio: tudo fechado no 1º carregamento. */
+  protected readonly gruposAbertos = signal<ReadonlySet<string>>(new Set());
 
   /** Menu recolhido (só ícones). Lido do localStorage no navegador. */
   protected readonly menuRecolhido = signal(false);
 
-  /** Flyout do grupo Dashboard quando recolhido (posição fixa, à direita do ícone). */
-  protected readonly flyoutDash = signal<{ top: number; left: number } | null>(null);
+  /** Flyout da seção quando o menu está recolhido (posição fixa, à direita do ícone). */
+  protected readonly flyout = signal<{ grupo: GrupoMenu; top: number; left: number } | null>(null);
   private fecharFlyoutTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly menuUnidadeAberto = signal(false);
@@ -177,22 +205,29 @@ export class Shell {
   /** True se o usuário é um profissional de saúde (mostra "Meus termos para assinar"). */
   protected readonly ehProfissional = this.auth.ehProfissional;
 
-  /** True se o usuário pode ver ao menos um dashboard (controla o grupo "Dashboard"). */
-  protected temAlgumDashboard(): boolean {
-    return (
-      this.temTela('DASHBOARD_GERAL') ||
-      this.temTela('DASHBOARD_AGENDAMENTOS') ||
-      this.temTela('DASHBOARD_CHATS') ||
-      this.temTela('DASHBOARD_SAU') ||
-      this.temTela('DASHBOARD_NPS')
-    );
+  /** True se a seção está aberta (accordion). */
+  protected grupoAberto(id: string): boolean {
+    return this.gruposAbertos().has(id);
+  }
+
+  /** Abre/fecha uma seção (expandido). Replace imutável do Set para o signal reagir. */
+  protected alternarGrupo(id: string): void {
+    const abertos = new Set(this.gruposAbertos());
+    if (abertos.has(id)) abertos.delete(id);
+    else abertos.add(id);
+    this.gruposAbertos.set(abertos);
+  }
+
+  /** Primeira rota liberada da seção (para o clique no menu recolhido). */
+  protected primeiraRota(grupo: GrupoMenu): string | null {
+    return grupo.itens.find((item) => this.temTela(item.tela))?.rota ?? null;
   }
 
   /** Recolhe/expande o menu (só ícones) e guarda a escolha no navegador. */
   protected alternarMenu(): void {
     const recolhido = !this.menuRecolhido();
     this.menuRecolhido.set(recolhido);
-    this.fecharFlyoutDash();
+    this.fecharFlyout();
     try {
       localStorage.setItem(CHAVE_MENU_RECOLHIDO, recolhido ? '1' : '0');
     } catch {
@@ -200,20 +235,20 @@ export class Shell {
     }
   }
 
-  // ---------- Flyout do Dashboard (menu recolhido) ----------
+  // ---------- Flyout da seção (menu recolhido) ----------
 
-  /** Abre o flyout do Dashboard à direita do ícone (só quando recolhido). */
-  protected abrirFlyoutDash(evento: Event): void {
-    if (!this.menuRecolhido() || !this.temAlgumDashboard()) return;
+  /** Abre o flyout da seção à direita do ícone (só quando recolhido e com itens visíveis). */
+  protected abrirFlyout(grupo: GrupoMenu, evento: Event): void {
+    if (!this.menuRecolhido() || !this.grupoVisivel(grupo)) return;
     this.cancelarFecharFlyout();
     const alvo = (evento.currentTarget as HTMLElement).getBoundingClientRect();
-    this.flyoutDash.set({ top: alvo.top, left: alvo.right + 8 });
+    this.flyout.set({ grupo, top: alvo.top, left: alvo.right + 8 });
   }
 
   /** Agenda o fechamento do flyout (dá tempo de mover o mouse do ícone até ele). */
   protected agendarFecharFlyout(): void {
     this.cancelarFecharFlyout();
-    this.fecharFlyoutTimer = setTimeout(() => this.flyoutDash.set(null), 160);
+    this.fecharFlyoutTimer = setTimeout(() => this.flyout.set(null), 160);
   }
 
   protected cancelarFecharFlyout(): void {
@@ -223,32 +258,22 @@ export class Shell {
     }
   }
 
-  protected fecharFlyoutDash(): void {
+  protected fecharFlyout(): void {
     this.cancelarFecharFlyout();
-    this.flyoutDash.set(null);
+    this.flyout.set(null);
   }
 
-  /** Clique no Dashboard: expandido alterna o submenu; recolhido navega ao 1º dashboard. */
-  protected aoClicarDashboard(): void {
+  /** Clique na seção: expandido abre/fecha o submenu; recolhido navega ao 1º item. */
+  protected aoClicarGrupo(grupo: GrupoMenu): void {
     if (this.menuRecolhido()) {
-      const rota = this.primeiraRotaDashboard();
+      const rota = this.primeiraRota(grupo);
       if (rota) {
-        this.fecharFlyoutDash();
+        this.fecharFlyout();
         this.router.navigateByUrl(rota);
       }
       return;
     }
-    this.menuDashAberto.set(!this.menuDashAberto());
-  }
-
-  /** Primeira rota de dashboard que o usuário tem acesso (para o clique no menu recolhido). */
-  protected primeiraRotaDashboard(): string | null {
-    if (this.temTela('DASHBOARD_GERAL')) return '/dashboards/geral';
-    if (this.temTela('DASHBOARD_AGENDAMENTOS')) return '/dashboards/agendamentos';
-    if (this.temTela('DASHBOARD_CHATS')) return '/dashboards/chats';
-    if (this.temTela('DASHBOARD_SAU')) return '/dashboards/sau';
-    if (this.temTela('DASHBOARD_NPS')) return '/dashboards/nps';
-    return null;
+    this.alternarGrupo(grupo.id);
   }
 
   protected iniciais(nome: string): string {
@@ -302,7 +327,7 @@ export class Shell {
     this.fecharNotif();
     this.fecharMenuUsuario();
     this.fecharMenuUnidade();
-    this.fecharFlyoutDash();
+    this.fecharFlyout();
     if (notifEstava) {
       this.sinoBtn()?.nativeElement.focus();
     }
