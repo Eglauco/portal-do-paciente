@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test;
 /** Testa a derivação de paleta (lógica pura, sem contexto Spring). */
 class TemaServiceTest {
 
-    /** ConfiguracaoService não é usado por derivar(), só por tema(). */
-    private final TemaService service = new TemaService(null);
+    /** Deps não são usadas por derivar(), só por tema(). */
+    private final TemaService service = new TemaService(null, null);
 
     @Test
     void verdePadraoPreservaAMarcaEUsaTextoBranco() {

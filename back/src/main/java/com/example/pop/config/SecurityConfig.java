@@ -71,7 +71,8 @@ public class SecurityConfig {
                         // Tema (cor da plataforma): leitura pública p/ o front e o app aplicarem no boot.
                         .requestMatchers(HttpMethod.GET, "/tema").permitAll()
                         // Marca (white-label: nome + textos do login): leitura pública p/ o login pintar.
-                        .requestMatchers(HttpMethod.GET, "/marca").permitAll()
+                        // /marca/plataforma força a marca da PLATAFORMA (portão do super-admin), também pública.
+                        .requestMatchers(HttpMethod.GET, "/marca", "/marca/plataforma").permitAll()
                         // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
                         .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
                         .requestMatchers("/dispositivo").permitAll()

@@ -45,10 +45,17 @@ public final class ChaveConfiguracao {
      */
     public static final String NOME_PLATAFORMA = "NOME_PLATAFORMA";
 
-    /** Título grande do painel de marca da tela de login (TEXTO) — white-label. */
+    /**
+     * Título grande do painel de marca da tela de login (TEXTO). SÓ na config de PLATAFORMA
+     * ({@code configuracao_plataforma}, super-admin) — a tela de login é pré-inquilino (removida do
+     * inquilino na V154).
+     */
     public static final String LOGIN_TITULO = "LOGIN_TITULO";
 
-    /** Subtítulo (texto de apoio) abaixo do título, na tela de login (TEXTO) — white-label. */
+    /**
+     * Subtítulo (texto de apoio) abaixo do título, na tela de login (TEXTO). SÓ na config de
+     * PLATAFORMA (super-admin) — pré-inquilino (removida do inquilino na V154).
+     */
     public static final String LOGIN_SUBTITULO = "LOGIN_SUBTITULO";
 
     /**
@@ -58,8 +65,9 @@ public final class ChaveConfiguracao {
     public static final String LOGO_PLATAFORMA = "LOGO_PLATAFORMA";
 
     /**
-     * Imagem de fundo do painel azul do login/trocar-unidade (IMAGEM, URL no S3) — white-label.
-     * Fica atrás do azul (que cobre em opacidade alta), como textura sutil.
+     * Imagem de fundo do painel azul do login (IMAGEM, URL no S3). Fica atrás do azul (que cobre em
+     * opacidade alta), como textura sutil. SÓ na config de PLATAFORMA (super-admin) — a tela de login
+     * é pré-inquilino (removida do inquilino na V154).
      */
     public static final String LOGIN_FUNDO = "LOGIN_FUNDO";
 

@@ -17,7 +17,7 @@ class ExportacaoServiceTest {
 
     // Deps null: nomePlataforma()/tema() caem no padrão e logoBytes()=null (sem logo) — basta para o teste.
     private final ExportacaoService service =
-            new ExportacaoService(new MarcaService(null, null), new TemaService(null));
+            new ExportacaoService(new MarcaService(null, null, null), new TemaService(null, null));
 
     private record Linha(String nome, int idade) {
     }

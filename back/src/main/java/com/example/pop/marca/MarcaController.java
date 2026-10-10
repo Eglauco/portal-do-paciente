@@ -18,4 +18,14 @@ public class MarcaController {
     public MarcaResponse marca() {
         return marcaService.marca();
     }
+
+    /**
+     * Marca SEMPRE da PLATAFORMA (ignora o inquilino) — PÚBLICA. Para a tela do super-admin, que é
+     * pré-login mas pode ser aberta com um admin logado em outra aba (quando {@code /marca} traria a
+     * marca do inquilino). Assim o portão mostra a logo/identidade da plataforma, não a de um inquilino.
+     */
+    @GetMapping("/marca/plataforma")
+    public MarcaResponse marcaPlataforma() {
+        return marcaService.marcaPlataforma();
+    }
 }

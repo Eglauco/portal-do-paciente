@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.plataforma.ConfiguracaoPlataformaService;
 import com.example.pop.tenant.TenantContext;
 
 /**
@@ -27,26 +28,51 @@ public class TemaService {
     static final String COR_PADRAO = "#0E8C7F";
 
     private final ConfiguracaoService configuracaoService;
+    private final ConfiguracaoPlataformaService plataformaService;
 
-    public TemaService(ConfiguracaoService configuracaoService) {
+    public TemaService(ConfiguracaoService configuracaoService, ConfiguracaoPlataformaService plataformaService) {
         this.configuracaoService = configuracaoService;
+        this.plataformaService = plataformaService;
     }
 
-    /** Paleta da cor primária configurada; cai no verde padrão se a config faltar/quebrar. */
+    /**
+     * Paleta da cor primária, em dois níveis:
+     * <ul>
+     *   <li><b>Pré-login</b> (nenhum inquilino resolvido na thread): serve a cor da PLATAFORMA (super-admin).</li>
+     *   <li><b>Pós-login</b> (inquilino resolvido): cor do inquilino → se vazia, cor da PLATAFORMA → se vazia, verde padrão.</li>
+     * </ul>
+     * Distingue "pré-login" de "inquilino cujo schema é o padrão ({@code principal})" por {@code atualBruto()}
+     * (null = nada resolvido). Qualquer falha cai no verde padrão — a tela nunca fica sem cor.
+     */
     public PaletaTema tema() {
-        // Pré-login: sem inquilino (schema public = plataforma), serve o tema NEUTRO da plataforma sem ler
-        // a config de nenhum inquilino (o tema do inquilino vem após o login). Evita a exceção por-request
-        // quando o public não tiver mais a tabela de configuração (Design B).
-        if (TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual())) {
-            return derivar(COR_PADRAO);
+        if (TenantContext.atualBruto() == null) {
+            // Pré-login: cor da plataforma (ou o verde padrão se não configurada).
+            return derivar(corOuPadrao(corDaPlataforma()));
         }
-        String semente;
+        String doInquilino;
         try {
-            semente = configuracaoService.lerCor(ChaveConfiguracao.COR_PRIMARIA_PLATAFORMA);
+            doInquilino = configuracaoService.lerCor(ChaveConfiguracao.COR_PRIMARIA_PLATAFORMA);
         } catch (RuntimeException e) {
-            semente = COR_PADRAO;
+            doInquilino = null;
         }
-        return derivar(semente == null || semente.isBlank() ? COR_PADRAO : semente);
+        if (doInquilino != null && !doInquilino.isBlank()) {
+            return derivar(doInquilino);
+        }
+        // Inquilino sem cor própria → cai na cor da plataforma (super-admin) → verde padrão.
+        return derivar(corOuPadrao(corDaPlataforma()));
+    }
+
+    /** Cor da plataforma (super-admin), ou {@code null} se não configurada/erro. */
+    private String corDaPlataforma() {
+        try {
+            return plataformaService.valorCor(ChaveConfiguracao.COR_PRIMARIA_PLATAFORMA);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static String corOuPadrao(String cor) {
+        return cor == null || cor.isBlank() ? COR_PADRAO : cor;
     }
 
     /** Deriva a paleta a partir de uma cor {@code #RRGGBB} (inválida → verde padrão). */

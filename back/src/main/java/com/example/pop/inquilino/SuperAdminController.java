@@ -1,10 +1,7 @@
 package com.example.pop.inquilino;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,16 +27,16 @@ import jakarta.validation.Valid;
 @RequestMapping("/superadmin/inquilinos")
 public class SuperAdminController {
 
-    private final byte[] segredo;
+    private final SuperAdminAutenticacao autenticacao;
     private final InquilinoRepository inquilinoRepository;
     private final UsuarioLoginRepository usuarioLoginRepository;
     private final ProvisionamentoService provisionamentoService;
     private final SeedInicialService seedInicialService;
 
-    public SuperAdminController(@Value("${app.superadmin.secret}") String segredo,
+    public SuperAdminController(SuperAdminAutenticacao autenticacao,
             InquilinoRepository inquilinoRepository, UsuarioLoginRepository usuarioLoginRepository,
             ProvisionamentoService provisionamentoService, SeedInicialService seedInicialService) {
-        this.segredo = segredo.getBytes(StandardCharsets.UTF_8);
+        this.autenticacao = autenticacao;
         this.inquilinoRepository = inquilinoRepository;
         this.usuarioLoginRepository = usuarioLoginRepository;
         this.provisionamentoService = provisionamentoService;
@@ -50,7 +47,7 @@ public class SuperAdminController {
     @GetMapping
     public List<InquilinoResponse> listar(
             @RequestHeader(value = "X-SuperAdmin-Secret", required = false) String secret) {
-        conferirSegredo(secret);
+        autenticacao.conferir(secret);
         return inquilinoRepository.findAll().stream().map(InquilinoResponse::from).toList();
     }
 
@@ -59,7 +56,7 @@ public class SuperAdminController {
     @ResponseStatus(HttpStatus.CREATED)
     public InquilinoResponse criar(@RequestHeader(value = "X-SuperAdmin-Secret", required = false) String secret,
             @Valid @RequestBody CriarInquilinoRequest request) {
-        conferirSegredo(secret);
+        autenticacao.conferir(secret);
         String schema = request.schemaName();
         if ("public".equals(schema)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "O schema 'public' é da plataforma.");
@@ -108,11 +105,4 @@ public class SuperAdminController {
         }
     }
 
-    /** Confere o segredo do super-admin em tempo constante; 401 se ausente/errado. */
-    private void conferirSegredo(String secret) {
-        byte[] enviado = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
-        if (!MessageDigest.isEqual(segredo, enviado)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credencial de super-admin inválida.");
-        }
-    }
 }

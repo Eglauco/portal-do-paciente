@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
+import com.example.pop.plataforma.ConfiguracaoPlataformaService;
 import com.example.pop.storage.StorageService;
 import com.example.pop.tenant.TenantContext;
 
@@ -28,21 +29,41 @@ public class MarcaService {
     private static final Duration VALIDADE_LOGO = Duration.ofHours(24);
 
     private final ConfiguracaoService configuracaoService;
+    private final ConfiguracaoPlataformaService plataformaService;
     private final StorageService storageService;
 
-    public MarcaService(ConfiguracaoService configuracaoService, StorageService storageService) {
+    public MarcaService(ConfiguracaoService configuracaoService, ConfiguracaoPlataformaService plataformaService,
+            StorageService storageService) {
         this.configuracaoService = configuracaoService;
+        this.plataformaService = plataformaService;
         this.storageService = storageService;
     }
 
-    /** Textos + imagens de marca atuais (com fallback ao padrão em cada campo). */
+    /**
+     * Marca atual. NOME e LOGO vêm do inquilino (pós-login) com fallback à plataforma. Já TÍTULO,
+     * SUBTÍTULO e FUNDO do login vêm SEMPRE da plataforma: só aparecem na tela de login, que é
+     * pré-inquilino (ainda não se sabe o inquilino) — por isso nem são config por-inquilino (V154).
+     */
     public MarcaResponse marca() {
         return new MarcaResponse(
                 nomePlataforma(),
-                lerTextoOu(ChaveConfiguracao.LOGIN_TITULO, TITULO_PADRAO),
-                lerTextoOu(ChaveConfiguracao.LOGIN_SUBTITULO, SUBTITULO_PADRAO),
+                textoPlataformaOu(ChaveConfiguracao.LOGIN_TITULO, TITULO_PADRAO),
+                textoPlataformaOu(ChaveConfiguracao.LOGIN_SUBTITULO, SUBTITULO_PADRAO),
                 logoUrl(),
-                urlImagem(ChaveConfiguracao.LOGIN_FUNDO));
+                urlImagemPlataforma(ChaveConfiguracao.LOGIN_FUNDO));
+    }
+
+    /**
+     * Marca SEMPRE da PLATAFORMA (ignora o inquilino), para o portão do super-admin. Todos os campos
+     * saem da config de plataforma (ou do padrão hardcoded), independentemente de haver inquilino resolvido.
+     */
+    public MarcaResponse marcaPlataforma() {
+        return new MarcaResponse(
+                textoPlataformaOu(ChaveConfiguracao.NOME_PLATAFORMA, NOME_PADRAO),
+                textoPlataformaOu(ChaveConfiguracao.LOGIN_TITULO, TITULO_PADRAO),
+                textoPlataformaOu(ChaveConfiguracao.LOGIN_SUBTITULO, SUBTITULO_PADRAO),
+                urlImagemPlataforma(ChaveConfiguracao.LOGO_PLATAFORMA),
+                urlImagemPlataforma(ChaveConfiguracao.LOGIN_FUNDO));
     }
 
     /** URL assinada da logomarca (24h) ou null se não houver imagem/config — front cai no SVG. */
@@ -62,17 +83,35 @@ public class MarcaService {
         return url == null ? null : storageService.urlVisualizacao(url, VALIDADE_LOGO);
     }
 
-    /** URL canônica salva na config de imagem (não assinada); null se ausente/vazia/erro. */
+    /** URL assinada (24h) da imagem SEMPRE da config de plataforma (nunca do inquilino), ou null. */
+    private String urlImagemPlataforma(String chave) {
+        String url = imagemPlataforma(chave);
+        return url == null ? null : storageService.urlVisualizacao(url, VALIDADE_LOGO);
+    }
+
+    /** Texto SEMPRE da config de plataforma (nunca do inquilino) → ou o padrão hardcoded. */
+    private String textoPlataformaOu(String chave, String padrao) {
+        String valor = textoPlataforma(chave);
+        return valor != null ? valor : padrao;
+    }
+
+    /**
+     * URL canônica da imagem (não assinada); null se ausente. Resolve em dois níveis: pré-login lê a
+     * imagem da PLATAFORMA (super-admin); logado tenta a do inquilino e, se vazia, cai na da plataforma.
+     */
     private String imagemBruta(String chave) {
-        if (semInquilino()) {
-            return null; // pré-login: sem imagem de inquilino (marca neutra de plataforma)
+        if (preLogin()) {
+            return imagemPlataforma(chave);
         }
         try {
             String url = configuracaoService.lerImagem(chave);
-            return url == null || url.isBlank() ? null : url;
+            if (url != null && !url.isBlank()) {
+                return url;
+            }
         } catch (RuntimeException e) {
-            return null; // config ausente/tipo divergente → sem imagem
+            // config ausente/tipo divergente → cai na plataforma abaixo
         }
+        return imagemPlataforma(chave);
     }
 
     /** Nome da plataforma (config ou padrão) — reaproveitado pelo rodapé dos relatórios. */
@@ -80,24 +119,53 @@ public class MarcaService {
         return lerTextoOu(ChaveConfiguracao.NOME_PLATAFORMA, NOME_PADRAO);
     }
 
+    /**
+     * Texto em dois níveis: pré-login = texto da PLATAFORMA (super-admin) ou o padrão; logado = texto do
+     * inquilino → se vazio, texto da plataforma → se vazio, o padrão hardcoded. A tela nunca fica sem texto.
+     */
     private String lerTextoOu(String chave, String padrao) {
-        if (semInquilino()) {
-            return padrao; // pré-login: marca neutra de plataforma, sem ler config de inquilino
+        if (preLogin()) {
+            String daPlataforma = textoPlataforma(chave);
+            return daPlataforma != null ? daPlataforma : padrao;
         }
         try {
             String valor = configuracaoService.lerTexto(chave);
-            return valor == null || valor.isBlank() ? padrao : valor;
+            if (valor != null && !valor.isBlank()) {
+                return valor;
+            }
         } catch (RuntimeException e) {
-            return padrao; // config ausente (faltou migration) ou tipo divergente → padrão
+            // config ausente (faltou migration) ou tipo divergente → cai na plataforma/padrão abaixo
+        }
+        String daPlataforma = textoPlataforma(chave);
+        return daPlataforma != null ? daPlataforma : padrao;
+    }
+
+    /** Texto da chave na config de PLATAFORMA (super-admin); null se vazio/ausente/erro. */
+    private String textoPlataforma(String chave) {
+        try {
+            String valor = plataformaService.valorTexto(chave);
+            return valor == null || valor.isBlank() ? null : valor;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** URL canônica da imagem da chave na config de PLATAFORMA (super-admin); null se vazia/ausente/erro. */
+    private String imagemPlataforma(String chave) {
+        try {
+            String valor = plataformaService.valorImagem(chave);
+            return valor == null || valor.isBlank() ? null : valor;
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
     /**
-     * Sem inquilino resolvido (schema public = plataforma): pré-login. Serve a marca NEUTRA sem ler a
-     * config de nenhum inquilino; o branding do inquilino só aparece após o login (request com tenant).
-     * Evita também a exceção por-request quando o public não tiver mais a tabela de configuração (Design B).
+     * Pré-login = nenhum inquilino resolvido na thread ({@code atualBruto() == null}). Usa o valor CRU do
+     * ThreadLocal (não {@code atual()}) para distinguir o pré-login do inquilino cujo schema é o padrão
+     * ({@code principal}) — este, logado, deve ver o próprio branding, não o neutro.
      */
-    private static boolean semInquilino() {
-        return TenantContext.SCHEMA_PADRAO.equals(TenantContext.atual());
+    private static boolean preLogin() {
+        return TenantContext.atualBruto() == null;
     }
 }
