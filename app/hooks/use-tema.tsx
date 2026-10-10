@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { Brand } from '@/constants/theme';
+import { useSessao } from '@/hooks/use-sessao';
 import { buscarPaleta, paletaEmCache, type PaletaTema } from '@/services/tema';
 
 /**
@@ -62,25 +63,38 @@ function comPaleta(p: PaletaTema | null): Tema {
 const Contexto = createContext<Tema>(comPaleta(null));
 
 /**
- * Provê o tema (cor da plataforma) a todo o app. No boot aplica a paleta em cache na hora e
- * busca a atual de GET /tema; o padrão é {@link Brand} (verde), então nada pisca no caso comum.
- * A mudança do admin vale no próximo abrir do app.
+ * Provê o tema a todo o app. No boot aplica a paleta em cache na hora (sem flash) e busca a atual de
+ * GET /tema. A busca segue a SESSÃO: logado, manda o token → o backend devolve a cor do INQUILINO;
+ * deslogado → a cor da plataforma. Re-busca a cada login/logout/troca de perfil (mudança do token).
+ * O padrão é {@link Brand} (verde), então nada pisca no caso comum.
+ * DEVE ficar DENTRO do {@code SessaoProvider} (usa {@link useSessao}).
  */
 export function TemaProvider({ children }: { children: ReactNode }) {
   const [paleta, setPaleta] = useState<PaletaTema | null>(null);
+  const { sessao, carregando } = useSessao();
 
+  // Cache local (sem flash) — uma vez, no arranque.
   useEffect(() => {
     let vivo = true;
     paletaEmCache().then((p) => {
-      if (vivo && p) setPaleta(p);
-    });
-    buscarPaleta().then((p) => {
       if (vivo && p) setPaleta(p);
     });
     return () => {
       vivo = false;
     };
   }, []);
+
+  // Re-busca a paleta quando a sessão resolve/muda (token): cor do inquilino logado, ou da plataforma.
+  useEffect(() => {
+    if (carregando) return; // espera resolver a sessão guardada antes de buscar (token já no lugar)
+    let vivo = true;
+    buscarPaleta().then((p) => {
+      if (vivo && p) setPaleta(p);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [carregando, sessao?.token]);
 
   const tema = useMemo(() => comPaleta(paleta), [paleta]);
   return <Contexto.Provider value={tema}>{children}</Contexto.Provider>;

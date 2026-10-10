@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_URL } from '@/constants/api';
+import { authHeaders } from '@/services/sessao';
 
 /** Paleta do tema (espelha PaletaTema no back). Cores hex, exceto brandRgb ("r, g, b"). */
 export interface PaletaTema {
@@ -27,12 +28,13 @@ export async function paletaEmCache(): Promise<PaletaTema | null> {
 }
 
 /**
- * Busca a paleta pública em GET /tema (a cor da plataforma, derivada no backend) e a
- * guarda em cache. Retorna null em qualquer falha — o app segue com o tema padrão/cacheado.
+ * Busca a paleta em GET /tema e a guarda em cache. Envia o token do paciente (quando logado), então o
+ * backend resolve o INQUILINO e devolve a cor DELE; sem token (pré-login) devolve a cor da plataforma.
+ * Retorna null em qualquer falha — o app segue com o tema padrão/cacheado.
  */
 export async function buscarPaleta(): Promise<PaletaTema | null> {
   try {
-    const resposta = await fetch(`${API_URL}/tema`);
+    const resposta = await fetch(`${API_URL}/tema`, { headers: authHeaders() });
     if (!resposta.ok) return null;
     const paleta = (await resposta.json()) as PaletaTema;
     try {
