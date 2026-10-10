@@ -80,6 +80,17 @@ public class ProvisionamentoService {
         limparDadosDemo(validar(schema));
     }
 
+    /**
+     * Garante o schema do inquilino PADRÃO (nomeado, {@code principal}) no boot, ANTES do Hibernate validar:
+     * cria + aplica as migrations de domínio COM os SEEDS do {@code db/migration} (referências + dados de
+     * exemplo). Idempotente — num restart só reaplica migrations pendentes e NÃO toca nos dados. O seed
+     * completo é necessário porque este é o schema que os testes usam (rodam sem inquilino resolvido) e a
+     * suíte foi desenhada contra o dado semeado. Os dados de demo ficam neste TENANT, nunca no {@code public}.
+     */
+    public void garantirInquilinoPadrao(String schema) {
+        provisionarSchema(schema);
+    }
+
     /** Dropa o schema do inquilino (CASCADE) — usado no rollback de um provisionamento falho. */
     public void dropSchema(String schema) {
         String nome = validar(schema);

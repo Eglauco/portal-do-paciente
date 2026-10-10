@@ -46,10 +46,10 @@ public class NpsController {
 
     /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
     private static final Map<String, String> ORDENAVEIS = Map.of(
-            "dataHora", "agendamento.dataHora",
-            "paciente", "agendamento.paciente.nome",
-            "especialidade", "agendamento.especialidade.nome",
-            "unidadeSaude", "agendamento.unidadeSaude.nome",
+            "dataHora", "horario.dataHora",
+            "paciente", "horario.paciente.nome",
+            "especialidade", "horario.agenda.especialidade.nome",
+            "unidadeSaude", "horario.agenda.unidadeSaude.nome",
             "media", "media",
             "status", "status");
     /** Ordenação usada quando nada é escolhido na tela. */

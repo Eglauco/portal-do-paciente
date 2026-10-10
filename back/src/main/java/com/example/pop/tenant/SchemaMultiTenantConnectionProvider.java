@@ -85,11 +85,12 @@ public class SchemaMultiTenantConnectionProvider implements MultiTenantConnectio
         }
     }
 
-    /** Volta o search_path ao padrão ({@code public}). */
+    /**
+     * Volta o search_path ao schema PADRÃO (schema nomeado com o domínio + {@code public} como fallback
+     * para as tabelas de plataforma). Usado no release (anti-leak) e no bootstrap/validate do Hibernate.
+     */
     private void resetarSchema(Connection connection) throws SQLException {
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("SET search_path TO public");
-        }
+        definirSchema(connection, TenantContext.SCHEMA_PADRAO);
     }
 
     /**

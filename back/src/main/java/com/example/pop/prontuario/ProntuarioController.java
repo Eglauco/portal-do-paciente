@@ -53,12 +53,12 @@ public class ProntuarioController {
     /** Colunas ordenáveis da tela → propriedade da entidade (whitelist da ordenação). */
     private static final Map<String, String> ORDENAVEIS = Map.of(
             "numeroAtendimento", "numeroAtendimento",
-            "paciente", "agendamento.paciente.nome",
-            "especialidade", "agendamento.especialidade.nome",
-            "unidade", "agendamento.unidadeSaude.nome",
-            "dataHora", "agendamento.dataHora");
+            "paciente", "horario.paciente.nome",
+            "especialidade", "horario.agenda.especialidade.nome",
+            "unidade", "horario.agenda.unidadeSaude.nome",
+            "dataHora", "horario.dataHora");
     /** Ordenação usada quando nada é escolhido na tela: por nome do paciente (A→Z). */
-    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "agendamento.paciente.nome", "id");
+    private static final Sort ORDEM_PADRAO = Sort.by(Sort.Direction.ASC, "horario.paciente.nome", "id");
 
     private final ProntuarioRepository repository;
     private final HorarioRepository agendamentoRepository;
