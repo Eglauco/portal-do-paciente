@@ -10,6 +10,84 @@ import { TrocarSenhaModal } from './trocar-senha-modal';
 /** Chave do localStorage que guarda se o menu está recolhido. */
 const CHAVE_MENU_RECOLHIDO = 'pop.menu.recolhido';
 
+/** Item simples do menu: um link direto, liberado por uma tela (RBAC). */
+interface ItemMenu {
+  /** Chave da tela que libera o item (ver AuthService.temTela). */
+  readonly tela: string;
+  /** Rota de destino do link. */
+  readonly rota: string;
+  /** Rótulo exibido. */
+  readonly label: string;
+  /** Chave do ícone (ver o @switch no template). */
+  readonly icone: string;
+}
+
+/** Seção do menu: um cabeçalho discreto + seus itens. */
+interface GrupoMenu {
+  readonly titulo: string;
+  readonly itens: readonly ItemMenu[];
+}
+
+/**
+ * Seções fixas da barra lateral (a ordem aqui é a ordem de exibição). Cada item
+ * só aparece quando o usuário tem a tela liberada (temTela); o cabeçalho da seção
+ * some quando nenhum item dela está visível (grupoVisivel). O grupo "Dashboard"
+ * (submenu com flyout) e "Meus termos para assinar" (gated por ehProfissional)
+ * ficam fora desta lista por terem comportamento próprio.
+ */
+const GRUPOS_MENU: readonly GrupoMenu[] = [
+  {
+    titulo: 'Atendimento',
+    itens: [
+      { tela: 'AGENDAMENTOS', rota: '/agendas', label: 'Agendamentos', icone: 'agendamentos' },
+      { tela: 'CHATS', rota: '/chats', label: 'Chats ao vivo', icone: 'chats' },
+      { tela: 'SAU', rota: '/sau', label: 'SAU', icone: 'sau' },
+      { tela: 'NPS', rota: '/nps', label: 'NPS', icone: 'nps' },
+    ],
+  },
+  {
+    titulo: 'Prontuário',
+    itens: [
+      { tela: 'PRONTUARIOS', rota: '/prontuarios', label: 'Prontuários', icone: 'prontuarios' },
+      { tela: 'PRONTUARIO_MEDICO', rota: '/prontuario-medico', label: 'Prontuário Médico', icone: 'prontuario-medico' },
+      { tela: 'PRONTUARIOS', rota: '/tipos-documento-prontuario', label: 'Tipos de Documento', icone: 'tipos-documento' },
+    ],
+  },
+  {
+    titulo: 'Rede social',
+    itens: [{ tela: 'POSTAGENS', rota: '/postagens', label: 'Rede Social', icone: 'postagens' }],
+  },
+  {
+    titulo: 'Cadastros',
+    itens: [
+      { tela: 'PACIENTES', rota: '/pacientes', label: 'Pacientes', icone: 'pacientes' },
+      { tela: 'PROFISSIONAIS', rota: '/profissionais', label: 'Profissionais', icone: 'profissionais' },
+      { tela: 'ESPECIALIDADES', rota: '/especialidades', label: 'Especialidades', icone: 'especialidades' },
+      { tela: 'EXAME', rota: '/exames', label: 'Exames', icone: 'exames' },
+      { tela: 'CONSELHOS', rota: '/conselhos', label: 'Conselhos', icone: 'conselhos' },
+      { tela: 'CONFIGURACAO_AGENDA', rota: '/configuracao-agenda', label: 'Configuração da Agenda', icone: 'configuracao-agenda' },
+      { tela: 'MOTIVOS_FALTA', rota: '/motivos-falta', label: 'Motivos de falta', icone: 'motivos-falta' },
+      { tela: 'TIPOS_MANIFESTACAO', rota: '/tipos-manifestacao', label: 'Tipos de Manifestação', icone: 'tipos-manifestacao' },
+      { tela: 'CATEGORIAS_NPS', rota: '/categorias-nps', label: 'Categorias de NPS', icone: 'categorias-nps' },
+      { tela: 'UNIDADES', rota: '/unidades', label: 'Unidades de Saúde', icone: 'unidades' },
+      { tela: 'USUARIOS', rota: '/usuarios', label: 'Usuários', icone: 'usuarios' },
+    ],
+  },
+  {
+    titulo: 'Integrações',
+    itens: [{ tela: 'SIRESP', rota: '/siresp', label: 'SIRESP', icone: 'siresp' }],
+  },
+  {
+    titulo: 'Sistema',
+    itens: [
+      { tela: 'PERFIS', rota: '/perfis', label: 'Perfis', icone: 'perfis' },
+      { tela: 'CONFIGURACOES', rota: '/configuracoes', label: 'Configurações', icone: 'configuracoes' },
+      { tela: 'PROVEDORES_ASSINATURA', rota: '/provedores-assinatura', label: 'Provedores de assinatura', icone: 'provedores-assinatura' },
+      { tela: 'USO_IA', rota: '/uso-ia', label: 'Uso de IA', icone: 'uso-ia' },
+    ],
+  },
+];
+
 @Component({
   selector: 'app-shell',
   imports: [RouterOutlet, RouterLink, RouterLinkActive, TrocarSenhaModal, BuscaFuncionalidades, RailTooltip],
@@ -83,9 +161,17 @@ export class Shell {
     this.destroyRef.onDestroy(() => this.cancelarFecharFlyout());
   }
 
+  /** Seções do menu (fixas no código). Renderizadas com @for na barra lateral. */
+  protected readonly grupos = GRUPOS_MENU;
+
   /** True se o usuário tem acesso à tela (controla a exibição do item de menu). */
   protected temTela(chave: string): boolean {
     return this.auth.temTela(chave);
+  }
+
+  /** True se ao menos um item da seção está liberado (controla o cabeçalho). */
+  protected grupoVisivel(grupo: GrupoMenu): boolean {
+    return grupo.itens.some((item) => this.temTela(item.tela));
   }
 
   /** True se o usuário é um profissional de saúde (mostra "Meus termos para assinar"). */
