@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { useSessao } from '@/hooks/use-sessao';
 import {
   buscarTelas,
   telasEmCache,
@@ -24,25 +25,37 @@ const Contexto = createContext<FuncionalidadesContexto>({
 });
 
 /**
- * Provê o kill switch global de telas a todo o app. No boot aplica o cache na hora e busca o
- * mapa atual de GET /funcionalidades; o padrão é tudo habilitado, então nada some no caso comum.
- * A mudança do admin vale no próximo abrir do app (mesmo padrão do {@link TemaProvider}).
+ * Provê o kill switch global de telas a todo o app. Aplica o cache na hora (sem flash) e busca o mapa
+ * de GET /funcionalidades seguindo a SESSÃO: logado, manda o token → o backend resolve o INQUILINO e
+ * devolve o kill switch DELE; deslogado → tudo habilitado. Re-busca a cada login/logout/troca de perfil
+ * (mudança do token). DEVE ficar DENTRO do {@code SessaoProvider} (usa {@link useSessao}).
  */
 export function FuncionalidadesProvider({ children }: { children: ReactNode }) {
   const [telas, setTelas] = useState<TelasHabilitadas>(() => todasHabilitadas());
+  const { sessao, carregando } = useSessao();
 
+  // Cache local (sem flash) — uma vez, no arranque.
   useEffect(() => {
     let vivo = true;
     telasEmCache().then((t) => {
-      if (vivo && t) setTelas(t);
-    });
-    buscarTelas().then((t) => {
       if (vivo && t) setTelas(t);
     });
     return () => {
       vivo = false;
     };
   }, []);
+
+  // Re-busca quando a sessão resolve/muda (token): kill switch do inquilino logado (com token já no lugar).
+  useEffect(() => {
+    if (carregando) return;
+    let vivo = true;
+    buscarTelas().then((t) => {
+      if (vivo && t) setTelas(t);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [carregando, sessao?.token]);
 
   const valor = useMemo<FuncionalidadesContexto>(
     () => ({ telas, telaHabilitada: (func) => telas[func] ?? true }),

@@ -88,7 +88,9 @@ export async function buscarNps(id: number | string): Promise<NpsDetalhe> {
 
 /** Categorias de NPS ativas (para o paciente avaliar). */
 export async function listarCategoriasNps(): Promise<CategoriaNps[]> {
-  const resposta = await fetch(`${API_URL}/categoria-nps/ativos`);
+  // categoria_nps é por-inquilino: com o token o TenantFilter resolve o schema do inquilino logado.
+  // Sem token cairia no 'principal' e mostraria as categorias de OUTRO inquilino.
+  const resposta = await fetchMeu(`/categoria-nps/ativos`);
   return comoJson<CategoriaNps[]>(resposta);
 }
 

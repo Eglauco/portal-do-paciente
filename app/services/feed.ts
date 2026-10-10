@@ -97,11 +97,14 @@ export async function buscarPostagem(id: number | string, dispositivoId: string)
   return comoJson<Postagem>(resposta);
 }
 
-/** Curte ou descurte (toggle) a postagem. */
+/** Curte ou descurte (toggle) a postagem. Envia o token para o backend resolver o INQUILINO certo. */
 export async function curtir(postagemId: number, dispositivoId: string): Promise<CurtirResultado> {
+  // /curtir é permitAll, mas o TenantFilter precisa do claim "inq" do JWT para achar o schema do
+  // inquilino (Postagem/Curtida NÃO são tabelas de plataforma). Sem token, cairia no 'principal'.
+  await carregarSessao();
   const resposta = await fetch(`${API_URL}/postagem/${postagemId}/curtir`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ dispositivoId }),
   });
   return comoJson<CurtirResultado>(resposta);
@@ -120,14 +123,11 @@ export async function listarComentarios(
 ): Promise<PaginaComentarios> {
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   const url = `${API_URL}/postagem/${postagemId}/comentarios?${params.toString()}`;
-  // Leitura é pública; com o token, o backend marca "meu"/"podeEditar". Enviamos o
-  // token MANUALMENTE (sem a lógica de logout do fetchMeu): se estiver expirado/rotacionado
-  // (401), relemos como anônimo — nunca deslogar o paciente só por LER comentários.
+  // Enviamos o token MANUALMENTE (sem a lógica de logout do fetchMeu): nunca deslogar o paciente só
+  // por LER comentários. NÃO relemos anônimo no 401: sem token o TenantFilter cairia no 'principal' e
+  // devolveria os comentários do INQUILINO ERRADO. Token expirado → a leitura falha (sem vazar outro tenant).
   await carregarSessao();
-  let resposta = await fetch(url, { headers: authHeaders() });
-  if (resposta.status === 401) {
-    resposta = await fetch(url);
-  }
+  const resposta = await fetch(url, { headers: authHeaders() });
   return comoJson<PaginaComentarios>(resposta);
 }
 

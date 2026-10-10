@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { API_URL } from '@/constants/api';
-import type { FuncionalidadeApp } from '@/services/sessao';
+import { authHeaders, type FuncionalidadeApp } from '@/services/sessao';
 
 /**
  * Kill switch global de telas: mapa tela → habilitada. `true` = visível; `false` = desligada
@@ -52,12 +52,13 @@ export async function telasEmCache(): Promise<TelasHabilitadas | null> {
 }
 
 /**
- * Busca o mapa público em GET /funcionalidades (o kill switch do admin) e o guarda em cache.
- * Retorna null em qualquer falha — o app segue com o cache/fallback (tudo habilitado).
+ * Busca o mapa em GET /funcionalidades (o kill switch do admin) e o guarda em cache. Envia o token do
+ * paciente (quando logado), senão o backend não resolve o inquilino (TenantFilter lê o claim "inq") e
+ * devolve tudo habilitado. Retorna null em qualquer falha — o app segue com o cache/fallback (tudo on).
  */
 export async function buscarTelas(): Promise<TelasHabilitadas | null> {
   try {
-    const resposta = await fetch(`${API_URL}/funcionalidades`);
+    const resposta = await fetch(`${API_URL}/funcionalidades`, { headers: authHeaders() });
     if (!resposta.ok) return null;
     const dados = (await resposta.json()) as { telas?: Record<string, boolean> };
     const telas = normalizar(dados.telas);

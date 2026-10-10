@@ -142,7 +142,9 @@ export async function cancelarAgendamento(id: string): Promise<Agendamento> {
 
 /** Motivos de falta ativos, para o paciente selecionar ao justificar. */
 export async function listarMotivosFalta(): Promise<MotivoFalta[]> {
-  const resposta = await fetch(`${API_URL}/motivo-falta/ativos`);
+  // motivo_falta é por-inquilino: com o token o TenantFilter resolve o schema do inquilino logado.
+  // Sem token (fetch anônimo) cairia no 'principal' e mostraria os motivos de OUTRO inquilino.
+  const resposta = await fetchMeu(`/motivo-falta/ativos`);
   const lista = await comoJson<MotivoFaltaBackend[]>(resposta);
   return lista.map((m) => ({ id: m.id, motivo: m.motivo }));
 }

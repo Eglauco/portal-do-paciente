@@ -182,18 +182,19 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <FuncionalidadesProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <SessaoProvider>
-          {/* TemaProvider DENTRO do SessaoProvider: a cor segue o inquilino logado (usa o token da sessão). */}
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <SessaoProvider>
+        {/* Tema e Funcionalidades DENTRO do SessaoProvider: cor e kill-switch de telas seguem o
+            inquilino logado (usam o token da sessão; re-buscam quando o token muda). */}
+        <FuncionalidadesProvider>
           <TemaProvider>
             <PerfilFotoProvider>
               <Navegacao />
             </PerfilFotoProvider>
           </TemaProvider>
-        </SessaoProvider>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </FuncionalidadesProvider>
+        </FuncionalidadesProvider>
+      </SessaoProvider>
+      <StatusBar style="auto" />
+    </ThemeProvider>
   );
 }
