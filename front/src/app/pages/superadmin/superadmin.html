@@ -4,10 +4,14 @@
     <section class="sa__gate">
       <div class="sa__brand">
         <span class="sa__mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
-            <path d="M9 12l2 2 4-4" />
-          </svg>
+          @if (logoPlataforma(); as logo) {
+            <img class="sa__mark-logo" [src]="logo" alt="" (error)="descartarLogoPlataforma()" />
+          } @else {
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          }
         </span>
         <div>
           <h1 class="sa__title">Console da plataforma</h1>
@@ -44,25 +48,51 @@
     <section class="dash">
       <header class="page-head">
         <div>
-          <h1 class="page-title">Inquilinos</h1>
-          <p class="page-sub">Cadastre e pesquise os inquilinos (clientes) da plataforma.</p>
+          <h1 class="page-title">Console da plataforma</h1>
+          <p class="page-sub">Inquilinos e identidade visual da plataforma.</p>
         </div>
         <div class="sa__actions">
-          <button type="button" class="btn btn--ghost" (click)="recarregar()" [disabled]="carregando()">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
-            </svg>
-            Recarregar
-          </button>
-          <button type="button" class="btn btn--solid" (click)="abrirForm()">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Novo inquilino
-          </button>
           <button type="button" class="btn btn--ghost" (click)="sair()">Sair</button>
         </div>
       </header>
+
+      <!-- Abas -->
+      <nav class="sa__tabs" aria-label="Seções do console">
+        <button
+          type="button"
+          class="sa__tab"
+          [class.sa__tab--ativa]="aba() === 'inquilinos'"
+          [attr.aria-pressed]="aba() === 'inquilinos'"
+          (click)="irPara('inquilinos')"
+        >
+          Inquilinos
+        </button>
+        <button
+          type="button"
+          class="sa__tab"
+          [class.sa__tab--ativa]="aba() === 'plataforma'"
+          [attr.aria-pressed]="aba() === 'plataforma'"
+          (click)="irPara('plataforma')"
+        >
+          Identidade da plataforma
+        </button>
+      </nav>
+
+      @if (aba() === 'inquilinos') {
+      <div class="sa__actions sa__actions--right">
+        <button type="button" class="btn btn--ghost" (click)="recarregar()" [disabled]="carregando()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+          </svg>
+          Recarregar
+        </button>
+        <button type="button" class="btn btn--solid" (click)="abrirForm()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Novo inquilino
+        </button>
+      </div>
 
       <!-- Cadastro (painel recolhível) -->
       @if (mostrarForm()) {
@@ -181,6 +211,137 @@
           </div>
         }
       </section>
+      } @else {
+      <!-- Identidade da plataforma -->
+      <form class="panel sa__ident" [formGroup]="formPlataforma" (submit)="salvarConfigPlataforma($event)">
+        <div class="panel__head">
+          <h2 class="panel__title">Identidade da plataforma</h2>
+        </div>
+        <p class="sa__hint">
+          Define a cor, a logomarca, a imagem de fundo e as frases da tela de login. É o que aparece
+          ANTES do login e o padrão para os inquilinos que não configurarem a própria identidade.
+        </p>
+
+        @if (carregandoConfig()) {
+          <div class="state"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>
+        } @else {
+          <!-- Cor primária -->
+          <div class="form-field form-field--full">
+            <label class="label" for="corPrimaria">Cor primária</label>
+            <div class="sa__cor-pick">
+              <input
+                type="color"
+                class="sa__cor-input"
+                aria-label="Seletor de cor primária"
+                [value]="formPlataforma.controls.corPrimaria.value || '#0E8C7F'"
+                (input)="aoMudarCor($event)"
+              />
+              <input
+                id="corPrimaria"
+                class="input sa__cor-hex"
+                formControlName="corPrimaria"
+                (input)="aoMudarCor($event)"
+                maxlength="7"
+                placeholder="#0E8C7F"
+                autocomplete="off"
+              />
+            </div>
+            @if (previewCor(); as p) {
+              <div class="sa__cor-preview" aria-hidden="true">
+                <span class="sa__swatch" [style.background]="p.brand" title="Base"></span>
+                <span class="sa__swatch" [style.background]="p.brandDeep" title="Escuro"></span>
+                <span class="sa__swatch" [style.background]="p.brandPine" title="Profundo"></span>
+                <span class="sa__swatch" [style.background]="p.glow" title="Realce"></span>
+              </div>
+            }
+          </div>
+
+          <!-- Logomarca -->
+          <div class="form-field form-field--full">
+            <span class="label">Logomarca</span>
+            <div class="sa__img">
+              @if (logoPreview(); as src) {
+                <div class="sa__img-preview"><img [src]="src" alt="Pré-visualização da logomarca" /></div>
+              } @else {
+                <div class="sa__img-vazio">Sem logo (usa o ícone padrão)</div>
+              }
+              <div class="sa__img-acoes">
+                <input #logoInput type="file" accept="image/*" hidden (change)="aoSelecionarLogo($event)" />
+                <button type="button" class="btn btn--ghost" [disabled]="enviandoLogo()" (click)="logoInput.click()">
+                  {{ enviandoLogo() ? 'Enviando…' : 'Escolher imagem' }}
+                </button>
+                @if (formPlataforma.controls.logoUrl.value) {
+                  <button type="button" class="btn btn--ghost" (click)="removerLogo()">Remover</button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Imagem de fundo do login -->
+          <div class="form-field form-field--full">
+            <span class="label">Imagem de fundo do login</span>
+            <div class="sa__img">
+              @if (fundoPreview(); as src) {
+                <div class="sa__img-preview sa__img-preview--wide">
+                  <img [src]="src" alt="Pré-visualização do fundo do login" />
+                </div>
+              } @else {
+                <div class="sa__img-vazio">Sem imagem (só o fundo colorido)</div>
+              }
+              <div class="sa__img-acoes">
+                <input #fundoInput type="file" accept="image/*" hidden (change)="aoSelecionarFundo($event)" />
+                <button type="button" class="btn btn--ghost" [disabled]="enviandoFundo()" (click)="fundoInput.click()">
+                  {{ enviandoFundo() ? 'Enviando…' : 'Escolher imagem' }}
+                </button>
+                @if (formPlataforma.controls.loginFundoUrl.value) {
+                  <button type="button" class="btn btn--ghost" (click)="removerFundo()">Remover</button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <!-- Frases -->
+          <div class="form-grid">
+            <div class="form-field form-field--full">
+              <label class="label" for="nomePlataforma">Nome da plataforma</label>
+              <input
+                id="nomePlataforma"
+                class="input"
+                formControlName="nomePlataforma"
+                autocomplete="off"
+                placeholder="Portal do Paciente"
+              />
+            </div>
+            <div class="form-field form-field--full">
+              <label class="label" for="loginTitulo">Título do login</label>
+              <input
+                id="loginTitulo"
+                class="input"
+                formControlName="loginTitulo"
+                autocomplete="off"
+                placeholder="A gestão do cuidado começa aqui."
+              />
+            </div>
+            <div class="form-field form-field--full">
+              <label class="label" for="loginSubtitulo">Subtítulo do login</label>
+              <textarea
+                id="loginSubtitulo"
+                class="input input--area"
+                rows="3"
+                formControlName="loginSubtitulo"
+                placeholder="Texto de apoio abaixo do título."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn--solid" [disabled]="salvandoConfig()">
+              {{ salvandoConfig() ? 'Salvando…' : 'Salvar identidade' }}
+            </button>
+          </div>
+        }
+      </form>
+      }
     </section>
   }
 </main>

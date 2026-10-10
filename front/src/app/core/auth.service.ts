@@ -4,6 +4,8 @@ import { computed, inject, Injectable, PLATFORM_ID, signal } from '@angular/core
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { MarcaService } from './marca.service';
+import { TemaService } from './tema.service';
 
 /** Unidade de saúde (referência leve id + nome). */
 export interface UnidadeRef {
@@ -87,6 +89,8 @@ const CHAVE_USUARIO = 'pop.usuario';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly marca = inject(MarcaService);
+  private readonly tema = inject(TemaService);
   private readonly ehNavegador = isPlatformBrowser(inject(PLATFORM_ID));
   private readonly base = `${environment.apiUrl}/auth`;
 
@@ -129,9 +133,14 @@ export class AuthService {
   }
 
   login(email: string, senha: string): Observable<LoginResponse> {
-    return this.http
-      .post<LoginResponse>(`${this.base}/login`, { email, senha })
-      .pipe(tap((r) => this.armazenarSessao(r)));
+    return this.http.post<LoginResponse>(`${this.base}/login`, { email, senha }).pipe(
+      tap((r) => {
+        this.armazenarSessao(r);
+        // Token já gravado → as chamadas /marca e /tema levam o Bearer e o back resolve o inquilino:
+        // troca o branding para o do inquilino logado sem exigir F5.
+        this.recarregarBranding();
+      }),
+    );
   }
 
   /** Troca a unidade ativa (persiste no backend) e atualiza a sessão local. */
@@ -174,7 +183,15 @@ export class AuthService {
 
   logout(): void {
     this.limparSessao();
+    // Sem token → /marca e /tema voltam a resolver o branding da PLATAFORMA (pré-login).
+    this.recarregarBranding();
     this.router.navigate(['/login']);
+  }
+
+  /** Re-aplica marca + tema conforme a sessão atual (inquilino logado, ou plataforma se deslogado). */
+  private recarregarBranding(): void {
+    this.marca.recarregar();
+    this.tema.recarregar();
   }
 
   /** Token válido (não expirado) ou null. Limpa a sessão se estiver expirado. */

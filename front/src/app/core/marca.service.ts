@@ -65,6 +65,21 @@ export class MarcaService {
       this.marca.set(c);
       this.aplicarFavicon(c.logoUrl);
     }
+    this.buscar();
+  }
+
+  /**
+   * Re-busca a marca do servidor após trocar de sessão (login/logout): limpa o cache do inquilino
+   * anterior e aplica o que o servidor resolver agora (marca do inquilino logado, ou a da plataforma
+   * quando deslogado). Não aplica o cache antigo (evita a marca anterior piscar).
+   */
+  recarregar(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.limparCache();
+    this.buscar();
+  }
+
+  private buscar(): void {
     this.http.get<Marca>(this.base).subscribe({
       next: (m) => {
         const resolvida = this.normalizar(m);
@@ -109,6 +124,14 @@ export class MarcaService {
       localStorage.setItem(MarcaService.CACHE, JSON.stringify(m));
     } catch {
       /* localStorage indisponível: sem cache, sem problema */
+    }
+  }
+
+  private limparCache(): void {
+    try {
+      localStorage.removeItem(MarcaService.CACHE);
+    } catch {
+      /* ignore */
     }
   }
 }

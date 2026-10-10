@@ -33,13 +33,28 @@ export class TemaService {
     if (!isPlatformBrowser(this.platformId)) return;
     const cache = this.lerCache();
     if (cache) this.pintar(cache);
+    this.buscar();
+  }
+
+  /**
+   * Re-busca a paleta do servidor após trocar de sessão (login/logout): limpa o cache do inquilino
+   * anterior e repinta com o que o servidor resolver agora (tema do inquilino logado, ou o da
+   * plataforma quando deslogado). Não repinta a partir do cache (evita a cor antiga piscar).
+   */
+  recarregar(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.limparCache();
+    this.buscar();
+  }
+
+  private buscar(): void {
     this.http.get<PaletaTema>(this.base).subscribe({
       next: (p) => {
         this.pintar(p);
         this.salvarCache(p);
       },
       error: () => {
-        /* mantém os defaults do :root */
+        /* mantém os defaults do :root / a paleta atual */
       },
     });
   }
@@ -85,6 +100,14 @@ export class TemaService {
       localStorage.setItem(TemaService.CACHE, JSON.stringify(p));
     } catch {
       /* localStorage indisponível: sem cache, sem problema */
+    }
+  }
+
+  private limparCache(): void {
+    try {
+      localStorage.removeItem(TemaService.CACHE);
+    } catch {
+      /* ignore */
     }
   }
 }

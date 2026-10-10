@@ -1,15 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
+import { PaletaTema } from '../../core/tema.service';
 import { CriarInquilino, Inquilino } from './inquilino.model';
+import { SalvarConfigPlataforma } from './plataforma-config.model';
 import { SuperadminService } from './superadmin.service';
 
 /**
- * Console de super-admin: cadastro e pesquisa de inquilinos da plataforma. Fica FORA do sistema dos
- * inquilinos (sem login de admin, sem unidade) — a porta é um segredo fixo digitado aqui e enviado
- * no header de cada chamada. Enquanto o segredo não é validado (carregando a lista), só o portão
- * aparece; a lista e o cadastro ficam ocultos. Marca GENÉRICA (sem white-label do inquilino).
+ * Console de super-admin: cadastro/pesquisa de inquilinos + identidade da plataforma (cor, logomarca,
+ * imagem de fundo e frases do login — os defaults do /login e o fallback dos inquilinos). Fica FORA do
+ * sistema dos inquilinos (sem login de admin): a porta é um segredo fixo digitado aqui e enviado no
+ * header de cada chamada. Enquanto o segredo não é validado, só o portão aparece.
  */
 @Component({
   selector: 'app-superadmin',
@@ -17,9 +19,27 @@ import { SuperadminService } from './superadmin.service';
   templateUrl: './superadmin.html',
   styleUrl: './superadmin.css',
 })
-export class Superadmin {
+export class Superadmin implements OnDestroy {
   private readonly service = inject(SuperadminService);
   private readonly toastr = inject(ToastrService);
+
+  /** Logo da PLATAFORMA (de /marca/plataforma, sempre a da plataforma) para o quadrado de marca do portão. */
+  protected readonly logoPlataforma = signal<string | null>(null);
+
+  constructor() {
+    // Busca a logo da plataforma no boot da tela (pública; ignora o inquilino mesmo se houver admin logado).
+    this.service.marcaPlataforma().subscribe({
+      next: (m) => this.logoPlataforma.set(m.logoUrl),
+      error: () => {
+        /* mantém o ícone padrão do portão */
+      },
+    });
+  }
+
+  /** A logo assinada da plataforma falhou/expirou ao carregar: descarta (cai no ícone padrão). */
+  protected descartarLogoPlataforma(): void {
+    this.logoPlataforma.set(null);
+  }
 
   /** Segredo do super-admin (só na memória; enviado no header de cada chamada). */
   protected readonly segredo = signal('');
@@ -27,6 +47,9 @@ export class Superadmin {
   protected readonly autenticado = signal(false);
   protected readonly carregando = signal(false);
   protected readonly erroAcesso = signal<string | null>(null);
+
+  /** Aba ativa do console. */
+  protected readonly aba = signal<'inquilinos' | 'plataforma'>('inquilinos');
 
   protected readonly inquilinos = signal<Inquilino[]>([]);
   /** Filtro cliente por nome ou schema (a lista de inquilinos é pequena). */
@@ -53,6 +76,31 @@ export class Superadmin {
     adminNome: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     adminEmail: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
     adminSenha: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(6)] }),
+  });
+
+  // ---------- Identidade da plataforma ----------
+
+  protected readonly configCarregada = signal(false);
+  protected readonly carregandoConfig = signal(false);
+  protected readonly salvandoConfig = signal(false);
+  /** Paleta derivada da cor escolhida (preview dos tons). */
+  protected readonly previewCor = signal<PaletaTema | null>(null);
+  /** URL p/ exibir a logo atual: assinada (salva) ou blob local (recém-enviada); null = sem logo. */
+  protected readonly logoPreview = signal<string | null>(null);
+  protected readonly fundoPreview = signal<string | null>(null);
+  protected readonly enviandoLogo = signal(false);
+  protected readonly enviandoFundo = signal(false);
+
+  protected readonly formPlataforma = new FormGroup({
+    corPrimaria: new FormControl('#0E8C7F', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.pattern(/^#[0-9a-fA-F]{6}$/)],
+    }),
+    nomePlataforma: new FormControl('', { nonNullable: true }),
+    loginTitulo: new FormControl('', { nonNullable: true }),
+    loginSubtitulo: new FormControl('', { nonNullable: true }),
+    logoUrl: new FormControl<string | null>(null),
+    loginFundoUrl: new FormControl<string | null>(null),
   });
 
   protected atualizarSegredo(event: Event): void {
@@ -114,6 +162,14 @@ export class Superadmin {
     this.busca.set('');
     this.mostrarForm.set(false);
     this.form.reset();
+    this.aba.set('inquilinos');
+    this.configCarregada.set(false);
+    this.previewCor.set(null);
+    this.revogarPreviewBlob(this.logoPreview());
+    this.revogarPreviewBlob(this.fundoPreview());
+    this.logoPreview.set(null);
+    this.fundoPreview.set(null);
+    this.formPlataforma.reset({ corPrimaria: '#0E8C7F' });
   }
 
   protected abrirForm(): void {
@@ -160,6 +216,151 @@ export class Superadmin {
     });
   }
 
+  // ---------- Identidade da plataforma ----------
+
+  /** Troca de aba; carrega a identidade da plataforma sob demanda (uma vez). */
+  protected irPara(aba: 'inquilinos' | 'plataforma'): void {
+    this.aba.set(aba);
+    if (aba === 'plataforma' && !this.configCarregada() && !this.carregandoConfig()) {
+      this.carregarConfigPlataforma();
+    }
+  }
+
+  private carregarConfigPlataforma(): void {
+    const segredo = this.segredo();
+    if (!segredo) return;
+    this.carregandoConfig.set(true);
+    this.service.lerConfigPlataforma(segredo).subscribe({
+      next: (c) => {
+        const cor = c.corPrimaria ?? '#0E8C7F';
+        this.formPlataforma.reset({
+          corPrimaria: cor,
+          nomePlataforma: c.nomePlataforma ?? '',
+          loginTitulo: c.loginTitulo ?? '',
+          loginSubtitulo: c.loginSubtitulo ?? '',
+          logoUrl: c.logoUrl ?? null,
+          loginFundoUrl: c.loginFundoUrl ?? null,
+        });
+        this.revogarPreviewBlob(this.logoPreview());
+        this.revogarPreviewBlob(this.fundoPreview());
+        this.logoPreview.set(c.logoUrlVisualizacao ?? null);
+        this.fundoPreview.set(c.loginFundoUrlVisualizacao ?? null);
+        this.atualizarPreviewCor(cor);
+        this.configCarregada.set(true);
+        this.carregandoConfig.set(false);
+      },
+      error: () => {
+        this.carregandoConfig.set(false);
+        this.toastr.error('Não foi possível carregar a identidade da plataforma.');
+      },
+    });
+  }
+
+  private ultimaCorPreview = '';
+
+  /** Busca a paleta derivada da cor (preview dos tons) — só reflete no sistema depois de salvar. */
+  protected atualizarPreviewCor(cor: string): void {
+    if (!/^#[0-9a-fA-F]{6}$/.test(cor)) return;
+    this.formPlataforma.controls.corPrimaria.setValue(cor);
+    this.ultimaCorPreview = cor;
+    this.service.temaPreview(this.segredo(), cor).subscribe({
+      next: (p) => {
+        if (this.ultimaCorPreview === cor) this.previewCor.set(p);
+      },
+      error: () => {
+        if (this.ultimaCorPreview === cor) this.previewCor.set(null);
+      },
+    });
+  }
+
+  protected aoMudarCor(event: Event): void {
+    this.atualizarPreviewCor((event.target as HTMLInputElement).value);
+  }
+
+  protected async aoSelecionarLogo(event: Event): Promise<void> {
+    await this.subirImagem(event, this.enviandoLogo, this.logoPreview, this.formPlataforma.controls.logoUrl);
+  }
+
+  protected async aoSelecionarFundo(event: Event): Promise<void> {
+    await this.subirImagem(event, this.enviandoFundo, this.fundoPreview, this.formPlataforma.controls.loginFundoUrl);
+  }
+
+  /** Sobe a imagem escolhida ao S3 (sob o segredo) e guarda a URL canônica no formulário. */
+  private async subirImagem(
+    event: Event,
+    enviando: ReturnType<typeof signal<boolean>>,
+    preview: ReturnType<typeof signal<string | null>>,
+    controle: FormControl<string | null>,
+  ): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const arquivo = input.files?.[0] ?? null;
+    input.value = ''; // permite re-selecionar o mesmo arquivo
+    if (!arquivo) return;
+    if (!arquivo.type.startsWith('image/')) {
+      this.toastr.error('Selecione um arquivo de imagem.');
+      return;
+    }
+    enviando.set(true);
+    try {
+      const url = await this.service.enviarImagemPlataforma(this.segredo(), arquivo);
+      controle.setValue(url);
+      this.revogarPreviewBlob(preview());
+      preview.set(URL.createObjectURL(arquivo)); // preview instantâneo (blob local)
+    } catch {
+      this.toastr.error('Não foi possível enviar a imagem.');
+    } finally {
+      enviando.set(false);
+    }
+  }
+
+  protected removerLogo(): void {
+    this.formPlataforma.controls.logoUrl.setValue(null);
+    this.revogarPreviewBlob(this.logoPreview());
+    this.logoPreview.set(null);
+  }
+
+  protected removerFundo(): void {
+    this.formPlataforma.controls.loginFundoUrl.setValue(null);
+    this.revogarPreviewBlob(this.fundoPreview());
+    this.fundoPreview.set(null);
+  }
+
+  protected salvarConfigPlataforma(event: Event): void {
+    event.preventDefault();
+    if (this.formPlataforma.controls.corPrimaria.invalid) {
+      this.toastr.error('Cor inválida. Use o formato #RRGGBB.');
+      return;
+    }
+    const v = this.formPlataforma.getRawValue();
+    const dados: SalvarConfigPlataforma = {
+      corPrimaria: v.corPrimaria,
+      nomePlataforma: v.nomePlataforma.trim() || null,
+      loginTitulo: v.loginTitulo.trim() || null,
+      loginSubtitulo: v.loginSubtitulo.trim() || null,
+      logoUrl: v.logoUrl,
+      loginFundoUrl: v.loginFundoUrl,
+    };
+    this.salvandoConfig.set(true);
+    this.service.salvarConfigPlataforma(this.segredo(), dados).subscribe({
+      next: (c) => {
+        // Atualiza os previews com as URLs assinadas devolvidas (substitui os blobs locais).
+        this.revogarPreviewBlob(this.logoPreview());
+        this.revogarPreviewBlob(this.fundoPreview());
+        this.logoPreview.set(c.logoUrlVisualizacao ?? null);
+        this.fundoPreview.set(c.loginFundoUrlVisualizacao ?? null);
+        this.formPlataforma.markAsPristine();
+        this.salvandoConfig.set(false);
+        this.toastr.success('Identidade da plataforma salva.');
+      },
+      error: (e: HttpErrorResponse) => {
+        this.salvandoConfig.set(false);
+        this.toastr.error(
+          e.status === 422 ? 'Cor inválida. Use o formato #RRGGBB.' : 'Não foi possível salvar a identidade.',
+        );
+      },
+    });
+  }
+
   /** Mensagem amigável a partir do erro HTTP (prefere a razão do backend quando vem no corpo). */
   private mensagemErro(e: HttpErrorResponse): string {
     const doBackend = typeof e.error?.message === 'string' ? (e.error.message as string) : null;
@@ -174,5 +375,15 @@ export class Superadmin {
       default:
         return 'Não foi possível provisionar o inquilino. Tente novamente.';
     }
+  }
+
+  /** Libera um blob local de preview (se for blob:) para não vazar memória. */
+  private revogarPreviewBlob(url: string | null): void {
+    if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
+  }
+
+  ngOnDestroy(): void {
+    this.revogarPreviewBlob(this.logoPreview());
+    this.revogarPreviewBlob(this.fundoPreview());
   }
 }
