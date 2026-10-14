@@ -33,7 +33,7 @@
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": [".railway.app", "portal-do-paciente-production.up.railway.app"]
+              "allowedHosts": [".railway.app", "portal-do-paciente-production.up.railway.app", ".trilharsaude.app.br"]
             },
             "ssr": {
               "entry": "src/server.ts"
