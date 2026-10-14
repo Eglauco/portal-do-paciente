@@ -21,6 +21,9 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.inquilino.PacienteLoginRepository;
+import com.example.pop.inquilino.RoteamentoPacienteService;
 import com.example.pop.pacienteauth.AtivarPacienteRequest;
 import com.example.pop.pacienteauth.PacienteAuthController;
 import com.example.pop.pacienteauth.SolicitarCodigoRequest;
@@ -47,6 +50,12 @@ class PacienteAcessoTest {
     private PacienteRepository repository;
     @Autowired
     private JwtDecoder jwtDecoder;
+    @Autowired
+    private RoteamentoPacienteService roteamentoService;
+    @Autowired
+    private InquilinoService inquilinoService;
+    @Autowired
+    private PacienteLoginRepository pacienteLoginRepository;
 
     /** Twilio Verify é mockado: controlamos aprovação do código sem bater no provedor. */
     @MockitoBean
@@ -64,6 +73,8 @@ class PacienteAcessoTest {
     @AfterEach
     void limpar() {
         repository.deleteById(pacienteId);
+        // Limpa o vínculo central (public.paciente_login) para não poluir outros testes da suíte.
+        pacienteLoginRepository.findByCpf(CPF).forEach(pacienteLoginRepository::delete);
     }
 
     /** Define CPF + data de nascimento direto na entidade (o atalho de criação não os coleta). */
@@ -72,6 +83,11 @@ class PacienteAcessoTest {
         p.setCpf(CPF);
         p.setDataNascimento(DOB);
         repository.save(p);
+        // Censo multi-inquilino: o app COMPARTILHADO resolve a clínica pelo paciente_login. O atalho de
+        // criação acima seta o CPF direto no repositório (sem o registrarVinculos do fluxo real do admin),
+        // então registramos o vínculo aqui — espelhando o cadastro real — para o solicitar-código/login
+        // encontrar a clínica do CPF.
+        roteamentoService.registrar(CPF, inquilinoService.idPadrao());
     }
 
     @Test
@@ -96,6 +112,7 @@ class PacienteAcessoTest {
         p2.setCpf(cpf2);
         p2.setDataNascimento(DOB);
         repository.save(p2);
+        roteamentoService.registrar(cpf2, inquilinoService.idPadrao()); // vínculo central (como no cadastro real)
         try {
             authController.solicitarCodigo(new SolicitarCodigoRequest(cpf2, DOB, tel2));
             // Segundo pedido imediato para o mesmo CPF → 429 (evita SMS bombing / abuso de custo).
@@ -104,6 +121,7 @@ class PacienteAcessoTest {
             assertEquals(429, ex.getStatusCode().value());
         } finally {
             repository.deleteById(id2);
+            pacienteLoginRepository.findByCpf(cpf2).forEach(pacienteLoginRepository::delete);
         }
     }
 

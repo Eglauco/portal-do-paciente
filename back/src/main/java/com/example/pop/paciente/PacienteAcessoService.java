@@ -50,6 +50,12 @@ public class PacienteAcessoService {
     /** Duração do lockout auto-expirável (minutos): libera sozinho, sem forçar OTP. */
     private static final long LOCKOUT_MINUTOS = 15;
 
+    /** Teto de pré-checagens por IP na janela (anti-enumeração: limita sondagem em massa de CPFs). */
+    private static final int MAX_PRECHECK_POR_JANELA = 30;
+    private static final long PRECHECK_JANELA_MS = 60_000L; // 1 minuto
+    /** Teto de IPs no limitador da pré-checagem (LRU): o mapa não cresce sem limite com IPs forjados (anti-DoS). */
+    private static final int MAX_IPS_PRECHECK = 20_000;
+
     private final PacienteRepository repository;
     private final ContaAppRepository contaRepository;
     private final ResponsavelRepository responsavelRepository;
@@ -64,6 +70,19 @@ public class PacienteAcessoService {
     private final String hashFicticio;
     /** Rate-limit por CPF (em memória) para evitar SMS bombing e abuso de custo. */
     private final Map<String, Deque<Long>> enviosPorCpf = new ConcurrentHashMap<>();
+    /**
+     * Rate-limit da pré-checagem por IP (anti-enumeração) — LinkedHashMap em ordem de ACESSO, LIMITADO a
+     * {@link #MAX_IPS_PRECHECK} entradas (descarta o IP menos usado), para não esgotar memória com IPs
+     * forjados/únicos a cada request (anti-DoS). Todo acesso é feito sob {@code synchronized(preChecagensPorIp)}.
+     */
+    @SuppressWarnings("serial")
+    private final Map<String, Deque<Long>> preChecagensPorIp =
+            new LinkedHashMap<>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Deque<Long>> eldest) {
+                    return size() > MAX_IPS_PRECHECK;
+                }
+            };
 
     public PacienteAcessoService(PacienteRepository repository, ContaAppRepository contaRepository,
             ResponsavelRepository responsavelRepository, DispositivoRepository dispositivoRepository,
@@ -135,6 +154,40 @@ public class PacienteAcessoService {
     }
 
     /**
+     * Verifica a credencial CENTRAL (CPF + PIN) com lockout/timing — SEM criar sessão nem checar clínica.
+     * Reusada pelo login por senha (que depois checa o perfil e cria a sessão) e, no app COMPARTILHADO, para
+     * só liberar a lista de clínicas do CPF DEPOIS da senha conferida. 429 se bloqueada, 401 se inválida.
+     * noRollbackFor: o ramo de PIN errado INCREMENTA o contador e lança 401 — sem isto o rollback padrão
+     * desfaria o incremento e a trava de tentativas nunca dispararia (força-bruta ilimitada).
+     */
+    @Transactional(noRollbackFor = ResponseStatusException.class)
+    public void verificarSenhaCentral(String cpfBruto, String pin) {
+        String cpf = normalizarCpf(cpfBruto);
+        // LOCK (SELECT ... FOR UPDATE): serializa as tentativas concorrentes do MESMO CPF → incremento do
+        // contador/lockout atômico (senão lost-update enfraquece a trava anti-força-bruta).
+        PacienteIdentidade id = cpf == null || cpf.isEmpty()
+                ? null : identidadeRepository.buscarParaAtualizarPorCpf(cpf).orElse(null);
+        boolean temHash = id != null && id.getSenhaHash() != null;
+        // Lockout CENTRAL auto-expirável: após MAX erros, bloqueia por alguns minutos e LIBERA sozinho.
+        if (temHash && estaBloqueada(id)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Muitas tentativas. Aguarde alguns minutos ou entre com o código por SMS.");
+        }
+        // Compara SEMPRE (hash fictício quando não há credencial) p/ não vazar por tempo nem mensagem.
+        boolean confere = passwordEncoder.matches(pin == null ? "" : pin, temHash ? id.getSenhaHash() : hashFicticio);
+        if (!temHash || !confere) {
+            if (temHash) {
+                registrarTentativaErrada(id); // incrementa e, no teto, entra em lockout temporal
+            }
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "CPF ou senha inválidos.");
+        }
+        id.setSenhaTentativas(0);
+        id.setBloqueadoAte(null);
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
+    }
+
+    /**
      * Login por SENHA (sem SMS): autentica por CPF + PIN e amarra o aparelho. O PIN é a prova de
      * identidade — o CPF apenas identifica a conta (telefone/data não entram: é o login rápido de
      * quem já ativou). Bloqueia após {@link #MAX_TENTATIVAS_SENHA} erros (aí só por OTP). Mensagem
@@ -148,43 +201,28 @@ public class PacienteAcessoService {
     public ContaApp loginPorSenha(String cpfBruto, String pin, String dispositivoId) {
         String cpf = normalizarCpf(cpfBruto);
         // Credencial CENTRAL (public): PIN + lockout valem para TODAS as clínicas do paciente.
-        // LOCK (SELECT ... FOR UPDATE): serializa as tentativas concorrentes do MESMO CPF para o
-        // incremento do contador/lockout ser atômico (senão lost-update enfraquece a trava — este é o
-        // único anti-força-bruta do /login-senha). CPFs diferentes não disputam (lock por-linha).
-        PacienteIdentidade id = cpf == null || cpf.isEmpty()
-                ? null : identidadeRepository.buscarParaAtualizarPorCpf(cpf).orElse(null);
-        boolean temHash = id != null && id.getSenhaHash() != null;
-        // Lockout CENTRAL auto-expirável: após MAX erros, bloqueia por alguns minutos e LIBERA sozinho
-        // (não força OTP) — evita que quem só conhece o CPF trave o login do paciente em todas as clínicas.
-        if (temHash && estaBloqueada(id)) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "Muitas tentativas. Aguarde alguns minutos ou entre com o código por SMS.");
-        }
-        // Compara SEMPRE (contra um hash fictício quando não há credencial) para não vazar — pelo tempo
-        // de resposta NEM pela mensagem — se o CPF tem senha (anti-enumeração, igual ao login do admin).
-        boolean confere = passwordEncoder.matches(pin == null ? "" : pin, temHash ? id.getSenhaHash() : hashFicticio);
-        if (!temHash || !confere) {
-            if (temHash) {
-                registrarTentativaErrada(id); // incrementa e, no teto, entra em lockout temporal
-            }
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "CPF ou senha inválidos.");
-        }
-        id.setSenhaTentativas(0);
-        id.setBloqueadoAte(null);
-        id.setAtualizadoEm(LocalDateTime.now());
-        identidadeRepository.save(id);
-        // Antes de criar a sessão: o CPF precisa ter perfil (paciente/responsável) NESTA clínica — evita
-        // gravar uma sessão órfã num inquilino onde o CPF não é paciente (o X-Inquilino é spoofável).
+        verificarSenhaCentral(cpf, pin); // 401 (inválida) / 429 (bloqueada); persiste o incremento (noRollbackFor)
+        // Senha conferida: cria a sessão nesta clínica (perfil + conta_app + espelho).
+        return entrarNaClinicaSemSenha(cpf, dispositivoId);
+    }
+
+    /**
+     * Cria/atualiza a SESSÃO (conta_app) do CPF na clínica ATUAL e amarra o aparelho — SEM verificar senha
+     * (o chamador já autenticou: por PIN no {@link #loginPorSenha}, ou pelo token na troca de clínica). Exige
+     * perfil (paciente/responsável) nesta clínica → 401 se não há (evita sessão órfã onde o CPF não é paciente).
+     */
+    @Transactional
+    public ContaApp entrarNaClinicaSemSenha(String cpfBruto, String dispositivoId) {
+        String cpf = normalizarCpf(cpfBruto);
         if (perfis(cpf).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nenhum perfil disponível para este CPF.");
         }
-        // SESSÃO (por-clínica): cria/atualiza o conta_app desta clínica e amarra o aparelho (1º acesso
-        // nesta clínica, com o PIN central já existente, cria a sessão sem novo OTP).
+        // SESSÃO (por-clínica): cria/atualiza o conta_app desta clínica e amarra o aparelho (1º acesso nesta
+        // clínica, com o PIN central já existente, cria a sessão sem novo OTP).
         ContaApp conta = upsertConta(cpf, dispositivoId);
         // Compat: espelha ativo/dispositivo no paciente próprio (chat/WebSocket/dashboard leem isso).
         repository.findByCpf(cpf).ifPresent(p -> {
-            // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão de conta): o espelho de sessão
-            // (ativo/dispositivo que o admin/chat/dashboard leem) tem de continuar revogado.
+            // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão): o espelho de sessão continua revogado.
             if (p.getSituacao() == SituacaoCadastro.INATIVO) {
                 return;
             }
@@ -231,6 +269,41 @@ public class PacienteAcessoService {
     @Transactional(readOnly = true)
     public boolean contaTemSenha(String cpf) {
         return identidadeRepository.findByCpf(normalizarCpf(cpf)).map(i -> i.getSenhaHash() != null).orElse(false);
+    }
+
+    /**
+     * Pré-checagem do login (só CPF): a identidade CENTRAL do CPF já tem senha? Clínico-agnóstico (lê o
+     * {@code public}), então NÃO revela se o CPF é paciente desta clínica (minimiza a enumeração). O
+     * rate-limit é por IP (quem enumera varia o CPF, não o IP) → 429 ao estourar.
+     */
+    @Transactional(readOnly = true)
+    public boolean preChecagemTemSenha(String cpf, String clientIp) {
+        checarLimitePreChecagem(clientIp);
+        return contaTemSenha(cpf);
+    }
+
+    /**
+     * Limita pré-checagens por IP numa janela curta (anti-enumeração) → 429 ao estourar. Todo o acesso ao
+     * mapa LRU acontece sob o mesmo monitor (o próprio mapa), cobrindo o get/put (que pode despejar o IP
+     * menos usado) e a janela deslizante daquele IP.
+     */
+    private void checarLimitePreChecagem(String ip) {
+        String chave = (ip == null || ip.isBlank()) ? "desconhecido" : ip;
+        long agora = System.currentTimeMillis();
+        synchronized (preChecagensPorIp) {
+            Deque<Long> janela = preChecagensPorIp.get(chave); // get conta como "uso" (ordem de acesso)
+            if (janela == null) {
+                janela = new ArrayDeque<>();
+                preChecagensPorIp.put(chave, janela); // dispara removeEldestEntry (LRU) se passar do teto
+            }
+            while (!janela.isEmpty() && agora - janela.peekFirst() > PRECHECK_JANELA_MS) {
+                janela.pollFirst();
+            }
+            if (janela.size() >= MAX_PRECHECK_POR_JANELA) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Muitas tentativas. Aguarde um momento.");
+            }
+            janela.addLast(agora);
+        }
     }
 
     /** PIN de acesso: exatamente 6 dígitos numéricos. */
@@ -363,9 +436,29 @@ public class PacienteAcessoService {
     public String solicitarCodigo(String cpfBruto, LocalDate dataNascimento, String telefoneBruto) {
         String cpf = normalizarCpf(cpfBruto);
         conferirIdentidade(cpf, dataNascimento, telefoneBruto);
-        checarLimiteEnvio(cpf);
+        return enviarCodigoSemConferir(cpf, telefoneBruto);
+    }
+
+    /**
+     * Envia o OTP (SMS) para o telefone, com rate-limit por CPF — mas SEM conferir a identidade (o chamador
+     * já conferiu, possivelmente CROSS-CLÍNICA no app compartilhado). Devolve o telefone mascarado.
+     */
+    public String enviarCodigoSemConferir(String cpfBruto, String telefoneBruto) {
+        checarLimiteEnvio(normalizarCpf(cpfBruto));
         verificacao.enviar(e164(telefoneBruto), CanalVerificacao.SMS);
         return mascararTelefone(telefoneBruto);
+    }
+
+    /**
+     * true se a identidade (CPF + data + telefone) confere no inquilino ATUAL (sem lançar). Público para a
+     * busca CROSS-CLÍNICA do app compartilhado: o controller fixa cada schema do CPF e pergunta aqui.
+     */
+    @Transactional(readOnly = true)
+    public boolean identidadeConfereNoTenant(String cpfBruto, LocalDate dataNascimento, String telefoneBruto) {
+        String cpf = normalizarCpf(cpfBruto);
+        String alvo = telefoneCanonico(telefoneBruto);
+        return cpf != null && !cpf.isEmpty() && dataNascimento != null && alvo != null
+                && identidadeConfere(cpf, dataNascimento, alvo);
     }
 
     /**

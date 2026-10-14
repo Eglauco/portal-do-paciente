@@ -2,16 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import type { ImagePickerOptions } from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { INQUILINO } from '@/constants/api';
 import { ScreenHeader } from '@/components/screen-header';
 import { SemAcesso } from '@/components/sem-acesso';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { usePerfilFoto } from '@/hooks/use-perfil-foto';
 import { useSessao } from '@/hooks/use-sessao';
 import { carregarPerfil, excluirConta, excluirFoto, trocarFoto, type MeuPerfil, type SexoPaciente } from '@/services/perfil';
-import { ehPerfilProprio, podeLancar, podeVer } from '@/services/sessao';
+import { ehPerfilProprio, podeLancar, podeVer, type ClinicaLogin } from '@/services/sessao';
 
 const SEXO_LABEL: Record<SexoPaciente, string> = {
   MASCULINO: 'Masculino',
@@ -119,7 +120,7 @@ export default function PerfilScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
-  const { sessao, sair } = useSessao();
+  const { sessao, sair, minhasClinicas } = useSessao();
   const { definirFoto } = usePerfilFoto();
   // Travas do perfil dependente: ver os dados vs. lançar (alterar foto e editar dados).
   // Editar e trocar foto exigem "Ver e lançar"; o perfil próprio sempre pode.
@@ -131,6 +132,10 @@ export default function PerfilScreen() {
   const [erro, setErro] = useState(false);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  // App compartilhado ("Integra Saúde"): clínicas do CPF logado, só para decidir se mostra o botão
+  // "Trocar unidade" (a troca em si é na tela /selecionar-unidade). No app A-baked (INQUILINO fixo)
+  // existe uma clínica só — nem busca, o botão não aparece.
+  const [clinicas, setClinicas] = useState<ClinicaLogin[]>([]);
 
   const carregar = useCallback(
     async (comSpinner = true) => {
@@ -148,6 +153,23 @@ export default function PerfilScreen() {
     },
     [definirFoto],
   );
+
+  // App compartilhado: descobre em quantas clínicas o CPF logado está (o botão "Trocar unidade"
+  // só aparece com mais de uma). No app A-baked é uma clínica só — nem busca. Falha em silêncio
+  // (é um extra; não trava a tela de perfil).
+  useEffect(() => {
+    if (INQUILINO) return;
+    let vivo = true;
+    minhasClinicas()
+      .then((lista) => {
+        if (vivo) setClinicas(lista);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Recarrega ao ganhar foco: assim, ao voltar da tela de edição, os dados já vêm atualizados.
   // 1ª vez mostra o spinner; nas voltas seguintes recarrega em silêncio (sem piscar a tela).
@@ -396,6 +418,19 @@ export default function PerfilScreen() {
           <Ionicons name="lock-closed-outline" size={20} color={t.brandDeep} />
           <Text style={styles.selecionarTxt}>Alterar senha</Text>
         </Pressable>
+
+        {/* Trocar unidade: só no app compartilhado e quando o CPF está em mais de uma clínica.
+            Abre a tela dedicada de seleção de unidade (mesma apresentação do login). */}
+        {clinicas.length > 1 && (
+          <Pressable
+            style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
+            onPress={() => router.push('/selecionar-unidade')}
+            accessibilityRole="button"
+            accessibilityLabel="Trocar unidade">
+            <Ionicons name="business-outline" size={20} color={t.brandDeep} />
+            <Text style={styles.selecionarTxt}>Trocar unidade</Text>
+          </Pressable>
+        )}
 
         <Pressable
           style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}

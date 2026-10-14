@@ -1,6 +1,8 @@
 package com.example.pop.pacienteauth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -43,6 +45,7 @@ import com.example.pop.tenant.TenantContext;
 class PacienteAuthMultiInquilinoTest {
 
     private static final String SCHEMA = "inq_teste_pacauth";
+    private static final String SCHEMA2 = "inq_teste_pacauth2";
     private static final String CPF = "52998224725";
     private static final String PIN = "123456";
     private static final String DISPOSITIVO = "disp-teste-pacauth";
@@ -114,11 +117,39 @@ class PacienteAuthMultiInquilinoTest {
 
     @Test
     void loginPorSenhaRoteiaPeloCpfECarimbaOInquilinoNoToken() {
-        var resposta = pacienteAuthController.loginSenha(new LoginSenhaRequest(CPF, PIN, DISPOSITIVO));
+        // Sem X-Inquilino e sem inquilinoId: caminho do app compartilhado — resolve as clínicas do CPF.
+        // Como o CPF só tem 1 clínica (o tenant do teste), entra direto e a sessão vem preenchida.
+        var resposta = pacienteAuthController.loginSenha(new LoginSenhaRequest(CPF, PIN, DISPOSITIVO, null));
 
-        assertEquals("Paciente PacAuth", resposta.nome(), "achou o paciente no schema do inquilino (não no public)");
-        assertEquals(tenantId.longValue(), inqDoToken(resposta.token()),
+        assertEquals("Paciente PacAuth", resposta.sessao().nome(),
+                "achou o paciente no schema do inquilino (não no public)");
+        assertEquals(tenantId.longValue(), inqDoToken(resposta.sessao().token()),
                 "o token carrega o inquilino resolvido pelo CPF (não o padrão)");
+    }
+
+    /**
+     * App COMPARTILHADO: CPF em DUAS clínicas (sem X-Inquilino, sem inquilinoId) → devolve a lista pra
+     * escolher (sem sessão). Escolhendo a clínica que tem o paciente, entra (sessão + inq no token).
+     */
+    @Test
+    void appCompartilhadoComCpfEmDuasClinicasDevolveListaParaEscolher() {
+        // 2ª clínica (só o registro + o ponteiro; LISTAR não acessa o schema de dados dela).
+        Inquilino outra = new Inquilino();
+        outra.setNome("Clinica Dois");
+        outra.setSchemaName(SCHEMA2);
+        Long outraId = inquilinoRepository.save(outra).getId();
+        roteamentoPacienteService.registrar(CPF, outraId);
+
+        var lista = pacienteAuthController.loginSenha(new LoginSenhaRequest(CPF, PIN, DISPOSITIVO, null));
+        assertNull(lista.sessao(), "com 2 clínicas não entra direto — primeiro escolhe");
+        assertNotNull(lista.escolherClinica(), "devolve a lista de clínicas");
+        assertEquals(2, lista.escolherClinica().size(), "as 2 clínicas vinculadas ao CPF");
+
+        // Escolhe a clínica que TEM o paciente (tenantId) → entra; a sessão vem preenchida com o inq certo.
+        var escolhida = pacienteAuthController.loginSenha(new LoginSenhaRequest(CPF, PIN, DISPOSITIVO, tenantId));
+        assertNotNull(escolhida.sessao(), "após escolher a clínica certa, entra");
+        assertEquals(tenantId.longValue(), inqDoToken(escolhida.sessao().token()),
+                "o token carrega o inquilino escolhido");
     }
 
     /** Lê o claim {@code inq} do payload do JWT (sem verificar assinatura — basta inspecionar o conteúdo). */
@@ -133,6 +164,8 @@ class PacienteAuthMultiInquilinoTest {
         pacienteLoginRepository.deleteAll(pacienteLoginRepository.findByCpf(CPF));
         pacienteIdentidadeRepository.findByCpf(CPF).ifPresent(pacienteIdentidadeRepository::delete);
         inquilinoRepository.findBySchemaName(SCHEMA).ifPresent(inquilinoRepository::delete);
+        // 2ª clínica do teste multi-clínica (só o registro; não tem schema provisionado).
+        inquilinoRepository.findBySchemaName(SCHEMA2).ifPresent(inquilinoRepository::delete);
         provisionamentoService.dropSchema(SCHEMA);
     }
 }

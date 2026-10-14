@@ -13,9 +13,11 @@ interface PerfilFotoContexto {
 const Contexto = createContext<PerfilFotoContexto | undefined>(undefined);
 
 /**
- * Guarda a foto do paciente para compartilhar entre o cabeçalho (TopBar, em todas
- * as abas) e o "Meu perfil". Busca uma vez por sessão — o perfil atualiza esta
- * foto ao trocá-la, então o cabeçalho reflete a mudança sem novo fetch.
+ * Guarda a foto do paciente para compartilhar entre o cabeçalho (TopBar, em todas as abas) e o
+ * "Meu perfil". Rebusca a cada TROCA de token (perfil OU clínica) — o token é único por sessão/clínica;
+ * o id do paciente NÃO serve de chave porque colide entre clínicas (ids por-schema no Design B), o que
+ * deixaria a foto do perfil anterior no cabeçalho ao trocar de unidade. O "Meu perfil" atualiza esta
+ * foto ao trocá-la (mesmo token) sem novo fetch.
  */
 export function PerfilFotoProvider({ children }: { children: ReactNode }) {
   const { sessao } = useSessao();
@@ -26,6 +28,9 @@ export function PerfilFotoProvider({ children }: { children: ReactNode }) {
       setFotoUrl(null);
       return;
     }
+    // Zera ANTES de buscar: na troca de perfil/clínica o cabeçalho nunca mostra a foto do perfil anterior
+    // (evita exibir o rosto errado enquanto a nova foto não chega).
+    setFotoUrl(null);
     let vivo = true;
     carregarPerfil()
       .then((p) => {
@@ -35,7 +40,10 @@ export function PerfilFotoProvider({ children }: { children: ReactNode }) {
     return () => {
       vivo = false;
     };
-  }, [sessao?.pacienteId]);
+    // Chave de propósito: só o TOKEN (perfil/clínica). Não depende do objeto `sessao` inteiro, que muda
+    // de identidade a cada setSessao e rebuscaria à toa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessao?.token]);
 
   return <Contexto.Provider value={{ fotoUrl, definirFoto: setFotoUrl }}>{children}</Contexto.Provider>;
 }

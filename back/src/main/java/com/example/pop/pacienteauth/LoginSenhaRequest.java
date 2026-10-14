@@ -10,5 +10,10 @@ import jakarta.validation.constraints.NotBlank;
 public record LoginSenhaRequest(
         @NotBlank String cpf,
         @NotBlank String senha,
-        @NotBlank String dispositivoId) {
+        @NotBlank String dispositivoId,
+        /**
+         * Clínica escolhida pelo app COMPARTILHADO na tela "Selecionar Clínica" (2ª chamada, quando o CPF
+         * está em mais de uma). Nulo na 1ª chamada e no app A-baked (a clínica vem do X-Inquilino assado).
+         */
+        Long inquilinoId) {
 }

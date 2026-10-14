@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.inquilino.RoteamentoPacienteService;
+
 import jakarta.validation.Valid;
 
 /**
@@ -39,14 +41,16 @@ public class MeuResponsavelController {
     private final ResponsavelRepository responsavelRepository;
     private final ResponsavelLancamentoService lancamentoService;
     private final PacienteLogService pacienteLogService;
+    private final RoteamentoPacienteService roteamentoService;
 
     public MeuResponsavelController(PacienteAcessoService acessoService,
             ResponsavelRepository responsavelRepository, ResponsavelLancamentoService lancamentoService,
-            PacienteLogService pacienteLogService) {
+            PacienteLogService pacienteLogService, RoteamentoPacienteService roteamentoService) {
         this.acessoService = acessoService;
         this.responsavelRepository = responsavelRepository;
         this.lancamentoService = lancamentoService;
         this.pacienteLogService = pacienteLogService;
+        this.roteamentoService = roteamentoService;
     }
 
     /**
@@ -115,6 +119,11 @@ public class MeuResponsavelController {
         Responsavel salvo = responsavelRepository.save(r);
         // Auditoria (LGPD): o próprio paciente autorizou uma pessoa pelo app.
         pacienteLogService.registrarResponsavelAdicionadoPeloPaciente(paciente, salvo);
+        // Censo do roteamento: o responsável agora pode logar com o próprio CPF — registra o vínculo
+        // (cpf → inquilino desta sessão) para o app compartilhado resolver a clínica dele no login. Idempotente.
+        if (jwt.getClaim("inq") instanceof Number inq) {
+            roteamentoService.registrar(salvo.getCpf(), inq.longValue());
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(paraResposta(salvo));
     }
 

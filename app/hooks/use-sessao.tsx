@@ -7,12 +7,18 @@ import {
   definirSenha as definirSenhaServico,
   iniciarLogin as iniciarLoginServico,
   loginPorSenha as loginPorSenhaServico,
+  minhasClinicas as minhasClinicasServico,
+  preChecagem as preChecagemServico,
   registrarInvalidacao,
   registrarTrocaPerfil,
   sair as sairServico,
   solicitarCodigo as solicitarCodigoServico,
+  trocarClinica as trocarClinicaServico,
   trocarPerfil as trocarPerfilServico,
+  type ClinicaLogin,
   type InicioLogin,
+  type InicioOtp,
+  type ResultadoLogin,
   type SessaoPaciente,
 } from '@/services/sessao';
 
@@ -26,18 +32,36 @@ interface SessaoContexto {
    * (para entrar sem SMS) e se o login por senha está bloqueado por tentativas.
    */
   iniciarLogin: (cpf: string, dataNascimento: string, telefone: string) => Promise<InicioLogin>;
-  /** Login por senha (PIN), sem SMS: só CPF + senha. Guarda a sessão (leva à tela de perfis). */
-  loginPorSenha: (cpf: string, senha: string) => Promise<void>;
+  /**
+   * Pré-checagem SÓ por CPF: diz se o CPF já tem senha (PIN) central, para rotear a tela
+   * (senha × primeiro acesso). Não revela se é paciente desta clínica (anti-enumeração).
+   */
+  preChecagem: (cpf: string) => Promise<{ temSenha: boolean }>;
+  /**
+   * Login por senha (PIN), sem SMS. No app A-baked (ou com a clínica já escolhida) guarda a sessão; no app
+   * compartilhado com o CPF em >1 clínica, devolve a lista pra escolher (o chamador abre o seletor).
+   */
+  loginPorSenha: (cpf: string, senha: string, inquilinoId?: number) => Promise<ResultadoLogin>;
   /**
    * Pede o código de ativação por SMS a partir do telefone + CPF + data de nascimento
    * (ISO "AAAA-MM-DD"); devolve o telefone mascarado do dono.
    */
-  solicitarCodigo: (cpf: string, dataNascimento: string, telefone: string) => Promise<string>;
-  ativar: (cpf: string, dataNascimento: string, codigo: string, telefone: string) => Promise<void>;
+  solicitarCodigo: (cpf: string, dataNascimento: string, telefone: string) => Promise<InicioOtp>;
+  ativar: (
+    cpf: string,
+    dataNascimento: string,
+    codigo: string,
+    telefone: string,
+    inquilinoId?: number,
+  ) => Promise<void>;
   /** Define a senha (PIN) inicial após o OTP (obrigatório antes de escolher o perfil). */
   definirSenha: (senha: string) => Promise<void>;
   /** Escolhe o perfil ativo (tela "Selecionar Perfil"). Nunca refaz OTP. */
   trocarPerfil: (pacienteId: number) => Promise<void>;
+  /** Clínicas (ativas) do CPF logado — app compartilhado, para oferecer "trocar unidade". */
+  minhasClinicas: () => Promise<ClinicaLogin[]>;
+  /** Troca a clínica da sessão (app compartilhado) sem refazer login. Volta a "Selecionar Perfil". */
+  trocarClinica: (inquilinoId: number) => Promise<void>;
   sair: () => Promise<void>;
 }
 
@@ -76,16 +100,30 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     return iniciarLoginServico(cpf, dataNascimento, telefone);
   }
 
-  async function loginPorSenha(cpf: string, senha: string) {
-    setSessao(await loginPorSenhaServico(cpf, senha));
+  async function preChecagem(cpf: string) {
+    return preChecagemServico(cpf);
+  }
+
+  async function loginPorSenha(cpf: string, senha: string, inquilinoId?: number) {
+    const resultado = await loginPorSenhaServico(cpf, senha, inquilinoId);
+    if ('sessao' in resultado) {
+      setSessao(resultado.sessao);
+    }
+    return resultado;
   }
 
   async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string) {
     return solicitarCodigoServico(cpf, dataNascimento, telefone);
   }
 
-  async function ativar(cpf: string, dataNascimento: string, codigo: string, telefone: string) {
-    setSessao(await ativarServico(cpf, dataNascimento, codigo, telefone));
+  async function ativar(
+    cpf: string,
+    dataNascimento: string,
+    codigo: string,
+    telefone: string,
+    inquilinoId?: number,
+  ) {
+    setSessao(await ativarServico(cpf, dataNascimento, codigo, telefone, inquilinoId));
   }
 
   async function definirSenha(senha: string) {
@@ -95,6 +133,14 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   async function trocarPerfil(pacienteId: number) {
     setSessao(await trocarPerfilServico(pacienteId));
+  }
+
+  async function minhasClinicas() {
+    return minhasClinicasServico();
+  }
+
+  async function trocarClinica(inquilinoId: number) {
+    setSessao(await trocarClinicaServico(inquilinoId));
   }
 
   async function sair() {
@@ -108,11 +154,14 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         sessao,
         carregando,
         iniciarLogin,
+        preChecagem,
         loginPorSenha,
         solicitarCodigo,
         ativar,
         definirSenha,
         trocarPerfil,
+        minhasClinicas,
+        trocarClinica,
         sair,
       }}>
       {children}

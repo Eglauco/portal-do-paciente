@@ -324,11 +324,7 @@ public class PacienteController {
         logService.registrarCriacao(salvo, uidDoToken(jwt));
         // Roteamento multi-inquilino: registra o CPF do paciente e dos responsáveis -> inquilino do
         // admin (public), para o login do app achar o schema. Na mesma transação do cadastro.
-        Long inquilinoId = inquilinoDoToken(jwt);
-        roteamentoPacienteService.registrar(salvo.getCpf(), inquilinoId);
-        for (Responsavel responsavel : salvo.getResponsaveis()) {
-            roteamentoPacienteService.registrar(responsavel.getCpf(), inquilinoId);
-        }
+        registrarVinculos(salvo, jwt);
         return salvo;
     }
 
@@ -349,6 +345,9 @@ public class PacienteController {
                     validarUnicidade(existente, id);
                     Paciente salvo = salvarUnico(existente);
                     logService.registrarAlteracao(antes, salvo, uidDoToken(jwt));
+                    // Censo do roteamento: o CPF do paciente pode ter sido definido/alterado e um
+                    // responsável novo pode ter entrado na edição — registra os vínculos (idempotente).
+                    registrarVinculos(salvo, jwt);
                     return ResponseEntity.ok(salvo);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -635,6 +634,19 @@ public class PacienteController {
             return numero.longValue();
         }
         return inquilinoService.idPadrao();
+    }
+
+    /**
+     * Registra os vínculos de roteamento (cpf → inquilino) do paciente e de cada responsável deste
+     * cadastro, para o login do app resolver a clínica pelo CPF. Idempotente (o serviço ignora o que já
+     * existe e CPF nulo/vazio). Chamado no criar E no atualizar (um responsável novo pode entrar na edição).
+     */
+    private void registrarVinculos(Paciente salvo, Jwt jwt) {
+        Long inquilinoId = inquilinoDoToken(jwt);
+        roteamentoPacienteService.registrar(salvo.getCpf(), inquilinoId);
+        for (Responsavel responsavel : salvo.getResponsaveis()) {
+            roteamentoPacienteService.registrar(responsavel.getCpf(), inquilinoId);
+        }
     }
 
     private Paciente salvarUnico(Paciente paciente) {

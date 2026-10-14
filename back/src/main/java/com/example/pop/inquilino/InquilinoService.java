@@ -1,5 +1,8 @@
 package com.example.pop.inquilino;
 
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
@@ -77,5 +80,24 @@ public class InquilinoService {
             idPadrao = id;
         }
         return id;
+    }
+
+    /** Resumo de uma clínica para o seletor pós-login do app compartilhado. */
+    public record Clinica(Long id, String nome) {
+    }
+
+    /**
+     * Clínicas ATIVAS entre os ids dados (ordenadas por nome), para o seletor "Selecionar Clínica" do app
+     * compartilhado quando o CPF está em mais de uma. Sem cache (login é raro; evita listar clínica inativa).
+     */
+    public List<Clinica> clinicasAtivas(Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return repository.findAllById(ids).stream()
+                .filter(i -> "ATIVO".equalsIgnoreCase(i.getSituacao()))
+                .map(i -> new Clinica(i.getId(), i.getNome()))
+                .sorted(Comparator.comparing(Clinica::nome, String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 }

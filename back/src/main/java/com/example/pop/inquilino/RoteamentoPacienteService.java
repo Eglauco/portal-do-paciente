@@ -1,6 +1,7 @@
 package com.example.pop.inquilino;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Mantém os VÍNCULOS de roteamento do paciente/responsável ({@link PacienteLogin}: cpf → inquilino)
@@ -18,20 +19,21 @@ public class RoteamentoPacienteService {
     }
 
     /**
-     * Garante o vínculo {@code (cpf, inquilinoId)}. Idempotente: se já existe para aquele inquilino, não
-     * faz nada; se não existe, cria (mesmo que o CPF já tenha vínculo com OUTRAS clínicas). CPF nulo/vazio
-     * é ignorado (responsável sem CPF não loga).
+     * Garante o vínculo {@code (cpf, inquilinoId)}. Idempotente E à prova de corrida: delega ao
+     * {@code INSERT ... ON CONFLICT DO NOTHING} (o banco resolve o duplo-insert concorrente sem lançar
+     * exceção), em vez de find-then-save — que sob dois cadastros/edições simultâneos do mesmo CPF novo
+     * estouraria a violação do índice único só no commit e derrubaria a transação do cadastro inteira.
+     * Cria mesmo que o CPF já tenha vínculo com OUTRAS clínicas. CPF nulo/vazio é ignorado
+     * (responsável sem CPF não loga).
      */
+    @Transactional
     public void registrar(String cpf, Long inquilinoId) {
         if (cpf == null || cpf.isBlank() || inquilinoId == null) {
             return;
         }
-        if (repository.findByCpfAndInquilinoId(cpf, inquilinoId).isPresent()) {
-            return; // vínculo já existe para este inquilino
-        }
-        PacienteLogin login = new PacienteLogin();
-        login.setCpf(cpf);
-        login.setInquilinoId(inquilinoId);
-        repository.save(login);
+        // O INSERT nativo (@Modifying) EXIGE uma transação ativa — ao contrário do save() do repositório,
+        // que abria a sua. Com propagação REQUIRED: junta-se à transação do cadastro (criar/atualizar) quando
+        // há uma, e abre a própria nos fluxos de auth (ativar/login/trocar-clínica), que não são @Transactional.
+        repository.inserirSeAusente(cpf, inquilinoId);
     }
 }

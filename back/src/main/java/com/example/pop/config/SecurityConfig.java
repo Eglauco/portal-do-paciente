@@ -67,7 +67,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Públicos (sem token).
                         .requestMatchers("/auth/login", "/paciente-auth/ativar", "/paciente-auth/solicitar-codigo",
-                                "/paciente-auth/iniciar", "/paciente-auth/login-senha").permitAll()
+                                "/paciente-auth/iniciar", "/paciente-auth/login-senha",
+                                "/paciente-auth/pre-checagem").permitAll()
                         .requestMatchers(HttpMethod.GET, "/motivo-falta/ativos", "/categoria-nps/ativos").permitAll()
                         // Tema (cor da plataforma): leitura pública p/ o front e o app aplicarem no boot.
                         .requestMatchers(HttpMethod.GET, "/tema").permitAll()

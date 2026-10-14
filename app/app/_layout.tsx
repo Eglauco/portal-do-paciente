@@ -126,6 +126,7 @@ function Navegacao() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="definir-senha" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="selecionar-perfil" options={{ headerShown: false }} />
+        <Stack.Screen name="selecionar-unidade" options={{ headerShown: false }} />
         <Stack.Screen name="notificacoes" options={{ headerShown: false }} />
         <Stack.Screen name="perfil" options={{ headerShown: false }} />
         <Stack.Screen name="perfil-editar" options={{ headerShown: false }} />

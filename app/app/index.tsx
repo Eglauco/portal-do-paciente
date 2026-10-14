@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -18,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
+import { buscarMarca, marcaEmCache, type Marca } from '@/services/marca';
+import { type ClinicaLogin } from '@/services/sessao';
 
 /** Máscara de CPF "000.000.000-00" enquanto o paciente digita. */
 function mascararCpf(valor: string): string {
@@ -54,21 +57,23 @@ function dataParaIso(valor: string): string {
 }
 
 /**
- * Etapas do login (CPF-first): a entrada padrão é CPF + senha; o caminho por SMS é secundário.
- * - `entrar`: CPF + senha de 6 dígitos → entra sem SMS (login do dia a dia). Num app novo com o PIN
- *   central já existente, o backend amarra o aparelho sem OTP. É a tela inicial.
- * - `identidade`: telefone + CPF + nascimento → envia o código por SMS. Caminho único de PRIMEIRO
- *   ACESSO e de RECUPERAÇÃO de senha (copy neutra; não revela se o CPF já tem senha — anti-enumeração).
+ * Etapas do login (CPF-first): digita-se SÓ o CPF; a pré-checagem roteia a próxima tela.
+ * - `cpf`: só o CPF → "Continuar" chama a pré-checagem (tem senha central?) e roteia. É a tela inicial.
+ * - `senha`: a pré-checagem achou senha → digita só o PIN (login sem SMS). "Esqueci" leva ao SMS.
+ * - `clinica`: app COMPARTILHADO (sem inquilino assado) e o CPF está em mais de uma clínica → escolhe qual.
+ * - `identidade`: a pré-checagem NÃO achou senha (primeiro acesso) ou veio do "esqueci" → telefone +
+ *   CPF + nascimento → envia o código por SMS. (A pré-checagem é clínico-agnóstica: só diz se há PIN na
+ *   plataforma, não se o CPF é paciente desta clínica — a trava real fica no login/SMS; anti-enumeração.)
  * - `codigo`: digita o código do SMS → ativa (e depois define a senha).
  */
-type Etapa = 'entrar' | 'identidade' | 'codigo';
+type Etapa = 'cpf' | 'senha' | 'clinica' | 'identidade' | 'codigo';
 
 export default function LoginScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
-  const { loginPorSenha, solicitarCodigo, ativar } = useSessao();
+  const { preChecagem, loginPorSenha, solicitarCodigo, ativar } = useSessao();
 
-  const [etapa, setEtapa] = useState<Etapa>('entrar');
+  const [etapa, setEtapa] = useState<Etapa>('cpf');
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
@@ -77,43 +82,79 @@ export default function LoginScreen() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [codigo, setCodigo] = useState('');
   const [erro, setErro] = useState<string | null>(null);
+  const [checando, setChecando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [entrandoSenha, setEntrandoSenha] = useState(false);
   const [entrando, setEntrando] = useState(false);
+  /** Marca (nome + logo) da clínica para o wordmark do login (white-label). */
+  const [marca, setMarca] = useState<Marca | null>(null);
+  /** App compartilhado: clínicas do CPF quando há mais de uma (etapa `clinica`). */
+  const [clinicas, setClinicas] = useState<ClinicaLogin[]>([]);
+  /** Clínica escolhida no seletor (usada pelo ativar/OTP) e de onde o seletor foi aberto. */
+  const [inquilinoEscolhido, setInquilinoEscolhido] = useState<number | null>(null);
+  const [clinicaOrigem, setClinicaOrigem] = useState<'senha' | 'otp'>('senha');
 
   const cpfValido = cpf.replace(/\D/g, '').length === 11;
   const dataValida = dataNascimento.replace(/\D/g, '').length === 8;
   const telefoneValido = [10, 11].includes(telefone.replace(/\D/g, '').length);
+  const podeContinuar = cpfValido && !checando;
   const podeEnviarCodigo = cpfValido && dataValida && telefoneValido && !enviando;
   const podeEntrarSenha = cpfValido && senha.length === 6 && !entrandoSenha;
   const podeEntrar = codigo.length === 6 && !entrando;
   /** Algum pedido em voo: trava os controles de navegação para não cair numa etapa errada. */
-  const ocupado = enviando || entrando || entrandoSenha;
+  const ocupado = checando || enviando || entrando || entrandoSenha;
 
-  /** Envia o código por SMS e vai para a etapa "codigo". Reutilizado pelo envio inicial e pelo reenvio. */
+  /** Pede o código por SMS (identidade). Devolve o resultado (telefone mascarado + clínicas que conferem). */
   async function pedirCodigoSms() {
-    const mascarado = await solicitarCodigo(cpf, dataParaIso(dataNascimento), telefone);
-    setTelefoneMascarado(mascarado);
+    const r = await solicitarCodigo(cpf, dataParaIso(dataNascimento), telefone);
+    setTelefoneMascarado(r.telefoneMascarado);
     setCodigo('');
+    return r;
   }
 
-  /** Volta para a tela inicial (entrar), limpando dados sensíveis (mantém CPF/telefone já digitados). */
-  function voltarInicio() {
-    setEtapa('entrar');
+  /** Passo 1 (só CPF): pré-checa se o CPF tem senha central e roteia — tela de senha OU primeiro acesso. */
+  async function continuar() {
+    if (checando || !cpfValido) return;
+    setErro(null);
+    setChecando(true);
+    try {
+      const { temSenha } = await preChecagem(cpf);
+      setSenha('');
+      setMostrarSenha(false);
+      setEtapa(temSenha ? 'senha' : 'identidade');
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível continuar. Tente novamente.');
+    } finally {
+      setChecando(false);
+    }
+  }
+
+  /** Volta ao passo do CPF, limpando dados sensíveis (mantém CPF/telefone já digitados). */
+  function voltarParaCpf() {
+    setEtapa('cpf');
     setErro(null);
     setCodigo('');
     setSenha('');
     setMostrarSenha(false);
   }
 
-  /** Primeiro acesso: valida identidade e envia o código por SMS (vai para a etapa "codigo"). */
+  /** Primeiro acesso / recuperação: valida identidade, envia o SMS e roteia (1 clínica → código; N → seletor). */
   async function enviarCodigo() {
     if (enviando || !cpfValido || !dataValida || !telefoneValido) return;
     setErro(null);
     setEnviando(true);
     try {
-      await pedirCodigoSms();
-      setEtapa('codigo');
+      const r = await pedirCodigoSms();
+      if (r.clinicas.length > 1) {
+        // App compartilhado, identidade confere em mais de uma clínica: escolher ANTES de digitar o código.
+        setClinicas(r.clinicas);
+        setClinicaOrigem('otp');
+        setInquilinoEscolhido(null);
+        setEtapa('clinica');
+      } else {
+        setInquilinoEscolhido(r.clinicas[0]?.inquilinoId ?? null);
+        setEtapa('codigo');
+      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível enviar o código. Tente novamente.');
     } finally {
@@ -121,21 +162,53 @@ export default function LoginScreen() {
     }
   }
 
-  /** "Já tenho senha": entra só com CPF + senha (sem SMS). */
+  /** Entra com CPF + senha (sem SMS). App compartilhado com CPF em mais de uma clínica → abre o seletor. */
   async function entrarComSenha() {
     if (entrandoSenha || !cpfValido || senha.length !== 6) return;
     setErro(null);
     setEntrandoSenha(true);
     try {
-      await loginPorSenha(cpf, senha);
-      // A navegação para "Selecionar Perfil" é feita pelo Navegacao (perfilSelecionado=false).
+      const resultado = await loginPorSenha(cpf, senha);
+      if ('clinicas' in resultado) {
+        setClinicas(resultado.clinicas);
+        setClinicaOrigem('senha');
+        setEtapa('clinica');
+        setEntrandoSenha(false);
+        return;
+      }
+      // Sessão criada → o Navegacao leva para "Selecionar Perfil" (perfilSelecionado=false).
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
       setEntrandoSenha(false);
     }
   }
 
-  /** De "entrar": primeiro acesso OU esqueci a senha → fluxo por SMS (o código ativa/redefine a senha). */
+  /** Escolhe a clínica (fluxo PIN) → re-chama o login com o inquilino escolhido. */
+  async function escolherClinica(inquilinoId: number) {
+    if (entrandoSenha) return;
+    setErro(null);
+    setEntrandoSenha(true);
+    try {
+      await loginPorSenha(cpf, senha, inquilinoId);
+      // Sessão criada → o Navegacao leva para "Selecionar Perfil".
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
+      setEntrandoSenha(false);
+    }
+  }
+
+  /** Pick no seletor de clínica: no fluxo PIN faz o login; no fluxo OTP fixa a clínica e vai para o código. */
+  function onEscolherClinica(inquilinoId: number) {
+    if (clinicaOrigem === 'otp') {
+      setInquilinoEscolhido(inquilinoId);
+      setErro(null);
+      setEtapa('codigo');
+    } else {
+      escolherClinica(inquilinoId);
+    }
+  }
+
+  /** Da tela de senha ("esqueci a senha") → fluxo por SMS (o código redefine a senha). */
   function irParaPrimeiroAcesso() {
     setSenha('');
     setMostrarSenha(false);
@@ -162,7 +235,7 @@ export default function LoginScreen() {
     setErro(null);
     setEntrando(true);
     try {
-      await ativar(cpf, dataParaIso(dataNascimento), codigo, telefone);
+      await ativar(cpf, dataParaIso(dataNascimento), codigo, telefone, inquilinoEscolhido ?? undefined);
       // A navegação para "Definir senha" / "Selecionar Perfil" é feita pelo Navegacao.
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.');
@@ -183,19 +256,36 @@ export default function LoginScreen() {
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (etapa === 'entrar') return false; // deixa o sistema tratar (fecha/background)
+      if (etapa === 'cpf') return false; // deixa o sistema tratar (fecha/background)
       if (ocupado) return true; // ignora enquanto envia/entra, sem sair da etapa atual
       if (etapa === 'codigo') voltarParaIdentidade();
-      else voltarInicio();
+      else if (etapa === 'clinica') {
+        setErro(null);
+        setEtapa(clinicaOrigem === 'otp' ? 'identidade' : 'senha'); // volta pra identidade (OTP) ou PIN
+      } else voltarParaCpf(); // senha ou identidade → volta ao CPF
       return true;
     });
     return () => sub.remove();
-  }, [etapa, ocupado]);
+  }, [etapa, ocupado, clinicaOrigem]);
 
   // Acessibilidade: anuncia a mensagem de erro assim que ela aparece (leitor de tela).
   useEffect(() => {
     if (erro) AccessibilityInfo.announceForAccessibility(erro);
   }, [erro]);
+
+  // Marca (nome + logo) da clínica para o wordmark: cache instantâneo + busca fresca (/marca com X-Inquilino).
+  useEffect(() => {
+    let vivo = true;
+    marcaEmCache().then((m) => {
+      if (vivo && m) setMarca(m);
+    });
+    buscarMarca().then((m) => {
+      if (vivo && m) setMarca(m);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   return (
     <View style={styles.root}>
@@ -207,10 +297,22 @@ export default function LoginScreen() {
 
         <View style={styles.wordmark}>
           <View style={styles.mark}>
-            <Ionicons name="pulse" size={22} color={t.glow} />
+            {marca?.logoUrl ? (
+              <Image
+                source={marca.logoUrl}
+                style={styles.markLogo}
+                contentFit="contain"
+                transition={150}
+                accessibilityLabel="Logomarca"
+              />
+            ) : (
+              <Ionicons name="pulse" size={22} color={t.glow} />
+            )}
           </View>
-          <View>
-            <Text style={styles.wordmarkName}>PORTAL DO PACIENTE</Text>
+          <View style={styles.wordmarkTexts}>
+            <Text style={styles.wordmarkName} numberOfLines={2}>
+              {marca?.nomePlataforma ?? 'Portal do Paciente'}
+            </Text>
             <Text style={styles.wordmarkSub}>Cuidado conectado</Text>
           </View>
         </View>
@@ -240,12 +342,10 @@ export default function LoginScreen() {
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {etapa === 'entrar' ? (
+          {etapa === 'cpf' ? (
             <>
               <Text style={styles.title}>Bem-vindo(a)</Text>
-              <Text style={styles.subtitle}>
-                Entre com seu CPF e a sua senha de 6 dígitos — a mesma de sempre.
-              </Text>
+              <Text style={styles.subtitle}>Digite seu CPF para entrar.</Text>
 
               {/* CPF */}
               <Text style={styles.label}>CPF</Text>
@@ -264,12 +364,63 @@ export default function LoginScreen() {
                   inputMode="numeric"
                   maxLength={14}
                   autoFocus
-                  returnKeyType="next"
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (podeContinuar) continuar();
+                  }}
                 />
               </View>
 
+              {erro && (
+                <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                  !podeContinuar && styles.primaryBtnOff,
+                ]}
+                onPress={continuar}
+                disabled={!podeContinuar}
+                accessibilityRole="button"
+                accessibilityLabel="Continuar"
+                accessibilityState={{ busy: checando, disabled: !podeContinuar }}>
+                {checando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Continuar</Text>
+                )}
+              </Pressable>
+
+              <View style={styles.foot}>
+                <Ionicons name="information-circle-outline" size={18} color={t.muted} />
+                <Text style={styles.footText}>
+                  CPF não cadastrado? Procure a recepção da sua unidade de saúde.
+                </Text>
+              </View>
+            </>
+          ) : etapa === 'senha' ? (
+            <>
+              <Pressable
+                style={[styles.backRow, entrandoSenha && styles.backRowOff]}
+                onPress={voltarParaCpf}
+                disabled={entrandoSenha}
+                accessibilityRole="button">
+                <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
+                <Text style={styles.backTxt}>Trocar CPF</Text>
+              </Pressable>
+
+              <Text style={styles.title}>Digite sua senha</Text>
+              <Text style={styles.subtitle}>
+                CPF {cpf} — entre com a sua senha de 6 dígitos, a mesma de sempre.
+              </Text>
+
               {/* Senha (PIN) */}
-              <Text style={[styles.label, styles.labelEspaco]}>Senha</Text>
+              <Text style={styles.label}>Senha</Text>
               <View style={styles.inputWrap}>
                 <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
                 <TextInput
@@ -285,6 +436,7 @@ export default function LoginScreen() {
                   inputMode="numeric"
                   maxLength={6}
                   secureTextEntry={!mostrarSenha}
+                  autoFocus
                   returnKeyType="done"
                   onSubmitEditing={() => {
                     if (podeEntrarSenha) entrarComSenha();
@@ -330,22 +482,63 @@ export default function LoginScreen() {
                 onPress={irParaPrimeiroAcesso}
                 disabled={entrandoSenha}
                 accessibilityRole="button"
-                accessibilityLabel="Primeiro acesso ou esqueci a senha. Entrar por SMS.">
-                <Text style={styles.linkTxt}>Primeiro acesso ou esqueci a senha</Text>
+                accessibilityLabel="Esqueci minha senha. Entrar por SMS.">
+                <Text style={styles.linkTxt}>Esqueci minha senha</Text>
+              </Pressable>
+            </>
+          ) : etapa === 'clinica' ? (
+            <>
+              <Pressable
+                style={[styles.backRow, entrandoSenha && styles.backRowOff]}
+                onPress={() => {
+                  setErro(null);
+                  setEtapa(clinicaOrigem === 'otp' ? 'identidade' : 'senha');
+                }}
+                disabled={entrandoSenha}
+                accessibilityRole="button">
+                <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
+                <Text style={styles.backTxt}>Voltar</Text>
               </Pressable>
 
-              <View style={styles.foot}>
-                <Ionicons name="information-circle-outline" size={18} color={t.muted} />
-                <Text style={styles.footText}>
-                  CPF não cadastrado? Procure a recepção da sua unidade de saúde.
-                </Text>
-              </View>
+              <Text style={styles.title}>Selecionar clínica</Text>
+              <Text style={styles.subtitle}>
+                Seu CPF tem cadastro em mais de uma unidade. Escolha por qual você quer entrar.
+              </Text>
+
+              {erro && (
+                <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
+
+              {clinicas.map((c) => (
+                <Pressable
+                  key={c.inquilinoId}
+                  style={({ pressed }) => [styles.clinicaItem, pressed && styles.clinicaItemPressed]}
+                  onPress={() => onEscolherClinica(c.inquilinoId)}
+                  disabled={entrandoSenha}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Entrar na ${c.nome}`}>
+                  <View style={styles.clinicaIcon}>
+                    <Ionicons name="business-outline" size={20} color={t.brandDeep} />
+                  </View>
+                  <Text style={styles.clinicaNome} numberOfLines={2}>
+                    {c.nome}
+                  </Text>
+                  {entrandoSenha ? (
+                    <ActivityIndicator color={t.brandDeep} />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={20} color={t.muted} />
+                  )}
+                </Pressable>
+              ))}
             </>
           ) : etapa === 'identidade' ? (
             <>
               <Pressable
                 style={[styles.backRow, enviando && styles.backRowOff]}
-                onPress={voltarInicio}
+                onPress={voltarParaCpf}
                 disabled={enviando}
                 accessibilityRole="button">
                 <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
@@ -561,12 +754,21 @@ const criarEstilos = (t: Tema) =>
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
     borderColor: alpha(t.onBrand, 0.28),
+    overflow: 'hidden',
+  },
+  markLogo: {
+    width: 30,
+    height: 30,
+  },
+  wordmarkTexts: {
+    flex: 1,
   },
   wordmarkName: {
     color: t.onBrand,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.6,
+    textTransform: 'uppercase',
   },
   wordmarkSub: {
     color: alpha(t.onBrand, 0.62),
@@ -736,5 +938,35 @@ const criarEstilos = (t: Tema) =>
     fontSize: 13.5,
     color: t.muted,
     lineHeight: 19,
+  },
+  // Seletor de clínica (app compartilhado com CPF em mais de uma unidade).
+  clinicaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: t.surface,
+    borderWidth: 1.5,
+    borderColor: t.line,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  clinicaItemPressed: {
+    backgroundColor: '#F2F7F6',
+  },
+  clinicaIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(t.brand, 0.1),
+  },
+  clinicaNome: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: t.ink,
   },
 });

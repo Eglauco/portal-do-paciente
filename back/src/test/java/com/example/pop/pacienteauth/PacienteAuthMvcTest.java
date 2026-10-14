@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.AfterEach;
@@ -216,5 +217,50 @@ class PacienteAuthMvcTest {
         mvc.perform(post("/paciente-auth/login-senha")
                         .contentType(MediaType.APPLICATION_JSON).content(certo))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    /**
+     * Pré-checagem SÓ com CPF (passo 1 do login CPF-first): diz se o CPF tem senha (PIN) CENTRAL, para o
+     * app rotear (tela de senha × primeiro acesso). É público e clínico-agnóstico. Começa ativando (o OTP
+     * zera o PIN central) → temSenha=false; após definir o PIN → temSenha=true.
+     */
+    @Test
+    void preChecagemSoComCpf() throws Exception {
+        String cpfBody = "{\"cpf\":\"" + CPF + "\"}";
+        // Ativa (OTP) — zera o PIN central → pré-check deve dizer temSenha=false (estado determinístico).
+        String ativarBody = "{\"cpf\":\"" + CPF + "\",\"dataNascimento\":\"1990-01-01\","
+                + "\"codigo\":\"000000\",\"dispositivoId\":\"dev-prechk\",\"telefone\":\"" + TEL + "\"}";
+        MvcResult ativou = mvc.perform(post("/paciente-auth/ativar")
+                        .contentType(MediaType.APPLICATION_JSON).content(ativarBody))
+                .andExpect(status().isOk()).andReturn();
+        String token = ativou.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
+
+        mvc.perform(post("/paciente-auth/pre-checagem")
+                        .contentType(MediaType.APPLICATION_JSON).content(cpfBody))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"temSenha\":false")));
+
+        // Define o PIN → pré-check agora deve dizer temSenha=true.
+        mvc.perform(post("/paciente-auth/definir-senha").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"123456\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/paciente-auth/pre-checagem")
+                        .contentType(MediaType.APPLICATION_JSON).content(cpfBody))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"temSenha\":true")));
+    }
+
+    /**
+     * Robustez do ipDoCliente (rate-limit): X-Forwarded-For só com vírgula (",") NÃO pode quebrar — era um
+     * 500 porque ",".split(",")[0] lançava AIOOBE. Com o fix (último token não-vazio, senão o IP remoto)
+     * deve responder 200 normalmente.
+     */
+    @Test
+    void preChecagemComXforwardedforMalformadoNaoQuebra() throws Exception {
+        mvc.perform(post("/paciente-auth/pre-checagem")
+                        .header("X-Forwarded-For", ",")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"cpf\":\"" + CPF + "\"}"))
+                .andExpect(status().isOk());
     }
 }

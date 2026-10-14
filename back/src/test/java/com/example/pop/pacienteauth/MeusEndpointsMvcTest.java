@@ -95,9 +95,9 @@ class MeusEndpointsMvcTest {
     @Test
     void meusEndpointsExigemTokenErespondemComSessao() throws Exception {
         // Sem token → 401.
-        mvc.perform(get("/meu/agendamentos")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/meu/horarios")).andExpect(status().isUnauthorized());
         // Com token → 200 (lista do próprio paciente, mesmo que vazia).
-        mvc.perform(get("/meu/agendamentos").header("Authorization", bearer())).andExpect(status().isOk());
+        mvc.perform(get("/meu/horarios").header("Authorization", bearer())).andExpect(status().isOk());
         mvc.perform(get("/meu/prontuarios").header("Authorization", bearer())).andExpect(status().isOk());
         mvc.perform(get("/meu/nps").header("Authorization", bearer())).andExpect(status().isOk());
         mvc.perform(get("/meu/chats").header("Authorization", bearer())).andExpect(status().isOk());
@@ -107,7 +107,7 @@ class MeusEndpointsMvcTest {
     void naoCancelaAgendamentoDeOutroPaciente() throws Exception {
         Horario alheio = agendamentoRepository.findAll().stream().findFirst().orElse(null);
         Assumptions.assumeTrue(alheio != null, "sem agendamento semeado para testar IDOR");
-        mvc.perform(post("/meu/agendamentos/" + alheio.getId() + "/cancelar").header("Authorization", bearer()))
+        mvc.perform(post("/meu/horarios/" + alheio.getId() + "/cancelar").header("Authorization", bearer()))
                 .andExpect(status().isNotFound());
     }
 

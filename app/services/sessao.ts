@@ -205,7 +205,17 @@ async function persistir(): Promise<void> {
  * Devolve o telefone MASCARADO do dono do CPF (ex.: "(••) •••••-1234"), para o app mostrar
  * para onde o SMS foi enviado.
  */
-export async function solicitarCodigo(cpf: string, dataNascimento: string, telefone: string): Promise<string> {
+/** Resultado do pedido de código: telefone mascarado + clínicas onde a identidade confere (app compartilhado). */
+export interface InicioOtp {
+  telefoneMascarado: string;
+  clinicas: ClinicaLogin[];
+}
+
+export async function solicitarCodigo(
+  cpf: string,
+  dataNascimento: string,
+  telefone: string,
+): Promise<InicioOtp> {
   const cpfLimpo = cpf.replace(/\D/g, '');
   const telLimpo = telefone.replace(/\D/g, '');
   let resposta: Response;
@@ -224,8 +234,8 @@ export async function solicitarCodigo(cpf: string, dataNascimento: string, telef
   if (!resposta.ok) {
     throw new Error('Não foi possível enviar o código agora. Tente novamente.');
   }
-  const dados = (await resposta.json()) as { telefoneMascarado?: string };
-  return dados.telefoneMascarado ?? '';
+  const dados = (await resposta.json()) as { telefoneMascarado?: string; clinicas?: ClinicaLogin[] };
+  return { telefoneMascarado: dados.telefoneMascarado ?? '', clinicas: dados.clinicas ?? [] };
 }
 
 /**
@@ -239,6 +249,7 @@ export async function ativar(
   dataNascimento: string,
   codigo: string,
   telefone: string,
+  inquilinoId?: number,
 ): Promise<SessaoPaciente> {
   const dispositivoId = await obterDispositivoId();
   const cpfLimpo = cpf.replace(/\D/g, '');
@@ -248,7 +259,14 @@ export async function ativar(
     resposta = await fetch(`${API_URL}/paciente-auth/ativar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
-      body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, codigo, dispositivoId, telefone: telLimpo }),
+      body: JSON.stringify({
+        cpf: cpfLimpo,
+        dataNascimento,
+        codigo,
+        dispositivoId,
+        telefone: telLimpo,
+        inquilinoId: inquilinoId ?? null,
+      }),
     });
   } catch {
     throw new Error('Sem conexão. Verifique a internet e tente novamente.');
@@ -314,12 +332,55 @@ export async function iniciarLogin(cpf: string, dataNascimento: string, telefone
 }
 
 /**
+ * Pré-checagem do login (SÓ CPF): diz se o CPF já tem senha (PIN) CENTRAL na plataforma, para o app
+ * rotear — tela de senha (tem) ou primeiro acesso (não tem). É clínico-agnóstico: NÃO revela se o CPF
+ * é paciente desta clínica (anti-enumeração). 429 quando há muitas tentativas (rate-limit por IP).
+ */
+export async function preChecagem(cpf: string): Promise<{ temSenha: boolean }> {
+  const cpfLimpo = cpf.replace(/\D/g, '');
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/pre-checagem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
+      body: JSON.stringify({ cpf: cpfLimpo }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (resposta.status === 429) {
+    throw new Error('Muitas tentativas. Aguarde um momento e tente de novo.');
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível continuar agora. Tente novamente.');
+  }
+  const dados = (await resposta.json()) as { temSenha?: boolean };
+  return { temSenha: dados.temSenha ?? false };
+}
+
+/**
  * Login por SENHA (sem SMS): CPF + PIN + id do aparelho. O PIN é a prova de identidade (o CPF só
  * identifica a conta — telefone e data não entram neste caminho). Guarda a sessão (mesmo formato do
  * OTP) já sem precisar definir senha. Erros do backend sobem com a mensagem exata (senha incorreta,
  * muitas tentativas, sem senha cadastrada) para a tela orientar o usuário.
  */
-export async function loginPorSenha(cpf: string, senha: string): Promise<SessaoPaciente> {
+/** Uma clínica que o CPF pode acessar — item do seletor "Selecionar Clínica" (app compartilhado). */
+export interface ClinicaLogin {
+  inquilinoId: number;
+  nome: string;
+}
+
+/**
+ * Resultado do login por senha: ou a SESSÃO foi criada (app A-baked, ou após escolher a clínica), ou há uma
+ * lista de CLÍNICAS para escolher (app compartilhado quando o CPF está em mais de uma). Exatamente um dos dois.
+ */
+export type ResultadoLogin = { sessao: SessaoPaciente } | { clinicas: ClinicaLogin[] };
+
+export async function loginPorSenha(
+  cpf: string,
+  senha: string,
+  inquilinoId?: number,
+): Promise<ResultadoLogin> {
   const dispositivoId = await obterDispositivoId();
   const cpfLimpo = cpf.replace(/\D/g, '');
   let resposta: Response;
@@ -327,7 +388,7 @@ export async function loginPorSenha(cpf: string, senha: string): Promise<SessaoP
     resposta = await fetch(`${API_URL}/paciente-auth/login-senha`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
-      body: JSON.stringify({ cpf: cpfLimpo, senha, dispositivoId }),
+      body: JSON.stringify({ cpf: cpfLimpo, senha, dispositivoId, inquilinoId: inquilinoId ?? null }),
     });
   } catch {
     throw new Error('Sem conexão. Verifique a internet e tente novamente.');
@@ -337,22 +398,27 @@ export async function loginPorSenha(cpf: string, senha: string): Promise<SessaoP
     throw new Error(await mensagemLogin(resposta));
   }
   const dados = (await resposta.json()) as {
-    token: string;
-    pacienteId: number;
-    nome: string;
-    perfis?: Perfil[];
-    precisaDefinirSenha?: boolean;
+    sessao?: { token: string; pacienteId: number; nome: string; perfis?: Perfil[]; precisaDefinirSenha?: boolean } | null;
+    escolherClinica?: ClinicaLogin[] | null;
   };
+  // App compartilhado, CPF em >1 clínica: devolve a lista pra escolher (sem sessão ainda).
+  if (dados.escolherClinica && dados.escolherClinica.length > 0) {
+    return { clinicas: dados.escolherClinica };
+  }
+  const s = dados.sessao;
+  if (!s) {
+    throw new Error('Não foi possível entrar. Tente novamente.');
+  }
   cache = {
-    token: dados.token,
-    pacienteId: dados.pacienteId,
-    nome: dados.nome,
-    perfis: dados.perfis ?? [],
+    token: s.token,
+    pacienteId: s.pacienteId,
+    nome: s.nome,
+    perfis: s.perfis ?? [],
     perfilSelecionado: false,
-    precisaDefinirSenha: dados.precisaDefinirSenha ?? false,
+    precisaDefinirSenha: s.precisaDefinirSenha ?? false,
   };
   await persistir();
-  return cache;
+  return { sessao: cache };
 }
 
 /**
@@ -494,6 +560,61 @@ export async function trocarPerfilSeNecessario(pacienteId: number): Promise<bool
   if (solicitarTrocaPerfil) await solicitarTrocaPerfil(pacienteId);
   else await trocarPerfil(pacienteId);
   return true;
+}
+
+/** Clínicas (ativas) que o CPF logado pode acessar — para o app compartilhado oferecer "trocar unidade". */
+export async function minhasClinicas(): Promise<ClinicaLogin[]> {
+  const resposta = await fetchMeu('/paciente-auth/minhas-clinicas');
+  if (!resposta.ok) {
+    throw new Error('Não foi possível carregar as unidades.');
+  }
+  return (await resposta.json()) as ClinicaLogin[];
+}
+
+/**
+ * Troca a clínica da sessão (app compartilhado), SEM refazer login: reemite o token com a nova clínica
+ * (novo `inq`) num perfil padrão dela. Volta à tela "Selecionar Perfil" (a nova unidade tem os próprios
+ * perfis). 401 → sessão expirada (desloga). 403 → clínica não é do CPF.
+ */
+export async function trocarClinica(inquilinoId: number): Promise<SessaoPaciente> {
+  await carregarSessao();
+  const cabecalhos = authHeaders();
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${API_URL}/paciente-auth/trocar-clinica`, {
+      method: 'POST',
+      headers: { ...cabecalhos, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inquilinoId }),
+    });
+  } catch {
+    throw new Error('Sem conexão. Verifique a internet e tente novamente.');
+  }
+  if (resposta.status === 401 && cabecalhos.Authorization) {
+    await sair();
+    aoInvalidar?.();
+    throw new Error('Sessão expirada. Entre novamente.');
+  }
+  if (!resposta.ok) {
+    throw new Error('Não foi possível trocar de unidade. Tente novamente.');
+  }
+  const dados = (await resposta.json()) as {
+    token: string;
+    pacienteId: number;
+    nome: string;
+    perfis?: Perfil[];
+    precisaDefinirSenha?: boolean;
+  };
+  cache = {
+    token: dados.token,
+    pacienteId: dados.pacienteId,
+    nome: dados.nome,
+    perfis: dados.perfis ?? [],
+    // A nova unidade tem os próprios perfis → volta para a tela "Selecionar Perfil".
+    perfilSelecionado: false,
+    precisaDefinirSenha: dados.precisaDefinirSenha ?? false,
+  };
+  await persistir();
+  return cache;
 }
 
 /** Encerra a sessão (o usuário precisará de um novo código para voltar). */

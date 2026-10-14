@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface PacienteLoginRepository extends JpaRepository<PacienteLogin, Long> {
 
@@ -15,4 +18,16 @@ public interface PacienteLoginRepository extends JpaRepository<PacienteLogin, Lo
 
     /** 1º vínculo do CPF em ordem DETERMINÍSTICA — fallback legado de roteamento (sem X-Inquilino). */
     Optional<PacienteLogin> findFirstByCpfOrderByIdAsc(String cpf);
+
+    /**
+     * Garante o vínculo (cpf, inquilino) de forma ATÔMICA e idempotente, à prova de corrida: o
+     * {@code ON CONFLICT DO NOTHING} deixa o banco resolver o duplo-insert concorrente (índice único
+     * uk_paciente_login_cpf_inq, V158) sem lançar exceção — ao contrário do find-then-save, que sob
+     * concorrência estoura DataIntegrityViolationException no commit e derruba a transação do cadastro.
+     * {@code criado_em} é NOT NULL sem default no banco, então preenche aqui com now().
+     */
+    @Modifying
+    @Query(value = "INSERT INTO public.paciente_login (cpf, inquilino_id, criado_em) "
+            + "VALUES (:cpf, :inquilinoId, now()) ON CONFLICT (cpf, inquilino_id) DO NOTHING", nativeQuery = true)
+    void inserirSeAusente(@Param("cpf") String cpf, @Param("inquilinoId") Long inquilinoId);
 }
