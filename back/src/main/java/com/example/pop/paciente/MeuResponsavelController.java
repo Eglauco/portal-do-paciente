@@ -212,6 +212,12 @@ public class MeuResponsavelController {
         paciente.getResponsaveis().removeIf(x -> x.getId().equals(id));
         // Auditoria (LGPD): lê os dados de r ANTES do flush, então o texto sobrevive à remoção.
         pacienteLogService.registrarResponsavelRemovidoPeloPaciente(paciente, r);
+        // Reconcilia o censo: se ninguém mais (paciente ou outro responsável) usa o CPF deste responsável
+        // nesta clínica, remove o vínculo órfão de public.paciente_login. A query de existência força o
+        // flush da remoção acima, então reflete o estado sem este responsável.
+        if (jwt.getClaim("inq") instanceof Number inq && r.getCpf() != null && !r.getCpf().isBlank()) {
+            roteamentoService.reconciliar(List.of(r.getCpf()), inq.longValue());
+        }
         return ResponseEntity.noContent().build();
     }
 

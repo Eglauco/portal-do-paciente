@@ -340,6 +340,9 @@ public class PacienteController {
                     }
                     // Fotografa o estado ANTES de aplicar as mudanças (para o diff granular).
                     PacienteLogService.SnapshotPaciente antes = logService.snapshot(existente);
+                    // CPFs do cadastro ANTES da edição: para reconciliar o censo (um CPF que saiu —
+                    // paciente com CPF trocado ou responsável removido — pode deixar vínculo órfão).
+                    Set<String> cpfsAntes = cpfsDoCadastro(existente);
                     aplicar(existente, dados);
                     // ativo/código/aparelho são geridos por gerar-codigo/revogar, não pelo corpo.
                     validarUnicidade(existente, id);
@@ -348,6 +351,10 @@ public class PacienteController {
                     // Censo do roteamento: o CPF do paciente pode ter sido definido/alterado e um
                     // responsável novo pode ter entrado na edição — registra os vínculos (idempotente).
                     registrarVinculos(salvo, jwt);
+                    // E remove os vínculos órfãos: dos CPFs que estavam no cadastro e não têm mais
+                    // paciente/responsável neste inquilino (CPF trocado, responsável removido). A
+                    // reconciliação roda após o save (flush das remoções) e só apaga vínculo sem dono.
+                    roteamentoPacienteService.reconciliar(cpfsAntes, inquilinoDoToken(jwt));
                     return ResponseEntity.ok(salvo);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -510,17 +517,24 @@ public class PacienteController {
                 p.getResponsaveis().add(novo);
             }
         }
+        // As remoções consideram SÓ os responsáveis que já existiam (existentes.keySet()). Um responsável
+        // NOVO (id nulo na entrada) não pode ser alvo de remoção mesmo que, no meio deste método, uma query
+        // (ex.: temLancamentos abaixo) force um flush do Hibernate e atribua um id ao novo (IDENTITY):
+        // sem este guard, o removeIf veria o id recém-gerado "fora de mantidos" e APAGARIA o responsável que
+        // acabou de ser criado (bug: adicionar + remover na mesma edição fazia o adicionado sumir).
         // Bloqueia a remoção de responsável com lançamentos (preserva a autoria): só resta
         // inativar. Checa ANTES do removeIf; se disparar, a transação inteira é desfeita.
         for (Responsavel r : p.getResponsaveis()) {
-            if (r.getId() != null && !mantidos.contains(r.getId()) && lancamentoService.temLancamentos(r.getId())) {
+            if (r.getId() != null && existentes.containsKey(r.getId()) && !mantidos.contains(r.getId())
+                    && lancamentoService.temLancamentos(r.getId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Não é possível remover o responsável \"" + r.getNome()
                                 + "\": há lançamentos dele no sistema. Inative-o para preservar o histórico.");
             }
         }
-        // Remove os existentes (sem lançamentos) que não vieram no request (orphanRemoval apaga).
-        p.getResponsaveis().removeIf(r -> r.getId() != null && !mantidos.contains(r.getId()));
+        // Remove os que JÁ EXISTIAM e não vieram no request (orphanRemoval apaga). Nunca um recém-criado.
+        p.getResponsaveis().removeIf(r -> r.getId() != null && existentes.containsKey(r.getId())
+                && !mantidos.contains(r.getId()));
     }
 
     /**
@@ -647,6 +661,20 @@ public class PacienteController {
         for (Responsavel responsavel : salvo.getResponsaveis()) {
             roteamentoPacienteService.registrar(responsavel.getCpf(), inquilinoId);
         }
+    }
+
+    /** CPFs (só dígitos, não vazios) presentes no cadastro: o do paciente + os dos responsáveis. */
+    private static Set<String> cpfsDoCadastro(Paciente p) {
+        Set<String> cpfs = new HashSet<>();
+        if (p.getCpf() != null && !p.getCpf().isBlank()) {
+            cpfs.add(p.getCpf());
+        }
+        for (Responsavel responsavel : p.getResponsaveis()) {
+            if (responsavel.getCpf() != null && !responsavel.getCpf().isBlank()) {
+                cpfs.add(responsavel.getCpf());
+            }
+        }
+        return cpfs;
     }
 
     private Paciente salvarUnico(Paciente paciente) {

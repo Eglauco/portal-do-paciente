@@ -42,6 +42,9 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
     // Checagens de unicidade (ignoram o próprio registro na edição, via id != :id).
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
+    /** Existe algum paciente com este CPF no schema atual (p/ reconciliar o censo paciente_login). */
+    boolean existsByCpf(String cpf);
+
     boolean existsByCnsAndIdNot(String cns, Long id);
 
     boolean existsByCodigoIntegracaoAndIdNot(String codigoIntegracao, Long id);

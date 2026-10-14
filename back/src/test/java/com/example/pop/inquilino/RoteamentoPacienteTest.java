@@ -4,11 +4,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import com.example.pop.paciente.Paciente;
+import com.example.pop.paciente.PacienteController;
+import com.example.pop.paciente.PacienteRepository;
+import com.example.pop.paciente.PacienteRequest;
 
 /**
  * Roteamento de login do paciente. Fase B: o vínculo cpf→inquilino é idempotente POR inquilino e um
@@ -20,6 +27,7 @@ class RoteamentoPacienteTest {
 
     private static final String CPF = "99988877700";
     private static final String SCHEMA_OUTRO = "inq_teste_rot_outro";
+    private static final String TEL_REC = "11955550099";
 
     @Autowired
     private RoteamentoPacienteService service;
@@ -29,6 +37,10 @@ class RoteamentoPacienteTest {
     private InquilinoService inquilinoService;
     @Autowired
     private InquilinoRepository inquilinoRepository;
+    @Autowired
+    private PacienteController pacienteController;
+    @Autowired
+    private PacienteRepository pacienteRepository;
 
     @BeforeEach
     void setup() {
@@ -71,8 +83,44 @@ class RoteamentoPacienteTest {
         assertTrue(pacienteLoginRepository.findByCpf(CPF).isEmpty(), "nada criado para CPF nulo/vazio");
     }
 
+    @Test
+    void reconciliarRemoveVinculoOrfao() {
+        Long padrao = inquilinoService.idPadrao();
+        service.registrar(CPF, padrao);
+        assertFalse(pacienteLoginRepository.findByCpf(CPF).isEmpty(), "vínculo criado");
+        // Nenhum paciente/responsável com esse CPF no schema → reconciliar remove o órfão.
+        service.reconciliar(List.of(CPF), padrao);
+        assertTrue(pacienteLoginRepository.findByCpf(CPF).isEmpty(), "vínculo órfão removido");
+    }
+
+    @Test
+    void reconciliarMantemVinculoEnquantoAlguemUsaOCpf() {
+        Long padrao = inquilinoService.idPadrao();
+        // Cria um paciente com o CPF no schema (atalho: cria sem CPF e seta direto, como nos outros testes).
+        pacienteRepository.buscarPorTelefoneNaLista(TEL_REC).forEach(p -> pacienteRepository.deleteById(p.getId()));
+        Long pid = pacienteController.criar(new PacienteRequest("Teste Reconciliar", TEL_REC), null).getId();
+        try {
+            Paciente p = pacienteRepository.findById(pid).orElseThrow();
+            p.setCpf(CPF);
+            pacienteRepository.save(p);
+            service.registrar(CPF, padrao);
+            // Ainda há paciente com o CPF nesta clínica → NÃO remove (nunca apaga vínculo válido).
+            service.reconciliar(List.of(CPF), padrao);
+            assertFalse(pacienteLoginRepository.findByCpf(CPF).isEmpty(),
+                    "vínculo mantido enquanto há paciente com o CPF");
+            // Sumiu o paciente → o CPF fica órfão → reconciliar remove.
+            pacienteRepository.deleteById(pid);
+            service.reconciliar(List.of(CPF), padrao);
+            assertTrue(pacienteLoginRepository.findByCpf(CPF).isEmpty(),
+                    "vínculo removido depois que ninguém mais usa o CPF");
+        } finally {
+            pacienteRepository.findById(pid).ifPresent(x -> pacienteRepository.deleteById(pid));
+        }
+    }
+
     private void limpar() {
         pacienteLoginRepository.deleteAll(pacienteLoginRepository.findByCpf(CPF));
         inquilinoRepository.findBySchemaName(SCHEMA_OUTRO).ifPresent(inquilinoRepository::delete);
+        pacienteRepository.buscarPorTelefoneNaLista(TEL_REC).forEach(p -> pacienteRepository.deleteById(p.getId()));
     }
 }
