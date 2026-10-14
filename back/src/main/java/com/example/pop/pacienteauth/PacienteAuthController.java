@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.inquilino.InquilinoService;
 import com.example.pop.inquilino.PacienteLogin;
 import com.example.pop.inquilino.PacienteLoginRepository;
+import com.example.pop.inquilino.RoteamentoPacienteService;
 import com.example.pop.paciente.ContaApp;
 import com.example.pop.paciente.Documentos;
 import com.example.pop.paciente.Paciente;
@@ -47,32 +48,44 @@ public class PacienteAuthController {
     private final JwtEncoder jwtEncoder;
     private final InquilinoService inquilinoService;
     private final PacienteLoginRepository pacienteLoginRepository;
+    private final RoteamentoPacienteService roteamentoService;
     private final long expiracaoDias;
 
     public PacienteAuthController(PacienteAcessoService acessoService, StorageService storageService,
             JwtEncoder jwtEncoder, InquilinoService inquilinoService,
-            PacienteLoginRepository pacienteLoginRepository,
+            PacienteLoginRepository pacienteLoginRepository, RoteamentoPacienteService roteamentoService,
             @Value("${app.jwt.paciente-expiration-days:365}") long expiracaoDias) {
         this.acessoService = acessoService;
         this.storageService = storageService;
         this.jwtEncoder = jwtEncoder;
         this.inquilinoService = inquilinoService;
         this.pacienteLoginRepository = pacienteLoginRepository;
+        this.roteamentoService = roteamentoService;
         this.expiracaoDias = expiracaoDias;
     }
 
     /**
-     * Login do app em 2 fases (multi-inquilino): o paciente/responsável não informa o inquilino — ele é
-     * resolvido pelo CPF no ponteiro {@link PacienteLogin} (schema {@code public}). Sem ponteiro (paciente
-     * legado ou ainda não roteado) cai no inquilino PADRÃO. O schema é fixado na thread ANTES de consultar
-     * o cadastro/credencial e restaurado no {@code finally} (não vaza entre requests do pool).
+     * Resolve o inquilino do login do app. Fase B: o app A-baked envia o inquilino no header
+     * {@code X-Inquilino} (o {@code SubdominioTenantFilter} já fixou o schema ANTES deste controller) —
+     * esse é o caminho normal. Fallback legado (sem o header): o 1º vínculo do CPF em {@link PacienteLogin}
+     * (schema {@code public}), senão o inquilino PADRÃO. O schema é fixado na thread ANTES de consultar o
+     * cadastro e restaurado no {@code finally} (não vaza entre requests do pool).
      */
     private Long resolverInquilino(String cpfBruto) {
+        String schemaAtual = TenantContext.atualBruto();
+        if (schemaAtual != null) {
+            Long id = inquilinoService.idPorSchema(schemaAtual);
+            if (id != null) {
+                return id;
+            }
+        }
+        // Legado (sem X-Inquilino): com 1→N o CPF não resolve mais UM inquilino de forma única — pega o
+        // 1º vínculo, senão o padrão. O app baked é a fonte da verdade do inquilino.
         String cpf = Documentos.somenteDigitos(cpfBruto);
         if (cpf == null) {
             return inquilinoService.idPadrao();
         }
-        return pacienteLoginRepository.findByCpf(cpf)
+        return pacienteLoginRepository.findFirstByCpfOrderByIdAsc(cpf)
                 .map(PacienteLogin::getInquilinoId)
                 .orElseGet(inquilinoService::idPadrao);
     }
@@ -134,6 +147,10 @@ public class PacienteAuthController {
         TenantContext.definir(inquilinoService.schemaPorId(inquilinoId));
         try {
             ContaApp conta = acessoService.loginPorSenha(request.cpf(), request.senha(), dispositivoId);
+            // Registra o vínculo (cpf→inquilino) desta clínica: o paciente_login passa a refletir TODA
+            // clínica onde o CPF de fato loga, p/ a limpeza da identidade central (excluirConta) não
+            // apagar o PIN de quem ainda usa outra clínica. Idempotente; escreve no public.
+            roteamentoService.registrar(conta.getCpf(), inquilinoId);
             return montarResposta(conta, dispositivoId, false, inquilinoId);
         } finally {
             restaurar(anterior);
@@ -161,6 +178,9 @@ public class PacienteAuthController {
         try {
             ContaApp conta = acessoService.ativar(request.cpf(), request.dataNascimento(), request.telefone(),
                     request.codigo(), dispositivoId);
+            // Census do vínculo (cpf→inquilino) desta clínica (ver loginSenha): mantém o paciente_login
+            // completo p/ a identidade central só ser apagada quando realmente não sobra clínica.
+            roteamentoService.registrar(conta.getCpf(), inquilinoId);
             // Pós-OTP: a senha foi resetada — o app deve pedir um novo PIN antes de escolher o perfil.
             return montarResposta(conta, dispositivoId, true, inquilinoId);
         } finally {

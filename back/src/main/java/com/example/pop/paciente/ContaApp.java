@@ -13,10 +13,12 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * Conta do app: representa o CPF autenticado por OTP e o aparelho vinculado.
- * É o ponto de sessão (cid no token). O perfil ativo (paciente por quem se age)
- * fica no claim pid. Assim um CPF que é só responsável também tem sessão. O telefone
- * deixou de ser identidade — é só o canal por onde o OTP é enviado.
+ * Conta do app: a SESSÃO por-clínica — o CPF autenticado e o aparelho vinculado. É o ponto de sessão
+ * (cid no token). O perfil ativo (paciente por quem se age) fica no claim pid. Assim um CPF que é só
+ * responsável também tem sessão. O telefone deixou de ser identidade — é só o canal do OTP.
+ *
+ * <p>Fase B: a CREDENCIAL (PIN + lockout) saiu daqui e virou CENTRAL ({@code public.paciente_identidade},
+ * 1 por CPF p/ todas as clínicas do paciente). Esta tabela guarda só a sessão/aparelho, por-inquilino.
  */
 @Entity
 @Table(name = "conta_app")
@@ -36,18 +38,6 @@ public class ContaApp {
     /** Aparelho com a sessão ativa (uma por vez). Trocar de aparelho exige reativar. */
     @Column(name = "dispositivo_ativo", length = 120)
     private String dispositivoAtivo;
-
-    /**
-     * Hash (BCrypt) do PIN de acesso definido pelo paciente/responsável — permite entrar sem SMS.
-     * Nulo = ainda não definiu (ou foi resetado por um novo OTP). Login por senha exige a identidade
-     * (telefone+CPF+data) + este PIN.
-     */
-    @Column(name = "senha_hash", length = 100)
-    private String senhaHash;
-
-    /** Tentativas consecutivas de PIN erradas; ao atingir o limite, o login por senha é bloqueado (usa SMS). */
-    @Column(name = "senha_tentativas", nullable = false)
-    private int senhaTentativas;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;

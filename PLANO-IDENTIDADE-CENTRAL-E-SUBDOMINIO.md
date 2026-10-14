@@ -233,7 +233,10 @@
 
 ## 7. Checklist — onboarding de um novo cliente (A-baked)
 1. Criar inquilino no super-admin (nome, schema, **subdomínio**, 1º admin).
-2. DNS: `clinicaX.trilharsaude.app.br` já coberto pelo wildcard (nada a fazer no registro.br por clínica).
+2. DNS por clínica (o registro.br NÃO aceita wildcard `*`): (a) adicionar `clinicaX.trilharsaude.app.br` no
+   serviço FRONT do Railway (`portal-do-paciente`, porta 8080) → copiar o CNAME + o TXT `_railway-verify.clinicaX`
+   que o Railway mostrar; (b) no registro.br (modo avançado, "Configurar zona DNS" → NOVA ENTRADA) criar os 2
+   registros e SALVAR. ~2 min por clínica; o Railway emite o cert sozinho.
 3. EAS: novo build profile (bundle id, nome, ícone, splash, cor, `INQUILINO`, arquivos Firebase).
 4. Contas de loja **do cliente** (Apple $99/ano, Google $25) + acesso pra publicar.
 5. Links de loja da clínica nas Configurações (SMS-convite).

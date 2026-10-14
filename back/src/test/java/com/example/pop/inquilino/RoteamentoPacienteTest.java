@@ -1,7 +1,7 @@
 package com.example.pop.inquilino;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
@@ -9,11 +9,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Roteamento de login do paciente (Fase 1.3a): o ponteiro cpf→inquilino é idempotente e barra o
- * mesmo CPF em dois inquilinos (1 pessoa = 1 inquilino). CPF nulo/vazio é ignorado.
+ * Roteamento de login do paciente. Fase B: o vínculo cpf→inquilino é idempotente POR inquilino e um
+ * mesmo CPF pode estar em N clínicas (identidade central — NÃO há mais "1 pessoa = 1 inquilino").
+ * CPF nulo/vazio é ignorado.
  */
 @SpringBootTest
 class RoteamentoPacienteTest {
@@ -41,23 +41,26 @@ class RoteamentoPacienteTest {
     }
 
     @Test
-    void registraPonteiroEhIdempotente() {
+    void registraVinculoEhIdempotentePorInquilino() {
         Long padrao = inquilinoService.idPadrao();
         service.registrar(CPF, padrao);
-        assertTrue(pacienteLoginRepository.findByCpf(CPF).isPresent(), "ponteiro criado");
-        service.registrar(CPF, padrao); // 2x não duplica nem falha
-        assertEquals(padrao, pacienteLoginRepository.findByCpf(CPF).orElseThrow().getInquilinoId());
+        assertFalse(pacienteLoginRepository.findByCpf(CPF).isEmpty(), "vínculo criado");
+        service.registrar(CPF, padrao); // 2x no MESMO inquilino não duplica
+        assertEquals(1, pacienteLoginRepository.findByCpf(CPF).size(), "não duplica o vínculo do mesmo inquilino");
+        assertEquals(padrao, pacienteLoginRepository.findByCpf(CPF).get(0).getInquilinoId());
     }
 
     @Test
-    void cpfEmOutroInquilinoFalha() {
+    void mesmoCpfEmOutroInquilinoCriaSegundoVinculo() {
         service.registrar(CPF, inquilinoService.idPadrao());
         Inquilino outro = new Inquilino();
         outro.setNome("Outro");
         outro.setSchemaName(SCHEMA_OUTRO);
         Long outroId = inquilinoRepository.save(outro).getId();
-        assertThrows(ResponseStatusException.class, () -> service.registrar(CPF, outroId),
-                "mesmo CPF em outro inquilino deve falhar (1 pessoa = 1 inquilino)");
+        // Fase B: o mesmo CPF em outra clínica NÃO falha mais — cria um 2º vínculo (identidade central).
+        service.registrar(CPF, outroId);
+        assertEquals(2, pacienteLoginRepository.findByCpf(CPF).size(),
+                "o mesmo CPF pode estar em duas clínicas (1→N)");
     }
 
     @Test
@@ -65,11 +68,11 @@ class RoteamentoPacienteTest {
         service.registrar(null, inquilinoService.idPadrao());
         service.registrar("", inquilinoService.idPadrao());
         service.registrar("  ", inquilinoService.idPadrao());
-        // não lança nem cria nada
+        assertTrue(pacienteLoginRepository.findByCpf(CPF).isEmpty(), "nada criado para CPF nulo/vazio");
     }
 
     private void limpar() {
-        pacienteLoginRepository.findByCpf(CPF).ifPresent(pacienteLoginRepository::delete);
+        pacienteLoginRepository.deleteAll(pacienteLoginRepository.findByCpf(CPF));
         inquilinoRepository.findBySchemaName(SCHEMA_OUTRO).ifPresent(inquilinoRepository::delete);
     }
 }

@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.inquilino.PacienteIdentidade;
+import com.example.pop.inquilino.PacienteIdentidadeRepository;
+import com.example.pop.inquilino.PacienteLoginRepository;
 import com.example.pop.push.Dispositivo;
 import com.example.pop.push.DispositivoRepository;
 import com.example.pop.verificacao.CanalVerificacao;
@@ -42,8 +45,10 @@ public class PacienteAcessoService {
     private static final int MAX_POR_JANELA = 5;
     private static final long JANELA_MS = 3_600_000L; // 1 hora
 
-    /** Após este nº de PINs errados, o login por senha é bloqueado até um novo OTP (SMS). */
+    /** Após este nº de PINs errados consecutivos, o login por senha entra em lockout temporal. */
     private static final int MAX_TENTATIVAS_SENHA = 5;
+    /** Duração do lockout auto-expirável (minutos): libera sozinho, sem forçar OTP. */
+    private static final long LOCKOUT_MINUTOS = 15;
 
     private final PacienteRepository repository;
     private final ContaAppRepository contaRepository;
@@ -52,13 +57,18 @@ public class PacienteAcessoService {
     private final VerificacaoService verificacao;
     private final TelasAppService telasAppService;
     private final PacienteLogService logService;
+    private final PacienteIdentidadeRepository identidadeRepository;
+    private final PacienteLoginRepository pacienteLoginRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    /** Hash de referência (mesmo custo dos reais) p/ igualar o tempo quando não há credencial (anti-enumeração). */
+    private final String hashFicticio;
     /** Rate-limit por CPF (em memória) para evitar SMS bombing e abuso de custo. */
     private final Map<String, Deque<Long>> enviosPorCpf = new ConcurrentHashMap<>();
 
     public PacienteAcessoService(PacienteRepository repository, ContaAppRepository contaRepository,
             ResponsavelRepository responsavelRepository, DispositivoRepository dispositivoRepository,
             VerificacaoService verificacao, TelasAppService telasAppService, PacienteLogService logService,
+            PacienteIdentidadeRepository identidadeRepository, PacienteLoginRepository pacienteLoginRepository,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.contaRepository = contaRepository;
@@ -67,7 +77,42 @@ public class PacienteAcessoService {
         this.verificacao = verificacao;
         this.telasAppService = telasAppService;
         this.logService = logService;
+        this.identidadeRepository = identidadeRepository;
+        this.pacienteLoginRepository = pacienteLoginRepository;
         this.passwordEncoder = passwordEncoder;
+        this.hashFicticio = passwordEncoder.encode("timing-guard-paciente-nao-usar");
+    }
+
+    /** Credencial CENTRAL (public) do CPF, ou {@code null} se ainda não existe. */
+    private PacienteIdentidade identidade(String cpf) {
+        return cpf == null || cpf.isEmpty() ? null : identidadeRepository.findByCpf(cpf).orElse(null);
+    }
+
+    /** Credencial CENTRAL do CPF; cria uma nova (ainda NÃO persistida) se não existir. */
+    private PacienteIdentidade identidadeOuNova(String cpf) {
+        return identidadeRepository.findByCpf(cpf).orElseGet(() -> {
+            PacienteIdentidade nova = new PacienteIdentidade();
+            nova.setCpf(cpf);
+            return nova;
+        });
+    }
+
+    /** A credencial está em lockout agora (bloqueio temporal ainda não expirou)? */
+    private boolean estaBloqueada(PacienteIdentidade id) {
+        return id.getBloqueadoAte() != null && id.getBloqueadoAte().isAfter(LocalDateTime.now());
+    }
+
+    /** Registra um PIN errado: incrementa e, ao atingir o teto, entra em lockout TEMPORAL (auto-expira). */
+    private void registrarTentativaErrada(PacienteIdentidade id) {
+        int tentativas = id.getSenhaTentativas() + 1;
+        if (tentativas >= MAX_TENTATIVAS_SENHA) {
+            id.setBloqueadoAte(LocalDateTime.now().plusMinutes(LOCKOUT_MINUTOS));
+            id.setSenhaTentativas(0); // zera ao entrar no bloqueio — o tempo é a trava agora
+        } else {
+            id.setSenhaTentativas(tentativas);
+        }
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
     }
 
     /** Resultado do início do login: se a conta já tem senha e se o login por senha está bloqueado. */
@@ -83,9 +128,9 @@ public class PacienteAcessoService {
     public InicioLogin iniciar(String cpfBruto, LocalDate dataNascimento, String telefoneBruto) {
         String cpf = normalizarCpf(cpfBruto);
         conferirIdentidade(cpf, dataNascimento, telefoneBruto);
-        ContaApp conta = contaRepository.findByCpf(cpf).orElse(null);
-        boolean temSenha = conta != null && conta.getSenhaHash() != null;
-        boolean bloqueada = conta != null && conta.getSenhaTentativas() >= MAX_TENTATIVAS_SENHA;
+        PacienteIdentidade id = identidade(cpf);
+        boolean temSenha = id != null && id.getSenhaHash() != null;
+        boolean bloqueada = id != null && estaBloqueada(id);
         return new InicioLogin(temSenha, bloqueada);
     }
 
@@ -102,25 +147,40 @@ public class PacienteAcessoService {
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public ContaApp loginPorSenha(String cpfBruto, String pin, String dispositivoId) {
         String cpf = normalizarCpf(cpfBruto);
-        ContaApp conta = cpf == null || cpf.isEmpty() ? null : contaRepository.findByCpf(cpf).orElse(null);
-        if (conta == null || conta.getSenhaHash() == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                    "Você ainda não cadastrou uma senha. Entre com o código por SMS.");
-        }
-        if (conta.getSenhaTentativas() >= MAX_TENTATIVAS_SENHA) {
+        // Credencial CENTRAL (public): PIN + lockout valem para TODAS as clínicas do paciente.
+        // LOCK (SELECT ... FOR UPDATE): serializa as tentativas concorrentes do MESMO CPF para o
+        // incremento do contador/lockout ser atômico (senão lost-update enfraquece a trava — este é o
+        // único anti-força-bruta do /login-senha). CPFs diferentes não disputam (lock por-linha).
+        PacienteIdentidade id = cpf == null || cpf.isEmpty()
+                ? null : identidadeRepository.buscarParaAtualizarPorCpf(cpf).orElse(null);
+        boolean temHash = id != null && id.getSenhaHash() != null;
+        // Lockout CENTRAL auto-expirável: após MAX erros, bloqueia por alguns minutos e LIBERA sozinho
+        // (não força OTP) — evita que quem só conhece o CPF trave o login do paciente em todas as clínicas.
+        if (temHash && estaBloqueada(id)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "Muitas tentativas. Entre com o código por SMS para redefinir a senha.");
+                    "Muitas tentativas. Aguarde alguns minutos ou entre com o código por SMS.");
         }
-        if (pin == null || !passwordEncoder.matches(pin, conta.getSenhaHash())) {
-            conta.setSenhaTentativas(conta.getSenhaTentativas() + 1);
-            conta.setAtualizadoEm(LocalDateTime.now());
-            contaRepository.save(conta);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Senha incorreta.");
+        // Compara SEMPRE (contra um hash fictício quando não há credencial) para não vazar — pelo tempo
+        // de resposta NEM pela mensagem — se o CPF tem senha (anti-enumeração, igual ao login do admin).
+        boolean confere = passwordEncoder.matches(pin == null ? "" : pin, temHash ? id.getSenhaHash() : hashFicticio);
+        if (!temHash || !confere) {
+            if (temHash) {
+                registrarTentativaErrada(id); // incrementa e, no teto, entra em lockout temporal
+            }
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "CPF ou senha inválidos.");
         }
-        conta.setSenhaTentativas(0);
-        conta.setDispositivoAtivo(dispositivoId);
-        conta.setAtualizadoEm(LocalDateTime.now());
-        contaRepository.save(conta);
+        id.setSenhaTentativas(0);
+        id.setBloqueadoAte(null);
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
+        // Antes de criar a sessão: o CPF precisa ter perfil (paciente/responsável) NESTA clínica — evita
+        // gravar uma sessão órfã num inquilino onde o CPF não é paciente (o X-Inquilino é spoofável).
+        if (perfis(cpf).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nenhum perfil disponível para este CPF.");
+        }
+        // SESSÃO (por-clínica): cria/atualiza o conta_app desta clínica e amarra o aparelho (1º acesso
+        // nesta clínica, com o PIN central já existente, cria a sessão sem novo OTP).
+        ContaApp conta = upsertConta(cpf, dispositivoId);
         // Compat: espelha ativo/dispositivo no paciente próprio (chat/WebSocket/dashboard leem isso).
         repository.findByCpf(cpf).ifPresent(p -> {
             // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão de conta): o espelho de sessão
@@ -138,37 +198,39 @@ public class PacienteAcessoService {
     /** Define a senha inicial (pós-OTP, PIN de 6 dígitos). Exige que a conta ainda NÃO tenha senha. */
     @Transactional
     public void definirSenhaInicial(Long contaId, String dispositivoId, String pin) {
-        ContaApp conta = contaValidaPorId(contaId, dispositivoId);
-        if (conta.getSenhaHash() != null) {
+        ContaApp conta = contaValidaPorId(contaId, dispositivoId); // valida a sessão (cid + aparelho)
+        PacienteIdentidade id = identidadeOuNova(conta.getCpf());
+        if (id.getSenhaHash() != null) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Você já tem uma senha. Use 'Alterar senha' no seu perfil.");
         }
         validarPin(pin);
-        conta.setSenhaHash(passwordEncoder.encode(pin));
-        conta.setSenhaTentativas(0);
-        conta.setAtualizadoEm(LocalDateTime.now());
-        contaRepository.save(conta);
+        id.setSenhaHash(passwordEncoder.encode(pin));
+        id.setSenhaTentativas(0);
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
     }
 
     /** Altera a senha logado (Meu Perfil): exige a senha atual quando já existe uma. */
     @Transactional
     public void alterarSenha(Long contaId, String dispositivoId, String pinAtual, String pinNovo) {
-        ContaApp conta = contaValidaPorId(contaId, dispositivoId);
+        ContaApp conta = contaValidaPorId(contaId, dispositivoId); // valida a sessão (cid + aparelho)
+        PacienteIdentidade id = identidadeOuNova(conta.getCpf());
         validarPin(pinNovo);
-        if (conta.getSenhaHash() != null
-                && (pinAtual == null || !passwordEncoder.matches(pinAtual, conta.getSenhaHash()))) {
+        if (id.getSenhaHash() != null
+                && (pinAtual == null || !passwordEncoder.matches(pinAtual, id.getSenhaHash()))) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Senha atual incorreta.");
         }
-        conta.setSenhaHash(passwordEncoder.encode(pinNovo));
-        conta.setSenhaTentativas(0);
-        conta.setAtualizadoEm(LocalDateTime.now());
-        contaRepository.save(conta);
+        id.setSenhaHash(passwordEncoder.encode(pinNovo));
+        id.setSenhaTentativas(0);
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
     }
 
     /** A conta do CPF já tem senha definida? (para o app mostrar "Definir" ou "Alterar" no perfil). */
     @Transactional(readOnly = true)
     public boolean contaTemSenha(String cpf) {
-        return contaRepository.findByCpf(normalizarCpf(cpf)).map(c -> c.getSenhaHash() != null).orElse(false);
+        return identidadeRepository.findByCpf(normalizarCpf(cpf)).map(i -> i.getSenhaHash() != null).orElse(false);
     }
 
     /** PIN de acesso: exatamente 6 dígitos numéricos. */
@@ -410,12 +472,15 @@ public class PacienteAcessoService {
         if (!verificacao.checar(e164(telefoneBruto), codigo)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "CPF ou código inválido");
         }
-        ContaApp conta = upsertConta(cpf, dispositivoId);
-        // O OTP redefine a senha: limpa o PIN e as tentativas — o app pede um novo PIN em seguida.
-        // Cobre tanto o 1º acesso quanto o "esqueci a senha" de forma uniforme.
-        conta.setSenhaHash(null);
-        conta.setSenhaTentativas(0);
-        contaRepository.save(conta);
+        ContaApp conta = upsertConta(cpf, dispositivoId); // sessão por-clínica (amarra o aparelho)
+        // O OTP redefine a credencial CENTRAL: limpa o PIN e as tentativas (vale para TODAS as clínicas
+        // do paciente) — o app pede um novo PIN em seguida. Cobre 1º acesso e "esqueci a senha".
+        PacienteIdentidade id = identidadeOuNova(cpf);
+        id.setSenhaHash(null);
+        id.setSenhaTentativas(0);
+        id.setBloqueadoAte(null);
+        id.setAtualizadoEm(LocalDateTime.now());
+        identidadeRepository.save(id);
         repository.findByCpf(cpf).ifPresent(p -> {
             // Não ressuscita um cadastro INATIVO (ex.: auto-exclusão de conta): o espelho de sessão
             // (ativo/dispositivo que o admin/chat/dashboard leem) tem de continuar revogado.
@@ -702,6 +767,17 @@ public class PacienteAcessoService {
         });
         dispositivoRepository.saveAll(aparelhos);
         contaRepository.delete(conta);
+        // 4) Desvincula ESTA clínica (remove o ponteiro de roteamento do inquilino atual).
+        Object inqClaim = jwt.getClaim("inq");
+        if (inqClaim instanceof Number inq) {
+            pacienteLoginRepository.findByCpfAndInquilinoId(cpf, inq.longValue())
+                    .ifPresent(pacienteLoginRepository::delete);
+        }
+        // 5) Se não sobra NENHUMA clínica, APAGA a credencial central (LGPD: não reter credencial sem
+        // finalidade). Multi-clínica: a identidade sobrevive (serve as outras clínicas do paciente).
+        if (pacienteLoginRepository.findByCpf(cpf).isEmpty()) {
+            identidadeRepository.findByCpf(cpf).ifPresent(identidadeRepository::delete);
+        }
     }
 
     /** Monta o E.164 assumindo Brasil (+55) quando o número não vem com o país. */

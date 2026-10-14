@@ -20,6 +20,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import com.example.pop.inquilino.Inquilino;
 import com.example.pop.inquilino.InquilinoRepository;
 import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.inquilino.PacienteIdentidade;
+import com.example.pop.inquilino.PacienteIdentidadeRepository;
 import com.example.pop.inquilino.PacienteLoginRepository;
 import com.example.pop.inquilino.ProvisionamentoService;
 import com.example.pop.inquilino.RoteamentoPacienteService;
@@ -56,6 +58,8 @@ class PacienteAuthMultiInquilinoTest {
     @Autowired
     private PacienteLoginRepository pacienteLoginRepository;
     @Autowired
+    private PacienteIdentidadeRepository pacienteIdentidadeRepository;
+    @Autowired
     private RoteamentoPacienteService roteamentoPacienteService;
     @Autowired
     private ContaAppRepository contaAppRepository;
@@ -75,19 +79,17 @@ class PacienteAuthMultiInquilinoTest {
         inquilino.setSchemaName(SCHEMA);
         tenantId = inquilinoRepository.save(inquilino).getId();
         provisionamentoService.provisionarInquilino(SCHEMA);
-        // 2) Conta (com senha) + paciente próprio DENTRO do schema do inquilino.
+        // 2) Credencial CENTRAL no public (Fase B): o PIN vive no public.paciente_identidade, NÃO no
+        // conta_app do inquilino. A sessão (conta_app) é criada pelo próprio loginPorSenha (upsertConta).
+        PacienteIdentidade identidade = new PacienteIdentidade();
+        identidade.setCpf(CPF);
+        identidade.setSenhaHash(passwordEncoder.encode(PIN));
+        identidade.setSenhaTentativas(0);
+        pacienteIdentidadeRepository.save(identidade);
+        // 3) Paciente próprio DENTRO do schema do inquilino.
         String anterior = TenantContext.atualBruto();
         TenantContext.definir(SCHEMA);
         try {
-            LocalDateTime agora = LocalDateTime.now();
-            ContaApp conta = new ContaApp();
-            conta.setCpf(CPF);
-            conta.setSenhaHash(passwordEncoder.encode(PIN));
-            conta.setSenhaTentativas(0);
-            conta.setCriadoEm(agora);
-            conta.setAtualizadoEm(agora);
-            contaAppRepository.save(conta);
-
             Paciente paciente = new Paciente();
             paciente.setNome("Paciente PacAuth");
             paciente.setCpf(CPF);
@@ -128,7 +130,8 @@ class PacienteAuthMultiInquilinoTest {
     }
 
     private void limpar() {
-        pacienteLoginRepository.findByCpf(CPF).ifPresent(pacienteLoginRepository::delete);
+        pacienteLoginRepository.deleteAll(pacienteLoginRepository.findByCpf(CPF));
+        pacienteIdentidadeRepository.findByCpf(CPF).ifPresent(pacienteIdentidadeRepository::delete);
         inquilinoRepository.findBySchemaName(SCHEMA).ifPresent(inquilinoRepository::delete);
         provisionamentoService.dropSchema(SCHEMA);
     }
