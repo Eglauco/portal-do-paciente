@@ -123,6 +123,15 @@ export interface SessaoPaciente {
 let cache: SessaoPaciente | null = null;
 
 /**
+ * UX: com UM ÚNICO perfil, o app já entra nele e pula a tela "Selecionar perfil" (não há o que
+ * escolher — o token já vem para esse perfil). Com 0 ou mais de 1, mantém a escolha. (A clínica
+ * única já é fixada antes, no próprio login.) Devolve o valor de `perfilSelecionado` da sessão.
+ */
+function entrarDiretoSePerfilUnico(perfis: Perfil[] | undefined | null): boolean {
+  return (perfis?.length ?? 0) === 1;
+}
+
+/**
  * expo-secure-store é um módulo nativo (guarda o token cifrado). Existe no dev
  * build / app standalone, mas pode não estar disponível no Expo Go — e o import
  * dele avalia código nativo no topo do módulo, o que quebraria o app no arranque.
@@ -289,7 +298,8 @@ export async function ativar(
     pacienteId: dados.pacienteId,
     nome: dados.nome,
     perfis: dados.perfis ?? [],
-    perfilSelecionado: false,
+    // 1 perfil → já entra nele (pula "Selecionar perfil"). Após definir a senha, cai direto no app.
+    perfilSelecionado: entrarDiretoSePerfilUnico(dados.perfis),
     // Após o OTP a senha foi zerada: o app pede um novo PIN antes de escolher o perfil.
     precisaDefinirSenha: dados.precisaDefinirSenha ?? true,
   };
@@ -414,7 +424,8 @@ export async function loginPorSenha(
     pacienteId: s.pacienteId,
     nome: s.nome,
     perfis: s.perfis ?? [],
-    perfilSelecionado: false,
+    // 1 perfil → já entra nele (pula "Selecionar perfil").
+    perfilSelecionado: entrarDiretoSePerfilUnico(s.perfis),
     precisaDefinirSenha: s.precisaDefinirSenha ?? false,
   };
   await persistir();
@@ -609,8 +620,8 @@ export async function trocarClinica(inquilinoId: number): Promise<SessaoPaciente
     pacienteId: dados.pacienteId,
     nome: dados.nome,
     perfis: dados.perfis ?? [],
-    // A nova unidade tem os próprios perfis → volta para a tela "Selecionar Perfil".
-    perfilSelecionado: false,
+    // A nova unidade tem os próprios perfis → "Selecionar Perfil"; mas se ela tem 1 só, já entra nele.
+    perfilSelecionado: entrarDiretoSePerfilUnico(dados.perfis),
     precisaDefinirSenha: dados.precisaDefinirSenha ?? false,
   };
   await persistir();
