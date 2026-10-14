@@ -33,10 +33,12 @@ import jakarta.servlet.Filter;
 class SuperAdminControllerTest {
 
     private static final String SCHEMA = "inq_teste_superadmin";
+    private static final String SUBDOMINIO = "inq-teste-superadmin";
     private static final String ADMIN_EMAIL = "admin.teste.superadmin@clinica.com";
     /** Default de dev de app.superadmin.secret (SUPERADMIN_SECRET não definido no teste). */
     private static final String SEGREDO = "dev-superadmin-trocar-em-producao";
     private static final String CORPO = "{\"nome\":\"Clinica Teste\",\"schemaName\":\"" + SCHEMA + "\","
+            + "\"subdominio\":\"" + SUBDOMINIO + "\","
             + "\"unidadeNome\":\"Unidade Central\",\"adminNome\":\"Admin Teste\","
             + "\"adminEmail\":\"" + ADMIN_EMAIL + "\",\"adminSenha\":\"senha-admin-123\"}";
 
@@ -83,9 +85,10 @@ class SuperAdminControllerTest {
                 "ponteiro de roteamento (usuario_login) criado no public");
         assertEquals(1, contarUsuarioNoTenant(ADMIN_EMAIL), "o admin foi semeado no schema do inquilino");
 
-        // 1.2b: o admin semeado CONSEGUE LOGAR — o /auth/login resolve o inquilino pelo usuario_login
-        // (login em 2 fases) e autentica no schema certo.
-        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+        // 1.2b/A4: o admin semeado CONSEGUE LOGAR — o /auth/login resolve o inquilino pelo SUBDOMÍNIO
+        // (header X-Inquilino, fixado pelo SubdominioTenantFilter) e autentica no schema certo.
+        mvc.perform(post("/auth/login").header("X-Inquilino", SUBDOMINIO)
+                        .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + ADMIN_EMAIL + "\",\"senha\":\"senha-admin-123\"}"))
                 .andExpect(status().isOk());
     }

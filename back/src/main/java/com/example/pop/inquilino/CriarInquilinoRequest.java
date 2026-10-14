@@ -15,6 +15,10 @@ public record CriarInquilinoRequest(
         @Pattern(regexp = "[a-z_][a-z0-9_]{0,62}",
                 message = "nome do schema inválido: minúsculo, começa por letra ou _, até 63 caracteres")
         String schemaName,
+        @NotBlank
+        @Pattern(regexp = "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?",
+                message = "subdomínio inválido: minúsculo, letras/números/hífen (sem hífen nas pontas), até 63")
+        String subdominio,
         @NotBlank String unidadeNome,
         @NotBlank String adminNome,
         @NotBlank @Email String adminEmail,

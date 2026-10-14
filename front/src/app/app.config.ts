@@ -12,6 +12,7 @@ import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/
 import { provideToastr } from 'ngx-toastr';
 import { provideEnvironmentNgxMask } from 'ngx-mask';
 import { authInterceptor } from './core/auth.interceptor';
+import { inquilinoInterceptor } from './core/inquilino.interceptor';
 import { TemaService } from './core/tema.service';
 import { MarcaService } from './core/marca.service';
 import { MarcaTitleStrategy } from './core/marca-title.strategy';
@@ -21,7 +22,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
     provideClientHydration(),
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, inquilinoInterceptor])),
     provideAnimations(),
     provideEnvironmentNgxMask(),
     // Aplica a cor da plataforma (GET /tema) no boot — não bloqueia (cache pinta na hora).

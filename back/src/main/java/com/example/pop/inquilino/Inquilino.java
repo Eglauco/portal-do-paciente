@@ -29,6 +29,14 @@ public class Inquilino {
     @Column(name = "schema_name", nullable = false, length = 63)
     private String schemaName;
 
+    /**
+     * Rótulo DNS do subdomínio do inquilino (ex.: {@code "nascente"} em nascente.trilharsaude.app.br).
+     * Resolve a clínica ANTES do login (branding do back-office). Nulo nas linhas de plataforma
+     * ({@code public}/{@code principal}). Único (índice parcial, V155).
+     */
+    @Column(length = 63)
+    private String subdominio;
+
     @Column(nullable = false, length = 20)
     private String situacao = "ATIVO";
 
@@ -60,6 +68,14 @@ public class Inquilino {
 
     public void setSchemaName(String schemaName) {
         this.schemaName = schemaName;
+    }
+
+    public String getSubdominio() {
+        return subdominio;
+    }
+
+    public void setSubdominio(String subdominio) {
+        this.subdominio = subdominio;
     }
 
     public String getSituacao() {

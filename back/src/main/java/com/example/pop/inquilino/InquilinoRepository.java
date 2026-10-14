@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface InquilinoRepository extends JpaRepository<Inquilino, Long> {
 
     Optional<Inquilino> findBySchemaName(String schemaName);
+
+    Optional<Inquilino> findBySubdominio(String subdominio);
 }

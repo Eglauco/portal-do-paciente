@@ -1,6 +1,7 @@
 package com.example.pop.inquilino;
 
 import java.util.List;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +27,10 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/superadmin/inquilinos")
 public class SuperAdminController {
+
+    /** Subdomínios reservados (infra/plataforma): não podem ser usados por um inquilino. */
+    private static final Set<String> SUBDOMINIOS_RESERVADOS =
+            Set.of("www", "api", "app", "admin", "super", "superadmin");
 
     private final SuperAdminAutenticacao autenticacao;
     private final InquilinoRepository inquilinoRepository;
@@ -64,8 +69,15 @@ public class SuperAdminController {
         if (inquilinoRepository.findBySchemaName(schema).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um inquilino com esse schema.");
         }
-        if (usuarioLoginRepository.findByEmailIgnoreCase(request.adminEmail().trim()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um login com esse e-mail.");
+        // O e-mail do admin é único POR INQUILINO (V156) — o MESMO e-mail pode administrar clínicas
+        // diferentes, resolvidas pelo subdomínio no login. Como o schema é novo/vazio, não há colisão a
+        // checar aqui (a unicidade (inquilino_id, e-mail) é garantida pelo índice no seed).
+        String subdominio = request.subdominio().trim().toLowerCase();
+        if (SUBDOMINIOS_RESERVADOS.contains(subdominio)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Subdomínio reservado. Escolha outro.");
+        }
+        if (inquilinoRepository.findBySubdominio(subdominio).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Já existe um inquilino com esse subdomínio.");
         }
 
         // Registra o inquilino (unicidade do schema no public barra duplicata concorrente), provisiona e semeia.
@@ -73,6 +85,7 @@ public class SuperAdminController {
         Inquilino inquilino = new Inquilino();
         inquilino.setNome(request.nome().trim());
         inquilino.setSchemaName(schema);
+        inquilino.setSubdominio(subdominio);
         inquilinoRepository.save(inquilino);
         try {
             provisionamentoService.provisionarInquilino(schema);
@@ -89,7 +102,8 @@ public class SuperAdminController {
     /** Rollback best-effort de um provisionamento falho. */
     private void desfazer(Inquilino inquilino, String schema, String email) {
         try {
-            usuarioLoginRepository.findByEmailIgnoreCase(email).ifPresent(usuarioLoginRepository::delete);
+            usuarioLoginRepository.findByInquilinoIdAndEmailIgnoreCase(inquilino.getId(), email)
+                    .ifPresent(usuarioLoginRepository::delete);
         } catch (RuntimeException ignore) {
             // best-effort
         }

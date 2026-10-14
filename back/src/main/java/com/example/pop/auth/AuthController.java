@@ -22,8 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.inquilino.InquilinoService;
-import com.example.pop.inquilino.UsuarioLogin;
-import com.example.pop.inquilino.UsuarioLoginRepository;
 import com.example.pop.tenant.TenantContext;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.unidade.UnidadeRepository;
@@ -41,21 +39,18 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JwtEncoder jwtEncoder;
     private final InquilinoService inquilinoService;
-    private final UsuarioLoginRepository usuarioLoginRepository;
     private final long expiracaoHoras;
     /** Hash de referência (mesmo custo dos reais) para igualar o tempo quando a conta não existe. */
     private final String hashFicticio;
 
     public AuthController(UsuarioRepository usuarioRepository, UnidadeRepository unidadeRepository,
             PasswordEncoder passwordEncoder, JwtEncoder jwtEncoder, InquilinoService inquilinoService,
-            UsuarioLoginRepository usuarioLoginRepository,
             @Value("${app.jwt.expiration-hours:8}") long expiracaoHoras) {
         this.usuarioRepository = usuarioRepository;
         this.unidadeRepository = unidadeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtEncoder = jwtEncoder;
         this.inquilinoService = inquilinoService;
-        this.usuarioLoginRepository = usuarioLoginRepository;
         this.expiracaoHoras = expiracaoHoras;
         this.hashFicticio = passwordEncoder.encode("timing-guard-nao-usar");
     }
@@ -64,12 +59,16 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         String email = request.email().trim();
-        // Login em 2 fases (multi-inquilino): acha o inquilino pelo e-mail no public (usuario_login) e
-        // entra no schema dele ANTES de autenticar. Fallback: inquilino padrão (public) para os admins
-        // legados que ainda não têm linha de roteamento. O inquilino NUNCA vem do request.
-        Long inquilinoId = usuarioLoginRepository.findByEmailIgnoreCase(email)
-                .map(UsuarioLogin::getInquilinoId).orElseGet(inquilinoService::idPadrao);
-        String schemaAnterior = TenantContext.atualBruto();
+        // Login em 2 fases (multi-inquilino): o inquilino vem do SUBDOMÍNIO — o SubdominioTenantFilter já
+        // fixou o TenantContext a partir do header X-Inquilino (que o front deriva do hostname) ANTES deste
+        // controller. Sem subdomínio (dev/localhost/apex) → inquilino PADRÃO (principal), que serve o admin
+        // legado. O inquilino NUNCA vem do corpo do request.
+        String schemaSub = TenantContext.atualBruto();
+        Long inquilinoId = schemaSub != null ? inquilinoService.idPorSchema(schemaSub) : null;
+        if (inquilinoId == null) {
+            inquilinoId = inquilinoService.idPadrao();
+        }
+        String schemaAnterior = schemaSub;
         TenantContext.definir(inquilinoService.schemaPorId(inquilinoId));
         try {
             Usuario usuario = usuarioRepository.findByEmailIgnoreCase(email).orElse(null);

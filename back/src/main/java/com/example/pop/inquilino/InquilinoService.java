@@ -16,6 +16,7 @@ public class InquilinoService {
 
     private final InquilinoRepository repository;
     private final ConcurrentHashMap<Long, String> schemaPorId = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> schemaPorSubdominio = new ConcurrentHashMap<>();
     private volatile Long idPadrao;
 
     public InquilinoService(InquilinoRepository repository) {
@@ -29,6 +30,41 @@ public class InquilinoService {
         }
         return schemaPorId.computeIfAbsent(id, i ->
                 repository.findById(i).map(Inquilino::getSchemaName).orElse(TenantContext.SCHEMA_PADRAO));
+    }
+
+    /**
+     * Schema do inquilino cujo subdomínio é o dado (ex.: {@code "nascente"}) — resolve a clínica ANTES
+     * do login, a partir do header {@code X-Inquilino} que o front deriva do hostname. Retorna
+     * {@code null} se o subdomínio é desconhecido (o chamador então deixa o contexto sem inquilino =
+     * branding da plataforma). Cacheia só os ACERTOS: o registro de inquilinos é pequeno, e não cachear
+     * os erros impede que subdomínios forjados inflem a memória.
+     */
+    public String schemaPorSubdominio(String subdominio) {
+        if (subdominio == null || subdominio.isBlank()) {
+            return null;
+        }
+        String cacheado = schemaPorSubdominio.get(subdominio);
+        if (cacheado != null) {
+            return cacheado;
+        }
+        String schema = repository.findBySubdominio(subdominio).map(Inquilino::getSchemaName).orElse(null);
+        if (schema != null) {
+            schemaPorSubdominio.put(subdominio, schema);
+        }
+        return schema;
+    }
+
+    /**
+     * Id do inquilino do schema dado (reverso de {@link #schemaPorId}) — usado no login para pôr o
+     * claim {@code inq} quando o inquilino foi resolvido pelo SUBDOMÍNIO. {@code null} se desconhecido.
+     * Sem cache: só é chamado no login (raro), e assim nunca devolve um id obsoleto se um schema for
+     * reaproveitado.
+     */
+    public Long idPorSchema(String schema) {
+        if (schema == null) {
+            return null;
+        }
+        return repository.findBySchemaName(schema).map(Inquilino::getId).orElse(null);
     }
 
     /** Id do inquilino padrão (schema {@code public}). Invariante do sistema — semeado na V148. */

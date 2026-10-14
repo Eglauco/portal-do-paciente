@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UsuarioLoginRepository extends JpaRepository<UsuarioLogin, Long> {
 
     Optional<UsuarioLogin> findByEmailIgnoreCase(String email);
+
+    Optional<UsuarioLogin> findByInquilinoIdAndEmailIgnoreCase(Long inquilinoId, String email);
 }

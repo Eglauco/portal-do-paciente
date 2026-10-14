@@ -1,5 +1,6 @@
 package com.example.pop.config;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -22,10 +23,21 @@ public class CorsConfig {
     @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://localhost:8081,http://localhost:19006}")
     private String[] allowedOrigins;
 
+    /**
+     * Padrões de origem COM CURINGA — os subdomínios das clínicas no web (cada clínica é uma Origin
+     * distinta: https://nascente.trilharsaude.app.br). Sobrescrevível por env p/ outros domínios.
+     */
+    @Value("${app.cors.allowed-origin-patterns:https://*.trilharsaude.app.br}")
+    private String[] allowedOriginPatterns;
+
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        // Origens exatas (dev + front fixo) + padrões com curinga (subdomínios das clínicas no web).
+        // setAllowedOriginPatterns aceita tanto exatas quanto curinga, então combinamos as duas listas.
+        List<String> origens = new ArrayList<>(Arrays.asList(allowedOrigins));
+        origens.addAll(Arrays.asList(allowedOriginPatterns));
+        config.setAllowedOriginPatterns(origens);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

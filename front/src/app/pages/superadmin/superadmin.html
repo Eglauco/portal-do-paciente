@@ -122,6 +122,20 @@
                 <span class="sa__field-hint">Identificador do banco — não dá para mudar depois.</span>
               }
             </div>
+            <div class="form-field">
+              <label class="label" for="subdominio">Subdomínio <span class="req" aria-hidden="true">*</span></label>
+              <input id="subdominio" class="input" formControlName="subdominio" placeholder="ex.: nascente"
+                     autocomplete="off" inputmode="latin" [class.input--error]="invalido('subdominio')" />
+              @if (invalido('subdominio')) {
+                @if (form.controls.subdominio.hasError('reservado')) {
+                  <span class="field-error">Subdomínio reservado (ex.: www, api). Escolha outro.</span>
+                } @else {
+                  <span class="field-error">Minúsculo, letras/números/hífen (sem hífen nas pontas), até 63.</span>
+                }
+              } @else {
+                <span class="sa__field-hint">Endereço do login da clínica: <b>subdomínio</b>.trilharsaude.app.br</span>
+              }
+            </div>
             <div class="form-field form-field--full">
               <label class="label" for="unidadeNome">Nome da 1ª unidade <span class="req" aria-hidden="true">*</span></label>
               <input id="unidadeNome" class="input" formControlName="unidadeNome" placeholder="Ex.: Unidade Central"
@@ -192,6 +206,7 @@
                   <th class="col-cod">ID</th>
                   <th>Nome</th>
                   <th>Schema</th>
+                  <th>Subdomínio</th>
                   <th>Situação</th>
                 </tr>
               </thead>
@@ -201,6 +216,7 @@
                     <td class="mono">{{ i.id }}</td>
                     <td><b>{{ i.nome }}</b></td>
                     <td class="mono">{{ i.schemaName }}</td>
+                    <td class="mono">{{ i.subdominio || '—' }}</td>
                     <td>
                       <span class="sa__badge" [class.sa__badge--off]="i.situacao !== 'ATIVO'">{{ i.situacao }}</span>
                     </td>

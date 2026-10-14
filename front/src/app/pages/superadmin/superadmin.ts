@@ -1,11 +1,27 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
 import { PaletaTema } from '../../core/tema.service';
 import { CriarInquilino, Inquilino } from './inquilino.model';
 import { SalvarConfigPlataforma } from './plataforma-config.model';
 import { SuperadminService } from './superadmin.service';
+
+/** Subdomínios reservados (infra/plataforma) — espelha a lista do backend (SuperAdminController). */
+const SUBDOMINIOS_RESERVADOS = new Set(['www', 'api', 'app', 'admin', 'super', 'superadmin']);
+
+/** Validador: barra subdomínios reservados (seriam irresolúveis pré-login). */
+function subdominioNaoReservado(control: AbstractControl): ValidationErrors | null {
+  const v = (control.value ?? '').trim().toLowerCase();
+  return SUBDOMINIOS_RESERVADOS.has(v) ? { reservado: true } : null;
+}
 
 /**
  * Console de super-admin: cadastro/pesquisa de inquilinos + identidade da plataforma (cor, logomarca,
@@ -59,7 +75,10 @@ export class Superadmin implements OnDestroy {
     const lista = this.inquilinos();
     if (!termo) return lista;
     return lista.filter(
-      (i) => i.nome.toLowerCase().includes(termo) || i.schemaName.toLowerCase().includes(termo),
+      (i) =>
+        i.nome.toLowerCase().includes(termo) ||
+        i.schemaName.toLowerCase().includes(termo) ||
+        (i.subdominio ?? '').toLowerCase().includes(termo),
     );
   });
 
@@ -71,6 +90,14 @@ export class Superadmin implements OnDestroy {
     schemaName: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, Validators.pattern(/^[a-z_][a-z0-9_]{0,62}$/)],
+    }),
+    subdominio: new FormControl('', {
+      nonNullable: true,
+      validators: [
+        Validators.required,
+        Validators.pattern(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/),
+        subdominioNaoReservado,
+      ],
     }),
     unidadeNome: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     adminNome: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -195,6 +222,7 @@ export class Superadmin implements OnDestroy {
     const dados: CriarInquilino = {
       nome: this.form.controls.nome.value.trim(),
       schemaName: this.form.controls.schemaName.value.trim(),
+      subdominio: this.form.controls.subdominio.value.trim().toLowerCase(),
       unidadeNome: this.form.controls.unidadeNome.value.trim(),
       adminNome: this.form.controls.adminNome.value.trim(),
       adminEmail: this.form.controls.adminEmail.value.trim(),
@@ -371,7 +399,7 @@ export class Superadmin implements OnDestroy {
       case 400:
         return 'Dados inválidos. Confira o nome do schema (minúsculo, começa por letra).';
       case 409:
-        return 'Já existe um inquilino com esse schema ou um login com esse e-mail.';
+        return 'Já existe um inquilino com esse schema, subdomínio ou e-mail.';
       default:
         return 'Não foi possível provisionar o inquilino. Tente novamente.';
     }

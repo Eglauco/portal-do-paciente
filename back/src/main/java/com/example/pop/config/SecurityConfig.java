@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.server.resource.web.authentication.Be
 import org.springframework.security.web.SecurityFilterChain;
 
 import com.example.pop.inquilino.InquilinoService;
+import com.example.pop.tenant.SubdominioTenantFilter;
 import com.example.pop.tenant.TenantContext;
 import com.example.pop.tenant.TenantFilter;
 import com.example.pop.usuario.Usuario;
@@ -112,7 +113,11 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 // Define o inquilino da requisição a partir do claim "inq" do JWT (após a autenticação Bearer).
-                .addFilterAfter(new TenantFilter(inquilinoService), BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(new TenantFilter(inquilinoService), BearerTokenAuthenticationFilter.class)
+                // Pré-login: resolve o inquilino pelo subdomínio (header X-Inquilino) QUANDO não há JWT,
+                // só para o branding público da tela de login. Roda DEPOIS do TenantFilter, então o claim
+                // "inq" do JWT sempre tem precedência (o filtro só age se atualBruto()==null).
+                .addFilterAfter(new SubdominioTenantFilter(inquilinoService), TenantFilter.class);
         return http.build();
     }
 
