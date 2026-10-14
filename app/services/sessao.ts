@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-import { API_URL } from '@/constants/api';
+import { API_URL, inquilinoHeader } from '@/constants/api';
 import { obterDispositivoId } from './identidade';
 
 const CHAVE = 'pop.sessaoPaciente';
@@ -212,7 +212,7 @@ export async function solicitarCodigo(cpf: string, dataNascimento: string, telef
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/solicitar-codigo`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
       body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo }),
     });
   } catch {
@@ -247,7 +247,7 @@ export async function ativar(
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/ativar`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
       body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, codigo, dispositivoId, telefone: telLimpo }),
     });
   } catch {
@@ -297,7 +297,7 @@ export async function iniciarLogin(cpf: string, dataNascimento: string, telefone
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/iniciar`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
       body: JSON.stringify({ cpf: cpfLimpo, dataNascimento, telefone: telLimpo }),
     });
   } catch {
@@ -326,7 +326,7 @@ export async function loginPorSenha(cpf: string, senha: string): Promise<SessaoP
   try {
     resposta = await fetch(`${API_URL}/paciente-auth/login-senha`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...inquilinoHeader() },
       body: JSON.stringify({ cpf: cpfLimpo, senha, dispositivoId }),
     });
   } catch {
@@ -539,7 +539,7 @@ export async function fetchMeu(path: string, init: RequestInit = {}): Promise<Re
   const cabecalhos = authHeaders();
   const resposta = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { ...(init.headers ?? {}), ...cabecalhos },
+    headers: { ...inquilinoHeader(), ...(init.headers ?? {}), ...cabecalhos },
   });
   // Só encerra a sessão se REALMENTE enviamos um token e ele foi recusado (401).
   if (resposta.status === 401 && cabecalhos.Authorization) {

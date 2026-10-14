@@ -54,23 +54,21 @@ function dataParaIso(valor: string): string {
 }
 
 /**
- * Etapas do login:
- * - `landing`: tela inicial com os dois caminhos (Primeiro acesso × Já tenho senha).
- * - `identidade`: telefone + CPF + nascimento → envia o código por SMS. Serve tanto ao "Primeiro
- *   acesso" quanto à recuperação de senha (via "Esqueci minha senha"); `recuperando` ajusta a copy.
+ * Etapas do login (CPF-first): a entrada padrão é CPF + senha; o caminho por SMS é secundário.
+ * - `entrar`: CPF + senha de 6 dígitos → entra sem SMS (login do dia a dia). Num app novo com o PIN
+ *   central já existente, o backend amarra o aparelho sem OTP. É a tela inicial.
+ * - `identidade`: telefone + CPF + nascimento → envia o código por SMS. Caminho único de PRIMEIRO
+ *   ACESSO e de RECUPERAÇÃO de senha (copy neutra; não revela se o CPF já tem senha — anti-enumeração).
  * - `codigo`: digita o código do SMS → ativa (e depois define a senha).
- * - `cadastro`: "Já tenho senha" — CPF + senha de 6 dígitos → entra sem SMS.
  */
-type Etapa = 'landing' | 'identidade' | 'codigo' | 'cadastro';
+type Etapa = 'entrar' | 'identidade' | 'codigo';
 
 export default function LoginScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const { loginPorSenha, solicitarCodigo, ativar } = useSessao();
 
-  const [etapa, setEtapa] = useState<Etapa>('landing');
-  /** true quando a etapa 'identidade' foi alcançada via "Esqueci minha senha" (ajusta título/subtítulo). */
-  const [recuperando, setRecuperando] = useState(false);
+  const [etapa, setEtapa] = useState<Etapa>('entrar');
   const [telefone, setTelefone] = useState('');
   const [cpf, setCpf] = useState('');
   const [dataNascimento, setDataNascimento] = useState('');
@@ -99,20 +97,13 @@ export default function LoginScreen() {
     setCodigo('');
   }
 
-  /** Vai para um caminho a partir da tela inicial (limpa o erro). */
-  function irPara(novaEtapa: Etapa) {
-    setErro(null);
-    setEtapa(novaEtapa);
-  }
-
-  /** Volta para a tela inicial, limpando os dados sensíveis (mantém CPF/telefone já digitados). */
+  /** Volta para a tela inicial (entrar), limpando dados sensíveis (mantém CPF/telefone já digitados). */
   function voltarInicio() {
-    setEtapa('landing');
+    setEtapa('entrar');
     setErro(null);
     setCodigo('');
     setSenha('');
     setMostrarSenha(false);
-    setRecuperando(false);
   }
 
   /** Primeiro acesso: valida identidade e envia o código por SMS (vai para a etapa "codigo"). */
@@ -144,12 +135,11 @@ export default function LoginScreen() {
     }
   }
 
-  /** Da etapa "cadastro": não lembra a senha → vai pro fluxo por SMS (o código redefine a senha). */
-  function esqueciSenha() {
+  /** De "entrar": primeiro acesso OU esqueci a senha → fluxo por SMS (o código ativa/redefine a senha). */
+  function irParaPrimeiroAcesso() {
     setSenha('');
     setMostrarSenha(false);
     setErro(null);
-    setRecuperando(true);
     setEtapa('identidade');
   }
 
@@ -193,14 +183,13 @@ export default function LoginScreen() {
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (etapa === 'landing') return false; // deixa o sistema tratar (fecha/background)
+      if (etapa === 'entrar') return false; // deixa o sistema tratar (fecha/background)
       if (ocupado) return true; // ignora enquanto envia/entra, sem sair da etapa atual
       if (etapa === 'codigo') voltarParaIdentidade();
       else voltarInicio();
       return true;
     });
     return () => sub.remove();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, ocupado]);
 
   // Acessibilidade: anuncia a mensagem de erro assim que ela aparece (leitor de tela).
@@ -251,44 +240,98 @@ export default function LoginScreen() {
           contentContainerStyle={styles.sheetContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          {etapa === 'landing' ? (
+          {etapa === 'entrar' ? (
             <>
               <Text style={styles.title}>Bem-vindo(a)</Text>
-              <Text style={styles.subtitle}>Como você quer entrar?</Text>
+              <Text style={styles.subtitle}>
+                Entre com seu CPF e a sua senha de 6 dígitos — a mesma de sempre.
+              </Text>
 
-              {/* Primeiro acesso: ativação por SMS */}
+              {/* CPF */}
+              <Text style={styles.label}>CPF</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="card-outline" size={20} color={t.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={cpf}
+                  onChangeText={(valor) => {
+                    setCpf(mascararCpf(valor));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="000.000.000-00"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={14}
+                  autoFocus
+                  returnKeyType="next"
+                />
+              </View>
+
+              {/* Senha (PIN) */}
+              <Text style={[styles.label, styles.labelEspaco]}>Senha</Text>
+              <View style={styles.inputWrap}>
+                <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
+                <TextInput
+                  style={[styles.input, styles.codeInput]}
+                  value={senha}
+                  onChangeText={(valor) => {
+                    setSenha(valor.replace(/\D/g, '').slice(0, 6));
+                    if (erro) setErro(null);
+                  }}
+                  placeholder="••••••"
+                  placeholderTextColor="#9AAAA5"
+                  keyboardType="number-pad"
+                  inputMode="numeric"
+                  maxLength={6}
+                  secureTextEntry={!mostrarSenha}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (podeEntrarSenha) entrarComSenha();
+                  }}
+                />
+                <Pressable
+                  onPress={() => setMostrarSenha((v) => !v)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}>
+                  <Ionicons name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'} size={20} color={t.muted} />
+                </Pressable>
+              </View>
+              <Text style={styles.hint}>São 6 números.</Text>
+
+              {erro && (
+                <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
+                  <Text style={styles.erroTxt}>{erro}</Text>
+                </View>
+              )}
+
               <Pressable
-                style={({ pressed }) => [styles.choice, styles.choicePrimary, pressed && styles.choicePrimaryPressed]}
-                onPress={() => {
-                  setRecuperando(false);
-                  irPara('identidade');
-                }}
+                style={({ pressed }) => [
+                  styles.primaryBtn,
+                  pressed && styles.primaryBtnPressed,
+                  !podeEntrarSenha && styles.primaryBtnOff,
+                ]}
+                onPress={entrarComSenha}
+                disabled={!podeEntrarSenha}
                 accessibilityRole="button"
-                accessibilityLabel="Primeiro acesso. Ativar minha conta por SMS.">
-                <View style={[styles.choiceIcon, styles.choiceIconPrimary]}>
-                  <Ionicons name="sparkles-outline" size={22} color={t.onBrand} />
-                </View>
-                <View style={styles.choiceTexts}>
-                  <Text style={[styles.choiceTitle, styles.choiceTitlePrimary]}>Primeiro acesso</Text>
-                  <Text style={[styles.choiceSub, styles.choiceSubPrimary]}>Ativar minha conta por SMS</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={22} color={alpha(t.onBrand, 0.9)} />
+                accessibilityLabel="Entrar"
+                accessibilityState={{ busy: entrandoSenha, disabled: !podeEntrarSenha }}>
+                {entrandoSenha ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Entrar</Text>
+                )}
               </Pressable>
 
-              {/* Já tenho senha: login rápido por CPF + senha */}
               <Pressable
-                style={({ pressed }) => [styles.choice, styles.choiceAlt, pressed && styles.choiceAltPressed]}
-                onPress={() => irPara('cadastro')}
+                style={styles.linkBtn}
+                onPress={irParaPrimeiroAcesso}
+                disabled={entrandoSenha}
                 accessibilityRole="button"
-                accessibilityLabel="Já tenho senha. Entrar com CPF e senha.">
-                <View style={[styles.choiceIcon, styles.choiceIconAlt]}>
-                  <Ionicons name="lock-closed-outline" size={22} color={t.brandDeep} />
-                </View>
-                <View style={styles.choiceTexts}>
-                  <Text style={styles.choiceTitle}>Já tenho senha</Text>
-                  <Text style={styles.choiceSub}>Entrar com CPF e senha</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={22} color={t.muted} />
+                accessibilityLabel="Primeiro acesso ou esqueci a senha. Entrar por SMS.">
+                <Text style={styles.linkTxt}>Primeiro acesso ou esqueci a senha</Text>
               </Pressable>
 
               <View style={styles.foot}>
@@ -309,11 +352,10 @@ export default function LoginScreen() {
                 <Text style={styles.backTxt}>Voltar</Text>
               </Pressable>
 
-              <Text style={styles.title}>{recuperando ? 'Redefinir acesso' : 'Primeiro acesso'}</Text>
+              <Text style={styles.title}>Primeiro acesso</Text>
               <Text style={styles.subtitle}>
-                {recuperando
-                  ? 'Confirme seu telefone, CPF e data de nascimento. Enviaremos um código por SMS para você criar uma nova senha.'
-                  : 'Confirme seu telefone, CPF e data de nascimento. Enviaremos um código por SMS para ativar o seu acesso.'}
+                Confirme seu telefone, CPF e data de nascimento. Enviaremos um código por SMS para
+                ativar o seu acesso ou criar uma nova senha.
               </Text>
 
               {/* Telefone (1ª trava de identidade) */}
@@ -409,108 +451,6 @@ export default function LoginScreen() {
                   CPF não cadastrado? Procure a recepção da sua unidade de saúde.
                 </Text>
               </View>
-            </>
-          ) : etapa === 'cadastro' ? (
-            <>
-              <Pressable
-                style={[styles.backRow, entrandoSenha && styles.backRowOff]}
-                onPress={voltarInicio}
-                disabled={entrandoSenha}
-                accessibilityRole="button">
-                <Ionicons name="chevron-back" size={20} color={t.brandDeep} />
-                <Text style={styles.backTxt}>Voltar</Text>
-              </Pressable>
-
-              <Text style={styles.title}>Entrar com senha</Text>
-              <Text style={styles.subtitle}>
-                Use seu CPF e a senha de 6 dígitos que você cadastrou. Assim você entra sem esperar o SMS.
-              </Text>
-
-              {/* CPF */}
-              <Text style={styles.label}>CPF</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="card-outline" size={20} color={t.muted} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  value={cpf}
-                  onChangeText={(valor) => {
-                    setCpf(mascararCpf(valor));
-                    if (erro) setErro(null);
-                  }}
-                  placeholder="000.000.000-00"
-                  placeholderTextColor="#9AAAA5"
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={14}
-                  autoFocus
-                  returnKeyType="next"
-                />
-              </View>
-
-              {/* Senha (PIN) */}
-              <Text style={[styles.label, styles.labelEspaco]}>Senha</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, styles.codeInput]}
-                  value={senha}
-                  onChangeText={(valor) => {
-                    setSenha(valor.replace(/\D/g, '').slice(0, 6));
-                    if (erro) setErro(null);
-                  }}
-                  placeholder="••••••"
-                  placeholderTextColor="#9AAAA5"
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={6}
-                  secureTextEntry={!mostrarSenha}
-                  returnKeyType="done"
-                  onSubmitEditing={() => {
-                    if (podeEntrarSenha) entrarComSenha();
-                  }}
-                />
-                <Pressable
-                  onPress={() => setMostrarSenha((v) => !v)}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}>
-                  <Ionicons name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'} size={20} color={t.muted} />
-                </Pressable>
-              </View>
-              <Text style={styles.hint}>São 6 números.</Text>
-
-              {erro && (
-                <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">
-                  <Ionicons name="alert-circle" size={18} color="#B23B4E" />
-                  <Text style={styles.erroTxt}>{erro}</Text>
-                </View>
-              )}
-
-              <Pressable
-                style={({ pressed }) => [
-                  styles.primaryBtn,
-                  pressed && styles.primaryBtnPressed,
-                  !podeEntrarSenha && styles.primaryBtnOff,
-                ]}
-                onPress={entrarComSenha}
-                disabled={!podeEntrarSenha}
-                accessibilityRole="button"
-                accessibilityLabel="Entrar"
-                accessibilityState={{ busy: entrandoSenha, disabled: !podeEntrarSenha }}>
-                {entrandoSenha ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.primaryBtnText}>Entrar</Text>
-                )}
-              </Pressable>
-
-              <Pressable
-                style={styles.linkBtn}
-                onPress={esqueciSenha}
-                disabled={entrandoSenha}
-                accessibilityRole="button">
-                <Text style={styles.linkTxt}>Esqueci minha senha</Text>
-              </Pressable>
             </>
           ) : (
             <>
@@ -782,67 +722,6 @@ const criarEstilos = (t: Tema) =>
     fontSize: 15,
     fontWeight: '600',
     color: t.brandDeep,
-  },
-  // Tela inicial: os dois caminhos de entrada.
-  choice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderRadius: 16,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    marginBottom: 14,
-  },
-  choicePrimary: {
-    backgroundColor: t.brand,
-    shadowColor: t.brandDeep,
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-  },
-  choicePrimaryPressed: {
-    backgroundColor: t.brandDeep,
-  },
-  choiceAlt: {
-    backgroundColor: t.surface,
-    borderWidth: 1.5,
-    borderColor: t.line,
-  },
-  choiceAltPressed: {
-    backgroundColor: '#F2F7F6',
-  },
-  choiceIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  choiceIconPrimary: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
-  },
-  choiceIconAlt: {
-    backgroundColor: alpha(t.brand, 0.1),
-  },
-  choiceTexts: {
-    flex: 1,
-  },
-  choiceTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: t.ink,
-  },
-  choiceTitlePrimary: {
-    color: t.onBrand,
-  },
-  choiceSub: {
-    fontSize: 13.5,
-    color: t.muted,
-    marginTop: 2,
-  },
-  choiceSubPrimary: {
-    color: alpha(t.onBrand, 0.85),
   },
   foot: {
     flexDirection: 'row',

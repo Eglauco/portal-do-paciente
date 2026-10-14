@@ -25,6 +25,16 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://amiable-flow-production-a405.up.railway.app"
       }
+    },
+    "nascente": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://amiable-flow-production-a405.up.railway.app",
+        "EXPO_PUBLIC_INQUILINO": "nascente"
+      }
     }
   },
   "submit": {

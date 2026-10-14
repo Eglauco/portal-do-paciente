@@ -25,3 +25,20 @@ const PADRAO_LOCAL = Platform.select({
 
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ?? (__DEV__ ? PADRAO_LOCAL : API_PRODUCAO);
+
+/**
+ * Inquilino (subdomínio da clínica) "assado" no build — A-baked: cada clínica tem seu próprio
+ * build com EXPO_PUBLIC_INQUILINO definido no perfil do eas.json. Null = build genérico/dev sem
+ * clínica fixa (o backend cai no padrão da plataforma no pré-login). Em dev dá pra simular uma
+ * clínica definindo EXPO_PUBLIC_INQUILINO no .env.local.
+ */
+export const INQUILINO = process.env.EXPO_PUBLIC_INQUILINO?.trim() || null;
+
+/**
+ * Header da "dica" de inquilino para o backend resolver a clínica ANTES do login (branding + tenant
+ * do login). Pós-login o claim `inq` do JWT manda e o backend ignora este header, então é seguro
+ * mandar sempre. Vazio quando não há inquilino assado (build genérico/dev).
+ */
+export function inquilinoHeader(): Record<string, string> {
+  return INQUILINO ? { 'X-Inquilino': INQUILINO } : {};
+}

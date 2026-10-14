@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_URL } from '@/constants/api';
+import { API_URL, inquilinoHeader } from '@/constants/api';
 import { authHeaders } from '@/services/sessao';
 
 /** Paleta do tema (espelha PaletaTema no back). Cores hex, exceto brandRgb ("r, g, b"). */
@@ -34,7 +34,7 @@ export async function paletaEmCache(): Promise<PaletaTema | null> {
  */
 export async function buscarPaleta(): Promise<PaletaTema | null> {
   try {
-    const resposta = await fetch(`${API_URL}/tema`, { headers: authHeaders() });
+    const resposta = await fetch(`${API_URL}/tema`, { headers: { ...inquilinoHeader(), ...authHeaders() } });
     if (!resposta.ok) return null;
     const paleta = (await resposta.json()) as PaletaTema;
     try {

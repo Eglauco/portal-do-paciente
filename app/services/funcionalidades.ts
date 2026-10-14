@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { API_URL } from '@/constants/api';
+import { API_URL, inquilinoHeader } from '@/constants/api';
 import { authHeaders, type FuncionalidadeApp } from '@/services/sessao';
 
 /**
@@ -58,7 +58,7 @@ export async function telasEmCache(): Promise<TelasHabilitadas | null> {
  */
 export async function buscarTelas(): Promise<TelasHabilitadas | null> {
   try {
-    const resposta = await fetch(`${API_URL}/funcionalidades`, { headers: authHeaders() });
+    const resposta = await fetch(`${API_URL}/funcionalidades`, { headers: { ...inquilinoHeader(), ...authHeaders() } });
     if (!resposta.ok) return null;
     const dados = (await resposta.json()) as { telas?: Record<string, boolean> };
     const telas = normalizar(dados.telas);
