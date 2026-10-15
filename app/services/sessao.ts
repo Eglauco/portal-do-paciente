@@ -117,6 +117,8 @@ export interface SessaoPaciente {
    * escolher o perfil (o OTP zera a senha). O login por senha e a troca de perfil devolvem false.
    */
   precisaDefinirSenha: boolean;
+  /** Nome da unidade (inquilino) da sessão, ex.: "Nascente" — para mostrar sempre no cabeçalho. */
+  inquilinoNome: string | null;
 }
 
 /** Cache em memória para leitura síncrona do token (cabeçalhos das requisições). */
@@ -188,6 +190,7 @@ export async function carregarSessao(): Promise<SessaoPaciente | null> {
         perfilSelecionado: obj.perfilSelecionado ?? true,
         // Sessão antiga (sem o campo): não força definir senha (já estava logada antes do recurso).
         precisaDefinirSenha: obj.precisaDefinirSenha ?? false,
+        inquilinoNome: obj.inquilinoNome ?? null,
       };
     }
   } catch {
@@ -292,6 +295,7 @@ export async function ativar(
     nome: string;
     perfis?: Perfil[];
     precisaDefinirSenha?: boolean;
+    inquilinoNome?: string | null;
   };
   cache = {
     token: dados.token,
@@ -302,6 +306,7 @@ export async function ativar(
     perfilSelecionado: entrarDiretoSePerfilUnico(dados.perfis),
     // Após o OTP a senha foi zerada: o app pede um novo PIN antes de escolher o perfil.
     precisaDefinirSenha: dados.precisaDefinirSenha ?? true,
+    inquilinoNome: dados.inquilinoNome ?? null,
   };
   await persistir();
   return cache;
@@ -408,7 +413,14 @@ export async function loginPorSenha(
     throw new Error(await mensagemLogin(resposta));
   }
   const dados = (await resposta.json()) as {
-    sessao?: { token: string; pacienteId: number; nome: string; perfis?: Perfil[]; precisaDefinirSenha?: boolean } | null;
+    sessao?: {
+      token: string;
+      pacienteId: number;
+      nome: string;
+      perfis?: Perfil[];
+      precisaDefinirSenha?: boolean;
+      inquilinoNome?: string | null;
+    } | null;
     escolherClinica?: ClinicaLogin[] | null;
   };
   // App compartilhado, CPF em >1 clínica: devolve a lista pra escolher (sem sessão ainda).
@@ -427,6 +439,7 @@ export async function loginPorSenha(
     // 1 perfil → já entra nele (pula "Selecionar perfil").
     perfilSelecionado: entrarDiretoSePerfilUnico(s.perfis),
     precisaDefinirSenha: s.precisaDefinirSenha ?? false,
+    inquilinoNome: s.inquilinoNome ?? null,
   };
   await persistir();
   return { sessao: cache };
@@ -538,6 +551,8 @@ export async function trocarPerfil(pacienteId: number): Promise<SessaoPaciente> 
     perfilSelecionado: true,
     // Só se chega à troca de perfil depois de definir a senha: nunca reabre a tela de senha.
     precisaDefinirSenha: false,
+    // Trocar de perfil não muda a clínica — mantém a unidade atual.
+    inquilinoNome: cache?.inquilinoNome ?? null,
   };
   await persistir();
   return cache;
@@ -614,6 +629,7 @@ export async function trocarClinica(inquilinoId: number): Promise<SessaoPaciente
     nome: string;
     perfis?: Perfil[];
     precisaDefinirSenha?: boolean;
+    inquilinoNome?: string | null;
   };
   cache = {
     token: dados.token,
@@ -623,6 +639,7 @@ export async function trocarClinica(inquilinoId: number): Promise<SessaoPaciente
     // A nova unidade tem os próprios perfis → "Selecionar Perfil"; mas se ela tem 1 só, já entra nele.
     perfilSelecionado: entrarDiretoSePerfilUnico(dados.perfis),
     precisaDefinirSenha: dados.precisaDefinirSenha ?? false,
+    inquilinoNome: dados.inquilinoNome ?? null,
   };
   await persistir();
   return cache;

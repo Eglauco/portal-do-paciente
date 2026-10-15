@@ -20,6 +20,7 @@ public class InquilinoService {
     private final InquilinoRepository repository;
     private final ConcurrentHashMap<Long, String> schemaPorId = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> schemaPorSubdominio = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, String> nomePorId = new ConcurrentHashMap<>();
     private volatile Long idPadrao;
 
     public InquilinoService(InquilinoRepository repository) {
@@ -33,6 +34,14 @@ public class InquilinoService {
         }
         return schemaPorId.computeIfAbsent(id, i ->
                 repository.findById(i).map(Inquilino::getSchemaName).orElse(TenantContext.SCHEMA_PADRAO));
+    }
+
+    /** Nome do inquilino do id dado (ex.: "Nascente"), para o app exibir a unidade atual. Null se desconhecido. */
+    public String nomePorId(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return nomePorId.computeIfAbsent(id, i -> repository.findById(i).map(Inquilino::getNome).orElse(null));
     }
 
     /**

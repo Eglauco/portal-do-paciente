@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { type Tema, useTema } from '@/hooks/use-tema';
@@ -26,6 +27,7 @@ export default function AlterarSenhaScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [atual, setAtual] = useState('');
   const [nova, setNova] = useState('');
@@ -113,7 +115,7 @@ export default function AlterarSenhaScreen() {
       <ScreenHeader title="Alterar senha" />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           <View style={styles.aviso}>

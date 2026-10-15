@@ -60,8 +60,11 @@ interface SessaoContexto {
   trocarPerfil: (pacienteId: number) => Promise<void>;
   /** Clínicas (ativas) do CPF logado — app compartilhado, para oferecer "trocar unidade". */
   minhasClinicas: () => Promise<ClinicaLogin[]>;
-  /** Troca a clínica da sessão (app compartilhado) sem refazer login. Volta a "Selecionar Perfil". */
-  trocarClinica: (inquilinoId: number) => Promise<void>;
+  /**
+   * Troca a clínica da sessão (app compartilhado) sem refazer login. Devolve a sessão nova para a tela
+   * decidir o destino: clínica de 1 perfil (perfilSelecionado=true) → app; mais de 1 → "Selecionar Perfil".
+   */
+  trocarClinica: (inquilinoId: number) => Promise<SessaoPaciente>;
   sair: () => Promise<void>;
 }
 
@@ -140,7 +143,9 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   }
 
   async function trocarClinica(inquilinoId: number) {
-    setSessao(await trocarClinicaServico(inquilinoId));
+    const nova = await trocarClinicaServico(inquilinoId);
+    setSessao(nova);
+    return nova;
   }
 
   async function sair() {

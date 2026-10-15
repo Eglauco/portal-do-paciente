@@ -1,6 +1,5 @@
 package com.example.pop.push;
 
-import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,22 +36,12 @@ public class DispositivoController {
     public ResponseEntity<Void> registrar(@Valid @RequestBody RegistrarDispositivoRequest request,
             @AuthenticationPrincipal Jwt jwt) {
         String token = request.token().trim();
-        Long contaId = claimLong(jwt, "cid");
+        Long contaId = claimLong(jwt, "cid"); // o aparelho pertence à CONTA; paciente_id fica só como legado
         Long pacienteId = claimLong(jwt, "pid");
-
-        Dispositivo dispositivo = repository.findFirstByToken(token).orElseGet(Dispositivo::new);
-        if (dispositivo.getId() == null) {
-            dispositivo.setToken(token);
-            dispositivo.setCriadoEm(LocalDateTime.now());
-        }
-        // O aparelho pertence à CONTA; paciente_id fica só como legado/transição.
-        if (contaId != null) {
-            dispositivo.setContaId(contaId);
-        }
-        if (pacienteId != null) {
-            dispositivo.setPacienteId(pacienteId);
-        }
-        repository.save(dispositivo);
+        // Upsert atômico por token (ON CONFLICT): à prova de corrida. O re-registro do push ao trocar de
+        // clínica/perfil pode disparar duas chamadas concorrentes com o mesmo token; o find-then-save antigo
+        // inseria duplicado e estourava o unique dispositivo_token_key (23505).
+        repository.registrarOuAtualizar(token, contaId, pacienteId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 

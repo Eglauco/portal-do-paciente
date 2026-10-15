@@ -4,15 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
-import { type ClinicaLogin } from '@/services/sessao';
+import { abaInicial, type ClinicaLogin } from '@/services/sessao';
 
 /**
  * Tela "Trocar unidade" (app compartilhado): lista as clínicas do CPF logado com a mesma apresentação
  * da seleção de clínica do login e da tela "Selecionar perfil". Ao escolher, troca a clínica da sessão
- * (reemite o token com o novo inquilino); como a sessão volta a "perfil não escolhido", o guard de
- * navegação (_layout) leva para "Selecionar perfil" da nova unidade. É opcional: "Cancelar" volta ao perfil.
+ * (reemite o token com o novo inquilino) e navega: unidade de 1 perfil → entra direto no app; mais de 1
+ * → "Selecionar Perfil" da nova unidade. É opcional: "Cancelar" volta ao perfil.
  */
 export default function SelecionarUnidadeScreen() {
   const t = useTema();
@@ -20,6 +21,7 @@ export default function SelecionarUnidadeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { minhasClinicas, trocarClinica } = useSessao();
+  const { telaHabilitada } = useFuncionalidades();
 
   const [clinicas, setClinicas] = useState<ClinicaLogin[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -58,9 +60,17 @@ export default function SelecionarUnidadeScreen() {
     if (trocandoId != null) return;
     setTrocandoId(inquilinoId);
     try {
-      await trocarClinica(inquilinoId);
-      // Não navega aqui: o guard de navegação (_layout) vê perfilSelecionado=false e leva para
-      // "Selecionar perfil" da nova unidade, substituindo esta tela.
+      const nova = await trocarClinica(inquilinoId);
+      // Limpa a pilha (veio de "Meu perfil") para o Voltar não cair em telas da unidade anterior.
+      if (router.canDismiss()) router.dismissAll();
+      // Navega AQUI (não pelo guard): unidade de 1 perfil → o auto-select já resolveu o perfil, entra
+      // direto no app; mais de 1 → "Selecionar Perfil". Se dependesse do guard, a tela nem abriria
+      // (o guard, vendo a sessão resolvida nesta rota, a fecharia na hora).
+      if (nova.perfilSelecionado) {
+        router.replace(abaInicial(nova, telaHabilitada));
+      } else {
+        router.replace('/selecionar-perfil');
+      }
     } catch (e) {
       setTrocandoId(null);
       Alert.alert('Não foi possível trocar de unidade', e instanceof Error ? e.message : 'Tente novamente.');

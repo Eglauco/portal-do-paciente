@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
@@ -71,6 +71,7 @@ type Etapa = 'cpf' | 'senha' | 'clinica' | 'identidade' | 'codigo';
 export default function LoginScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
+  const insets = useSafeAreaInsets();
   const { preChecagem, loginPorSenha, solicitarCodigo, ativar } = useSessao();
 
   const [etapa, setEtapa] = useState<Etapa>('cpf');
@@ -339,7 +340,7 @@ export default function LoginScreen() {
         keyboardVerticalOffset={0}>
         <ScrollView
           style={styles.sheet}
-          contentContainerStyle={styles.sheetContent}
+          contentContainerStyle={[styles.sheetContent, { paddingBottom: insets.bottom + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {etapa === 'cpf' ? (

@@ -116,6 +116,8 @@ function Navegacao() {
     }
     // Perfil escolhido: se ainda está no login, entra no app na primeira aba acessível
     // do perfil ativo E ligada no kill switch (evita cair numa aba escondida/desligada).
+    // (A tela "Trocar unidade" navega sozinha após a troca — não depende daqui, senão ela
+    // seria fechada ao abrir, já que a sessão continua resolvida.)
     if (naRaiz) roteador.replace(abaInicial(sessao, telaHabilitada));
   }, [sessao, carregando, segments, roteador, telaHabilitada]);
 

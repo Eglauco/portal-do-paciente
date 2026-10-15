@@ -4,6 +4,7 @@ import type { ImagePickerOptions } from 'expo-image-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { INQUILINO } from '@/constants/api';
 import { ScreenHeader } from '@/components/screen-header';
@@ -120,6 +121,7 @@ export default function PerfilScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { sessao, sair, minhasClinicas } = useSessao();
   const { definirFoto } = usePerfilFoto();
   // Travas do perfil dependente: ver os dados vs. lançar (alterar foto e editar dados).
@@ -289,7 +291,7 @@ export default function PerfilScreen() {
   return (
     <View style={styles.screen}>
       <ScreenHeader title="Meu perfil" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         {/* Cabeçalho do perfil */}
         <View style={styles.hero}>
           <Pressable
@@ -322,6 +324,12 @@ export default function PerfilScreen() {
               <Text style={styles.trocarFoto}>{enviandoFoto ? 'Enviando foto…' : 'Alterar foto'}</Text>
             </Pressable>
           )}
+          {sessao?.inquilinoNome ? (
+            <View style={styles.unidade}>
+              <Ionicons name="business" size={14} color={t.brandDeep} />
+              <Text style={styles.unidadeTxt}>{sessao.inquilinoNome}</Text>
+            </View>
+          ) : null}
           {perfil?.prontuario ? (
             <View style={styles.codigo}>
               <Ionicons name="finger-print-outline" size={13} color={t.brandDeep} />
@@ -503,6 +511,17 @@ const criarEstilos = (t: Tema) =>
       marginTop: 12,
     },
     codigoTxt: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep },
+    unidade: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: t.brandTint,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 22,
+      marginTop: 12,
+    },
+    unidadeTxt: { fontSize: 14, fontWeight: '700', color: t.brandDeep },
     aviso: {
       flexDirection: 'row',
       alignItems: 'center',

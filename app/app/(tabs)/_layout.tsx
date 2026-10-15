@@ -27,12 +27,13 @@ export default function TabLayout() {
         tabBarButton: HapticTab,
         tabBarActiveTintColor: t.brandDeep,
         tabBarInactiveTintColor: t.muted,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        // Só ícones (sem legenda): com 6 abas, os textos cortavam em telas estreitas (ex.: iPhone 13).
+        // A acessibilidade segue pelo `title` de cada aba (vira accessibilityLabel).
+        tabBarShowLabel: false,
         tabBarStyle: {
           backgroundColor: t.surface,
           borderTopColor: t.line,
-          height: 62 + insets.bottom,
-          paddingTop: 6,
+          height: 56 + insets.bottom,
           paddingBottom: insets.bottom,
         },
       }}>

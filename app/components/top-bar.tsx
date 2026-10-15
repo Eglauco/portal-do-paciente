@@ -50,26 +50,39 @@ export function TopBar() {
             <Ionicons name="person" size={24} color={t.muted} />
           </View>
         )}
-        <View>
+        <View style={styles.identity}>
           <Text style={styles.hello}>Olá,</Text>
-          <Text style={styles.name}>{primeiroNome}</Text>
+          <Text style={styles.name} numberOfLines={1}>
+            {primeiroNome}
+          </Text>
         </View>
       </Pressable>
 
-      <Pressable
-        style={({ pressed }) => [styles.bell, pressed && styles.bellPressed]}
-        onPress={() => router.push('/notificacoes')}
-        accessibilityRole="button"
-        accessibilityLabel={
-          naoLidas > 0 ? `Notificações, ${naoLidas} não lidas` : 'Notificações'
-        }>
-        <Ionicons name="notifications-outline" size={22} color={t.ink} />
-        {naoLidas > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeTxt}>{naoLidas > 99 ? '99+' : naoLidas}</Text>
+      <View style={styles.right}>
+        {/* Unidade (inquilino) da sessão, ao lado do sino — deixa a esquerda enxuta e dá mais espaço. */}
+        {sessao?.inquilinoNome ? (
+          <View style={styles.clinicaChip}>
+            <Ionicons name="business" size={14} color={t.brandDeep} />
+            <Text style={styles.clinicaTxt} numberOfLines={1}>
+              {sessao.inquilinoNome}
+            </Text>
           </View>
-        )}
-      </Pressable>
+        ) : null}
+        <Pressable
+          style={({ pressed }) => [styles.bell, pressed && styles.bellPressed]}
+          onPress={() => router.push('/notificacoes')}
+          accessibilityRole="button"
+          accessibilityLabel={
+            naoLidas > 0 ? `Notificações, ${naoLidas} não lidas` : 'Notificações'
+          }>
+          <Ionicons name="notifications-outline" size={22} color={t.ink} />
+          {naoLidas > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeTxt}>{naoLidas > 99 ? '99+' : naoLidas}</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -87,15 +100,43 @@ const criarEstilos = (t: Tema) =>
     borderBottomColor: t.line,
   },
   left: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     borderRadius: 14,
     padding: 4,
     marginLeft: -4,
+    marginRight: 8,
   },
   leftPressed: {
     backgroundColor: t.brandTint,
+  },
+  identity: {
+    flex: 1,
+    minWidth: 0,
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  clinicaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    maxWidth: 180,
+    backgroundColor: t.brandTint,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 22,
+  },
+  clinicaTxt: {
+    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: t.brandDeep,
+    letterSpacing: -0.1,
   },
   avatar: {
     width: 46,

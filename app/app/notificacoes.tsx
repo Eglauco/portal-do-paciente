@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { type Tema, useTema } from '@/hooks/use-tema';
@@ -58,6 +59,7 @@ const ORDEM_GRUPOS = ['Hoje', 'Ontem', 'Anteriores'] as const;
 export default function NotificacoesScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
+  const insets = useSafeAreaInsets();
   const [itens, setItens] = useState<Notificacao[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
@@ -153,7 +155,11 @@ export default function NotificacoesScreen() {
         </View>
       )}
       <ScrollView
-        contentContainerStyle={[styles.content, itens.length === 0 && styles.vazioContent]}
+        contentContainerStyle={[
+          styles.content,
+          itens.length === 0 && styles.vazioContent,
+          { paddingBottom: insets.bottom + 24 },
+        ]}
         refreshControl={
           <RefreshControl refreshing={atualizando} onRefresh={aoAtualizar} tintColor={t.brand} colors={[t.brand]} />
         }>

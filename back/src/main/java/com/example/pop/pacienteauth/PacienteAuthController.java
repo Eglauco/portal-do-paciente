@@ -370,7 +370,8 @@ public class PacienteAuthController {
         }
         String token = gerarToken(conta, padrao.paciente(), dispositivoId, inquilinoId);
         return new AtivarResponse(token, padrao.paciente().getId(), padrao.paciente().getNome(),
-                perfis.stream().map(this::paraResposta).toList(), precisaDefinirSenha);
+                perfis.stream().map(this::paraResposta).toList(), precisaDefinirSenha,
+                inquilinoService.nomePorId(inquilinoId));
     }
 
     /** Perfis que a sessão atual pode acessar (para a tela "Selecionar Perfil"). */
