@@ -32,6 +32,15 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     /** Mensagens de um remetente ainda não entregues ao destinatário (para os "checks"). */
     List<Mensagem> findByChatIdAndRemetenteAndEntregueFalse(Long chatId, RemetenteMensagem remetente);
 
+    /**
+     * Mensagens de um remetente ainda não entregues em TODAS as conversas do paciente
+     * (entrega global: o app confirma o recebimento mesmo fora da tela da conversa).
+     */
+    @Query("select m from Mensagem m where m.chat.paciente.id = :pacienteId "
+            + "and m.remetente = :remetente and m.entregue = false")
+    List<Mensagem> pendentesDeEntregaDoPaciente(@Param("pacienteId") Long pacienteId,
+            @Param("remetente") RemetenteMensagem remetente);
+
     // ===================== Dashboard (agregações) =====================
 
     /** Mensagens da unidade no período agrupadas por remetente (PACIENTE/UNIDADE). */

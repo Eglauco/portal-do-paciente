@@ -16,7 +16,7 @@ import { SemAcesso } from '@/components/sem-acesso';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
-import { ChatItem, listarChats } from '@/services/chat';
+import { ChatItem, confirmarEntregaTodas, listarChats } from '@/services/chat';
 import { observarLista } from '@/services/chat-realtime';
 import { podeLancar, podeVer } from '@/services/sessao';
 
@@ -65,6 +65,9 @@ export default function ChatScreen() {
       const dados = await listarChats();
       setChats(dados);
       jaCarregou.current = true;
+      // O aparelho tem as mensagens (estão na lista): confirma a entrega (2º "check")
+      // sem exigir abrir a conversa. Idempotente — no-op quando nada está pendente.
+      confirmarEntregaTodas();
     } catch {
       if (!jaCarregou.current) setErro(true); // silencioso: nao apaga o conteudo ja exibido
     } finally {

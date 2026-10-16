@@ -153,6 +153,19 @@ export async function confirmarEntrega(id: number | string): Promise<void> {
   }
 }
 
+/**
+ * Confirma a entrega de TODAS as mensagens pendentes (qualquer conversa) neste aparelho.
+ * Usado fora da tela da conversa — na lista, em push de primeiro plano e ao voltar do
+ * segundo plano — para que o 2º "check" apareça assim que o aparelho recebe, sem abrir a conversa.
+ */
+export async function confirmarEntregaTodas(): Promise<void> {
+  try {
+    await fetchMeu('/meu/chats/entregar-pendentes', { method: 'POST' });
+  } catch {
+    // best-effort; silencioso (inclusive quando não há sessão)
+  }
+}
+
 /** Marca a conversa como lida por mim (limpa o indicador na lista e mostra "lido" ao atendente). */
 export async function marcarLido(id: number | string): Promise<void> {
   try {

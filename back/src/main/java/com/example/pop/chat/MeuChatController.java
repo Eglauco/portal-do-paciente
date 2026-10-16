@@ -143,6 +143,19 @@ public class MeuChatController {
     }
 
     /**
+     * Confirma a entrega de TODAS as mensagens pendentes do paciente (em qualquer conversa).
+     * Chamado quando o app recebe a mensagem FORA da conversa — lista aberta, push em primeiro
+     * plano ou retorno ao primeiro plano: garante o 2º "check" sem exigir abrir a conversa.
+     */
+    @PostMapping("/entregar-pendentes")
+    @Transactional
+    public void confirmarEntregaTodas(@AuthenticationPrincipal Jwt jwt) {
+        acessoService.exigirVisualizar(jwt, FuncionalidadeApp.CHAT);
+        Long pacienteId = acessoService.pacienteDoToken(jwt).getId();
+        chatService.marcarEntregueTodasDoPaciente(pacienteId);
+    }
+
+    /**
      * Marca a conversa como LIDA pelo paciente (ao abrir a conversa ou ao receber uma
      * mensagem estando dentro dela): limpa o indicador no app e mostra "lido" ao atendente.
      */

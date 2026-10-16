@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 
 import com.example.pop.agendamento.Horario;
 import com.example.pop.chat.Chat;
+import com.example.pop.inquilino.InquilinoService;
 import com.example.pop.notificacao.NotificacaoService;
 import com.example.pop.notificacao.TipoNotificacao;
 import com.example.pop.nps.Nps;
@@ -26,6 +27,7 @@ import com.example.pop.paciente.PacienteAcessoService;
 import com.example.pop.paciente.PacienteAcessoService.DestinoPush;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.postagem.Postagem;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Envia notificações push pela Expo Push API.
@@ -47,14 +49,19 @@ public class PushService {
     private final NotificacaoService notificacaoService;
     private final PacienteAcessoService acessoService;
     private final PacienteRepository pacienteRepository;
+    private final InquilinoService inquilinoService;
+    private final PushAckToken pushAckToken;
     private RestClient restClient;
 
     public PushService(DispositivoRepository repository, NotificacaoService notificacaoService,
-            PacienteAcessoService acessoService, PacienteRepository pacienteRepository) {
+            PacienteAcessoService acessoService, PacienteRepository pacienteRepository,
+            InquilinoService inquilinoService, PushAckToken pushAckToken) {
         this.repository = repository;
         this.notificacaoService = notificacaoService;
         this.acessoService = acessoService;
         this.pacienteRepository = pacienteRepository;
+        this.inquilinoService = inquilinoService;
+        this.pushAckToken = pushAckToken;
     }
 
     // Criado sob demanda (evita abrir conexão na inicialização/testes). Com timeouts:
@@ -78,11 +85,25 @@ public class PushService {
         notificarPaciente(a.getPaciente().getId(), FuncionalidadeApp.AGENDAMENTOS, "Falta registrada", corpo, data);
     }
 
-    /** Nova mensagem da unidade no chat — só o paciente da conversa. */
+    /**
+     * Nova mensagem da unidade no chat — só o paciente da conversa. Leva um TOKEN DE ENTREGA
+     * assinado ({@code data.ack}) e {@code mutableContent} para confirmar o 2º "check" com o app
+     * FECHADO: no iOS a Notification Service Extension dispara (mesmo force-quit) e no Android a
+     * background task acorda — ambos ecoam o token para {@code POST /push/entregue} sem Bearer.
+     */
     public void notificarNovaMensagem(Chat chat) {
         String corpo = "Você recebeu uma nova mensagem de " + chat.getUnidadeSaude().getNome() + ".";
-        Map<String, Object> data = Map.of("tipo", "CHAT", "chatId", chat.getId());
-        notificarPaciente(chat.getPaciente().getId(), FuncionalidadeApp.CHAT, "Nova mensagem", corpo, data);
+        Long pacienteId = chat.getPaciente().getId();
+        Map<String, Object> data = new HashMap<>();
+        data.put("tipo", "CHAT");
+        data.put("chatId", chat.getId());
+        // O inquilino atual (schema da thread do envio) vai DENTRO do token assinado, não cru no data.
+        Long inquilinoId = inquilinoService.idPorSchema(TenantContext.atual());
+        data.put("ack", pushAckToken.gerar(inquilinoId, pacienteId));
+        // mutableContent:true → aps.mutable-content:1 (iOS roda a NSE, inclusive com app encerrado).
+        // priority:high (já padrão em enviarLote) → entrega imediata e acorda a task no Android.
+        notificarPaciente(pacienteId, FuncionalidadeApp.CHAT, "Nova mensagem", corpo, data,
+                Map.of("mutableContent", true));
     }
 
     /** Nova avaliação NPS pendente — só o paciente do atendimento. */
@@ -124,6 +145,16 @@ public class PushService {
      */
     public void notificarPaciente(Long pacienteId, FuncionalidadeApp funcionalidade, String titulo, String corpo,
             Map<String, Object> data) {
+        notificarPaciente(pacienteId, funcionalidade, titulo, corpo, data, Map.of());
+    }
+
+    /**
+     * Igual ao {@link #notificarPaciente(Long, FuncionalidadeApp, String, String, Map)}, mas com
+     * {@code extrasTopo} — campos adicionais no NÍVEL da mensagem Expo (ex.: {@code mutableContent}
+     * para o chat). Só o chat usa; os demais push chamam a versão sem extras.
+     */
+    public void notificarPaciente(Long pacienteId, FuncionalidadeApp funcionalidade, String titulo, String corpo,
+            Map<String, Object> data, Map<String, Object> extrasTopo) {
         if (pacienteId == null) {
             return;
         }
@@ -139,7 +170,7 @@ public class PushService {
         repository.findByPacienteIdAndContaIdIsNull(pacienteId).forEach(d -> aparelhos.put(d.getId(), d));
 
         List<String> tokens = aparelhos.values().stream().map(Dispositivo::getToken).distinct().toList();
-        enviar(tokens, comPrefixo(destino.nome(), titulo), corpo, comPacienteId(data, pacienteId));
+        enviar(tokens, comPrefixo(destino.nome(), titulo), corpo, comPacienteId(data, pacienteId), extrasTopo);
     }
 
     /** Prefixa o título com o primeiro nome do perfil ("Mariana: Novo agendamento"). */
@@ -161,26 +192,34 @@ public class PushService {
     }
 
     private void enviar(List<String> tokens, String titulo, String corpo, Map<String, Object> data) {
+        enviar(tokens, titulo, corpo, data, Map.of());
+    }
+
+    private void enviar(List<String> tokens, String titulo, String corpo, Map<String, Object> data,
+            Map<String, Object> extrasTopo) {
         if (tokens.isEmpty()) {
             return;
         }
         for (int i = 0; i < tokens.size(); i += LOTE) {
             List<String> lote = tokens.subList(i, Math.min(i + LOTE, tokens.size()));
-            enviarLote(lote, titulo, corpo, data);
+            enviarLote(lote, titulo, corpo, data, extrasTopo);
         }
     }
 
-    private void enviarLote(List<String> tokens, String titulo, String corpo, Map<String, Object> data) {
+    private void enviarLote(List<String> tokens, String titulo, String corpo, Map<String, Object> data,
+            Map<String, Object> extrasTopo) {
         List<Map<String, Object>> mensagens = new ArrayList<>();
         for (String token : tokens) {
-            mensagens.add(Map.of(
-                    "to", token,
-                    "title", titulo,
-                    "body", corpo,
-                    "data", data,
-                    "channelId", "default",
-                    "priority", "high",
-                    "sound", "default"));
+            Map<String, Object> mensagem = new LinkedHashMap<>();
+            mensagem.put("to", token);
+            mensagem.put("title", titulo);
+            mensagem.put("body", corpo);
+            mensagem.put("data", data);
+            mensagem.put("channelId", "default");
+            mensagem.put("priority", "high");
+            mensagem.put("sound", "default");
+            mensagem.putAll(extrasTopo); // ex.: mutableContent para o chat (NSE do iOS)
+            mensagens.add(mensagem);
         }
         try {
             client().post()

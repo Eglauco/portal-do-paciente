@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "br.com.eglauco.integrasaude",
+      "appleTeamId": "3P7GB28VS6",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -62,7 +63,8 @@
           "photosPermission": "O app precisa acessar suas fotos para você escolher a foto do perfil.",
           "cameraPermission": "O app precisa acessar a câmera para você tirar a foto do perfil."
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,

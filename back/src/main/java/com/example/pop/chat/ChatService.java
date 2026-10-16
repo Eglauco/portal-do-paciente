@@ -14,6 +14,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
@@ -447,6 +448,29 @@ public class ChatService {
         // retrato da conversa; se publicássemos antes do commit, esse retrato
         // poderia ler o "entregue" ainda como false (2º check voltaria a 1).
         aposCommit(() -> messagingTemplate.convertAndSend("/topic/chat/" + chatId + "/entregue", new EntregaEvento(chatId)));
+    }
+
+    /**
+     * Marca como ENTREGUES todas as mensagens da unidade ainda pendentes em QUALQUER
+     * conversa do paciente. Chamado quando o app recebe a mensagem FORA da tela da
+     * conversa (lista aberta, push em primeiro plano ou retorno ao primeiro plano):
+     * o 2º "check" não deve depender de abrir a conversa, só de o aparelho ter recebido.
+     * Emite um evento de entrega por conversa afetada (o back-office atualiza ao vivo).
+     */
+    @Transactional
+    public void marcarEntregueTodasDoPaciente(Long pacienteId) {
+        List<Mensagem> pendentes = mensagemRepository
+                .pendentesDeEntregaDoPaciente(pacienteId, RemetenteMensagem.UNIDADE);
+        if (pendentes.isEmpty()) {
+            return;
+        }
+        pendentes.forEach(m -> m.setEntregue(true));
+        mensagemRepository.saveAll(pendentes);
+        // Ids das conversas afetadas, capturados AINDA na transação (um evento por conversa).
+        java.util.Set<Long> chatsAfetados = new java.util.LinkedHashSet<>();
+        pendentes.forEach(m -> chatsAfetados.add(m.getChat().getId()));
+        aposCommit(() -> chatsAfetados.forEach(cid ->
+                messagingTemplate.convertAndSend("/topic/chat/" + cid + "/entregue", new EntregaEvento(cid))));
     }
 
     /** Sinal de que as mensagens da conversa foram entregues ao paciente. */

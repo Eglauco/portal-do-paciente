@@ -78,6 +78,9 @@ public class SecurityConfig {
                         // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
                         .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
+                        // ACK de entrega por push (app fechado): chamado pela NSE/iOS e pela task/Android
+                        // SEM Bearer; autenticado por um token HMAC assinado que veio no próprio push.
+                        .requestMatchers(HttpMethod.POST, "/push/entregue").permitAll()
                         // Assinatura eletrônica: os webhooks são chamados pelos provedores sem JWT (autenticados por
                         // header secreto/HMAC no controller); endpoints /dev/** são protegidos por segredo compartilhado.
                         .requestMatchers("/zapsign/webhook", "/dev/zapsign/**").permitAll()

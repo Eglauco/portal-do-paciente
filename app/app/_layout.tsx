@@ -16,6 +16,7 @@ import { PerfilFotoProvider } from '@/hooks/use-perfil-foto';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
 import { TemaProvider } from '@/hooks/use-tema';
 import { notificarAtualizacao } from '@/services/atualizacao';
+import { confirmarEntregaTodas } from '@/services/chat';
 import { ehChatAtivo } from '@/services/chat-ativo';
 import { registrarParaPush } from '@/services/notificacoes';
 import { navegarNotificacao } from '@/services/rota-notificacao';
@@ -166,14 +167,23 @@ export default function RootLayout() {
     const sub = Notifications.addNotificationResponseReceivedListener(tratarToque);
 
     // Notificação chegou com o app em primeiro plano: atualiza a tela em foco.
-    const recebido = Notifications.addNotificationReceivedListener(() => notificarAtualizacao());
+    // Se for de chat, confirma a entrega (2º "check") mesmo fora da tela da conversa.
+    const recebido = Notifications.addNotificationReceivedListener((notificacao) => {
+      notificarAtualizacao();
+      const dados = notificacao.request.content.data as DadosNotificacao;
+      if (dados?.tipo === 'CHAT') confirmarEntregaTodas();
+    });
 
     // App voltou de fato do SEGUNDO PLANO (ex.: paciente tocou na notificação):
     // atualiza. Só dispara em background→active — ignora o 'inactive' transitório
     // (diálogo de permissão, central de controle, alternador de apps).
     let estadoApp = AppState.currentState;
     const appState = AppState.addEventListener('change', (estado) => {
-      if (estadoApp === 'background' && estado === 'active') notificarAtualizacao();
+      if (estadoApp === 'background' && estado === 'active') {
+        notificarAtualizacao();
+        // Pode ter chegado mensagem enquanto estava em segundo plano: confirma a entrega.
+        confirmarEntregaTodas();
+      }
       estadoApp = estado;
     });
 
