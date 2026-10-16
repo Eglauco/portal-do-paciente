@@ -23,14 +23,15 @@ public interface DispositivoRepository extends JpaRepository<Dispositivo, Long> 
      */
     @Modifying
     @Query(value = """
-            INSERT INTO dispositivo (token, conta_id, paciente_id, criado_em)
-            VALUES (:token, :contaId, :pacienteId, now())
+            INSERT INTO dispositivo (token, conta_id, paciente_id, plataforma, criado_em)
+            VALUES (:token, :contaId, :pacienteId, :plataforma, now())
             ON CONFLICT (token) DO UPDATE SET
               conta_id = COALESCE(EXCLUDED.conta_id, dispositivo.conta_id),
-              paciente_id = COALESCE(EXCLUDED.paciente_id, dispositivo.paciente_id)
+              paciente_id = COALESCE(EXCLUDED.paciente_id, dispositivo.paciente_id),
+              plataforma = COALESCE(EXCLUDED.plataforma, dispositivo.plataforma)
             """, nativeQuery = true)
     void registrarOuAtualizar(@Param("token") String token, @Param("contaId") Long contaId,
-            @Param("pacienteId") Long pacienteId);
+            @Param("pacienteId") Long pacienteId, @Param("plataforma") String plataforma);
 
     List<Dispositivo> findByToken(String token);
 

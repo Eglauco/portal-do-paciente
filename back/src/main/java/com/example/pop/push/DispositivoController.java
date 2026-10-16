@@ -41,7 +41,7 @@ public class DispositivoController {
         // Upsert atômico por token (ON CONFLICT): à prova de corrida. O re-registro do push ao trocar de
         // clínica/perfil pode disparar duas chamadas concorrentes com o mesmo token; o find-then-save antigo
         // inseria duplicado e estourava o unique dispositivo_token_key (23505).
-        repository.registrarOuAtualizar(token, contaId, pacienteId);
+        repository.registrarOuAtualizar(token, contaId, pacienteId, request.plataforma());
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 

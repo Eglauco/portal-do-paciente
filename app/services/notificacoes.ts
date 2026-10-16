@@ -55,7 +55,7 @@ export async function registrarParaPush(): Promise<string | null> {
     await fetch(`${API_URL}/dispositivo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token, plataforma: Platform.OS }),
     });
   } catch {
     // Falha ao registrar não deve quebrar o app.

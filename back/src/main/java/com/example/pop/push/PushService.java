@@ -104,6 +104,11 @@ public class PushService {
         // priority:high (já padrão em enviarLote) → entrega imediata e acorda a task no Android.
         notificarPaciente(pacienteId, FuncionalidadeApp.CHAT, "Nova mensagem", corpo, data,
                 Map.of("mutableContent", true));
+        // Android: além da notificação visível acima, um push SILENCIOSO (data-only) que acorda a
+        // task em background para confirmar a entrega (2º "check") com o app FECHADO. É separado e
+        // best-effort: se não disparar (force-stop/Doze), a notificação visível NÃO regride e o 2º
+        // check ainda sai ao reabrir (rede de segurança POST /meu/chats/entregar-pendentes).
+        enviarAckEntregaAndroid(pacienteId, data);
     }
 
     /** Nova avaliação NPS pendente — só o paciente do atendimento. */
@@ -160,17 +165,37 @@ public class PushService {
         }
         // Fan-out respeitando a permissão: responsável sem acesso àquela funcionalidade não recebe.
         DestinoPush destino = acessoService.destinoPush(pacienteId, funcionalidade);
+        List<String> tokens = aparelhosDe(destino, pacienteId).stream()
+                .map(Dispositivo::getToken).distinct().toList();
+        enviar(tokens, comPrefixo(destino.nome(), titulo), corpo, comPacienteId(data, pacienteId), extrasTopo);
+    }
+
+    /**
+     * Aparelhos que devem receber o push de um paciente: todas as contas que o acessam (fan-out por
+     * conta) + aparelhos legados sem conta. Reaproveitado pelo push visível e pelo ACK silencioso.
+     */
+    private java.util.Collection<Dispositivo> aparelhosDe(DestinoPush destino, Long pacienteId) {
         Map<Long, Dispositivo> aparelhos = new LinkedHashMap<>();
         if (!destino.contaIds().isEmpty()) {
             repository.findByContaIdIn(destino.contaIds()).forEach(d -> aparelhos.put(d.getId(), d));
         }
-        // Transição: aparelhos legados (sem conta) ainda registrados pelo paciente.
         // Só conta_id nulo — um aparelho já migrado é resolvido pela conta (autorização atual),
         // evitando vazar o push para uma conta que perdeu o acesso ao paciente.
         repository.findByPacienteIdAndContaIdIsNull(pacienteId).forEach(d -> aparelhos.put(d.getId(), d));
+        return aparelhos.values();
+    }
 
-        List<String> tokens = aparelhos.values().stream().map(Dispositivo::getToken).distinct().toList();
-        enviar(tokens, comPrefixo(destino.nome(), titulo), corpo, comPacienteId(data, pacienteId), extrasTopo);
+    /**
+     * Push SILENCIOSO (data-only) adicional SÓ para aparelhos Android: acorda a task em background
+     * para ela confirmar a entrega (POST /push/entregue) com o app FECHADO — o recibo "entregue"
+     * estilo WhatsApp. Não exibe nada (a notificação visível vai à parte). O iOS usa a NSE.
+     */
+    private void enviarAckEntregaAndroid(Long pacienteId, Map<String, Object> data) {
+        DestinoPush destino = acessoService.destinoPush(pacienteId, FuncionalidadeApp.CHAT);
+        List<String> tokens = aparelhosDe(destino, pacienteId).stream()
+                .filter(d -> "android".equalsIgnoreCase(d.getPlataforma()))
+                .map(Dispositivo::getToken).distinct().toList();
+        enviarSilencioso(tokens, comPacienteId(data, pacienteId));
     }
 
     /** Prefixa o título com o primeiro nome do perfil ("Mariana: Novo agendamento"). */
@@ -221,6 +246,11 @@ public class PushService {
             mensagem.putAll(extrasTopo); // ex.: mutableContent para o chat (NSE do iOS)
             mensagens.add(mensagem);
         }
+        postExpo(mensagens);
+    }
+
+    /** POST em lote na Expo Push API; falhas são engolidas (o push nunca quebra o fluxo de origem). */
+    private void postExpo(List<Map<String, Object>> mensagens) {
         try {
             client().post()
                     .uri(EXPO_PUSH_URL)
@@ -231,6 +261,29 @@ public class PushService {
                     .toBodilessEntity();
         } catch (RuntimeException e) {
             log.warn("Falha ao enviar notificação push: {}", e.getMessage());
+        }
+    }
+
+    /** Envia um push SILENCIOSO (data-only, alta prioridade) em lotes — só acorda a task, não exibe. */
+    private void enviarSilencioso(List<String> tokens, Map<String, Object> data) {
+        if (tokens.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < tokens.size(); i += LOTE) {
+            List<String> lote = tokens.subList(i, Math.min(i + LOTE, tokens.size()));
+            List<Map<String, Object>> mensagens = new ArrayList<>();
+            for (String token : lote) {
+                Map<String, Object> mensagem = new LinkedHashMap<>();
+                mensagem.put("to", token);
+                mensagem.put("data", data);
+                // SEM title/body/channelId/sound: data-only para a task em background rodar com o app
+                // fechado (um "notification message" não acordaria a task no Android).
+                mensagem.put("_contentAvailable", true);
+                mensagem.put("priority", "high");
+                mensagem.put("ttl", 150); // curto: o recibo de entrega só faz sentido agora.
+                mensagens.add(mensagem);
+            }
+            postExpo(mensagens);
         }
     }
 

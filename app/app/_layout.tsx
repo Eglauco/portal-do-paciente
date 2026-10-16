@@ -18,6 +18,7 @@ import { TemaProvider } from '@/hooks/use-tema';
 import { notificarAtualizacao } from '@/services/atualizacao';
 import { confirmarEntregaTodas } from '@/services/chat';
 import { ehChatAtivo } from '@/services/chat-ativo';
+import { registrarEntregaBackground } from '@/services/entrega-background';
 import { registrarParaPush } from '@/services/notificacoes';
 import { navegarNotificacao } from '@/services/rota-notificacao';
 import { abaInicial, trocarPerfilSeNecessario } from '@/services/sessao';
@@ -157,6 +158,8 @@ export default function RootLayout() {
     if (Platform.OS === 'web') return;
 
     registrarParaPush();
+    // Android: task em background que confirma a entrega do chat (2º check) com o app fechado.
+    registrarEntregaBackground();
 
     // App aberto por um toque na notificação (estava fechado).
     Notifications.getLastNotificationResponseAsync().then((resposta) => {

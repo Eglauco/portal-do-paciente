@@ -35,6 +35,10 @@ public class Dispositivo {
     @Column(name = "paciente_id")
     private Long pacienteId;
 
+    /** Plataforma do aparelho ('android'/'ios'/'web'), informada no registro. Decide o shape do push. */
+    @Column(length = 16)
+    private String plataforma;
+
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;
 }
