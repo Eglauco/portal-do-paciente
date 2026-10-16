@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import 'react-native-reanimated';
 
+import { AvisoBateria } from '@/components/aviso-bateria';
 import { LembretePopup } from '@/components/lembrete-popup';
 import { FuncionalidadesProvider, useFuncionalidades } from '@/hooks/use-funcionalidades';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -146,6 +147,8 @@ function Navegacao() {
       </Stack>
       {/* Pop-up fixo de lembrete: só com um perfil escolhido (usa endpoints do paciente). */}
       {sessao && sessao.perfilSelecionado && <LembretePopup />}
+      {/* Aviso único (Android) de isenção de bateria: ajuda a entrega a chegar na hora em 2º plano. */}
+      {sessao && sessao.perfilSelecionado && <AvisoBateria />}
     </>
   );
 }

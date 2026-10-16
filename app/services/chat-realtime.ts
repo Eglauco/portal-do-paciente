@@ -1,7 +1,7 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 
 import { API_URL } from '@/constants/api';
-import { Mensagem, Remetente, StatusChat } from './chat';
+import { confirmarEntregaTodas, Mensagem, Remetente, StatusChat } from './chat';
 import { authHeaders } from './sessao';
 
 export interface DigitandoEvento {
@@ -74,6 +74,10 @@ function garantirCliente(): Client {
       assinaturas.forEach((a) => {
         a.sub = client!.subscribe(a.destino, a.callback);
       });
+      // Rede de segurança: ao (re)conectar, confirma a entrega do que chegou enquanto o WS esteve
+      // fora (ou se o push silencioso de ACK foi descartado pelo Doze mas a mensagem veio pelo WS).
+      // Idempotente; no-op quando nada está pendente.
+      confirmarEntregaTodas();
     },
     onStompError: (frame) => {
       definirEstado('offline', 'STOMP: ' + (frame.headers['message'] ?? 'erro'));
