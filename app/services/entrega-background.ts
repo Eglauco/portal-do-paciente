@@ -1,3 +1,4 @@
+import { fetch } from 'expo/fetch';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
@@ -45,6 +46,11 @@ function extrairAck(data: unknown): string | null {
 
 async function confirmarPorAck(ack: string): Promise<void> {
   try {
+    // IMPORTANTE: usa o `fetch` do `expo/fetch` (nativo), NÃO o global do React Native.
+    // O fetch do RN NÃO completa requisição HTTP quando o processo está em 2º plano/headless
+    // (expo/expo#41146): a task disparava mas o POST só "saía" ao reabrir — era por isso que o
+    // ✓✓ não aparecia com o app minimizado/fechado. O fetch do Expo usa a pilha de rede nativa
+    // e conclui o POST no contexto headless. (Sem dependência nova: vem dentro do pacote `expo`.)
     await fetch(`${API_URL}/push/entregue`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

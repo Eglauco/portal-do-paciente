@@ -280,7 +280,12 @@ public class PushService {
                 // fechado (um "notification message" não acordaria a task no Android).
                 mensagem.put("_contentAvailable", true);
                 mensagem.put("priority", "high");
-                mensagem.put("ttl", 150); // curto: o recibo de entrega só faz sentido agora.
+                // TTL alinhado à validade do token de ACK (15 min, PushAckToken.VALIDADE_SEGUNDOS):
+                // com 150s (2,5 min) o FCM/Doze descartavam o push silencioso antes da próxima janela
+                // de manutenção, então o ✓✓ não saía nem com uma soneca curta. 900s dá à task uma
+                // janela real de entrega diferida (o POST /push/entregue é idempotente — um ACK
+                // atrasado só "promove" o check). Além disso o token expira e o POST daria 400.
+                mensagem.put("ttl", 900);
                 mensagens.add(mensagem);
             }
             postExpo(mensagens);
