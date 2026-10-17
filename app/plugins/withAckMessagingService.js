@@ -8,9 +8,20 @@
 // JSON na chave "body" do FCM — ver RemoteMessageSerializer) e faz um POST em /push/entregue.
 // Registrado com a intent-filter em priority 0 (> -1 do Expo), então vence o slot único de
 // FirebaseMessagingService do Android. iOS não é afetado (lá a entrega morta é via NSE).
-const { withDangerousMod, withAndroidManifest, AndroidConfig } = require('@expo/config-plugins');
+const {
+  withDangerousMod,
+  withAndroidManifest,
+  withAppBuildGradle,
+  AndroidConfig,
+} = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
+
+// Versao do firebase-messaging que o expo-notifications usa (android/build.gradle) — casamos para
+// nao conflitar. O expo-notifications o declara como `implementation`, entao as classes
+// (FirebaseMessagingService, RemoteMessage) NAO vazam pro classpath de compilacao do app; como o
+// nosso .kt as referencia diretamente, precisamos adiciona-las ao modulo do app.
+const FIREBASE_MESSAGING = 'com.google.firebase:firebase-messaging:24.0.1';
 
 const SERVICE_CLASS = 'AckFirebaseMessagingService';
 const API_URL = 'https://amiable-flow-production-a405.up.railway.app';
@@ -72,6 +83,15 @@ class ${SERVICE_CLASS} : ExpoFirebaseMessagingService() {
 }
 
 const withAckMessagingService = (config) => {
+  // 0) Adiciona o firebase-messaging ao classpath de COMPILACAO do app (bloco dependencies extra;
+  //    o Gradle acumula multiplos blocos). Sem isso o .kt nao compila (Cannot access RemoteMessage).
+  config = withAppBuildGradle(config, (cfg) => {
+    if (!cfg.modResults.contents.includes('firebase-messaging')) {
+      cfg.modResults.contents += `\ndependencies {\n    implementation '${FIREBASE_MESSAGING}'\n}\n`;
+    }
+    return cfg;
+  });
+
   // 1) Escreve o .kt no projeto Android gerado (CNG) durante o prebuild.
   config = withDangerousMod(config, [
     'android',
