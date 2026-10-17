@@ -64,7 +64,8 @@
           "cameraPermission": "O app precisa acessar a câmera para você tirar a foto do perfil."
         }
       ],
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "./plugins/withAckMessagingService"
     ],
     "experiments": {
       "typedRoutes": true,
