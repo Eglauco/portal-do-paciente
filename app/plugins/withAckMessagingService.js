@@ -5,9 +5,12 @@
 //
 // O serviço ESTENDE o ExpoFirebaseMessagingService: chama super (mantém a notificação visível + a
 // task quando o app está vivo) e, além disso, extrai o ack (o Expo entrega o data do usuário como
-// JSON na chave "body" do FCM — ver RemoteMessageSerializer) e faz um POST em /push/entregue.
-// Registrado com a intent-filter em priority 0 (> -1 do Expo), então vence o slot único de
-// FirebaseMessagingService do Android. iOS não é afetado (lá a entrega morta é via NSE).
+// JSON na chave "body" do FCM — ver RemoteMessageSerializer) e faz um POST em <base>/push/entregue.
+// A <base> NÃO é fixa: o serviço lê a URL do backend de um arquivo (ack-base.txt) que o app grava a
+// cada abertura (services/ack-nativo.ts) — assim segue o MESMO backend do app (LOCAL em dev, Railway
+// em produção); se o arquivo faltar, usa o fallback compilado (produção). Registrado com a
+// intent-filter em priority 0 (> -1 do Expo), então vence o slot único de FirebaseMessagingService
+// do Android. iOS não é afetado (lá a entrega morta é via NSE, que ainda aponta p/ produção).
 const {
   withDangerousMod,
   withAndroidManifest,
@@ -41,10 +44,29 @@ import java.net.URL
  * a notificacao visivel e a task-quando-vivo; alem disso extrai o ack e faz o POST em /push/entregue.
  */
 class ${SERVICE_CLASS} : ExpoFirebaseMessagingService() {
+  // Fallback COMPILADO (producao/Railway). Em runtime preferimos a URL gravada pelo app no arquivo
+  // abaixo, para o servico nativo seguir o MESMO backend que o app usa (local em dev, Railway em prod).
+  private val fallbackBaseUrl = "${API_URL}"
+  private val arquivoBase = "ack-base.txt" // casa com o lado JS: documentDirectory == context.filesDir
+
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
     // Primeiro a confirmacao nativa (garantida mesmo que o super tente o headless e falhe na New Arch).
     confirmarEntrega(remoteMessage)
     super.onMessageReceived(remoteMessage)
+  }
+
+  /**
+   * Backend que o app esta usando, lido do arquivo que o JS grava a cada abertura (em dev, o IP do
+   * notebook; em producao, o Railway). Cai no fallback compilado se o arquivo nao existir ou estiver vazio.
+   */
+  private fun baseUrl(): String {
+    return try {
+      val arquivo = java.io.File(applicationContext.filesDir, arquivoBase)
+      val txt = if (arquivo.exists()) arquivo.readText(Charsets.UTF_8).trim().trimEnd('/') else ""
+      if (txt.isNotEmpty()) txt else fallbackBaseUrl
+    } catch (e: Exception) {
+      fallbackBaseUrl
+    }
   }
 
   private fun confirmarEntrega(remoteMessage: RemoteMessage) {
@@ -59,9 +81,10 @@ class ${SERVICE_CLASS} : ExpoFirebaseMessagingService() {
         }
       }
       val token: String = ack?.takeIf { it.isNotEmpty() } ?: return
+      val base = baseUrl()
       Thread {
         try {
-          val conn = URL("${API_URL}/push/entregue").openConnection() as HttpURLConnection
+          val conn = URL(base + "/push/entregue").openConnection() as HttpURLConnection
           conn.requestMethod = "POST"
           conn.setRequestProperty("Content-Type", "application/json")
           conn.doOutput = true

@@ -16,6 +16,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { PerfilFotoProvider } from '@/hooks/use-perfil-foto';
 import { SessaoProvider, useSessao } from '@/hooks/use-sessao';
 import { TemaProvider } from '@/hooks/use-tema';
+import { sincronizarApiBaseNativo } from '@/services/ack-nativo';
 import { notificarAtualizacao } from '@/services/atualizacao';
 import { confirmarEntregaTodas } from '@/services/chat';
 import { ehChatAtivo } from '@/services/chat-ativo';
@@ -163,6 +164,8 @@ export default function RootLayout() {
     // Android: a entrega do chat (2º "check") com o app em 2º plano/fechado é confirmada por um
     // FirebaseMessagingService NATIVO (config plugin withAckMessagingService) — não por task JS,
     // que não roda no cold-start do app morto na New Architecture. iOS usa a NSE.
+    // Diz ao serviço nativo QUAL backend usar (segue o app: local em dev, Railway em prod).
+    sincronizarApiBaseNativo();
 
     // App aberto por um toque na notificação (estava fechado).
     Notifications.getLastNotificationResponseAsync().then((resposta) => {
