@@ -68,6 +68,14 @@ public class Mensagem {
     @Column(nullable = false)
     private boolean entregue;
 
+    /** Quando a mensagem foi entregue ao aparelho (2º check); nulo enquanto não entregue. */
+    @Column(name = "entregue_em")
+    private LocalDateTime entregueEm;
+
+    /** Quando o paciente visualizou a mensagem da unidade (recibo "lido"); nulo enquanto não lida. */
+    @Column(name = "visualizada_em")
+    private LocalDateTime visualizadaEm;
+
     /** Id gerado pelo cliente (idempotência): evita duplicar em reenvios. */
     @Column(name = "cliente_id", length = 60)
     private String clienteId;

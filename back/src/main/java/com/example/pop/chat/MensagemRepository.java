@@ -32,6 +32,9 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     /** Mensagens de um remetente ainda não entregues ao destinatário (para os "checks"). */
     List<Mensagem> findByChatIdAndRemetenteAndEntregueFalse(Long chatId, RemetenteMensagem remetente);
 
+    /** Mensagens de um remetente ainda sem data de visualização (para carimbar o recibo "lido"). */
+    List<Mensagem> findByChatIdAndRemetenteAndVisualizadaEmIsNull(Long chatId, RemetenteMensagem remetente);
+
     /**
      * Mensagens de um remetente ainda não entregues em TODAS as conversas do paciente
      * (entrega global: o app confirma o recebimento mesmo fora da tela da conversa).

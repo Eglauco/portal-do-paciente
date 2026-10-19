@@ -36,6 +36,10 @@ export interface Mensagem {
   enviadaEm: string;
   lida: boolean;
   entregue: boolean;
+  /** Quando foi entregue ao aparelho (2º check); null se ainda não entregue. */
+  entregueEm?: string | null;
+  /** Quando o paciente visualizou (recibo "lido"); null se ainda não visualizada. */
+  visualizadaEm?: string | null;
   /** Nome do atendente que enviou (só nas mensagens da unidade). */
   atendenteNome?: string | null;
   /** Mensagem gerada pela assistente virtual (IA), não por um atendente humano. */

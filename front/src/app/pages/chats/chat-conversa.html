@@ -91,6 +91,19 @@
                   }
                 }
               </span>
+              @if (m.remetente === 'UNIDADE' && !m.pendente && !m.falha) {
+                <button
+                  type="button"
+                  class="wa__menu-btn"
+                  (click)="abrirMenu(m.id, $event)"
+                  aria-haspopup="menu"
+                  [attr.aria-expanded]="menuAbertoId() === m.id"
+                  aria-label="Opções da mensagem"
+                  title="Opções da mensagem"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+                </button>
+              }
             </div>
             @if (m.remetente === 'UNIDADE' && m.falha && chat.pacienteUsandoApp !== false && souResponsavel()) {
               <button type="button" class="wa__reenviar" (click)="reenviar(m)">
@@ -306,6 +319,84 @@
 
         <div class="modal__actions">
           <button type="button" class="btn btn--ghost" (click)="fecharLogs()">Fechar</button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (menuAbertoId() !== null) {
+    <div class="wa__menu-backdrop" (click)="fecharMenu()"></div>
+    <div
+      #menuMsg
+      class="wa__menu"
+      role="menu"
+      tabindex="-1"
+      [style.top.px]="menuPos()?.top"
+      [style.right.px]="menuPos()?.right"
+      (keydown.escape)="fecharMenu()"
+    >
+      <button type="button" class="wa__menu-item" role="menuitem" (click)="abrirDados(menuAbertoId())">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" />
+        </svg>
+        Dados da mensagem
+      </button>
+    </div>
+  }
+
+  @if (dadosMensagem(); as m) {
+    <div class="modal-backdrop" (click)="fecharDados()">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dados-titulo"
+        tabindex="-1"
+        #dadosDialog
+        (keydown.escape)="fecharDados()"
+        (click)="$event.stopPropagation()"
+      >
+        <h2 id="dados-titulo" class="modal__titulo">Dados da mensagem</h2>
+        <p class="modal__sub wa__dados-texto">"{{ m.texto }}"</p>
+        <ul class="wa__dados">
+          <li class="wa__dados-item">
+            <span class="wa__dados-icone wa__dados-icone--enviada" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 13 5 5L20 6" /></svg>
+            </span>
+            <div class="wa__dados-info">
+              <b>Enviada</b>
+              <time>{{ m.enviadaEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+            </div>
+          </li>
+          <li class="wa__dados-item">
+            <span class="wa__dados-icone wa__dados-icone--entregue" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 13 5 5L19 6" /><path d="m9 16 2 2L22 7" /></svg>
+            </span>
+            <div class="wa__dados-info">
+              <b>Entregue</b>
+              @if (m.entregueEm) {
+                <time>{{ m.entregueEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+              } @else {
+                <span class="wa__dados-vazio">Não entregue</span>
+              }
+            </div>
+          </li>
+          <li class="wa__dados-item">
+            <span class="wa__dados-icone wa__dados-icone--lida" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 13 5 5L19 6" /><path d="m9 16 2 2L22 7" /></svg>
+            </span>
+            <div class="wa__dados-info">
+              <b>Visualizada</b>
+              @if (m.visualizadaEm) {
+                <time>{{ m.visualizadaEm | date: 'dd/MM/yyyy · HH:mm' }}</time>
+              } @else {
+                <span class="wa__dados-vazio">Não visualizada</span>
+              }
+            </div>
+          </li>
+        </ul>
+        <div class="modal__actions">
+          <button type="button" class="btn btn--ghost" (click)="fecharDados()">Fechar</button>
         </div>
       </div>
     </div>

@@ -81,6 +81,8 @@ export class ChatConversa {
   private readonly transferirDialogRef = viewChild<ElementRef<HTMLElement>>('transferirDialog');
   private readonly confirmarBtnRef = viewChild<ElementRef<HTMLElement>>('confirmarBtn');
   private readonly logsDialogRef = viewChild<ElementRef<HTMLElement>>('logsDialog');
+  private readonly dadosDialogRef = viewChild<ElementRef<HTMLElement>>('dadosDialog');
+  private readonly menuRef = viewChild<ElementRef<HTMLElement>>('menuMsg');
 
   /** Modal de auditoria (linha do tempo) da conversa. */
   protected readonly mostrarLogs = signal(false);
@@ -90,6 +92,20 @@ export class ChatConversa {
   protected readonly rotuloStatus = statusLabel;
   /** Elemento que abriu o modal de histórico, para devolver o foco ao fechar (a11y). */
   private focoAnterior: HTMLElement | null = null;
+
+  // --- "Dados da mensagem" (menu de hover → modal) — só nas mensagens da unidade ---
+  /** Id da mensagem com o menu de contexto aberto (null = nenhum). */
+  protected readonly menuAbertoId = signal<number | null>(null);
+  /** Posição fixa do menu, ancorada no chevron clicado (evita recorte dentro do scroll). */
+  protected readonly menuPos = signal<{ top: number; right: number } | null>(null);
+  /** Id da mensagem cujo modal "Dados da mensagem" está aberto (null = fechado). */
+  protected readonly dadosMensagemId = signal<number | null>(null);
+  /** Mensagem do modal, derivada do detalhe para refletir atualizações ao vivo (entregue/lido). */
+  protected readonly dadosMensagem = computed<Mensagem | null>(() => {
+    const id = this.dadosMensagemId();
+    if (id == null) return null;
+    return this.detalhe()?.mensagens.find((m) => m.id === id) ?? null;
+  });
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -252,6 +268,33 @@ export class ChatConversa {
     this.focoAnterior = null;
   }
 
+  /** Abre o menu de contexto da mensagem, ancorado no chevron clicado (posição fixa). */
+  protected abrirMenu(id: number, event: MouseEvent): void {
+    const alvo = event.currentTarget as HTMLElement | null;
+    if (alvo && typeof window !== 'undefined') {
+      const r = alvo.getBoundingClientRect();
+      this.menuPos.set({ top: Math.round(r.bottom + 4), right: Math.round(window.innerWidth - r.right) });
+    }
+    this.menuAbertoId.set(id);
+    this.focarRef(this.menuRef); // move o foco para o menu (Escape fecha; a11y)
+  }
+
+  protected fecharMenu(): void {
+    this.menuAbertoId.set(null);
+  }
+
+  /** Abre o modal "Dados da mensagem" (enviada/entregue/visualizada) e fecha o menu. */
+  protected abrirDados(id: number | null): void {
+    this.menuAbertoId.set(null);
+    if (id == null) return;
+    this.dadosMensagemId.set(id);
+    this.focarRef(this.dadosDialogRef);
+  }
+
+  protected fecharDados(): void {
+    this.dadosMensagemId.set(null);
+  }
+
   /** Frase descritiva de um evento do log. */
   protected descreverLog(log: ChatLog): string {
     const nome = log.usuarioNome ?? 'Atendente';
@@ -363,6 +406,10 @@ export class ChatConversa {
     this.detalhe.update((d) =>
       d ? { ...d, pacienteLeuEm: this.cursorMaisRecente(d.pacienteLeuEm, pacienteLeuEm) } : d,
     );
+    // O evento /lido só traz o cursor; re-sincroniza o retrato para trazer o visualizadaEm por
+    // mensagem (hora exibida no modal "Dados da mensagem"), coerente com os checks azuis.
+    const id = this.idAtual();
+    if (id != null) this.ressincronizar(id);
   }
 
   /** Mantém o cursor de leitura mais recente (nunca regride numa re-sincronização atrasada). */

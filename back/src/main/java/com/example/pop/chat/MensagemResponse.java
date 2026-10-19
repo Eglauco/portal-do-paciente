@@ -10,6 +10,10 @@ public record MensagemResponse(
         LocalDateTime enviadaEm,
         boolean lida,
         boolean entregue,
+        /** Quando foi entregue ao aparelho (2º check); nulo se ainda não entregue. */
+        LocalDateTime entregueEm,
+        /** Quando o paciente visualizou (recibo "lido"); nulo se ainda não visualizada. */
+        LocalDateTime visualizadaEm,
         String clienteId,
         /** Nome do atendente que enviou (só nas mensagens da unidade); nulo caso contrário. */
         String atendenteNome,
@@ -31,7 +35,7 @@ public record MensagemResponse(
 
     public static MensagemResponse from(Mensagem m, String responsavelNome) {
         return new MensagemResponse(m.getId(), m.getRemetente(), m.getTexto(), m.getEnviadaEm(),
-                m.isLida(), m.isEntregue(), m.getClienteId(),
+                m.isLida(), m.isEntregue(), m.getEntregueEm(), m.getVisualizadaEm(), m.getClienteId(),
                 m.getUsuario() != null ? m.getUsuario().getNome() : null,
                 responsavelNome,
                 m.isGeradaPorIa(),

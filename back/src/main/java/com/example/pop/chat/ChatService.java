@@ -442,7 +442,11 @@ public class ChatService {
         if (pendentes.isEmpty()) {
             return;
         }
-        pendentes.forEach(m -> m.setEntregue(true));
+        LocalDateTime agora = LocalDateTime.now();
+        pendentes.forEach(m -> {
+            m.setEntregue(true);
+            m.setEntregueEm(agora);
+        });
         mensagemRepository.saveAll(pendentes);
         // Publica SÓ APÓS o commit: o back-office reage ao evento recarregando o
         // retrato da conversa; se publicássemos antes do commit, esse retrato
@@ -464,7 +468,11 @@ public class ChatService {
         if (pendentes.isEmpty()) {
             return;
         }
-        pendentes.forEach(m -> m.setEntregue(true));
+        LocalDateTime agora = LocalDateTime.now();
+        pendentes.forEach(m -> {
+            m.setEntregue(true);
+            m.setEntregueEm(agora);
+        });
         mensagemRepository.saveAll(pendentes);
         // Ids das conversas afetadas, capturados AINDA na transação (um evento por conversa).
         java.util.Set<Long> chatsAfetados = new java.util.LinkedHashSet<>();
@@ -497,6 +505,14 @@ public class ChatService {
         LocalDateTime agora = LocalDateTime.now();
         chat.setPacienteLeuEm(agora);
         repository.save(chat);
+        // Carimba o momento da visualização nas mensagens da unidade ainda sem recibo "lido"
+        // (todas já enviadas antes de agora): é o que o modal "Dados da mensagem" exibe.
+        List<Mensagem> aVisualizar = mensagemRepository
+                .findByChatIdAndRemetenteAndVisualizadaEmIsNull(chat.getId(), RemetenteMensagem.UNIDADE);
+        if (!aVisualizar.isEmpty()) {
+            aVisualizar.forEach(m -> m.setVisualizadaEm(agora));
+            mensagemRepository.saveAll(aVisualizar);
+        }
         aposCommit(() -> {
             messagingTemplate.convertAndSend("/topic/chat/" + chat.getId() + "/lido", new LeituraEvento(chat.getId(), agora));
             messagingTemplate.convertAndSend("/topic/chats", new ChatEvento(chat.getId()));
