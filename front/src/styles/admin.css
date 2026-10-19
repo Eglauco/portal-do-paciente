@@ -2407,15 +2407,18 @@
 
 /* "Dados da mensagem": chevron no hover da bolha da unidade → menu → modal. */
 .wa__menu-btn {
-  position: absolute; top: 3px; right: 4px; width: 22px; height: 20px;
-  display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px;
-  cursor: pointer; color: #5a6b66; background: color-mix(in srgb, #d6f0e7 86%, transparent);
+  position: absolute; top: 1px; right: 1px; width: 40px; height: 22px;
+  display: flex; align-items: center; justify-content: flex-end; padding: 0 5px 0 0;
+  border: 0; border-radius: 0 13px 0 12px; cursor: pointer; color: #5a6b66;
+  /* Fade (estilo WhatsApp): o nome longo do atendente some suave sob o chevron, sem corte seco.
+     Transparente definido como a MESMA cor com alpha 0 (evita tom cinza no meio do gradiente). */
+  background: linear-gradient(to left, #d6f0e7 58%, rgba(214, 240, 231, 0));
   opacity: 0; transition: opacity 0.12s ease;
 }
 .wa__bolha-wrap:hover .wa__menu-btn,
 .wa__menu-btn:focus-visible { opacity: 1; }
 .wa__menu-btn:hover { color: var(--ink); }
-.wa__menu-btn svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; }
+.wa__menu-btn svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; flex-shrink: 0; }
 
 .wa__menu-backdrop { position: fixed; inset: 0; z-index: 60; background: transparent; }
 .wa__menu {
