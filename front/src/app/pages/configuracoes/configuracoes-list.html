@@ -4,6 +4,12 @@
       <h1 class="page-title">Configurações</h1>
       <p class="page-sub">Ajuste os valores das configurações do sistema. Clique numa configuração para editar.</p>
     </div>
+    <button type="button" class="btn btn--ghost" (click)="mostrarArmazenamento.set(true)">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" /><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      </svg>
+      Armazenamento (S3 padrão)
+    </button>
   </header>
 
   <!-- Filtros -->
@@ -141,4 +147,28 @@
       </div>
     }
   </section>
+
+  @if (mostrarArmazenamento()) {
+    <div class="modal-backdrop">
+      <div
+        class="modal modal--s3"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="s3-titulo"
+        tabindex="-1"
+        (keydown.escape)="mostrarArmazenamento.set(false)"
+      >
+        <div class="modal__head">
+          <h2 id="s3-titulo" class="modal__titulo">Armazenamento (S3 padrão da clínica)</h2>
+          <button type="button" class="modal__close" (click)="mostrarArmazenamento.set(false)" aria-label="Fechar">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <p class="modal__sub">
+          Guarda os arquivos compartilhados entre unidades: fotos de pacientes e profissionais, modelos de TCLE e logomarca.
+        </p>
+        <app-armazenamento-s3-form [escopo]="escopoInquilino" />
+      </div>
+    </div>
+  }
 </section>

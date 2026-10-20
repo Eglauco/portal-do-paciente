@@ -20,14 +20,17 @@ export class StorageService {
    * 3) retorna a URL pública para salvar no documento.
    *
    * {@code pasta}: subpasta no bucket (ex.: "rede-social"). Omitida → "prontuarios".
+   * {@code unidadeId}: unidade DONA do arquivo (prontuário, postagem…) → grava no S3 dela.
+   * Omitido → S3 PADRÃO do inquilino (fotos, logomarca, modelos de TCLE).
    */
-  async enviar(arquivo: File, pasta?: string): Promise<string> {
+  async enviar(arquivo: File, pasta?: string, unidadeId?: number | null): Promise<string> {
     const contentType = arquivo.type || 'application/octet-stream';
     const { uploadUrl, publicUrl } = await firstValueFrom(
       this.http.post<UploadUrlResponse>(`${this.base}/upload-url`, {
         nomeArquivo: arquivo.name,
         contentType,
         pasta,
+        unidadeId: unidadeId ?? null,
       }),
     );
 
@@ -52,6 +55,7 @@ export class StorageService {
     arquivo: File,
     pasta?: string,
     opcoes: { maxLado?: number; qualidade?: number } = {},
+    unidadeId?: number | null,
   ): Promise<string> {
     const maxLado = opcoes.maxLado ?? 512;
     const qualidade = opcoes.qualidade ?? 0.8;
@@ -65,7 +69,7 @@ export class StorageService {
       // Falha no processamento: envia o original (não bloqueia o usuário).
       paraEnviar = arquivo;
     }
-    return this.enviar(paraEnviar, pasta);
+    return this.enviar(paraEnviar, pasta, unidadeId);
   }
 
   /** Desenha um recorte quadrado central da imagem num canvas de lado fixo e devolve um JPEG. */

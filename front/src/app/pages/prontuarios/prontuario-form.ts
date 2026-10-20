@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
+import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { Agendamento, filtroVazio } from '../agendamentos/agendamento.model';
 import { AgendamentoService } from '../agendamentos/agendamento.service';
@@ -66,6 +67,7 @@ export class ProntuarioForm implements PodeSair {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
+  private readonly auth = inject(AuthService);
 
   protected readonly agendamentos = signal<OpcaoAgendamento[]>([]);
   protected readonly tiposDocumento = signal<TipoDocumentoProntuarioAtivo[]>([]);
@@ -411,7 +413,8 @@ export class ProntuarioForm implements PodeSair {
       for (const g of grupos) {
         const arquivo = g.controls.arquivo.value;
         if (arquivo) {
-          const novaUrl = await this.storage.enviar(arquivo);
+          // Documento de prontuário é por-unidade → S3 da unidade ativa do admin.
+          const novaUrl = await this.storage.enviar(arquivo, undefined, this.auth.unidadeId());
           enviadasAgora.push(novaUrl);
           urlPorGrupo.set(g, novaUrl);
         } else {

@@ -23,11 +23,20 @@ public class StorageController {
         this.storageService = storageService;
     }
 
-    /** Gera a URL pré-assinada para o upload direto do navegador ao S3. */
+    /**
+     * Gera a URL pré-assinada para o upload direto do navegador ao S3. Com {@code unidadeId} no corpo,
+     * grava no S3 daquela UNIDADE (prontuário, postagem…); sem ele, no S3 PADRÃO do inquilino (fotos de
+     * profissional, logomarca, modelos de TCLE).
+     */
     @PostMapping("/upload-url")
     public UploadUrlResponse gerarUploadUrl(@Valid @RequestBody UploadUrlRequest request) {
+        EscopoS3 escopo = request.unidadeId() != null
+                ? EscopoS3.unidade(request.unidadeId())
+                : EscopoS3.inquilinoPadrao();
         try {
-            return storageService.gerarUploadUrl(request.nomeArquivo(), request.contentType(), request.pasta());
+            return storageService.gerarUploadUrl(escopo, request.nomeArquivo(), request.contentType(), request.pasta());
+        } catch (ResponseStatusException e) {
+            throw e; // "armazenamento não configurado" (422) e afins passam direto para o front
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Não foi possível preparar o upload. Verifique a configuração do armazenamento.");
@@ -43,6 +52,8 @@ public class StorageController {
             @RequestParam(required = false) String nome) {
         try {
             return new DownloadUrlResponse(storageService.gerarDownloadUrl(url, nome));
+        } catch (ResponseStatusException e) {
+            throw e;
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Não foi possível gerar o link do arquivo.");
         }

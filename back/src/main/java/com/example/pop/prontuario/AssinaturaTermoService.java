@@ -21,6 +21,7 @@ import com.example.pop.configuracaoagenda.OrigemModeloTermo;
 import com.example.pop.configuracaoagenda.TermoConfiguracaoAgenda;
 import com.example.pop.configuracaoagenda.TermoConfiguracaoAgendaRepository;
 import com.example.pop.configuracaoagenda.TermoVariavelResolver;
+import com.example.pop.storage.EscopoS3;
 import com.example.pop.storage.StorageService;
 import com.example.pop.tenant.TenantContext;
 
@@ -473,7 +474,10 @@ public class AssinaturaTermoService {
         }
         boolean combinado = termos.size() > 1;
         String nomeBase = combinado ? "Termos de Consentimento" : termos.get(0).getNome();
-        String url = storageService.salvarBytes(pdf, "application/pdf", "tcle-assinado", nomeBase + ".pdf");
+        // Documento do prontuário é da UNIDADE do atendimento (prontuário → horário → agenda.unidadeSaude, não-nula).
+        Long unidadeId = termos.get(0).getProntuario().getHorario().getUnidadeSaude().getId();
+        String url = storageService.salvarBytes(EscopoS3.unidade(unidadeId), pdf, "application/pdf",
+                "tcle-assinado", nomeBase + ".pdf");
 
         Documento documento = new Documento();
         documento.setProntuario(termos.get(0).getProntuario());

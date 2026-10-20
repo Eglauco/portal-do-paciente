@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.inquilino.SuperAdminAutenticacao;
+import com.example.pop.storage.EscopoS3;
 import com.example.pop.storage.StorageService;
 import com.example.pop.storage.UploadUrlRequest;
 import com.example.pop.storage.UploadUrlResponse;
@@ -108,7 +109,8 @@ public class ConfigPlataformaController {
             @Valid @RequestBody UploadUrlRequest request) {
         autenticacao.conferir(secret);
         try {
-            return storageService.gerarUploadUrl(request.nomeArquivo(), request.contentType(), PASTA);
+            // Branding da plataforma (super-admin, cross-tenant) → S3 central da PLATAFORMA.
+            return storageService.gerarUploadUrl(EscopoS3.plataforma(), request.nomeArquivo(), request.contentType(), PASTA);
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Não foi possível preparar o upload. Verifique a configuração do armazenamento.");

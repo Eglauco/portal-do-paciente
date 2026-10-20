@@ -1,6 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { ArmazenamentoS3Form } from '../../shared/armazenamento/armazenamento-s3-form';
+import { EscopoS3Input } from '../../shared/armazenamento/armazenamento.model';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Configuracao, TipoConfiguracao } from './configuracao.model';
@@ -11,10 +13,13 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-configuracoes-list',
-  imports: [DatePipe, Ordenavel],
+  imports: [DatePipe, Ordenavel, ArmazenamentoS3Form],
   templateUrl: './configuracoes-list.html',
 })
 export class ConfiguracoesList {
+  /** S3 PADRÃO do inquilino (fotos, modelos de TCLE, logomarca) — configurado num modal daqui. */
+  protected readonly escopoInquilino: EscopoS3Input = { tipo: 'inquilino' };
+  protected readonly mostrarArmazenamento = signal(false);
   private readonly service = inject(ConfiguracaoService);
   private readonly router = inject(Router);
   private readonly store = inject(ConfiguracaoBuscaStore);

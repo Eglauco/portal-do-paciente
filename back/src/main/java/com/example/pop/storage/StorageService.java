@@ -2,18 +2,20 @@ package com.example.pop.storage;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.StringUtils;
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import com.example.pop.tenant.TenantContext;
+
 import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -24,149 +26,108 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequ
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 /**
- * Integração com o S3/MinIO. O upload do arquivo é feito direto do navegador
- * para o S3 usando uma URL pré-assinada gerada aqui — o arquivo nunca passa
- * pelo backend (evita sobrecarga de banda). O backend só guarda a URL e é
- * responsável por remover o objeto quando o documento é excluído.
+ * Integração com o S3/MinIO, agora POR ESCOPO ({@link EscopoS3}: unidade / padrão do inquilino /
+ * plataforma). Cada objeto é gravado com um PREFIXO de escopo na key ({@code u<id>/}, {@code inq/},
+ * {@code plat/}), e a leitura/exclusão descobre o escopo só pela URL salva — sem o chamador precisar
+ * repassar a unidade. A config (endpoint/bucket/credenciais) de cada escopo vem do {@link ConfigS3Service};
+ * clients/presigners são cacheados por {@code schema|prefixo} e invalidados quando a config muda.
+ *
+ * <p>O upload é feito direto do navegador para o S3 via URL pré-assinada (o arquivo nunca passa pelo backend).
  */
 @Service
 public class StorageService {
 
-    private final String bucket;
-    private final String accessKey;
-    private final String secretKey;
-    private final String region;
-    private final String publicEndpoint;
-    private final String internalEndpoint;
+    private final ConfigS3Service configS3;
 
-    private S3Presigner presigner;
-    private S3Client client;
+    private final Map<String, S3Presigner> presigners = new ConcurrentHashMap<>();
+    private final Map<String, S3Client> clients = new ConcurrentHashMap<>();
 
-    public StorageService(
-            @Value("${storage.bucket}") String bucket,
-            @Value("${storage.access-key}") String accessKey,
-            @Value("${storage.secret-key}") String secretKey,
-            @Value("${storage.region}") String region,
-            @Value("${storage.public-endpoint}") String publicEndpoint,
-            @Value("${storage.internal-endpoint}") String internalEndpoint) {
-        this.bucket = bucket;
-        this.accessKey = accessKey;
-        this.secretKey = secretKey;
-        this.region = region;
-        this.publicEndpoint = normalizar(publicEndpoint);
-        this.internalEndpoint = normalizarPreservandoPorta(internalEndpoint);
+    public StorageService(ConfigS3Service configS3) {
+        this.configS3 = configS3;
     }
 
-    private boolean configurado() {
-        return StringUtils.hasText(accessKey) && StringUtils.hasText(secretKey);
-    }
+    // ===================== Escrita (precisa do escopo) =====================
 
-    private void exigirConfiguracao() {
-        if (!configurado()) {
-            throw new IllegalStateException("Armazenamento (S3/MinIO) não configurado.");
-        }
-    }
-
-    private StaticCredentialsProvider credenciais() {
-        return StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey));
-    }
-
-    // Clientes criados sob demanda (o SDK rejeita credenciais vazias na criação).
-    private synchronized S3Presigner presigner() {
-        if (presigner == null) {
-            presigner = S3Presigner.builder()
-                    .endpointOverride(URI.create(publicEndpoint))
-                    .region(Region.of(region))
-                    .credentialsProvider(credenciais())
-                    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-                    .build();
-        }
-        return presigner;
-    }
-
-    private synchronized S3Client client() {
-        if (client == null) {
-            client = S3Client.builder()
-                    .endpointOverride(URI.create(internalEndpoint))
-                    .region(Region.of(region))
-                    .credentialsProvider(credenciais())
-                    .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-                    .build();
-        }
-        return client;
-    }
-
-    /** Gera uma URL pré-assinada (PUT) para o navegador enviar o arquivo direto ao S3. */
-    public UploadUrlResponse gerarUploadUrl(String nomeArquivo, String contentType, String pasta) {
-        exigirConfiguracao();
+    /** Gera uma URL pré-assinada (PUT) para o navegador enviar o arquivo direto ao S3 do escopo. */
+    public UploadUrlResponse gerarUploadUrl(EscopoS3 escopo, String nomeArquivo, String contentType, String pasta) {
+        DadosS3 cfg = configS3.exigir(escopo);
         String tipo = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
-        String chave = pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
+        String chave = chaveNova(escopo, pasta, nomeArquivo);
 
         PutObjectRequest put = PutObjectRequest.builder()
-                .bucket(bucket)
-                .key(chave)
-                .contentType(tipo)
-                .build();
-
-        PresignedPutObjectRequest presigned = presigner().presignPutObject(
+                .bucket(cfg.bucket()).key(chave).contentType(tipo).build();
+        PresignedPutObjectRequest presigned = presigner(escopo, cfg).presignPutObject(
                 PutObjectPresignRequest.builder()
                         .signatureDuration(Duration.ofMinutes(10))
-                        .putObjectRequest(put)
-                        .build());
+                        .putObjectRequest(put).build());
 
-        String uploadUrl = presigned.url().toString();
-        String publicUrl = publicEndpoint + "/" + bucket + "/" + chave;
-        return new UploadUrlResponse(uploadUrl, publicUrl);
+        return new UploadUrlResponse(presigned.url().toString(), urlPublica(cfg, chave));
     }
 
-    /** Gera uma URL pré-assinada (GET) temporária para VISUALIZAR o arquivo (inline, sem forçar download). */
+    /**
+     * Grava bytes gerados no backend direto no S3 do escopo (putObject server-side) e devolve a URL pública.
+     * Usado quando o arquivo NÃO vem do navegador (ex.: PDF assinado baixado da ZapSign). Escopo sem S3
+     * configurado sobe como erro 422.
+     */
+    public String salvarBytes(EscopoS3 escopo, byte[] conteudo, String contentType, String pasta, String nomeArquivo) {
+        DadosS3 cfg = configS3.exigir(escopo);
+        String tipo = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
+        String chave = chaveNova(escopo, pasta, nomeArquivo);
+        client(escopo, cfg).putObject(
+                PutObjectRequest.builder().bucket(cfg.bucket()).key(chave).contentType(tipo).build(),
+                RequestBody.fromBytes(conteudo));
+        return urlPublica(cfg, chave);
+    }
+
+    // ===================== Leitura / exclusão (escopo vem da URL) =====================
+
+    /** Gera uma URL pré-assinada (GET) temporária para VISUALIZAR o arquivo (inline). */
     public String gerarDownloadUrl(String url) {
         return gerarDownloadUrl(url, null);
     }
 
     /**
-     * Gera uma URL pré-assinada (GET) temporária. Com {@code nomeArquivo} preenchido, a resposta vem com
-     * {@code Content-Disposition: attachment} — o navegador BAIXA o arquivo (com esse nome) em vez de abrir inline.
+     * Gera uma URL pré-assinada (GET) temporária. Com {@code nomeArquivo}, a resposta vem com
+     * {@code Content-Disposition: attachment} (o navegador BAIXA com esse nome). Objetos legados (sem
+     * prefixo de escopo) são devolvidos como estão (não assináveis).
      */
     public String gerarDownloadUrl(String url, String nomeArquivo) {
-        exigirConfiguracao();
+        EscopoS3 escopo = escopoDaUrl(url);
+        if (escopo == null) {
+            return url;
+        }
+        DadosS3 cfg = configS3.exigir(escopo);
         String chave = chaveDaUrl(url);
         if (chave == null) {
             return url;
         }
-        GetObjectRequest.Builder get = GetObjectRequest.builder().bucket(bucket).key(chave);
+        GetObjectRequest.Builder get = GetObjectRequest.builder().bucket(cfg.bucket()).key(chave);
         if (StringUtils.hasText(nomeArquivo)) {
             get.responseContentDisposition("attachment; filename=\"" + nomeAnexoSeguro(nomeArquivo) + "\"");
         }
-        PresignedGetObjectRequest presigned = presigner().presignGetObject(
+        PresignedGetObjectRequest presigned = presigner(escopo, cfg).presignGetObject(
                 GetObjectPresignRequest.builder()
                         .signatureDuration(Duration.ofMinutes(10))
-                        .getObjectRequest(get.build())
-                        .build());
+                        .getObjectRequest(get.build()).build());
         return presigned.url().toString();
     }
 
-    /** Remove aspas/quebras/controle do nome (evita injeção no header Content-Disposition). */
-    private static String nomeAnexoSeguro(String nome) {
-        return nome.replaceAll("[\"\\\\\\r\\n]", "").trim();
-    }
-
     /**
-     * URL de visualização (GET pré-assinada) com validade configurável.
-     * Não lança erro se o armazenamento não estiver configurado: devolve a URL
-     * recebida (útil em ambientes sem S3, como testes).
+     * URL de visualização (GET pré-assinada) com validade configurável. Fail-soft: devolve a URL
+     * recebida se o escopo não estiver configurado / URL inválida / erro (não quebra a tela).
      */
     public String urlVisualizacao(String url, Duration duracao) {
-        if (!StringUtils.hasText(url) || !configurado()) {
+        if (!StringUtils.hasText(url)) {
             return url;
         }
+        DadosS3 cfg = configS3.resolver(escopoDaUrl(url)).orElse(null);
         String chave = chaveDaUrl(url);
-        if (chave == null) {
+        if (cfg == null || chave == null) {
             return url;
         }
         try {
-            GetObjectRequest get = GetObjectRequest.builder().bucket(bucket).key(chave).build();
-            PresignedGetObjectRequest presigned = presigner().presignGetObject(
+            GetObjectRequest get = GetObjectRequest.builder().bucket(cfg.bucket()).key(chave).build();
+            PresignedGetObjectRequest presigned = presigner(escopoDaUrl(url), cfg).presignGetObject(
                     GetObjectPresignRequest.builder().signatureDuration(duracao).getObjectRequest(get).build());
             return presigned.url().toString();
         } catch (RuntimeException e) {
@@ -174,87 +135,141 @@ public class StorageService {
         }
     }
 
-    /** URL de visualização (GET pré-assinada) da foto do paciente, válida por 6h; null se não houver. */
+    /** URL de visualização (GET pré-assinada) da foto do paciente, válida por 6h; a própria URL se não houver S3. */
     public String urlFotoPaciente(String fotoUrl) {
         return urlVisualizacao(fotoUrl, Duration.ofHours(6));
     }
 
     /**
-     * true se a URL aponta para um objeto dentro da subpasta informada. Defesa
-     * para o app só salvar como foto uma URL realmente da pasta esperada
-     * (fecha o risco de gravar a URL de um objeto de outra pasta/paciente).
+     * true se a URL aponta para um objeto dentro da subpasta informada (2º segmento da key, após o
+     * prefixo de escopo). Defesa para o app só salvar como foto uma URL realmente da pasta esperada.
      */
     public boolean urlNaPasta(String url, String pasta) {
         String chave = chaveDaUrl(url);
-        return chave != null && chave.startsWith(pastaSegura(pasta) + "/");
+        if (chave == null) {
+            return false;
+        }
+        int i = chave.indexOf('/');
+        if (i < 0) {
+            return false;
+        }
+        String aposPrefixo = chave.substring(i + 1); // pasta/UUID-arquivo
+        return aposPrefixo.startsWith(pastaSegura(pasta) + "/");
     }
 
     /**
-     * Baixa os bytes do objeto (server-side, endpoint interno) a partir da URL salva.
-     * Devolve null se não configurado, URL inválida ou objeto ausente — útil p/ embutir
-     * a logo no PDF sem quebrar a geração quando não há imagem/S3.
+     * Baixa os bytes do objeto (server-side, endpoint interno). Fail-soft: null se escopo não
+     * configurado / URL inválida / objeto ausente.
      */
     public byte[] baixarBytes(String url) {
-        if (!StringUtils.hasText(url) || !configurado()) {
+        if (!StringUtils.hasText(url)) {
             return null;
         }
+        EscopoS3 escopo = escopoDaUrl(url);
+        DadosS3 cfg = configS3.resolver(escopo).orElse(null);
         String chave = chaveDaUrl(url);
-        if (chave == null) {
+        if (cfg == null || chave == null) {
             return null;
         }
         try {
-            return client().getObjectAsBytes(
-                    GetObjectRequest.builder().bucket(bucket).key(chave).build()).asByteArray();
+            return client(escopo, cfg).getObjectAsBytes(
+                    GetObjectRequest.builder().bucket(cfg.bucket()).key(chave).build()).asByteArray();
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    /**
-     * Grava bytes gerados no backend direto no S3 (putObject server-side) e devolve a URL pública.
-     * Usado quando o arquivo NÃO vem do navegador (ex.: PDF assinado baixado da ZapSign). Falha
-     * (S3 não configurado) sobe como IllegalStateException.
-     */
-    public String salvarBytes(byte[] conteudo, String contentType, String pasta, String nomeArquivo) {
-        exigirConfiguracao();
-        String tipo = StringUtils.hasText(contentType) ? contentType : "application/octet-stream";
-        String chave = pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
-        client().putObject(
-                PutObjectRequest.builder().bucket(bucket).key(chave).contentType(tipo).build(),
-                RequestBody.fromBytes(conteudo));
-        return publicEndpoint + "/" + bucket + "/" + chave;
-    }
-
-    /** Remove o objeto no S3 a partir da URL salva no documento. */
+    /** Remove o objeto no S3 a partir da URL salva. Fail-soft se escopo não configurado / URL inválida. */
     public void excluirPorUrl(String url) {
-        if (!StringUtils.hasText(url) || !configurado()) {
+        if (!StringUtils.hasText(url)) {
             return;
         }
+        EscopoS3 escopo = escopoDaUrl(url);
+        DadosS3 cfg = configS3.resolver(escopo).orElse(null);
+        String chave = chaveDaUrl(url);
+        if (cfg == null || chave == null) {
+            return;
+        }
+        client(escopo, cfg).deleteObject(DeleteObjectRequest.builder().bucket(cfg.bucket()).key(chave).build());
+    }
+
+    // ===================== Cache de clients/presigners =====================
+
+    private S3Presigner presigner(EscopoS3 escopo, DadosS3 cfg) {
+        return presigners.computeIfAbsent(TenantContext.atual() + "|" + escopo.prefixo(), k -> S3Fabrica.presigner(cfg));
+    }
+
+    private S3Client client(EscopoS3 escopo, DadosS3 cfg) {
+        return clients.computeIfAbsent(TenantContext.atual() + "|" + escopo.prefixo(), k -> S3Fabrica.client(cfg));
+    }
+
+    /** Config de S3 mudou: descarta os clients/presigners cacheados daquele schema (recriados on-demand). */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void aoAlterarConfig(ConfigS3AlteradaEvento ev) {
+        String prefixo = ev.schema() + "|";
+        fecharERemover(presigners, prefixo, S3Presigner::close);
+        fecharERemover(clients, prefixo, S3Client::close);
+    }
+
+    private static <T> void fecharERemover(Map<String, T> mapa, String prefixoChave, Consumer<T> fechar) {
+        mapa.entrySet().removeIf(e -> {
+            if (e.getKey().startsWith(prefixoChave)) {
+                try {
+                    fechar.accept(e.getValue());
+                } catch (RuntimeException ignore) {
+                    // best-effort ao fechar o client antigo
+                }
+                return true;
+            }
+            return false;
+        });
+    }
+
+    // ===================== Helpers de key/URL =====================
+
+    /** Nova key com prefixo de escopo: {@code <prefixo>/<pasta>/<UUID>-<nome>}. */
+    private String chaveNova(EscopoS3 escopo, String pasta, String nomeArquivo) {
+        return escopo.prefixo() + "/" + pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
+    }
+
+    private static String urlPublica(DadosS3 cfg, String chave) {
+        return cfg.publicEndpoint() + "/" + cfg.bucket() + "/" + chave;
+    }
+
+    /** Escopo do objeto a partir do 1º segmento da key (prefixo); null se legado/irreconhecível. */
+    private EscopoS3 escopoDaUrl(String url) {
         String chave = chaveDaUrl(url);
         if (chave == null) {
-            return;
+            return null;
         }
-        client().deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(chave).build());
+        int i = chave.indexOf('/');
+        return EscopoS3.doPrefixo(i < 0 ? chave : chave.substring(0, i));
     }
 
-    /** Extrai a chave do objeto (após "/bucket/") a partir da URL. */
+    /** Key do objeto = tudo após o 1º segmento do path (o bucket). Endpoint/bucket-agnóstico. */
     private String chaveDaUrl(String url) {
         try {
             String path = URI.create(url).getPath();
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
-            String prefixo = bucket + "/";
-            if (path.startsWith(prefixo)) {
-                return path.substring(prefixo.length());
+            int i = path.indexOf('/'); // fim do segmento do bucket
+            if (i < 0) {
+                return null;
             }
-            return path.isEmpty() ? null : path;
+            String chave = path.substring(i + 1);
+            return chave.isEmpty() ? null : chave;
         } catch (RuntimeException e) {
             return null;
         }
     }
 
-    private String sanitizar(String nome) {
+    /** Remove aspas/quebras/controle do nome (evita injeção no header Content-Disposition). */
+    private static String nomeAnexoSeguro(String nome) {
+        return nome.replaceAll("[\"\\\\\\r\\n]", "").trim();
+    }
+
+    private static String sanitizar(String nome) {
         if (!StringUtils.hasText(nome)) {
             return "arquivo";
         }
@@ -262,29 +277,12 @@ public class StorageService {
         return limpo.length() > 120 ? limpo.substring(limpo.length() - 120) : limpo;
     }
 
-    /**
-     * Subpasta (prefixo) segura: só minúsculas/dígitos/hífen (evita "../" e chaves
-     * estranhas). Vazio/ausente cai em "prontuarios" (retrocompatível).
-     */
-    private String pastaSegura(String pasta) {
+    /** Subpasta (prefixo temático) segura: só minúsculas/dígitos/hífen. Vazio → "prontuarios". */
+    private static String pastaSegura(String pasta) {
         if (!StringUtils.hasText(pasta)) {
             return "prontuarios";
         }
         String limpa = pasta.trim().toLowerCase().replaceAll("[^a-z0-9-]", "");
         return limpa.isEmpty() ? "prontuarios" : limpa;
-    }
-
-    /** Remove barra final e portas padrão (para casar com o Host que o navegador envia). */
-    private String normalizar(String endpoint) {
-        String ep = normalizarPreservandoPorta(endpoint);
-        return ep.replaceFirst(":443$", "").replaceFirst(":80$", "");
-    }
-
-    private String normalizarPreservandoPorta(String endpoint) {
-        String ep = endpoint == null ? "" : endpoint.trim();
-        while (ep.endsWith("/")) {
-            ep = ep.substring(0, ep.length() - 1);
-        }
-        return ep;
     }
 }

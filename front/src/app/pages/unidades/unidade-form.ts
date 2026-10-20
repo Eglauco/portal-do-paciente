@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import {
   AbstractControl,
   FormArray,
@@ -10,6 +10,8 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
+import { ArmazenamentoS3Form } from '../../shared/armazenamento/armazenamento-s3-form';
+import { EscopoS3Input } from '../../shared/armazenamento/armazenamento.model';
 import { Unidade, UnidadeFaqItem } from './unidade.model';
 import { UnidadeService } from './unidade.service';
 
@@ -21,11 +23,11 @@ type FaqItemForm = FormGroup<{
 }>;
 
 /** Abas do cadastro (dividem o formulário em seções). */
-type AbaId = 'dados' | 'faq';
+type AbaId = 'dados' | 'faq' | 'armazenamento';
 
 @Component({
   selector: 'app-unidade-form',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, ArmazenamentoS3Form],
   templateUrl: './unidade-form.html',
   styles: [`
     /* Abas do cadastro: separam Dados / FAQ (uma visível por vez). */
@@ -74,8 +76,15 @@ export class UnidadeForm implements PodeSair {
   protected readonly abas: { id: AbaId; label: string }[] = [
     { id: 'dados', label: 'Dados' },
     { id: 'faq', label: 'FAQ da assistente virtual' },
+    { id: 'armazenamento', label: 'Armazenamento' },
   ];
   protected readonly abaAtiva = signal<AbaId>('dados');
+
+  /** Escopo do S3 desta unidade (só quando editando — precisa do id). */
+  protected readonly escopoS3 = computed<EscopoS3Input | null>(() => {
+    const id = this.codigo();
+    return id != null ? { tipo: 'unidade', unidadeId: id } : null;
+  });
 
   protected selecionarAba(id: AbaId): void {
     this.abaAtiva.set(id);

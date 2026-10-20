@@ -111,7 +111,8 @@ public class SecurityConfig {
                                 "/categoria-nps/**", "/postagem/**", "/sau/**", "/tipo-manifestacao/**",
                                 "/tipo-documento-prontuario/**", "/uso-ia/**", "/coassinatura/**",
                                 "/provedores-assinatura/**", "/siresp/**",
-                                "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**", "/tema/**")
+                                "/dashboard/**", "/perfil/**", "/notificacoes/**", "/configuracao/**",
+                                "/configuracao-s3/**", "/tema/**")
                         .hasRole("ADMIN")
                         // /ws (handshake do WebSocket) e o que não foi listado seguem abertos por ora (a Fase 4B tranca o WS).
                         .anyRequest().permitAll())

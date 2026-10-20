@@ -133,6 +133,14 @@
     </fieldset>
     }
 
+    @if (abaAtiva() === 'armazenamento') {
+      @if (escopoS3(); as esc) {
+        <app-armazenamento-s3-form [escopo]="esc" />
+      } @else {
+        <p class="field-hint">Salve a unidade primeiro para configurar o armazenamento (S3) dela.</p>
+      }
+    }
+
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
       <button type="submit" class="btn btn--solid" [disabled]="salvando()">

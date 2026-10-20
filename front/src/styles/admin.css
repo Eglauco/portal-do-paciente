@@ -1708,6 +1708,8 @@
 
 /* Modal de transferência de conversa (lista de atendentes) */
 .modal--lista { max-width: 27rem; text-align: left; padding: 1.5rem 1.5rem 1.2rem; }
+/* Modal largo (formulário em 2 colunas, ex.: Armazenamento/S3). */
+.modal--s3 { max-width: 44rem; width: 92vw; text-align: left; padding: 1.5rem 1.6rem 1.3rem; }
 .modal__titulo { margin: 0 0 0.2rem; font-size: 1.1rem; font-weight: 700; color: var(--ink); }
 .modal__sub { margin: 0 0 1rem; font-size: 0.85rem; color: var(--muted); }
 .transf__busca {

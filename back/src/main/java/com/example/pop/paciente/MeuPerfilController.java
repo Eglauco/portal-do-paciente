@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.storage.EscopoS3;
 import com.example.pop.storage.StorageService;
 import com.example.pop.storage.UploadUrlResponse;
 
@@ -106,7 +107,8 @@ public class MeuPerfilController {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.MEU_PERFIL);
         acessoService.pacienteDoToken(jwt); // valida a sessão do paciente
         try {
-            return storageService.gerarUploadUrl(req.nomeArquivo(), req.contentType(), PASTA_FOTO);
+            // Foto do paciente é compartilhada entre as unidades dele → S3 PADRÃO do inquilino.
+            return storageService.gerarUploadUrl(EscopoS3.inquilinoPadrao(), req.nomeArquivo(), req.contentType(), PASTA_FOTO);
         } catch (RuntimeException e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Não foi possível preparar o envio da foto.");
         }

@@ -22,6 +22,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import com.example.pop.auth.Permissoes;
+import com.example.pop.storage.EscopoS3;
 import com.example.pop.storage.StorageService;
 import com.example.pop.unidade.Unidade;
 import com.example.pop.usuario.Usuario;
@@ -74,17 +75,8 @@ public class SirespImportacaoService {
                     "Nenhuma <Mensagem> encontrada no XML. Verifique se é um arquivo do SIRESP.");
         }
 
-        // Guarda o ARQUIVO ORIGINAL (bytes exatos) no S3. Se falhar, cancela o import inteiro (tx desfaz tudo) —
-        // nenhum registro deve ficar sem o original fiel para reenviar/baixar.
-        String arquivoUrl;
-        try {
-            arquivoUrl = storageService.salvarBytes(conteudo, "application/xml", "siresp", arquivo);
-        } catch (RuntimeException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Não foi possível guardar o arquivo original no armazenamento (S3). O import foi cancelado.");
-        }
-
-        // Metadados: unidade ativa + nome de quem importou (resolvidos no servidor pelo uid do token).
+        // Unidade ativa + nome de quem importou (resolvidos no servidor pelo uid do token). O SIRESP é
+        // por-unidade: a unidade define o S3 onde o arquivo original será guardado — resolvemos ANTES de salvar.
         Long unidadeId = null;
         String importadoPorNome = null;
         Usuario usuario = usuarioId == null ? null : usuarioRepository.findById(usuarioId).orElse(null);
@@ -93,6 +85,23 @@ public class SirespImportacaoService {
             Unidade ativa = Permissoes.unidadeAtivaEfetiva(usuario);
             unidadeId = ativa == null ? null : ativa.getId();
         }
+        if (unidadeId == null) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Não foi possível identificar a unidade ativa para guardar o arquivo do SIRESP. Selecione uma unidade.");
+        }
+
+        // Guarda o ARQUIVO ORIGINAL (bytes exatos) no S3 da UNIDADE. Se falhar, cancela o import inteiro
+        // (tx desfaz tudo) — nenhum registro deve ficar sem o original fiel para reenviar/baixar.
+        String arquivoUrl;
+        try {
+            arquivoUrl = storageService.salvarBytes(EscopoS3.unidade(unidadeId), conteudo, "application/xml", "siresp", arquivo);
+        } catch (ResponseStatusException e) {
+            throw e; // "S3 da unidade não configurado" (422) passa direto
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Não foi possível guardar o arquivo original no armazenamento (S3). O import foi cancelado.");
+        }
+
         LocalDateTime agora = LocalDateTime.now();
 
         List<Siresp> linhas = new ArrayList<>();
