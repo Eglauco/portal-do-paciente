@@ -28,4 +28,9 @@ export class ArmazenamentoService {
   testar(escopo: EscopoS3Input, form: FormS3): Observable<ResultadoTesteS3> {
     return this.http.post<ResultadoTesteS3>(this.url(escopo, '/testar'), form);
   }
+
+  /** Remove o S3 próprio da unidade → ela volta a usar o S3 padrão do inquilino. */
+  remover(escopo: EscopoS3Input): Observable<StatusS3> {
+    return this.http.delete<StatusS3>(this.url(escopo));
+  }
 }

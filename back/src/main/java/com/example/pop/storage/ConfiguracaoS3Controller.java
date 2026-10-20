@@ -1,6 +1,7 @@
 package com.example.pop.storage;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -49,6 +50,14 @@ public class ConfiguracaoS3Controller {
     public ResultadoTeste testarUnidade(@PathVariable Long unidadeId, @RequestBody(required = false) FormS3 form) {
         exigirUnidade(unidadeId);
         return service.testar(EscopoS3.unidade(unidadeId), form);
+    }
+
+    /** Remove o S3 próprio da unidade → ela passa a usar o S3 padrão do inquilino. */
+    @DeleteMapping("/unidade/{unidadeId}")
+    public StatusS3 removerUnidade(@PathVariable Long unidadeId) {
+        exigirUnidade(unidadeId);
+        service.remover(EscopoS3.unidade(unidadeId));
+        return service.status(EscopoS3.unidade(unidadeId));
     }
 
     // ---- Padrão do inquilino ----

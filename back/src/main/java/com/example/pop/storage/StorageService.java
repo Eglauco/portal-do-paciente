@@ -27,10 +27,12 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 
 /**
  * Integração com o S3/MinIO, agora POR ESCOPO ({@link EscopoS3}: unidade / padrão do inquilino /
- * plataforma). Cada objeto é gravado com um PREFIXO de escopo na key ({@code u<id>/}, {@code inq/},
- * {@code plat/}), e a leitura/exclusão descobre o escopo só pela URL salva — sem o chamador precisar
- * repassar a unidade. A config (endpoint/bucket/credenciais) de cada escopo vem do {@link ConfigS3Service};
- * clients/presigners são cacheados por {@code schema|prefixo} e invalidados quando a config muda.
+ * plataforma). Cada objeto é gravado com um PREFIXO de escopo na key
+ * ({@code inquilino-<schema>/unidade-<id>/…}, {@code inquilino-<schema>/…}, {@code plat/…}), e a
+ * leitura/exclusão descobre o escopo só pela URL salva — sem o chamador precisar repassar a unidade.
+ * O schema no prefixo deixa 1 bucket servir vários inquilinos/unidades sem colisão. A config
+ * (endpoint/bucket/credenciais) de cada escopo vem do {@link ConfigS3Service}; clients/presigners são
+ * cacheados por {@code schema|cacheId} e invalidados quando a config muda.
  *
  * <p>O upload é feito direto do navegador para o S3 via URL pré-assinada (o arquivo nunca passa pelo backend).
  */
@@ -141,20 +143,17 @@ public class StorageService {
     }
 
     /**
-     * true se a URL aponta para um objeto dentro da subpasta informada (2º segmento da key, após o
-     * prefixo de escopo). Defesa para o app só salvar como foto uma URL realmente da pasta esperada.
+     * true se a URL aponta para um objeto dentro da subpasta informada (a subpasta é um segmento da
+     * key, após o prefixo de escopo — que varia de 1 a 3 segmentos). Defesa para o app só salvar como
+     * foto uma URL realmente da pasta esperada. Seguro porque nenhuma subpasta começa com
+     * {@code inquilino-} nem {@code unidade-}.
      */
     public boolean urlNaPasta(String url, String pasta) {
         String chave = chaveDaUrl(url);
         if (chave == null) {
             return false;
         }
-        int i = chave.indexOf('/');
-        if (i < 0) {
-            return false;
-        }
-        String aposPrefixo = chave.substring(i + 1); // pasta/UUID-arquivo
-        return aposPrefixo.startsWith(pastaSegura(pasta) + "/");
+        return ("/" + chave).contains("/" + pastaSegura(pasta) + "/");
     }
 
     /**
@@ -196,11 +195,11 @@ public class StorageService {
     // ===================== Cache de clients/presigners =====================
 
     private S3Presigner presigner(EscopoS3 escopo, DadosS3 cfg) {
-        return presigners.computeIfAbsent(TenantContext.atual() + "|" + escopo.prefixo(), k -> S3Fabrica.presigner(cfg));
+        return presigners.computeIfAbsent(TenantContext.atual() + "|" + escopo.cacheId(), k -> S3Fabrica.presigner(cfg));
     }
 
     private S3Client client(EscopoS3 escopo, DadosS3 cfg) {
-        return clients.computeIfAbsent(TenantContext.atual() + "|" + escopo.prefixo(), k -> S3Fabrica.client(cfg));
+        return clients.computeIfAbsent(TenantContext.atual() + "|" + escopo.cacheId(), k -> S3Fabrica.client(cfg));
     }
 
     /** Config de S3 mudou: descarta os clients/presigners cacheados daquele schema (recriados on-demand). */
@@ -227,23 +226,19 @@ public class StorageService {
 
     // ===================== Helpers de key/URL =====================
 
-    /** Nova key com prefixo de escopo: {@code <prefixo>/<pasta>/<UUID>-<nome>}. */
+    /** Nova key com prefixo de escopo: {@code <prefixoDoEscopo>/<pasta>/<UUID>-<nome>}. */
     private String chaveNova(EscopoS3 escopo, String pasta, String nomeArquivo) {
-        return escopo.prefixo() + "/" + pastaSegura(pasta) + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
+        return escopo.prefixoChave(TenantContext.atual()) + "/" + pastaSegura(pasta)
+                + "/" + UUID.randomUUID() + "-" + sanitizar(nomeArquivo);
     }
 
     private static String urlPublica(DadosS3 cfg, String chave) {
         return cfg.publicEndpoint() + "/" + cfg.bucket() + "/" + chave;
     }
 
-    /** Escopo do objeto a partir do 1º segmento da key (prefixo); null se legado/irreconhecível. */
+    /** Escopo do objeto a partir do prefixo da key; null se legado/irreconhecível. */
     private EscopoS3 escopoDaUrl(String url) {
-        String chave = chaveDaUrl(url);
-        if (chave == null) {
-            return null;
-        }
-        int i = chave.indexOf('/');
-        return EscopoS3.doPrefixo(i < 0 ? chave : chave.substring(0, i));
+        return EscopoS3.doChave(chaveDaUrl(url));
     }
 
     /** Key do objeto = tudo após o 1º segmento do path (o bucket). Endpoint/bucket-agnóstico. */

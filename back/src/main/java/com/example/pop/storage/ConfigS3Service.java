@@ -25,7 +25,7 @@ import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
  * secret-key, e administra o cadastro (CRUD write-only + testar conexão). A config da plataforma vem
  * do {@code application.properties} (global); unidade e padrão-inquilino vêm da tabela
  * {@code configuracao_s3_unidade} (no schema do inquilino). Cacheia a config resolvida por
- * {@code schema|prefixo} e invalida ao salvar (publicando {@link ConfigS3AlteradaEvento} para o
+ * {@code schema|cacheId} e invalida ao salvar (publicando {@link ConfigS3AlteradaEvento} para o
  * {@link StorageService} limpar os clients).
  */
 @Service
@@ -36,7 +36,7 @@ public class ConfigS3Service {
     private final ApplicationEventPublisher eventos;
     private final DadosS3 plataforma;
 
-    /** Cache de config resolvida (com secret decifrada) por "schema|prefixo". */
+    /** Cache de config resolvida (com secret decifrada) por "schema|cacheId". */
     private final ConcurrentHashMap<String, DadosS3> cache = new ConcurrentHashMap<>();
 
     public ConfigS3Service(
@@ -58,20 +58,50 @@ public class ConfigS3Service {
 
     // ===================== Resolução (usada pelo StorageService) =====================
 
-    /** Config resolvida+decifrada do escopo; vazio se não configurado/inativo. */
+    /**
+     * Config resolvida+decifrada do escopo; vazio se não configurado/inativo.
+     * <p>UNIDADE: se a unidade tem config PRÓPRIA ativa, usa-a; se tem própria mas INATIVA, bloqueia
+     * (vazio — não herda); se NÃO tem config própria, herda o S3 PADRÃO do inquilino. Nunca cai na
+     * plataforma/global para dados de unidade/inquilino.
+     */
     public Optional<DadosS3> resolver(EscopoS3 escopo) {
         if (escopo == null) {
             return Optional.empty();
         }
-        if (escopo.tipo() == EscopoS3.Tipo.PLATAFORMA) {
-            return plataforma.completo() ? Optional.of(plataforma) : Optional.empty();
-        }
-        String chave = TenantContext.atual() + "|" + escopo.prefixo();
+        return switch (escopo.tipo()) {
+            case PLATAFORMA -> plataforma.completo() ? Optional.of(plataforma) : Optional.empty();
+            case INQUILINO_PADRAO -> resolverPadrao();
+            case UNIDADE -> resolverUnidade(escopo);
+        };
+    }
+
+    private Optional<DadosS3> resolverUnidade(EscopoS3 escopo) {
+        String chave = TenantContext.atual() + "|" + escopo.cacheId();
         DadosS3 cacheado = cache.get(chave);
         if (cacheado != null) {
             return Optional.of(cacheado);
         }
-        Optional<DadosS3> carregado = carregar(escopo);
+        Optional<ConfiguracaoS3> propria = repo.findByUnidadeId(escopo.unidadeId());
+        Optional<DadosS3> resolvido;
+        if (propria.isPresent()) {
+            if (!propria.get().isAtivo()) {
+                return Optional.empty(); // config própria inativa = bloqueada (não herda, não cacheia)
+            }
+            resolvido = Optional.of(dados(propria.get()));
+        } else {
+            resolvido = resolverPadrao(); // sem config própria → herda o S3 padrão do inquilino
+        }
+        resolvido.ifPresent(d -> cache.put(chave, d));
+        return resolvido;
+    }
+
+    private Optional<DadosS3> resolverPadrao() {
+        String chave = TenantContext.atual() + "|inq";
+        DadosS3 cacheado = cache.get(chave);
+        if (cacheado != null) {
+            return Optional.of(cacheado);
+        }
+        Optional<DadosS3> carregado = repo.findByUnidadeIdIsNull().filter(ConfiguracaoS3::isAtivo).map(this::dados);
         carregado.ifPresent(d -> cache.put(chave, d));
         return carregado;
     }
@@ -88,20 +118,18 @@ public class ConfigS3Service {
         }
         return switch (escopo.tipo()) {
             case UNIDADE -> "Armazenamento (S3) não configurado para esta unidade. "
-                    + "Configure em Cadastros → Unidade → Armazenamento antes de enviar arquivos.";
+                    + "Configure o S3 da unidade (Cadastros → Unidade → Armazenamento) ou o S3 padrão "
+                    + "do inquilino (Configurações → Armazenamento) antes de enviar arquivos.";
             case INQUILINO_PADRAO -> "Armazenamento (S3) padrão da clínica não configurado. "
                     + "Configure em Configurações → Armazenamento antes de enviar arquivos.";
             case PLATAFORMA -> "Armazenamento (S3) da plataforma não configurado.";
         };
     }
 
-    private Optional<DadosS3> carregar(EscopoS3 escopo) {
-        Optional<ConfiguracaoS3> e = escopo.tipo() == EscopoS3.Tipo.UNIDADE
-                ? repo.findByUnidadeId(escopo.unidadeId())
-                : repo.findByUnidadeIdIsNull();
-        return e.filter(ConfiguracaoS3::isAtivo).map(c -> new DadosS3(
-                c.getBucket(), c.getRegion(), c.getPublicEndpoint(), c.getInternalEndpoint(),
-                c.getAccessKey(), cripto.decifrar(c.getSecretKey())));
+    /** Monta {@link DadosS3} a partir da linha de config, decifrando a secret-key. */
+    private DadosS3 dados(ConfiguracaoS3 c) {
+        return new DadosS3(c.getBucket(), c.getRegion(), c.getPublicEndpoint(), c.getInternalEndpoint(),
+                c.getAccessKey(), cripto.decifrar(c.getSecretKey()));
     }
 
     // ===================== Cadastro (tela) =====================
@@ -155,6 +183,23 @@ public class ConfigS3Service {
         repo.save(c);
         // Invalida APÓS o commit (StorageService também ouve) — evita re-cachear o valor antigo
         // numa leitura concorrente feita antes do commit.
+        eventos.publishEvent(new ConfigS3AlteradaEvento(TenantContext.atual()));
+    }
+
+    /**
+     * Remove a config PRÓPRIA do escopo (unidade ou padrão do inquilino). Para a unidade, isso a faz
+     * voltar a HERDAR o S3 padrão do inquilino (sem config própria = herda). No-op se não havia config.
+     */
+    @Transactional
+    public void remover(EscopoS3 escopo) {
+        if (escopo == null || escopo.tipo() == EscopoS3.Tipo.PLATAFORMA) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O S3 da plataforma é configurado por variáveis de ambiente, não por esta tela.");
+        }
+        Optional<ConfiguracaoS3> existente = escopo.tipo() == EscopoS3.Tipo.UNIDADE
+                ? repo.findByUnidadeId(escopo.unidadeId())
+                : repo.findByUnidadeIdIsNull();
+        existente.ifPresent(repo::delete);
         eventos.publishEvent(new ConfigS3AlteradaEvento(TenantContext.atual()));
     }
 
