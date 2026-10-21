@@ -226,7 +226,11 @@ public class ConfigIaService {
         AnthropicClient c = AnthropicOkHttpClient.builder()
                 .apiKey(apiKey).timeout(Duration.ofSeconds(20)).maxRetries(0).build();
         try {
-            Set<String> ids = c.models().list(ModelListParams.builder().build()).data().stream()
+            // Lista TODAS as páginas de modelos da conta (autoPager): o default traz só 20 (mais recentes
+            // primeiro), o que reportava falsamente modelos mais antigos — ex.: claude-haiku-4-5 — como
+            // "não encontrados". limit(1000) resolve em 1 request no caso comum; o autoPager cobre o resto.
+            Set<String> ids = c.models().list(ModelListParams.builder().limit(1000L).build())
+                    .autoPager().stream()
                     .map(ModelInfo::id).collect(Collectors.toSet());
             List<String> faltando = Stream.of(
                             form == null ? null : form.modeloModeracao(),
