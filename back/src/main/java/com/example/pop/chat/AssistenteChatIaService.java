@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -14,9 +15,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.example.pop.credencialia.ConfigIaService;
+import com.example.pop.credencialia.EscopoIa;
+import com.example.pop.credencialia.FrenteIa;
 
 /**
  * Assistente virtual (Claude) do PRIMEIRO ATENDIMENTO no chat ao vivo. Recebe o FAQ da unidade, a
@@ -86,19 +89,15 @@ public class AssistenteChatIaService {
     private static final DateTimeFormatter AGORA_FMT =
             DateTimeFormatter.ofPattern("EEEE, dd 'de' MMMM 'de' yyyy, HH'h'mm", new Locale("pt", "BR"));
 
-    private final String apiKey;
-    private final String modelo;
+    private final ConfigIaService configIa;
     private final long maxTokens;
     private final long timeoutSegundos;
-    private volatile AnthropicClient client;
 
     public AssistenteChatIaService(
-            @Value("${anthropic.api-key:}") String apiKey,
-            @Value("${anthropic.chat.modelo:claude-haiku-4-5}") String modelo,
+            ConfigIaService configIa,
             @Value("${anthropic.chat.max-tokens:600}") long maxTokens,
             @Value("${anthropic.chat.timeout-segundos:20}") long timeoutSegundos) {
-        this.apiKey = apiKey;
-        this.modelo = modelo;
+        this.configIa = configIa;
         this.maxTokens = maxTokens;
         this.timeoutSegundos = timeoutSegundos;
     }
@@ -122,12 +121,14 @@ public class AssistenteChatIaService {
      * (mais antiga → mais recente), terminando na mensagem atual do paciente. Fail-open: erro/sem
      * chave → ESCALAR.
      */
-    public RespostaIa responder(String nomeUnidade, String faq, String ficha, List<Mensagem> historico) {
-        AnthropicClient c = client();
-        if (c == null) {
+    public RespostaIa responder(EscopoIa escopo, String nomeUnidade, String faq, String ficha, List<Mensagem> historico) {
+        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
+        if (cliOpt.isEmpty()) {
             log.warn("IA do chat sem chave configurada; escalando para humano (fail-open).");
             return new RespostaIa(Acao.ESCALAR, null, null, null, null);
         }
+        AnthropicClient c = cliOpt.get();
+        String modelo = configIa.modelo(escopo, FrenteIa.CHAT);
         try {
             String system = INSTRUCOES
                     + "\n\nUnidade: " + sanitizar(nomeUnidade)
@@ -244,27 +245,5 @@ public class AssistenteChatIaService {
 
     private boolean vazio(String s) {
         return s == null || s.isBlank();
-    }
-
-    /** Cliente Anthropic sob demanda; null quando não há chave (→ fail-open, escala). */
-    private AnthropicClient client() {
-        if (apiKey == null || apiKey.isBlank()) {
-            return null;
-        }
-        AnthropicClient local = client;
-        if (local == null) {
-            synchronized (this) {
-                local = client;
-                if (local == null) {
-                    local = AnthropicOkHttpClient.builder()
-                            .apiKey(apiKey)
-                            .timeout(Duration.ofSeconds(timeoutSegundos))
-                            .maxRetries(0)
-                            .build();
-                    client = local;
-                }
-            }
-        }
-        return local;
     }
 }

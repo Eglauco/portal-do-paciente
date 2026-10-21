@@ -85,9 +85,10 @@ public class ChatService {
             return;
         }
         String paciente = chat.getPaciente() == null ? "" : chat.getPaciente().getNome();
+        Long unidadeId = chat.getUnidadeSaude() == null ? null : chat.getUnidadeSaude().getId();
         usoIaService.registrar(com.example.pop.usoia.UsoIaTipo.CHAT_MENSAGEM,
                 "Mensagem do chat — " + paciente, modelo, tokensEntrada, tokensSaida, custo,
-                "/chats/" + chat.getId());
+                "/chats/" + chat.getId(), unidadeId);
     }
 
     /**

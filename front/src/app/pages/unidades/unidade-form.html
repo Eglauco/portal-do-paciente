@@ -141,6 +141,14 @@
       }
     }
 
+    @if (abaAtiva() === 'ia') {
+      @if (escopoIa(); as esc) {
+        <app-credencial-ia-form [escopo]="esc" />
+      } @else {
+        <p class="field-hint">Salve a unidade primeiro para configurar a credencial de IA dela.</p>
+      }
+    }
+
     <div class="form-actions">
       <button type="button" class="btn btn--ghost" (click)="cancelar()">Cancelar</button>
       <button type="submit" class="btn btn--solid" [disabled]="salvando()">

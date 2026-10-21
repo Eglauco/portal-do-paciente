@@ -412,13 +412,15 @@ public class FeedController {
         if (!postagem.isValidarComentariosIa()) {
             return;
         }
-        ModeracaoService.Moderacao m = moderacaoService.avaliar(comentario.getTexto());
+        Long unidadeId = postagem.getUnidadeSaude() == null ? null : postagem.getUnidadeSaude().getId();
+        ModeracaoService.Moderacao m = moderacaoService.avaliar(
+                com.example.pop.credencialia.EscopoIa.deUnidade(unidadeId), comentario.getTexto());
         BigDecimal custo = custoIaService.custoUsd(m.modelo(), m.tokensEntrada(), m.tokensSaida());
         comentario.setTokensEntrada(m.tokensEntrada());
         comentario.setTokensSaida(m.tokensSaida());
         comentario.setModeloIa(m.modelo());
         comentario.setCustoUsd(custo);
-        registrarUsoModeracao(m, custo, postagem.getId());
+        registrarUsoModeracao(m, custo, postagem.getId(), unidadeId);
         if (!m.liberado()) {
             comentario.setStatusModeracao(StatusModeracao.PENDENTE);
             comentario.setMotivoModeracao(m.motivo());
@@ -435,13 +437,16 @@ public class FeedController {
             return;
         }
         boolean eraRejeitado = c.getStatusModeracao() == StatusModeracao.REJEITADO;
-        ModeracaoService.Moderacao m = moderacaoService.avaliar(c.getTexto());
+        Long unidadeId = c.getPostagem() == null || c.getPostagem().getUnidadeSaude() == null
+                ? null : c.getPostagem().getUnidadeSaude().getId();
+        ModeracaoService.Moderacao m = moderacaoService.avaliar(
+                com.example.pop.credencialia.EscopoIa.deUnidade(unidadeId), c.getTexto());
         BigDecimal custo = custoIaService.custoUsd(m.modelo(), m.tokensEntrada(), m.tokensSaida());
         c.setTokensEntrada(m.tokensEntrada());
         c.setTokensSaida(m.tokensSaida());
         c.setModeloIa(m.modelo());
         c.setCustoUsd(custo);
-        registrarUsoModeracao(m, custo, c.getPostagem() == null ? null : c.getPostagem().getId());
+        registrarUsoModeracao(m, custo, c.getPostagem() == null ? null : c.getPostagem().getId(), unidadeId);
         if (m.liberado() && !eraRejeitado) {
             c.setStatusModeracao(StatusModeracao.PUBLICADO);
             c.setMotivoModeracao(null);
@@ -454,13 +459,13 @@ public class FeedController {
     }
 
     /** Registra no ledger o uso de IA da moderação (só quando a IA rodou de fato: tokens != null). */
-    private void registrarUsoModeracao(ModeracaoService.Moderacao m, BigDecimal custo, Long postagemId) {
+    private void registrarUsoModeracao(ModeracaoService.Moderacao m, BigDecimal custo, Long postagemId, Long unidadeId) {
         if (m.tokensEntrada() == null) {
             return;
         }
         usoIaService.registrar(com.example.pop.usoia.UsoIaTipo.MODERACAO_COMENTARIO,
                 "Validação de comentário — rede social", m.modelo(), m.tokensEntrada(), m.tokensSaida(), custo,
-                postagemId == null ? null : "/postagens/" + postagemId);
+                postagemId == null ? null : "/postagens/" + postagemId, unidadeId);
     }
 
     /**

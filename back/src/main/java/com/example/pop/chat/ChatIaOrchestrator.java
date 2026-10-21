@@ -8,6 +8,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.example.pop.credencialia.EscopoIa;
+
 /**
  * Orquestra o primeiro atendimento por IA em BACKGROUND (assíncrono), para não travar o envio do
  * paciente. Fluxo: carrega o contexto (curto, transacional) → mostra "escrevendo…" ao paciente →
@@ -48,7 +50,8 @@ public class ChatIaOrchestrator {
                     new DigitandoEvento(RemetenteMensagem.UNIDADE));
 
             AssistenteChatIaService.RespostaIa resposta =
-                    assistente.responder(ctx.nomeUnidade(), ctx.faq(), ctx.ficha(), ctx.historico());
+                    assistente.responder(EscopoIa.deUnidade(ctx.unidadeId()),
+                            ctx.nomeUnidade(), ctx.faq(), ctx.ficha(), ctx.historico());
 
             Long tEntrada = resposta.tokensEntrada();
             Long tSaida = resposta.tokensSaida();

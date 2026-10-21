@@ -36,6 +36,10 @@ public class UsoIa {
     @Column(nullable = false, length = 40)
     private UsoIaTipo tipo;
 
+    /** Unidade que originou o uso (para detalhar o gasto por unidade); nulo em registros antigos. */
+    @Column(name = "unidade_id")
+    private Long unidadeId;
+
     /** Descrição legível do uso (ex.: "Documento: Exame de Lab 2"). */
     @Column(nullable = false, length = 200)
     private String descricao;

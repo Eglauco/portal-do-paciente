@@ -53,7 +53,7 @@ public class ProntuarioIaService {
     }
 
     /** Contexto para a IA analisar um documento (dados desanexados). */
-    public record ContextoAnalise(String url, String nome, String promptResumo, String promptValidacao) {
+    public record ContextoAnalise(Long unidadeId, String url, String nome, String promptResumo, String promptValidacao) {
     }
 
     /**
@@ -81,7 +81,8 @@ public class ProntuarioIaService {
         }
         d.setStatusAnalise(StatusAnaliseDocumento.EM_ANALISE);
         documentoRepository.save(d);
-        return Optional.of(new ContextoAnalise(d.getUrl(), d.getNome(), tipo.getPromptResumo(), tipo.getPromptValidacao()));
+        return Optional.of(new ContextoAnalise(unidadeDoDocumento(d), d.getUrl(), d.getNome(),
+                tipo.getPromptResumo(), tipo.getPromptValidacao()));
     }
 
     /** Reverte um documento preso em "em análise" (ex.: falha inesperada) para NAO_ANALISADO (reanalisável). */
@@ -121,7 +122,7 @@ public class ProntuarioIaService {
             Long prontuarioId = d.getProntuario() == null ? null : d.getProntuario().getId();
             usoIaService.registrar(UsoIaTipo.PRONTUARIO_DOCUMENTO, "Documento: " + d.getNome(),
                     resultado.modelo(), resultado.tokensEntrada(), resultado.tokensSaida(), custo,
-                    prontuarioId == null ? null : "/prontuarios/" + prontuarioId);
+                    prontuarioId == null ? null : "/prontuarios/" + prontuarioId, unidadeDoDocumento(d));
         }
         d.setAnalisadoEm(LocalDateTime.now());
         // Uma (re)análise invalida qualquer decisão humana anterior.
@@ -202,6 +203,13 @@ public class ProntuarioIaService {
                 "Documento aguardando validação",
                 "O documento \"" + nomeDoc + "\" de " + paciente + " precisa de validação (alerta da IA).",
                 documentoId, "/prontuarios/" + prontuarioId));
+    }
+
+    /** Unidade dona do documento (prontuário → horário → unidade); null se faltar algum elo. */
+    private static Long unidadeDoDocumento(Documento d) {
+        Prontuario p = d.getProntuario();
+        Horario a = p == null ? null : p.getHorario();
+        return a == null || a.getUnidadeSaude() == null ? null : a.getUnidadeSaude().getId();
     }
 
     private static long zero(Long v) {

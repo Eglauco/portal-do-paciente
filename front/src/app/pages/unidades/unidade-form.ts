@@ -12,6 +12,8 @@ import { ToastrService } from 'ngx-toastr';
 import { PodeSair } from '../../core/pending-changes.guard';
 import { ArmazenamentoS3Form } from '../../shared/armazenamento/armazenamento-s3-form';
 import { EscopoS3Input } from '../../shared/armazenamento/armazenamento.model';
+import { CredencialIaForm } from '../../shared/credencial-ia/credencial-ia-form';
+import { EscopoIaInput } from '../../shared/credencial-ia/credencial-ia.model';
 import { Unidade, UnidadeFaqItem } from './unidade.model';
 import { UnidadeService } from './unidade.service';
 
@@ -23,11 +25,11 @@ type FaqItemForm = FormGroup<{
 }>;
 
 /** Abas do cadastro (dividem o formulário em seções). */
-type AbaId = 'dados' | 'faq' | 'armazenamento';
+type AbaId = 'dados' | 'faq' | 'armazenamento' | 'ia';
 
 @Component({
   selector: 'app-unidade-form',
-  imports: [ReactiveFormsModule, ArmazenamentoS3Form],
+  imports: [ReactiveFormsModule, ArmazenamentoS3Form, CredencialIaForm],
   templateUrl: './unidade-form.html',
   styles: [`
     /* Abas do cadastro: separam Dados / FAQ (uma visível por vez). */
@@ -77,11 +79,18 @@ export class UnidadeForm implements PodeSair {
     { id: 'dados', label: 'Dados' },
     { id: 'faq', label: 'FAQ da assistente virtual' },
     { id: 'armazenamento', label: 'Armazenamento' },
+    { id: 'ia', label: 'Inteligência Artificial' },
   ];
   protected readonly abaAtiva = signal<AbaId>('dados');
 
   /** Escopo do S3 desta unidade (só quando editando — precisa do id). */
   protected readonly escopoS3 = computed<EscopoS3Input | null>(() => {
+    const id = this.codigo();
+    return id != null ? { tipo: 'unidade', unidadeId: id } : null;
+  });
+
+  /** Escopo da credencial de IA desta unidade (só quando editando — precisa do id). */
+  protected readonly escopoIa = computed<EscopoIaInput | null>(() => {
     const id = this.codigo();
     return id != null ? { tipo: 'unidade', unidadeId: id } : null;
   });

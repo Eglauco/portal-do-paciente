@@ -12,18 +12,25 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pop.auth.Permissoes;
 import com.example.pop.common.Ordenacoes;
 import com.example.pop.common.Pagina;
 import com.example.pop.export.ColunaExport;
 import com.example.pop.export.ExportacaoService;
 import com.example.pop.export.FiltroAplicado;
+import com.example.pop.unidade.Unidade;
+import com.example.pop.usuario.UsuarioRepository;
 
 /** Consulta (só leitura) e exportação do ledger de uso de IA. */
 @RestController
@@ -47,14 +54,18 @@ public class UsoIaController {
 
     private final UsoIaRepository repository;
     private final ExportacaoService exportacaoService;
+    private final UsuarioRepository usuarioRepository;
 
-    public UsoIaController(UsoIaRepository repository, ExportacaoService exportacaoService) {
+    public UsoIaController(UsoIaRepository repository, ExportacaoService exportacaoService,
+            UsuarioRepository usuarioRepository) {
         this.repository = repository;
         this.exportacaoService = exportacaoService;
+        this.usuarioRepository = usuarioRepository;
     }
 
     @GetMapping
     public Pagina<UsoIaResponse> listar(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) UsoIaTipo tipo,
             @RequestParam(required = false) LocalDate de,
             @RequestParam(required = false) LocalDate ate,
@@ -64,24 +75,26 @@ public class UsoIaController {
             @RequestParam(defaultValue = "10") int size) {
         int tamanho = Math.min(Math.max(size, 1), TAMANHO_MAXIMO);
         Pageable pageable = PageRequest.of(Math.max(page, 0), tamanho, Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO));
-        Page<UsoIa> resultado = repository.search(tipo, inicio(de), fim(ate), texto(busca), pageable);
+        Page<UsoIa> resultado = repository.search(alvoUnidade(jwt), tipo, inicio(de), fim(ate), texto(busca), pageable);
         List<UsoIaResponse> content = resultado.getContent().stream().map(UsoIaResponse::from).toList();
         return new Pagina<>(content, resultado.getNumber(), resultado.getSize(),
                 resultado.getTotalElements(), resultado.getTotalPages(), resultado.isFirst(), resultado.isLast());
     }
 
-    /** Totais (custo/tokens) do MESMO filtro — para bater com a fatura. */
+    /** Totais (custo/tokens) da unidade ativa no MESMO filtro — para bater com a fatura. */
     @GetMapping("/totais")
     public UsoIaTotaisResponse totais(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) UsoIaTipo tipo,
             @RequestParam(required = false) LocalDate de,
             @RequestParam(required = false) LocalDate ate,
             @RequestParam(required = false) String busca) {
-        return UsoIaTotaisResponse.from(repository.somar(tipo, inicio(de), fim(ate), texto(busca)));
+        return UsoIaTotaisResponse.from(repository.somar(alvoUnidade(jwt), tipo, inicio(de), fim(ate), texto(busca)));
     }
 
     @GetMapping("/exportar")
     public ResponseEntity<byte[]> exportar(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "xlsx") String formato,
             @RequestParam(required = false) UsoIaTipo tipo,
             @RequestParam(required = false) LocalDate de,
@@ -89,7 +102,7 @@ public class UsoIaController {
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) List<String> ordenar,
             @RequestParam(required = false) List<String> colunas) {
-        List<UsoIa> dados = repository.search(tipo, inicio(de), fim(ate), texto(busca),
+        List<UsoIa> dados = repository.search(alvoUnidade(jwt), tipo, inicio(de), fim(ate), texto(busca),
                 Pageable.unpaged(Ordenacoes.montar(ordenar, ORDENAVEIS, ORDEM_PADRAO))).getContent();
         List<ColunaExport<UsoIa>> cols = ExportacaoService.filtrar(colunasUso(), colunas);
 
@@ -107,6 +120,26 @@ public class UsoIaController {
     @GetMapping("/exportar/colunas")
     public List<String> colunasDisponiveis() {
         return colunasUso().stream().map(ColunaExport::titulo).toList();
+    }
+
+    /**
+     * Unidade ATIVA do admin logado (a tela sempre mostra o uso dessa unidade; troca-se de unidade no
+     * topo). {@code -1} quando o admin não tem unidade ativa → a consulta não devolve nada.
+     */
+    private Long alvoUnidade(Jwt jwt) {
+        Long unidadeId = usuarioRepository.findById(uid(jwt))
+                .map(Permissoes::unidadeAtivaEfetiva)
+                .map(Unidade::getId)
+                .orElse(null);
+        return unidadeId == null ? -1L : unidadeId;
+    }
+
+    private Long uid(Jwt jwt) {
+        Object claim = jwt == null ? null : jwt.getClaim("uid");
+        if (claim instanceof Number n) {
+            return n.longValue();
+        }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sessão inválida.");
     }
 
     private List<FiltroAplicado> filtros(UsoIaTipo tipo, LocalDate de, LocalDate ate, String busca) {

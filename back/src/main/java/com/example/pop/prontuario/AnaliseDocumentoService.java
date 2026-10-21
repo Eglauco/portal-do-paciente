@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.Base64ImageSource;
 import com.anthropic.models.messages.Base64PdfSource;
 import com.anthropic.models.messages.ContentBlockParam;
@@ -21,6 +21,9 @@ import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.TextBlockParam;
+import com.example.pop.credencialia.ConfigIaService;
+import com.example.pop.credencialia.EscopoIa;
+import com.example.pop.credencialia.FrenteIa;
 import com.example.pop.storage.StorageService;
 
 /**
@@ -60,20 +63,16 @@ public class AnaliseDocumentoService {
             português do Brasil, de forma clara e concisa.""";
 
     private final StorageService storageService;
-    private final String apiKey;
-    private final String modelo;
+    private final ConfigIaService configIa;
     private final long maxTokens;
     private final long timeoutSegundos;
-    private volatile AnthropicClient client;
 
     public AnaliseDocumentoService(StorageService storageService,
-            @Value("${anthropic.api-key:}") String apiKey,
-            @Value("${anthropic.prontuario.modelo:claude-opus-5}") String modelo,
+            ConfigIaService configIa,
             @Value("${anthropic.prontuario.max-tokens:1500}") long maxTokens,
             @Value("${anthropic.prontuario.timeout-segundos:90}") long timeoutSegundos) {
         this.storageService = storageService;
-        this.apiKey = apiKey;
-        this.modelo = modelo;
+        this.configIa = configIa;
         this.maxTokens = maxTokens;
         this.timeoutSegundos = timeoutSegundos;
     }
@@ -95,17 +94,19 @@ public class AnaliseDocumentoService {
      * Analisa o documento. {@code promptResumo} é obrigatório (o chamador garante). {@code promptValidacao}
      * nulo/vazio = não avalia alerta (nunca marca "Aguardando validação").
      */
-    public AnaliseResultado analisar(String url, String nomeArquivo, String promptResumo, String promptValidacao) {
+    public AnaliseResultado analisar(EscopoIa escopo, String url, String nomeArquivo, String promptResumo, String promptValidacao) {
         Base64ImageSource.MediaType mediaImagem = mediaTypeImagem(nomeArquivo, url);
         TipoArquivo tipo = tipoDe(nomeArquivo, url, mediaImagem);
         if (tipo == TipoArquivo.NAO_SUPORTADO) {
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISAVEL, null, null, null, null);
         }
-        AnthropicClient c = client();
-        if (c == null) {
+        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
+        if (cliOpt.isEmpty()) {
             log.warn("Análise de documento sem chave de IA configurada; fica não analisado.");
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null);
         }
+        AnthropicClient c = cliOpt.get();
+        String modelo = configIa.modelo(escopo, FrenteIa.PRONTUARIO);
         byte[] bytes = storageService.baixarBytes(url);
         if (bytes == null || bytes.length == 0) {
             log.warn("Não foi possível baixar o documento do S3 (url={}); fica não analisado.", url);
@@ -216,27 +217,5 @@ public class AnaliseDocumentoService {
             }
         }
         return false;
-    }
-
-    /** Cliente Anthropic sob demanda; null quando não há chave. */
-    private AnthropicClient client() {
-        if (apiKey == null || apiKey.isBlank()) {
-            return null;
-        }
-        AnthropicClient local = client;
-        if (local == null) {
-            synchronized (this) {
-                local = client;
-                if (local == null) {
-                    local = AnthropicOkHttpClient.builder()
-                            .apiKey(apiKey)
-                            .timeout(Duration.ofSeconds(timeoutSegundos))
-                            .maxRetries(0)
-                            .build();
-                    client = local;
-                }
-            }
-        }
-        return local;
     }
 }

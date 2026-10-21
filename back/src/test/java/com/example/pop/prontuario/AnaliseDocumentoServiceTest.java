@@ -12,9 +12,9 @@ import com.example.pop.prontuario.AnaliseDocumentoService.AnaliseResultado;
 /** Parsing da decisão da análise: alerta (AGUARDANDO_VALIDACAO) x sem alterações, e limpeza do token. */
 class AnaliseDocumentoServiceTest {
 
-    // storage null e sem chave: só exercita interpretar() (não faz rede nem baixa bytes).
+    // storage e configIa null: só exercita interpretar() (não faz rede nem baixa bytes).
     private final AnaliseDocumentoService service =
-            new AnaliseDocumentoService(null, "", "claude-opus-5", 1500, 90);
+            new AnaliseDocumentoService(null, null, 1500, 90);
 
     @Test
     void semValidacaoNuncaGeraAlerta() {

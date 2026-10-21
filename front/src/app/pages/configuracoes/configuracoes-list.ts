@@ -3,6 +3,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router } from '@angular/router';
 import { ArmazenamentoS3Form } from '../../shared/armazenamento/armazenamento-s3-form';
 import { EscopoS3Input } from '../../shared/armazenamento/armazenamento.model';
+import { CredencialIaForm } from '../../shared/credencial-ia/credencial-ia-form';
+import { EscopoIaInput } from '../../shared/credencial-ia/credencial-ia.model';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Configuracao, TipoConfiguracao } from './configuracao.model';
@@ -13,13 +15,16 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-configuracoes-list',
-  imports: [DatePipe, Ordenavel, ArmazenamentoS3Form],
+  imports: [DatePipe, Ordenavel, ArmazenamentoS3Form, CredencialIaForm],
   templateUrl: './configuracoes-list.html',
 })
 export class ConfiguracoesList {
   /** S3 PADRÃO do inquilino (fotos, modelos de TCLE, logomarca) — configurado num modal daqui. */
   protected readonly escopoInquilino: EscopoS3Input = { tipo: 'inquilino' };
   protected readonly mostrarArmazenamento = signal(false);
+  /** Credencial de IA PADRÃO do inquilino (Claude) — configurada num modal daqui. */
+  protected readonly escopoInquilinoIa: EscopoIaInput = { tipo: 'inquilino' };
+  protected readonly mostrarIa = signal(false);
   private readonly service = inject(ConfiguracaoService);
   private readonly router = inject(Router);
   private readonly store = inject(ConfiguracaoBuscaStore);

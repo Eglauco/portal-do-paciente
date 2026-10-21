@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.example.pop.credencialia.EscopoIa;
+
 /**
  * Orquestra a análise de documentos por IA em BACKGROUND (não trava o salvar do prontuário): carrega
  * o contexto (curto, transacional) → chama o Claude (lento) → aplica o resultado. Disparado após
@@ -37,12 +39,13 @@ public class ProntuarioIaOrchestrator {
                 return;
             }
             ProntuarioIaService.ContextoAnalise c = ctxOpt.get();
-            AnaliseDocumentoService.AnaliseResultado r =
-                    analiseDocumentoService.analisar(c.url(), c.nome(), c.promptResumo(), c.promptValidacao());
+            AnaliseDocumentoService.AnaliseResultado r = analiseDocumentoService.analisar(
+                    EscopoIa.deUnidade(c.unidadeId()), c.url(), c.nome(), c.promptResumo(), c.promptValidacao());
             Long pacienteId = prontuarioIaService.aplicarResultado(documentoId, r);
             // Regenera automaticamente o resumo do histórico do paciente (gated + fail-safe internamente).
+            // O resumo usa o escopo de IA da MESMA unidade do documento que o disparou.
             if (pacienteId != null) {
-                prontuarioMedicoService.regenerarResumo(pacienteId);
+                prontuarioMedicoService.regenerarResumo(pacienteId, c.unidadeId());
             }
         } catch (RuntimeException e) {
             // Não deixa o documento preso em "em análise" se algo inesperado estourar.

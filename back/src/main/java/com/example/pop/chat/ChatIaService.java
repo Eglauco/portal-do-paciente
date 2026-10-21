@@ -56,7 +56,7 @@ public class ChatIaService {
     }
 
     /** Contexto da conversa para a IA (dados desanexados, seguros de usar fora da transação). */
-    public record ContextoIa(String nomeUnidade, String faq, String ficha, List<Mensagem> historico) {
+    public record ContextoIa(Long unidadeId, String nomeUnidade, String faq, String ficha, List<Mensagem> historico) {
     }
 
     /**
@@ -81,7 +81,7 @@ public class ChatIaService {
                 ? todas
                 : new ArrayList<>(todas.subList(todas.size() - historicoMaximo, todas.size()));
 
-        return Optional.of(new ContextoIa(chat.getUnidadeSaude().getNome(), faq, ficha, historico));
+        return Optional.of(new ContextoIa(unidadeId, chat.getUnidadeSaude().getNome(), faq, ficha, historico));
     }
 
     /** Persiste a resposta da IA (revalidando que ela ainda está no comando). */

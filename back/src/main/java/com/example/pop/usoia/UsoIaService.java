@@ -18,11 +18,12 @@ public class UsoIaService {
         this.repository = repository;
     }
 
-    /** Registra um uso de IA no ledger. Roda na transação de quem chama (commita junto do uso). */
+    /** Registra um uso de IA no ledger, atribuído à {@code unidadeId} que o originou (nula se não houver). */
     public void registrar(UsoIaTipo tipo, String descricao, String modelo, Long tokensEntrada, Long tokensSaida,
-            BigDecimal custoUsd, String rota) {
+            BigDecimal custoUsd, String rota, Long unidadeId) {
         UsoIa u = new UsoIa();
         u.setTipo(tipo);
+        u.setUnidadeId(unidadeId);
         u.setDescricao(recortar(descricao));
         u.setModeloIa(modelo);
         u.setTokensEntrada(tokensEntrada);

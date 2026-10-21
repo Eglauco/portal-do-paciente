@@ -17,6 +17,7 @@ import com.example.pop.agendamento.Horario;
 import com.example.pop.configuracao.ChaveConfiguracao;
 import com.example.pop.configuracao.ConfiguracaoService;
 import com.example.pop.configuracao.CustoIaService;
+import com.example.pop.credencialia.EscopoIa;
 import com.example.pop.paciente.Paciente;
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.storage.StorageService;
@@ -87,7 +88,7 @@ public class ProntuarioMedicoService {
      * quando um documento é analisado. No-op se os toggles estiverem desligados, sem histórico, ou se
      * a IA falhar (mantém o resumo anterior — fail-safe). Faz a chamada lenta ao Claude fora de tx.
      */
-    public void regenerarResumo(Long pacienteId) {
+    public void regenerarResumo(Long pacienteId, Long unidadeId) {
         if (pacienteId == null || !iaHabilitada() || !resumoIaHabilitado()) {
             return;
         }
@@ -95,11 +96,12 @@ public class ProntuarioMedicoService {
         if (!dados.temHistorico()) {
             return;
         }
-        ResumoHistoricoService.ResumoIa resumo = resumoHistoricoService.gerar(dados.historicoTexto());
+        ResumoHistoricoService.ResumoIa resumo =
+                resumoHistoricoService.gerar(EscopoIa.deUnidade(unidadeId), dados.historicoTexto());
         if (resumo == null) {
             return; // falha na IA: preserva o resumo anterior (não soma nada)
         }
-        salvarResumo(pacienteId, resumo);
+        salvarResumo(pacienteId, resumo, unidadeId);
     }
 
     /** Contexto para gerar o resumo por IA (texto do histórico + flags), sem segurar transação na chamada lenta. */
@@ -114,7 +116,7 @@ public class ProntuarioMedicoService {
 
     /** Grava o resumo gerado e ACUMULA o consumo de IA (tokens + custo + nº de gerações + modelo). */
     @Transactional
-    public void salvarResumo(Long pacienteId, ResumoHistoricoService.ResumoIa resumo) {
+    public void salvarResumo(Long pacienteId, ResumoHistoricoService.ResumoIa resumo, Long unidadeId) {
         Paciente p = pacienteRepository.findById(pacienteId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Paciente não encontrado"));
         p.setResumoHistoricoIa(resumo.texto());
@@ -129,7 +131,7 @@ public class ProntuarioMedicoService {
         // Ledger de auditoria: uma linha por geração do resumo do histórico.
         usoIaService.registrar(UsoIaTipo.PRONTUARIO_RESUMO, "Resumo do histórico — " + p.getNome(),
                 resumo.modelo(), resumo.tokensEntrada(), resumo.tokensSaida(), custo,
-                "/prontuario-medico/" + p.getId());
+                "/prontuario-medico/" + p.getId(), unidadeId);
     }
 
     private static long zero(Long v) {

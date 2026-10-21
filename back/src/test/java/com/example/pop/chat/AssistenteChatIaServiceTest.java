@@ -12,8 +12,8 @@ import com.example.pop.chat.AssistenteChatIaService.RespostaIa;
 /** Parsing da decisão da IA (responder x escalar) e defesa contra "fechar" o bloco de dados. */
 class AssistenteChatIaServiceTest {
 
-    // Sem chave: não faz chamada de rede; só exercita interpretar()/sanitizar().
-    private final AssistenteChatIaService service = new AssistenteChatIaService("", "claude-haiku-4-5", 600, 20);
+    // Sem credencial (configIa null): não faz chamada de rede; só exercita interpretar()/sanitizar().
+    private final AssistenteChatIaService service = new AssistenteChatIaService(null, 600, 20);
 
     @Test
     void respostaNormalEhParaResponder() {

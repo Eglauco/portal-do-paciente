@@ -2,6 +2,7 @@ package com.example.pop.postagem;
 
 import java.time.Duration;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -10,9 +11,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
-import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
+import com.example.pop.credencialia.ConfigIaService;
+import com.example.pop.credencialia.EscopoIa;
+import com.example.pop.credencialia.FrenteIa;
 
 /**
  * Modera comentários com a IA (Claude/Haiku): decide se um comentário deve ir para revisão
@@ -39,17 +42,13 @@ public class ModeracaoService {
             OK
             OFENSIVO: <motivo curto>""";
 
-    private final String apiKey;
-    private final String modelo;
+    private final ConfigIaService configIa;
     private final long timeoutSegundos;
-    private volatile AnthropicClient client;
 
     public ModeracaoService(
-            @Value("${anthropic.api-key:}") String apiKey,
-            @Value("${anthropic.moderacao.modelo:claude-haiku-4-5}") String modelo,
+            ConfigIaService configIa,
             @Value("${anthropic.moderacao.timeout-segundos:12}") long timeoutSegundos) {
-        this.apiKey = apiKey;
-        this.modelo = modelo;
+        this.configIa = configIa;
         this.timeoutSegundos = timeoutSegundos;
     }
 
@@ -60,12 +59,14 @@ public class ModeracaoService {
     public record Moderacao(boolean liberado, String motivo, Long tokensEntrada, Long tokensSaida, String modelo) {
     }
 
-    /** Avalia o texto. Fail-closed: na dúvida/erro, devolve pendente. */
-    public Moderacao avaliar(String texto) {
-        AnthropicClient c = client();
-        if (c == null) {
+    /** Avalia o texto no escopo da unidade dona. Fail-closed: na dúvida/erro, devolve pendente. */
+    public Moderacao avaliar(EscopoIa escopo, String texto) {
+        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
+        if (cliOpt.isEmpty()) {
             return pendente("Validação automática indisponível (chave de IA não configurada).");
         }
+        AnthropicClient c = cliOpt.get();
+        String modelo = configIa.modelo(escopo, FrenteIa.MODERACAO);
         try {
             MessageCreateParams params = MessageCreateParams.builder()
                     .model(modelo)
@@ -122,28 +123,5 @@ public class ModeracaoService {
 
     private Moderacao pendente(String motivo) {
         return new Moderacao(false, motivo, null, null, null);
-    }
-
-    /** Cliente Anthropic construído sob demanda; null quando não há chave (fail-closed). */
-    private AnthropicClient client() {
-        if (apiKey == null || apiKey.isBlank()) {
-            return null;
-        }
-        AnthropicClient local = client;
-        if (local == null) {
-            synchronized (this) {
-                local = client;
-                if (local == null) {
-                    // maxRetries(0): sem retries — o timeout é o teto de espera do envio do comentário.
-                    local = AnthropicOkHttpClient.builder()
-                            .apiKey(apiKey)
-                            .timeout(Duration.ofSeconds(timeoutSegundos))
-                            .maxRetries(0)
-                            .build();
-                    client = local;
-                }
-            }
-        }
-        return local;
     }
 }
