@@ -27,17 +27,17 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 4.25rem;
-  height: 4.25rem;
-  border-radius: 1rem;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.8rem;
   color: #fff;
   background: linear-gradient(150deg, var(--brand) 0%, var(--brand-deep) 100%);
   box-shadow: 0 10px 22px -12px rgba(var(--brand-deep-rgb), 0.7);
 }
 
 .sidebar__mark svg {
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 1.7rem;
+  height: 1.7rem;
   stroke: var(--glow);
 }
 
