@@ -8,14 +8,10 @@ export interface StatusIa {
   modeloModeracao: string;
   modeloChat: string;
   modeloProntuario: string;
-  /** Modelos padrão da plataforma (usados quando o do cliente fica em branco) — mostrados como dica. */
-  modeloModeracaoPadrao: string;
-  modeloChatPadrao: string;
-  modeloProntuarioPadrao: string;
   ativo: boolean;
 }
 
-/** Corpo de salvar (api-key em branco MANTÉM a atual; modelos em branco usam o padrão da plataforma). */
+/** Corpo de salvar (api-key em branco MANTÉM a atual; os 3 modelos são obrigatórios). */
 export interface FormIa {
   apiKey: string;
   modeloModeracao: string;

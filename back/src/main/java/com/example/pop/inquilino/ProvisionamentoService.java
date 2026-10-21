@@ -42,7 +42,7 @@ public class ProvisionamentoService {
      */
     private static final Set<String> MANTER_NO_BASELINE = Set.of(
             "flyway_schema_history", "perfil", "perfil_tela", "configuracao",
-            "conselho", "motivo_falta", "categoria_nps", "tipo_manifestacao");
+            "conselho", "motivo_falta", "categoria_nps", "tipo_manifestacao", "modelo_ia");
 
     private final DataSource dataSource;
 

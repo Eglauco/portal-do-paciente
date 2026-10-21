@@ -2,7 +2,7 @@ package com.example.pop.credencialia;
 
 /**
  * Corpo do cadastro da credencial de IA. {@code apiKey} em branco MANTÉM a atual (write-only).
- * Modelos em branco = usa o padrão da plataforma.
+ * Os 3 modelos são obrigatórios e precisam existir ativos no cadastro "Modelos de IA".
  */
 public record FormIa(
         String apiKey,

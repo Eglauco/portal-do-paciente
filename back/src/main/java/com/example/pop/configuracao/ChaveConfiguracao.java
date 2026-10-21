@@ -118,17 +118,8 @@ public final class ChaveConfiguracao {
      */
     public static final String APP_PRONTUARIO_RESUMO_IA_HABILITADO = "APP_PRONTUARIO_RESUMO_IA_HABILITADO";
 
-    // ---------- Custo dos modelos de IA (NUMERICO, US$ por milhão de tokens / MTok) ----------
-    // Usados para calcular e gravar o custo de cada uso de IA (prontuário, chat, moderação).
-
-    /** Preço dos tokens de ENTRADA do Claude Opus 5, em US$ por MTok (NUMERICO). */
-    public static final String CUSTO_IA_OPUS_5_ENTRADA_USD_MTOK = "CUSTO_IA_OPUS_5_ENTRADA_USD_MTOK";
-    /** Preço dos tokens de SAÍDA do Claude Opus 5, em US$ por MTok (NUMERICO). */
-    public static final String CUSTO_IA_OPUS_5_SAIDA_USD_MTOK = "CUSTO_IA_OPUS_5_SAIDA_USD_MTOK";
-    /** Preço dos tokens de ENTRADA do Claude Haiku 4.5, em US$ por MTok (NUMERICO). */
-    public static final String CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK = "CUSTO_IA_HAIKU_45_ENTRADA_USD_MTOK";
-    /** Preço dos tokens de SAÍDA do Claude Haiku 4.5, em US$ por MTok (NUMERICO). */
-    public static final String CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK = "CUSTO_IA_HAIKU_45_SAIDA_USD_MTOK";
+    // O custo dos modelos de IA deixou de ser config por-família aqui; agora é o cadastro "Modelos de IA"
+    // (tabela modelo_ia: preço por versão exata), lido pelo CustoIaService. Ver V166.
 
     // ---------- Assinatura eletrônica (TCLE) ----------
 

@@ -512,6 +512,26 @@ export const routes: Routes = [
         title: 'Uso de IA',
       },
       {
+        path: 'modelos-ia',
+        loadComponent: () => import('./pages/modelos-ia/modelos-ia-list').then((m) => m.ModelosIaList),
+        canActivate: [telaGuard('MODELOS_IA')],
+        title: 'Modelos de IA',
+      },
+      {
+        path: 'modelos-ia/novo',
+        loadComponent: () => import('./pages/modelos-ia/modelo-ia-form').then((m) => m.ModeloIaForm),
+        canActivate: [telaGuard('MODELOS_IA')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Novo modelo de IA',
+      },
+      {
+        path: 'modelos-ia/:id',
+        loadComponent: () => import('./pages/modelos-ia/modelo-ia-form').then((m) => m.ModeloIaForm),
+        canActivate: [telaGuard('MODELOS_IA')],
+        canDeactivate: [pendingChangesGuard],
+        title: 'Editar modelo de IA',
+      },
+      {
         path: 'siresp',
         loadComponent: () => import('./pages/siresp/siresp-list').then((m) => m.SirespList),
         canActivate: [telaGuard('SIRESP')],

@@ -92,6 +92,7 @@ export const FUNCIONALIDADES: readonly Funcionalidade[] = [
   { tela: 'PERFIS', rotulo: 'Perfis', rota: '/perfis', grupo: 'Administração', icone: ICONE.perfis, palavras: ['permissões', 'acesso', 'rbac', 'papéis'] },
   { tela: 'CONFIGURACOES', rotulo: 'Configurações', rota: '/configuracoes', grupo: 'Administração', icone: ICONE.engrenagem, palavras: ['ajustes', 'settings', 'white-label', 'tema', 'cor'] },
   { tela: 'PROVEDORES_ASSINATURA', rotulo: 'Provedores de assinatura', rota: '/provedores-assinatura', grupo: 'Administração', icone: ICONE.assinatura, palavras: ['assinatura', 'provedor', 'token', 'credenciais', 'integração', 'zapsign', 'autentique', 'clicksign', 'docusign', 'chaves', 'api'] },
+  { tela: 'MODELOS_IA', rotulo: 'Modelos de IA', rota: '/modelos-ia', grupo: 'Administração', icone: ICONE.ia, palavras: ['modelo', 'claude', 'preço', 'versão', 'ia', 'opus', 'sonnet', 'haiku', 'token', 'custo'] },
   { tela: 'USO_IA', rotulo: 'Uso de IA', rota: '/uso-ia', grupo: 'Administração', icone: ICONE.ia, palavras: ['custo', 'tokens', 'auditoria', 'ia', 'gasto', 'fatura', 'claude'] },
   { tela: 'SIRESP', rotulo: 'SIRESP', rota: '/siresp', grupo: 'Administração', icone: ICONE.tipoDoc, palavras: ['siresp', 'cross', 'importação', 'xml', 'regulação', 'agendamento', 'integração'] },
 ];

@@ -24,6 +24,8 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient;
 import com.anthropic.models.models.ModelInfo;
 import com.anthropic.models.models.ModelListParams;
 import com.example.pop.configuracao.SegredoCripto;
+import com.example.pop.modeloia.ModeloIa;
+import com.example.pop.modeloia.ModeloIaRepository;
 import com.example.pop.tenant.TenantContext;
 
 /**
@@ -39,10 +41,14 @@ import com.example.pop.tenant.TenantContext;
 public class ConfigIaService {
 
     private final ConfiguracaoIaRepository repo;
+    private final ModeloIaRepository modeloIaRepository;
     private final SegredoCripto cripto;
     private final ApplicationEventPublisher eventos;
 
-    /** Modelos padrão da plataforma (env) — usados quando o cliente deixa o modelo em branco. */
+    /**
+     * Modelos padrão da plataforma (env) — fallback DEFENSIVO em {@link #modelo} caso uma credencial
+     * antiga tenha chegado com o modelo em branco. No cadastro o modelo é obrigatório (ver {@link #salvar}).
+     */
     private final String modeloModeracaoPadrao;
     private final String modeloChatPadrao;
     private final String modeloProntuarioPadrao;
@@ -52,12 +58,14 @@ public class ConfigIaService {
 
     public ConfigIaService(
             ConfiguracaoIaRepository repo,
+            ModeloIaRepository modeloIaRepository,
             SegredoCripto cripto,
             ApplicationEventPublisher eventos,
             @Value("${anthropic.moderacao.modelo:claude-haiku-4-5}") String modeloModeracaoPadrao,
             @Value("${anthropic.chat.modelo:claude-haiku-4-5}") String modeloChatPadrao,
             @Value("${anthropic.prontuario.modelo:claude-opus-5}") String modeloProntuarioPadrao) {
         this.repo = repo;
+        this.modeloIaRepository = modeloIaRepository;
         this.cripto = cripto;
         this.eventos = eventos;
         this.modeloModeracaoPadrao = modeloModeracaoPadrao;
@@ -152,10 +160,8 @@ public class ConfigIaService {
     public StatusIa status(EscopoIa escopo) {
         return carregar(escopo)
                 .map(c -> new StatusIa(true, StringUtils.hasText(c.getApiKey()),
-                        c.getModeloModeracao(), c.getModeloChat(), c.getModeloProntuario(),
-                        modeloModeracaoPadrao, modeloChatPadrao, modeloProntuarioPadrao, c.isAtivo()))
-                .orElseGet(() -> new StatusIa(false, false, "", "", "",
-                        modeloModeracaoPadrao, modeloChatPadrao, modeloProntuarioPadrao, true));
+                        c.getModeloModeracao(), c.getModeloChat(), c.getModeloProntuario(), c.isAtivo()))
+                .orElseGet(() -> new StatusIa(false, false, "", "", "", true));
     }
 
     @Transactional
@@ -176,9 +182,10 @@ public class ConfigIaService {
         if (StringUtils.hasText(form.apiKey())) {
             c.setApiKey(cripto.cifrar(form.apiKey().trim()));
         }
-        c.setModeloModeracao(limpar(form.modeloModeracao()));
-        c.setModeloChat(limpar(form.modeloChat()));
-        c.setModeloProntuario(limpar(form.modeloProntuario()));
+        // Modelos obrigatórios + validados contra o cadastro "Modelos de IA" (ativo) → o custo sempre computa.
+        c.setModeloModeracao(exigirModeloAtivo(form.modeloModeracao(), "da moderação"));
+        c.setModeloChat(exigirModeloAtivo(form.modeloChat(), "do chat"));
+        c.setModeloProntuario(exigirModeloAtivo(form.modeloProntuario(), "do prontuário"));
         c.setAtivo(form.ativo());
         c.setAtualizadoEm(agora);
         repo.save(c);
@@ -255,8 +262,19 @@ public class ConfigIaService {
         return carregar(escopo).map(c -> cripto.decifrar(c.getApiKey())).orElse(null);
     }
 
-    private static String limpar(String s) {
-        return StringUtils.hasText(s) ? s.trim() : null;
+    /** Exige um modelo preenchido e que exista ATIVO no cadastro "Modelos de IA"; devolve o id já trimado. */
+    private String exigirModeloAtivo(String valor, String frente) {
+        if (!StringUtils.hasText(valor)) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Escolha o modelo " + frente + ".");
+        }
+        String id = valor.trim();
+        boolean ativo = modeloIaRepository.findByModeloId(id).filter(ModeloIa::isAtivo).isPresent();
+        if (!ativo) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O modelo " + frente + " (" + id + ") não existe ou está inativo no cadastro de Modelos de IA.");
+        }
+        return id;
     }
 
     private static void fechar(AnthropicClient c) {

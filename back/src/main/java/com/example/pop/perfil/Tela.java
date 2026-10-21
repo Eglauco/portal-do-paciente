@@ -35,6 +35,7 @@ public enum Tela {
     PERFIS("Perfis"),
     CONFIGURACOES("Configurações"),
     PROVEDORES_ASSINATURA("Provedores de assinatura"),
+    MODELOS_IA("Modelos de IA"),
     USO_IA("Uso de IA"),
     SIRESP("SIRESP");
 

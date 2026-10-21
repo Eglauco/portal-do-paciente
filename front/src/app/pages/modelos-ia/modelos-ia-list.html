@@ -1,0 +1,97 @@
+<section class="dash">
+  <header class="page-head">
+    <div>
+      <h1 class="page-title">Modelos de IA</h1>
+      <p class="page-sub">
+        Versões do Claude disponíveis e o preço por milhão de tokens. Alimenta os modelos escolhidos na
+        credencial de IA e o cálculo de custo de uso.
+      </p>
+    </div>
+    <div class="page-head__actions">
+      <a class="btn btn--solid" routerLink="/modelos-ia/novo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        Novo modelo
+      </a>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="panel__head">
+      <h2 class="panel__title">Modelos cadastrados</h2>
+      <div class="panel__head-right">
+        @if (carregado() && !error() && !loading()) {
+          <span class="result-count">{{ modelos().length }} modelo(s)</span>
+        }
+      </div>
+    </div>
+
+    @if (loading()) {
+      <div class="state">
+        <span class="spinner" aria-hidden="true"></span>
+        <p>Carregando modelos…</p>
+      </div>
+    } @else if (error()) {
+      <div class="state">
+        <span class="state__icon state__icon--warn" aria-hidden="true">!</span>
+        <h3>Não foi possível carregar</h3>
+        <p>Verifique se o servidor está disponível e tente novamente.</p>
+        <button type="button" class="btn btn--solid" (click)="carregar()">Tentar novamente</button>
+      </div>
+    } @else if (modelos().length === 0) {
+      <div class="state">
+        <span class="state__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" />
+          </svg>
+        </span>
+        <h3>Nenhum modelo cadastrado</h3>
+        <p>Cadastre as versões do Claude que a clínica usa, com o preço de cada uma.</p>
+        <a class="btn btn--ghost" routerLink="/modelos-ia/novo">Cadastrar modelo</a>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Id do modelo</th>
+              <th>Entrada (US$/MTok)</th>
+              <th>Saída (US$/MTok)</th>
+              <th class="col-sit">Situação</th>
+              <th class="col-act"><span class="sr-only">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of modelos(); track m.id) {
+              <tr
+                tabindex="0"
+                role="button"
+                [attr.aria-label]="'Editar ' + m.nome"
+                (click)="editar(m)"
+                (keydown.enter)="editar(m)"
+              >
+                <td><b>{{ m.nome }}</b></td>
+                <td class="mono">{{ m.modeloId }}</td>
+                <td>US$ {{ preco(m.precoEntradaUsdMtok) }}</td>
+                <td>US$ {{ preco(m.precoSaidaUsdMtok) }}</td>
+                <td class="col-sit">
+                  <span class="sit" [class.sit--off]="!m.ativo">{{ m.ativo ? 'Ativo' : 'Inativo' }}</span>
+                </td>
+                <td class="col-act">
+                  <span class="row-go" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m9 6 6 6-6 6" />
+                    </svg>
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</section>

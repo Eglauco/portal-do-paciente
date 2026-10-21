@@ -1,12 +1,17 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ToastrService } from 'ngx-toastr';
+import { ModeloIa } from '../modelo-ia/modelo-ia.model';
+import { ModeloIaService } from '../modelo-ia/modelo-ia.service';
 import { CredencialIaService } from './credencial-ia.service';
 import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-ia.model';
 
 /**
  * Formulário (reutilizável) da credencial de IA (Claude/Anthropic) de um escopo (unidade ou padrão do
  * inquilino): API key (write-only) + modelo por frente. Carrega o status, salva e testa a chave.
+ *
+ * <p>Os 3 modelos são escolhidos num SELECT alimentado pelo cadastro "Modelos de IA" (sem erro de
+ * digitação) e são OBRIGATÓRIOS — o modelo escolhido tem preço cadastrado, então o custo sempre computa.
  *
  * <p>Para UNIDADE a credencial é OPCIONAL: sem chave própria, a unidade usa o padrão do inquilino.
  * O botão "Usar o padrão da clínica" remove a chave própria da unidade.
@@ -46,24 +51,46 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
         </span>
       </div>
 
+      @if (semModelos()) {
+        <div class="ia-sem-modelos" role="alert">
+          Nenhum modelo de IA ativo cadastrado. Cadastre as versões do Claude (com preço) em
+          <b>Modelos de IA</b> antes de salvar a credencial.
+        </div>
+      }
+
       <div class="form-grid" style="margin-top: 0.9rem">
         <div class="form-field">
-          <label class="label" for="ia-mod-moderacao">Modelo — Moderação</label>
-          <input id="ia-mod-moderacao" class="input" [formControl]="form.controls.modeloModeracao"
-            [placeholder]="padraoModeracao()" autocomplete="off" />
+          <label class="label" for="ia-mod-moderacao">Modelo — Moderação <span class="req" aria-hidden="true">*</span></label>
+          <select id="ia-mod-moderacao" class="input" [formControl]="form.controls.modeloModeracao"
+            [class.input--error]="invalido('modeloModeracao')">
+            <option value="" disabled>Selecione o modelo…</option>
+            @for (o of opcoes(form.controls.modeloModeracao.value); track o.id) {
+              <option [value]="o.id" [disabled]="o.inativo">{{ o.rotulo }}</option>
+            }
+          </select>
         </div>
         <div class="form-field">
-          <label class="label" for="ia-mod-chat">Modelo — Chat</label>
-          <input id="ia-mod-chat" class="input" [formControl]="form.controls.modeloChat"
-            [placeholder]="padraoChat()" autocomplete="off" />
+          <label class="label" for="ia-mod-chat">Modelo — Chat <span class="req" aria-hidden="true">*</span></label>
+          <select id="ia-mod-chat" class="input" [formControl]="form.controls.modeloChat"
+            [class.input--error]="invalido('modeloChat')">
+            <option value="" disabled>Selecione o modelo…</option>
+            @for (o of opcoes(form.controls.modeloChat.value); track o.id) {
+              <option [value]="o.id" [disabled]="o.inativo">{{ o.rotulo }}</option>
+            }
+          </select>
         </div>
         <div class="form-field">
-          <label class="label" for="ia-mod-prontuario">Modelo — Prontuário</label>
-          <input id="ia-mod-prontuario" class="input" [formControl]="form.controls.modeloProntuario"
-            [placeholder]="padraoProntuario()" autocomplete="off" />
+          <label class="label" for="ia-mod-prontuario">Modelo — Prontuário <span class="req" aria-hidden="true">*</span></label>
+          <select id="ia-mod-prontuario" class="input" [formControl]="form.controls.modeloProntuario"
+            [class.input--error]="invalido('modeloProntuario')">
+            <option value="" disabled>Selecione o modelo…</option>
+            @for (o of opcoes(form.controls.modeloProntuario.value); track o.id) {
+              <option [value]="o.id" [disabled]="o.inativo">{{ o.rotulo }}</option>
+            }
+          </select>
         </div>
       </div>
-      <span class="field-hint">Deixe um modelo em branco para usar o padrão da plataforma (o placeholder mostra qual).</span>
+      <span class="field-hint">O preço (US$/MTok de entrada / saída) vem do cadastro Modelos de IA e é o que calcula o custo de uso.</span>
 
       <label class="ia-check">
         <input type="checkbox" [formControl]="form.controls.ativo" />
@@ -114,6 +141,8 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
     .ia-teste { margin-top: 1rem; padding: 0.7rem 0.95rem; border-radius: 0.55rem; font-size: 0.9rem; }
     .ia-teste--ok { background: #e2f4ec; color: #1e6f54; }
     .ia-teste--erro { background: #fdecea; color: #b42318; }
+    .ia-sem-modelos { margin-top: 0.9rem; padding: 0.7rem 0.95rem; border-radius: 0.55rem; font-size: 0.9rem;
+      background: #fdf3e2; color: #8a5a00; border: 1px solid #f2d9a8; }
     .ia-padrao { display: flex; gap: 0.6rem; align-items: flex-start; margin: 0 0 1.1rem;
       padding: 0.75rem 0.9rem; border-radius: 0.55rem; background: #e2f4ec; color: #1e6f54; border: 1px solid #bfe4d3; }
     .ia-padrao svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; margin-top: 0.1rem; }
@@ -126,6 +155,7 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
 })
 export class CredencialIaForm {
   private readonly service = inject(CredencialIaService);
+  private readonly modeloService = inject(ModeloIaService);
   private readonly toastr = inject(ToastrService);
 
   readonly escopo = input.required<EscopoIaInput>();
@@ -141,25 +171,59 @@ export class CredencialIaForm {
   protected readonly erroApiKey = signal(false);
   protected readonly resultado = signal<ResultadoTesteIa | null>(null);
 
-  protected readonly padraoModeracao = signal('claude-haiku-4-5');
-  protected readonly padraoChat = signal('claude-haiku-4-5');
-  protected readonly padraoProntuario = signal('claude-opus-5');
+  /** Modelos ativos do cadastro "Modelos de IA" — alimentam os selects. */
+  protected readonly modelos = signal<ModeloIa[]>([]);
+  protected readonly semModelos = computed(() => this.modelos().length === 0);
 
   protected readonly usandoPadrao = computed(() => this.escopo().tipo === 'unidade' && !this.configurado());
 
   protected readonly form = new FormGroup({
     apiKey: new FormControl('', { nonNullable: true }),
-    modeloModeracao: new FormControl('', { nonNullable: true }),
-    modeloChat: new FormControl('', { nonNullable: true }),
-    modeloProntuario: new FormControl('', { nonNullable: true }),
+    modeloModeracao: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    modeloChat: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    modeloProntuario: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     ativo: new FormControl(true, { nonNullable: true }),
   });
 
   constructor() {
+    this.carregarModelos();
     effect(() => {
       const escopo = this.escopo();
       this.carregar(escopo);
     });
+  }
+
+  private carregarModelos(): void {
+    this.modeloService.ativos().subscribe({
+      next: (m) => this.modelos.set(m),
+      error: () => this.modelos.set([]),
+    });
+  }
+
+  /**
+   * Opções do select para o valor atual do controle. Se o valor salvo não estiver entre os ativos
+   * (ex.: o modelo foi desativado depois), ele entra como opção desabilitada marcada "(indisponível)"
+   * para o usuário ver o que está gravado e trocar por um ativo.
+   */
+  protected opcoes(valorAtual: string): { id: string; rotulo: string; inativo: boolean }[] {
+    const lista = this.modelos().map((m) => ({ id: m.modeloId, rotulo: this.rotulo(m), inativo: false }));
+    if (valorAtual && !lista.some((o) => o.id === valorAtual)) {
+      lista.unshift({ id: valorAtual, rotulo: `${valorAtual} (indisponível)`, inativo: true });
+    }
+    return lista;
+  }
+
+  private rotulo(m: ModeloIa): string {
+    return `${m.nome} · US$ ${this.preco(m.precoEntradaUsdMtok)} / ${this.preco(m.precoSaidaUsdMtok)} por MTok`;
+  }
+
+  private preco(v: number): string {
+    return (v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+  }
+
+  protected invalido(campo: 'modeloModeracao' | 'modeloChat' | 'modeloProntuario'): boolean {
+    const c = this.form.controls[campo];
+    return c.invalid && (c.touched || c.dirty);
   }
 
   private carregar(escopo: EscopoIaInput): void {
@@ -187,9 +251,6 @@ export class CredencialIaForm {
     this.apiKeyPreenchida.set(s.apiKeyPreenchida);
     this.configurado.set(s.configurado);
     this.erroApiKey.set(false);
-    if (s.modeloModeracaoPadrao) this.padraoModeracao.set(s.modeloModeracaoPadrao);
-    if (s.modeloChatPadrao) this.padraoChat.set(s.modeloChatPadrao);
-    if (s.modeloProntuarioPadrao) this.padraoProntuario.set(s.modeloProntuarioPadrao);
   }
 
   private valores(): FormIa {
@@ -205,9 +266,17 @@ export class CredencialIaForm {
 
   protected salvar(): void {
     // API key obrigatória só na PRIMEIRA vez (depois, em branco mantém a atual).
-    if (!this.apiKeyPreenchida() && !this.form.controls.apiKey.value.trim()) {
-      this.erroApiKey.set(true);
-      this.toastr.error('Informe a API key da Anthropic.');
+    const semApiKey = !this.apiKeyPreenchida() && !this.form.controls.apiKey.value.trim();
+    const modelosInvalidos =
+      this.form.controls.modeloModeracao.invalid ||
+      this.form.controls.modeloChat.invalid ||
+      this.form.controls.modeloProntuario.invalid;
+    if (semApiKey || modelosInvalidos) {
+      this.erroApiKey.set(semApiKey);
+      this.form.controls.modeloModeracao.markAsTouched();
+      this.form.controls.modeloChat.markAsTouched();
+      this.form.controls.modeloProntuario.markAsTouched();
+      this.toastr.error(semApiKey ? 'Informe a API key da Anthropic.' : 'Escolha os 3 modelos de IA.');
       return;
     }
     this.salvando.set(true);

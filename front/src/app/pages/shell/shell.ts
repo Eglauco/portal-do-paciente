@@ -111,6 +111,7 @@ const GRUPOS_MENU: readonly GrupoMenu[] = [
       { tela: 'PERFIS', rota: '/perfis', label: 'Perfis' },
       { tela: 'CONFIGURACOES', rota: '/configuracoes', label: 'Configurações' },
       { tela: 'PROVEDORES_ASSINATURA', rota: '/provedores-assinatura', label: 'Provedores de assinatura' },
+      { tela: 'MODELOS_IA', rota: '/modelos-ia', label: 'Modelos de IA' },
       { tela: 'USO_IA', rota: '/uso-ia', label: 'Uso de IA' },
     ],
   },
