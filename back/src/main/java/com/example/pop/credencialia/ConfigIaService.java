@@ -2,11 +2,10 @@ package com.example.pop.credencialia;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-import com.anthropic.models.models.ModelInfo;
+import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.models.ModelListParams;
 import com.example.pop.configuracao.SegredoCripto;
 import com.example.pop.modeloia.ModeloIa;
@@ -215,7 +215,13 @@ public class ConfigIaService {
 
     // ===================== Testar a chave =====================
 
-    /** Testa a api-key do formulário (em branco usa a salva) validando com um list de modelos (sem gastar tokens). */
+    /**
+     * Testa a api-key do formulário (em branco usa a salva). Prova CADA modelo escolhido com uma geração
+     * mínima ({@code max_tokens=1}): é a única forma confiável de saber se a CHAVE consegue USAR o modelo —
+     * o {@code /v1/models} nem sempre LISTA modelos que a conta de fato consegue chamar (um list que não
+     * acha o modelo dava falso "não encontrado"). Sem modelo escolhido, valida só a chave com um list barato.
+     * Gasta pouquíssimos tokens (1 por modelo distinto).
+     */
     public ResultadoTeste testar(EscopoIa escopo, FormIa form) {
         String apiKey = StringUtils.hasText(form == null ? null : form.apiKey())
                 ? form.apiKey().trim()
@@ -223,26 +229,38 @@ public class ConfigIaService {
         if (!StringUtils.hasText(apiKey)) {
             return new ResultadoTeste(false, "Informe a API key para testar.");
         }
+        List<String> modelos = Stream.of(
+                        form == null ? null : form.modeloModeracao(),
+                        form == null ? null : form.modeloChat(),
+                        form == null ? null : form.modeloProntuario())
+                .filter(StringUtils::hasText).map(String::trim).distinct().toList();
         AnthropicClient c = AnthropicOkHttpClient.builder()
                 .apiKey(apiKey).timeout(Duration.ofSeconds(20)).maxRetries(0).build();
         try {
-            // Lista TODAS as páginas de modelos da conta (autoPager): o default traz só 20 (mais recentes
-            // primeiro), o que reportava falsamente modelos mais antigos — ex.: claude-haiku-4-5 — como
-            // "não encontrados". limit(1000) resolve em 1 request no caso comum; o autoPager cobre o resto.
-            Set<String> ids = c.models().list(ModelListParams.builder().limit(1000L).build())
-                    .autoPager().stream()
-                    .map(ModelInfo::id).collect(Collectors.toSet());
-            List<String> faltando = Stream.of(
-                            form == null ? null : form.modeloModeracao(),
-                            form == null ? null : form.modeloChat(),
-                            form == null ? null : form.modeloProntuario())
-                    .filter(StringUtils::hasText).map(String::trim).distinct()
-                    .filter(m -> !ids.contains(m)).toList();
-            if (!faltando.isEmpty()) {
-                return new ResultadoTeste(true,
-                        "Chave OK, mas estes modelos não foram encontrados na conta: " + String.join(", ", faltando));
+            if (modelos.isEmpty()) {
+                c.models().list(ModelListParams.builder().limit(1L).build()); // só valida a chave
+                return new ResultadoTeste(true, "Conexão OK — chave válida.");
             }
-            return new ResultadoTeste(true, "Conexão OK — chave válida.");
+            List<String> falharam = new ArrayList<>();
+            for (String modelo : modelos) {
+                try {
+                    c.messages().create(MessageCreateParams.builder()
+                            .model(modelo).maxTokens(1L).addUserMessage("oi").build());
+                } catch (AnthropicServiceException e) {
+                    // 401/403 = problema na CHAVE (vale p/ todos os modelos) → aborta; senão, o MODELO falhou.
+                    if (e.statusCode() == 401 || e.statusCode() == 403) {
+                        return new ResultadoTeste(false,
+                                "Chave inválida ou sem permissão (HTTP " + e.statusCode() + ").");
+                    }
+                    falharam.add(modelo);
+                }
+            }
+            if (!falharam.isEmpty()) {
+                return new ResultadoTeste(true,
+                        "Chave OK, mas a conta não conseguiu usar: " + String.join(", ", falharam)
+                                + ". Escolha outro modelo ou verifique o acesso a ele na conta Anthropic.");
+            }
+            return new ResultadoTeste(true, "Conexão OK — chave e modelos válidos.");
         } catch (RuntimeException e) {
             String causa = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             return new ResultadoTeste(false, "Falha ao validar a chave: " + causa);
