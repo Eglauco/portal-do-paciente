@@ -6,8 +6,10 @@ import { PodeSair } from '../../core/pending-changes.guard';
 import { ModeloIaService } from '../../shared/modelo-ia/modelo-ia.service';
 
 /**
- * Cadastro de um Modelo de IA: id do modelo (Anthropic) + nome + preço por MTok (entrada/saída) + ativo.
+ * Cadastro de um Modelo de IA: provedor + id do modelo + nome + preço por MTok (entrada/saída) + ativo.
  * O id do modelo é único; o backend recusa duplicado (409) e devolve a mensagem para exibir.
+ * O provedor amarra o modelo a uma plataforma (Anthropic/Claude e, no futuro, OpenAI/Gemini/Azure) e
+ * filtra os modelos oferecidos no cadastro da credencial de IA.
  */
 @Component({
   selector: 'app-modelo-ia-form',
@@ -20,7 +22,14 @@ export class ModeloIaForm implements PodeSair {
   private readonly route = inject(ActivatedRoute);
   private readonly toastr = inject(ToastrService);
 
+  /** Provedores conhecidos (para o select). Vem do backend; cai em ANTHROPIC se falhar. */
+  protected readonly provedores = signal<string[]>(['ANTHROPIC']);
+
   protected readonly form = new FormGroup({
+    provedor: new FormControl('ANTHROPIC', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
     modeloId: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
@@ -49,6 +58,10 @@ export class ModeloIaForm implements PodeSair {
   private saidaAutorizada = false;
 
   constructor() {
+    this.service.provedores().subscribe({
+      next: (p) => this.provedores.set(p?.length ? p : ['ANTHROPIC']),
+      error: () => this.provedores.set(['ANTHROPIC']),
+    });
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
       const id = Number(idParam);
@@ -57,6 +70,7 @@ export class ModeloIaForm implements PodeSair {
       this.service.buscarPorId(id).subscribe({
         next: (m) =>
           this.form.patchValue({
+            provedor: m.provedor || 'ANTHROPIC',
             modeloId: m.modeloId,
             nome: m.nome,
             precoEntradaUsdMtok: m.precoEntradaUsdMtok,
@@ -65,6 +79,17 @@ export class ModeloIaForm implements PodeSair {
           }),
         error: () => this.erroCarregar.set(true),
       });
+    }
+  }
+
+  /** Nome amigável do provedor para o select. */
+  protected rotuloProvedor(id: string): string {
+    switch (id) {
+      case 'ANTHROPIC': return 'Anthropic · Claude';
+      case 'OPENAI': return 'OpenAI · GPT';
+      case 'GOOGLE_GEMINI': return 'Google · Gemini';
+      case 'AZURE_OPENAI': return 'Azure OpenAI';
+      default: return id;
     }
   }
 
@@ -87,6 +112,7 @@ export class ModeloIaForm implements PodeSair {
     this.salvando.set(true);
     const v = this.form.getRawValue();
     const dados = {
+      provedor: v.provedor,
       modeloId: v.modeloId.trim(),
       nome: v.nome.trim(),
       precoEntradaUsdMtok: v.precoEntradaUsdMtok!,

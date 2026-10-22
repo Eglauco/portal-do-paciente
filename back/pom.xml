@@ -96,11 +96,30 @@
 			<artifactId>openpdf</artifactId>
 			<version>2.0.3</version>
 		</dependency>
-		<!-- SDK oficial da Anthropic (moderação de comentários por IA — Claude Haiku). -->
+		<!-- SDK oficial da Anthropic (ainda usado por features legadas; a IA das frentes migrou p/ LangChain4j). -->
 		<dependency>
 			<groupId>com.anthropic</groupId>
 			<artifactId>anthropic-java</artifactId>
 			<version>2.34.0</version>
+		</dependency>
+		<!-- LangChain4j: abstração única de LLM (Anthropic hoje; OpenAI/Gemini/Azure plugáveis só adicionando
+		     o módulo langchain4j-<provedor>). Traz langchain4j-core (ChatModel, mensagens, multimodal, tokens). -->
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-anthropic</artifactId>
+			<version>1.22.0</version>
+		</dependency>
+		<!-- Provedor OpenAI (GPT) plugado via LangChain4j: só o módulo + um case no ProvedorIaFactory. -->
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-open-ai</artifactId>
+			<version>1.22.0</version>
+		</dependency>
+		<!-- Provedor Google Gemini (API key via Google AI) plugado via LangChain4j: módulo + case na factory. -->
+		<dependency>
+			<groupId>dev.langchain4j</groupId>
+			<artifactId>langchain4j-google-ai-gemini</artifactId>
+			<version>1.22.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>

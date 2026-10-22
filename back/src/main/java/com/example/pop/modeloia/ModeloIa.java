@@ -2,8 +2,12 @@ package com.example.pop.modeloia;
 
 import java.math.BigDecimal;
 
+import com.example.pop.credencialia.TipoProvedorIa;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -35,7 +39,13 @@ public class ModeloIa {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** Id do modelo na API da Anthropic (ex.: {@code claude-opus-5}). Único. */
+    /** Provedor a que o modelo pertence (Claude→ANTHROPIC, GPT→OPENAI…). Define o filtro no select da credencial. */
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provedor", nullable = false, length = 30)
+    private TipoProvedorIa provedor = TipoProvedorIa.ANTHROPIC;
+
+    /** Id do modelo na API do provedor (ex.: {@code claude-opus-5}, {@code gpt-4o}). Único. */
     @NotBlank
     @Column(name = "modelo_id", nullable = false, length = 80, unique = true)
     private String modeloId;

@@ -21,7 +21,17 @@
   <form class="panel form-card" [formGroup]="form" (submit)="salvar($event)">
     <div class="form-grid">
       <div class="form-field">
-        <label class="label" for="modeloId">Id do modelo (Anthropic) <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="provedor">Provedor <span class="req" aria-hidden="true">*</span></label>
+        <select id="provedor" class="input" formControlName="provedor">
+          @for (p of provedores(); track p) {
+            <option [value]="p">{{ rotuloProvedor(p) }}</option>
+          }
+        </select>
+        <span class="field-hint">A plataforma do modelo — filtra o que aparece no cadastro da credencial de IA.</span>
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="modeloId">Id do modelo <span class="req" aria-hidden="true">*</span></label>
         <input
           id="modeloId"
           class="input mono"
@@ -34,7 +44,7 @@
         @if (invalido('modeloId')) {
           <span class="field-error">Informe o id do modelo (ex.: claude-opus-5).</span>
         } @else {
-          <span class="field-hint">Exatamente como na API da Anthropic — é por ele que o custo é calculado.</span>
+          <span class="field-hint">Exatamente como na API do provedor — é por ele que o custo é calculado.</span>
         }
       </div>
 

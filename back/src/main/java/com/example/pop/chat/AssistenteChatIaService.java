@@ -4,22 +4,22 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.messages.Message;
-import com.anthropic.models.messages.MessageCreateParams;
 import com.example.pop.credencialia.ConfigIaService;
 import com.example.pop.credencialia.EscopoIa;
 import com.example.pop.credencialia.FrenteIa;
+import com.example.pop.credencialia.GeracaoIa;
+import com.example.pop.credencialia.RequisicaoIa;
+import com.example.pop.credencialia.Turno;
 
 /**
  * Assistente virtual (Claude) do PRIMEIRO ATENDIMENTO no chat ao vivo. Recebe o FAQ da unidade, a
@@ -122,49 +122,36 @@ public class AssistenteChatIaService {
      * chave → ESCALAR.
      */
     public RespostaIa responder(EscopoIa escopo, String nomeUnidade, String faq, String ficha, List<Mensagem> historico) {
-        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
-        if (cliOpt.isEmpty()) {
-            log.warn("IA do chat sem chave configurada; escalando para humano (fail-open).");
-            return new RespostaIa(Acao.ESCALAR, null, null, null, null);
-        }
-        AnthropicClient c = cliOpt.get();
-        String modelo = configIa.modelo(escopo, FrenteIa.CHAT);
+        String system = INSTRUCOES
+                + "\n\nUnidade: " + sanitizar(nomeUnidade)
+                + "\nData e hora atuais (horário de Brasília): " + LocalDateTime.now(FUSO).format(AGORA_FMT)
+                + " — use isto para responder perguntas sobre datas e prazos."
+                + "\n\n<<<FAQ>>>\n" + (vazio(faq) ? "(sem FAQ cadastrado para esta unidade)" : sanitizar(faq)) + "\n<<<FIM_FAQ>>>"
+                + "\n\n<<<PACIENTE>>>\n" + (vazio(ficha) ? "(sem dados adicionais do paciente)" : sanitizar(ficha)) + "\n<<<FIM_PACIENTE>>>";
+        RequisicaoIa req = new RequisicaoIa(system, montarTurnos(historico), maxTokens, Duration.ofSeconds(timeoutSegundos));
+        Optional<GeracaoIa> gerOpt;
         try {
-            String system = INSTRUCOES
-                    + "\n\nUnidade: " + sanitizar(nomeUnidade)
-                    + "\nData e hora atuais (horário de Brasília): " + LocalDateTime.now(FUSO).format(AGORA_FMT)
-                    + " — use isto para responder perguntas sobre datas e prazos."
-                    + "\n\n<<<FAQ>>>\n" + (vazio(faq) ? "(sem FAQ cadastrado para esta unidade)" : sanitizar(faq)) + "\n<<<FIM_FAQ>>>"
-                    + "\n\n<<<PACIENTE>>>\n" + (vazio(ficha) ? "(sem dados adicionais do paciente)" : sanitizar(ficha)) + "\n<<<FIM_PACIENTE>>>";
-
-            MessageCreateParams.Builder builder = MessageCreateParams.builder()
-                    .model(modelo)
-                    .maxTokens(maxTokens)
-                    .system(system);
-            adicionarHistorico(builder, historico);
-
-            Message resposta = c.messages().create(builder.build());
-            long tokensEntrada = resposta.usage().inputTokens();
-            long tokensSaida = resposta.usage().outputTokens();
-            String saida = resposta.content().stream()
-                    .flatMap(b -> b.text().stream())
-                    .map(t -> t.text())
-                    .collect(Collectors.joining(" "))
-                    .trim();
-            RespostaIa base = interpretar(saida);
-            return new RespostaIa(base.acao(), base.texto(), tokensEntrada, tokensSaida, modelo);
+            gerOpt = configIa.gerar(escopo, FrenteIa.CHAT, req);
         } catch (RuntimeException e) {
             log.warn("IA do chat falhou; escalando para humano (fail-open): {}", e.toString());
             return new RespostaIa(Acao.ESCALAR, null, null, null, null);
         }
+        if (gerOpt.isEmpty()) {
+            log.warn("IA do chat sem chave configurada; escalando para humano (fail-open).");
+            return new RespostaIa(Acao.ESCALAR, null, null, null, null);
+        }
+        GeracaoIa g = gerOpt.get();
+        RespostaIa base = interpretar(g.texto());
+        return new RespostaIa(base.acao(), base.texto(), g.tokensEntrada(), g.tokensSaida(), g.modelo());
     }
 
     /**
-     * Adiciona o histórico como turnos user (paciente) / assistant (unidade/IA). Junta mensagens
+     * Monta o histórico como turnos usuário (paciente) / assistente (unidade/IA). Junta mensagens
      * consecutivas do mesmo lado (a API exige alternância) e garante começar por um turno do
      * paciente (descarta turnos iniciais da unidade, que deixariam a conversa sem contexto).
      */
-    private void adicionarHistorico(MessageCreateParams.Builder builder, List<Mensagem> historico) {
+    private List<Turno> montarTurnos(List<Mensagem> historico) {
+        List<Turno> turnos = new ArrayList<>();
         boolean comecou = false;
         StringBuilder buffer = new StringBuilder();
         Boolean ladoPaciente = null; // lado acumulado no buffer
@@ -179,7 +166,7 @@ public class AssistenteChatIaService {
                 continue;
             }
             if (ladoPaciente != null && ladoPaciente != paciente) {
-                emitir(builder, ladoPaciente, buffer.toString());
+                turnos.add(emitir(ladoPaciente, buffer.toString()));
                 buffer.setLength(0);
             }
             if (buffer.length() > 0) {
@@ -189,20 +176,17 @@ public class AssistenteChatIaService {
             ladoPaciente = paciente;
         }
         if (ladoPaciente != null && buffer.length() > 0) {
-            emitir(builder, ladoPaciente, buffer.toString());
+            turnos.add(emitir(ladoPaciente, buffer.toString()));
         }
         if (!comecou) {
             // Sem nenhuma fala do paciente (não deveria acontecer): manda algo para a API responder.
-            builder.addUserMessage("Olá");
+            turnos.add(Turno.usuario("Olá"));
         }
+        return turnos;
     }
 
-    private void emitir(MessageCreateParams.Builder builder, boolean paciente, String texto) {
-        if (paciente) {
-            builder.addUserMessage(texto);
-        } else {
-            builder.addAssistantMessage(texto);
-        }
+    private Turno emitir(boolean paciente, String texto) {
+        return paciente ? Turno.usuario(texto) : Turno.assistente(texto);
     }
 
     RespostaIa interpretar(String saida) {

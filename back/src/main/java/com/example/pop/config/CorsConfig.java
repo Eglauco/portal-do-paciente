@@ -27,7 +27,7 @@ public class CorsConfig {
      * Padrões de origem COM CURINGA — os subdomínios das clínicas no web (cada clínica é uma Origin
      * distinta: https://nascente.trilharsaude.app.br). Sobrescrevível por env p/ outros domínios.
      */
-    @Value("${app.cors.allowed-origin-patterns:https://*.trilharsaude.app.br}")
+    @Value("${app.cors.allowed-origin-patterns:https://*.trilharsaude.app.br,http://*.trilharsaude.app.br:4200,http://*.trilharsaude.app.br:4300}")
     private String[] allowedOriginPatterns;
 
     @Bean

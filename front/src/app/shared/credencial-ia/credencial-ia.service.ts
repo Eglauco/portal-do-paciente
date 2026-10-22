@@ -16,6 +16,11 @@ export class CredencialIaService {
       : `${this.base}/inquilino${sufixo}`;
   }
 
+  /** Provedores de IA oferecidos no select (suportados + com modelos ativos). */
+  provedores(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.base}/provedores`);
+  }
+
   status(escopo: EscopoIaInput): Observable<StatusIa> {
     return this.http.get<StatusIa>(this.url(escopo));
   }

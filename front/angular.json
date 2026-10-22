@@ -65,6 +65,9 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "allowedHosts": [".trilharsaude.app.br"]
+          },
           "configurations": {
             "production": {
               "buildTarget": "pop:build:production"

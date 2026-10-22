@@ -51,4 +51,15 @@ export class ModelosIaList {
   protected preco(valor: number): string {
     return (valor ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   }
+
+  /** Nome amigável do provedor para a coluna. */
+  protected rotuloProvedor(id: string): string {
+    switch (id) {
+      case 'ANTHROPIC': return 'Anthropic · Claude';
+      case 'OPENAI': return 'OpenAI · GPT';
+      case 'GOOGLE_GEMINI': return 'Google · Gemini';
+      case 'AZURE_OPENAI': return 'Azure OpenAI';
+      default: return id;
+    }
+  }
 }

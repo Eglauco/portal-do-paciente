@@ -7,11 +7,14 @@ import { CredencialIaService } from './credencial-ia.service';
 import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-ia.model';
 
 /**
- * Formulário (reutilizável) da credencial de IA (Claude/Anthropic) de um escopo (unidade ou padrão do
- * inquilino): API key (write-only) + modelo por frente. Carrega o status, salva e testa a chave.
+ * Formulário (reutilizável) da credencial de IA de um escopo (unidade ou padrão do inquilino):
+ * PROVEDOR + API key (write-only) + Base URL opcional + modelo por frente. Carrega o status, salva e testa.
  *
- * <p>Os 3 modelos são escolhidos num SELECT alimentado pelo cadastro "Modelos de IA" (sem erro de
- * digitação) e são OBRIGATÓRIOS — o modelo escolhido tem preço cadastrado, então o custo sempre computa.
+ * <p>O provedor (Anthropic/Claude e, no futuro, OpenAI/Gemini/Azure) vem de um SELECT alimentado por
+ * {@code GET /configuracao-ia/provedores} (só os suportados e com modelo ativo). Os 3 modelos são
+ * escolhidos num SELECT alimentado pelo cadastro "Modelos de IA" FILTRADO pelo provedor escolhido
+ * (sem erro de digitação) e são OBRIGATÓRIOS — o modelo tem preço cadastrado, então o custo sempre computa.
+ * A unidade pode ter um provedor e o inquilino outro — não precisam ser iguais.
  *
  * <p>Para UNIDADE a credencial é OPCIONAL: sem chave própria, a unidade usa o padrão do inquilino.
  * O botão "Usar o padrão da clínica" remove a chave própria da unidade.
@@ -25,8 +28,8 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
     } @else {
       <p class="field-hint" style="margin-bottom: 1rem">
         {{ escopo().tipo === 'unidade'
-          ? 'Chave de IA (Claude/Anthropic) desta unidade — usada na moderação de comentários, no chat com IA e na análise/resumo do prontuário. Deixe em branco para usar o padrão da clínica.'
-          : 'Chave de IA padrão da clínica (Claude/Anthropic) — usada pelas unidades que não têm chave própria. Sem chave, esses recursos de IA ficam indisponíveis.' }}
+          ? 'Credencial de IA desta unidade — usada na moderação de comentários, no chat com IA e na análise/resumo do prontuário. Deixe em branco para usar o padrão da clínica.'
+          : 'Credencial de IA padrão da clínica — usada pelas unidades que não têm credencial própria. Sem ela, esses recursos de IA ficam indisponíveis.' }}
       </p>
 
       @if (usandoPadrao()) {
@@ -35,26 +38,43 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
             <path d="M20 6 9 17l-5-5" />
           </svg>
           <div>
-            <b>Esta unidade usa a chave de IA padrão da clínica.</b>
-            <span>Ela não tem chave própria. Preencha abaixo e salve para dar a ela uma chave só dela.</span>
+            <b>Esta unidade usa a credencial de IA padrão da clínica.</b>
+            <span>Ela não tem credencial própria. Preencha abaixo e salve para dar a ela uma credencial só dela.</span>
           </div>
         </div>
       }
 
       <div class="form-field">
-        <label class="label" for="ia-key">API key (Anthropic) <span class="req" aria-hidden="true">*</span></label>
+        <label class="label" for="ia-provedor">Provedor de IA <span class="req" aria-hidden="true">*</span></label>
+        <select id="ia-provedor" class="input" [formControl]="form.controls.provedor">
+          @for (p of opcoesProvedor(); track p.id) {
+            <option [value]="p.id">{{ p.rotulo }}</option>
+          }
+        </select>
+        <span class="field-hint">Cada escopo escolhe o seu — a unidade pode usar um provedor e a clínica outro.</span>
+      </div>
+
+      <div class="form-field" style="margin-top: 0.9rem">
+        <label class="label" for="ia-key">API key ({{ rotuloProvedor(form.controls.provedor.value) }}) <span class="req" aria-hidden="true">*</span></label>
         <input id="ia-key" type="password" class="input" [formControl]="form.controls.apiKey"
-          [placeholder]="apiKeyPreenchida() ? '•••••••• (mantém a atual)' : 'sk-ant-...'"
+          [placeholder]="apiKeyPreenchida() ? '•••••••• (mantém a atual)' : placeholderChave()"
           autocomplete="new-password" [class.input--error]="erroApiKey()" />
         <span class="field-hint">
           {{ apiKeyPreenchida() ? 'Já salva (cifrada). Preencha só para trocar.' : 'Guardada cifrada no banco.' }}
         </span>
       </div>
 
+      <div class="form-field" style="margin-top: 0.9rem">
+        <label class="label" for="ia-base-url">Base URL (opcional)</label>
+        <input id="ia-base-url" type="url" class="input" [formControl]="form.controls.baseUrl"
+          placeholder="Deixe em branco para o padrão do provedor" autocomplete="off" />
+        <span class="field-hint">Só preencha para apontar a um endpoint próprio/compatível (ex.: Azure, gateway, self-hosted).</span>
+      </div>
+
       @if (semModelos()) {
         <div class="ia-sem-modelos" role="alert">
-          Nenhum modelo de IA ativo cadastrado. Cadastre as versões do Claude (com preço) em
-          <b>Modelos de IA</b> antes de salvar a credencial.
+          Nenhum modelo de IA ativo cadastrado para <b>{{ rotuloProvedor(form.controls.provedor.value) }}</b>.
+          Cadastre as versões (com preço) em <b>Modelos de IA</b> antes de salvar a credencial.
         </div>
       }
 
@@ -101,7 +121,7 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
         <div class="ia-padrao-acao">
           @if (confirmandoRemocao()) {
             <span class="ia-padrao-acao__pergunta">
-              Remover a chave própria desta unidade? Ela passará a usar o padrão da clínica.
+              Remover a credencial própria desta unidade? Ela passará a usar o padrão da clínica.
             </span>
             <button type="button" class="btn btn--ghost btn--perigo" (click)="confirmarUsarPadrao()" [disabled]="removendo()">
               {{ removendo() ? 'Removendo…' : 'Sim, usar o padrão' }}
@@ -112,9 +132,9 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
           } @else {
             <button type="button" class="btn btn--ghost" (click)="confirmandoRemocao.set(true)"
               [disabled]="salvando() || testando()">
-              Usar a chave padrão da clínica
+              Usar a credencial padrão da clínica
             </button>
-            <span class="field-hint">Limpa os campos e remove a chave própria desta unidade.</span>
+            <span class="field-hint">Limpa os campos e remove a credencial própria desta unidade.</span>
           }
         </div>
       }
@@ -127,7 +147,7 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
 
       <div class="form-actions">
         <button type="button" class="btn btn--ghost" (click)="testar()" [disabled]="testando() || salvando()">
-          {{ testando() ? 'Testando…' : 'Testar chave' }}
+          {{ testando() ? 'Testando…' : 'Testar credencial' }}
         </button>
         <button type="button" class="btn btn--solid" (click)="salvar()" [disabled]="salvando() || testando()">
           {{ salvando() ? 'Salvando…' : 'Salvar credencial' }}
@@ -171,14 +191,21 @@ export class CredencialIaForm {
   protected readonly erroApiKey = signal(false);
   protected readonly resultado = signal<ResultadoTesteIa | null>(null);
 
-  /** Modelos ativos do cadastro "Modelos de IA" — alimentam os selects. */
+  /** Provedores oferecidos (suportados + com modelo ativo), vindos do backend. */
+  protected readonly provedores = signal<string[]>([]);
+  /** Modelos ativos do cadastro "Modelos de IA" DO PROVEDOR escolhido — alimentam os selects. */
   protected readonly modelos = signal<ModeloIa[]>([]);
   protected readonly semModelos = computed(() => this.modelos().length === 0);
 
   protected readonly usandoPadrao = computed(() => this.escopo().tipo === 'unidade' && !this.configurado());
 
+  /** Enquanto aplicamos o status carregado, não reagir ao valueChanges do provedor (que limparia os modelos). */
+  private aplicandoStatus = false;
+
   protected readonly form = new FormGroup({
+    provedor: new FormControl('ANTHROPIC', { nonNullable: true, validators: [Validators.required] }),
     apiKey: new FormControl('', { nonNullable: true }),
+    baseUrl: new FormControl('', { nonNullable: true }),
     modeloModeracao: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     modeloChat: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     modeloProntuario: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
@@ -186,18 +213,63 @@ export class CredencialIaForm {
   });
 
   constructor() {
-    this.carregarModelos();
+    this.carregarProvedores();
+    // Troca manual de provedor: zera os modelos escolhidos e recarrega os ativos do novo provedor.
+    this.form.controls.provedor.valueChanges.subscribe((prov) => {
+      if (this.aplicandoStatus) return;
+      this.form.controls.modeloModeracao.setValue('');
+      this.form.controls.modeloChat.setValue('');
+      this.form.controls.modeloProntuario.setValue('');
+      this.carregarModelos(prov);
+    });
     effect(() => {
       const escopo = this.escopo();
       this.carregar(escopo);
     });
   }
 
-  private carregarModelos(): void {
-    this.modeloService.ativos().subscribe({
+  private carregarProvedores(): void {
+    this.service.provedores().subscribe({
+      next: (p) => this.provedores.set(p?.length ? p : ['ANTHROPIC']),
+      error: () => this.provedores.set(['ANTHROPIC']),
+    });
+  }
+
+  private carregarModelos(provedor: string): void {
+    this.modeloService.ativos(provedor).subscribe({
       next: (m) => this.modelos.set(m),
       error: () => this.modelos.set([]),
     });
+  }
+
+  /** Opções do select de provedor — garante que o provedor salvo apareça mesmo se o backend não o listar. */
+  protected opcoesProvedor(): { id: string; rotulo: string }[] {
+    const lista = (this.provedores().length ? this.provedores() : ['ANTHROPIC']).slice();
+    const atual = this.form.controls.provedor.value;
+    if (atual && !lista.includes(atual)) lista.unshift(atual);
+    return lista.map((id) => ({ id, rotulo: this.rotuloProvedor(id) }));
+  }
+
+  /** Nome amigável do provedor para rótulos/placeholder. */
+  protected rotuloProvedor(id: string): string {
+    switch (id) {
+      case 'ANTHROPIC': return 'Anthropic · Claude';
+      case 'OPENAI': return 'OpenAI · GPT';
+      case 'GOOGLE_GEMINI': return 'Google · Gemini';
+      case 'AZURE_OPENAI': return 'Azure OpenAI';
+      default: return id;
+    }
+  }
+
+  /** Placeholder da chave conforme o provedor. */
+  protected placeholderChave(): string {
+    switch (this.form.controls.provedor.value) {
+      case 'ANTHROPIC': return 'sk-ant-...';
+      case 'OPENAI': return 'sk-...';
+      case 'GOOGLE_GEMINI': return 'AIza...';
+      case 'AZURE_OPENAI': return 'chave do recurso Azure';
+      default: return 'chave da API';
+    }
   }
 
   /**
@@ -241,13 +313,19 @@ export class CredencialIaForm {
   }
 
   private aplicarStatus(s: StatusIa): void {
+    const provedor = s.provedor || 'ANTHROPIC';
+    this.aplicandoStatus = true;
     this.form.reset({
+      provedor,
       apiKey: '',
+      baseUrl: s.baseUrl ?? '',
       modeloModeracao: s.modeloModeracao ?? '',
       modeloChat: s.modeloChat ?? '',
       modeloProntuario: s.modeloProntuario ?? '',
       ativo: s.configurado ? s.ativo : true,
     });
+    this.aplicandoStatus = false;
+    this.carregarModelos(provedor);
     this.apiKeyPreenchida.set(s.apiKeyPreenchida);
     this.configurado.set(s.configurado);
     this.erroApiKey.set(false);
@@ -255,8 +333,11 @@ export class CredencialIaForm {
 
   private valores(): FormIa {
     const v = this.form.getRawValue();
+    const baseUrl = v.baseUrl.trim();
     return {
+      provedor: v.provedor,
       apiKey: v.apiKey, // em branco mantém a atual
+      baseUrl: baseUrl ? baseUrl : null,
       modeloModeracao: v.modeloModeracao.trim(),
       modeloChat: v.modeloChat.trim(),
       modeloProntuario: v.modeloProntuario.trim(),
@@ -276,7 +357,7 @@ export class CredencialIaForm {
       this.form.controls.modeloModeracao.markAsTouched();
       this.form.controls.modeloChat.markAsTouched();
       this.form.controls.modeloProntuario.markAsTouched();
-      this.toastr.error(semApiKey ? 'Informe a API key da Anthropic.' : 'Escolha os 3 modelos de IA.');
+      this.toastr.error(semApiKey ? 'Informe a API key do provedor.' : 'Escolha os 3 modelos de IA.');
       return;
     }
     this.salvando.set(true);
@@ -298,7 +379,7 @@ export class CredencialIaForm {
     });
   }
 
-  /** Remove a chave própria da unidade → limpa a tela e volta a usar o padrão da clínica. */
+  /** Remove a credencial própria da unidade → limpa a tela e volta a usar o padrão da clínica. */
   protected confirmarUsarPadrao(): void {
     this.removendo.set(true);
     this.service.remover(this.escopo()).subscribe({
@@ -307,11 +388,11 @@ export class CredencialIaForm {
         this.resultado.set(null);
         this.confirmandoRemocao.set(false);
         this.removendo.set(false);
-        this.toastr.success('A unidade passou a usar a chave de IA padrão da clínica.');
+        this.toastr.success('A unidade passou a usar a credencial de IA padrão da clínica.');
       },
       error: (e) => {
         this.removendo.set(false);
-        this.toastr.error(e?.error?.message ?? 'Não foi possível remover a chave própria da unidade.');
+        this.toastr.error(e?.error?.message ?? 'Não foi possível remover a credencial própria da unidade.');
       },
     });
   }
@@ -325,7 +406,7 @@ export class CredencialIaForm {
         this.testando.set(false);
       },
       error: (e) => {
-        this.resultado.set({ ok: false, mensagem: e?.error?.message ?? 'Falha ao testar a chave.' });
+        this.resultado.set({ ok: false, mensagem: e?.error?.message ?? 'Falha ao testar a credencial.' });
         this.testando.set(false);
       },
     });

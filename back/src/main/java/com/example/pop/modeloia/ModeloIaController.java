@@ -11,9 +11,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.example.pop.credencialia.TipoProvedorIa;
 
 import jakarta.validation.Valid;
 
@@ -37,10 +40,18 @@ public class ModeloIaController {
         return repository.findAll(org.springframework.data.domain.Sort.by("nome"));
     }
 
-    /** Só os ativos — alimenta os selects de modelo no cadastro da credencial de IA. */
+    /** Só os ativos — alimenta os selects de modelo da credencial. {@code provedor} opcional filtra pelo provedor. */
     @GetMapping("/ativos")
-    public List<ModeloIa> ativos() {
-        return repository.findByAtivoTrueOrderByNomeAsc();
+    public List<ModeloIa> ativos(@RequestParam(required = false) TipoProvedorIa provedor) {
+        return provedor == null
+                ? repository.findByAtivoTrueOrderByNomeAsc()
+                : repository.findByAtivoTrueAndProvedorOrderByNomeAsc(provedor);
+    }
+
+    /** Todos os provedores de IA conhecidos (alimenta o select de provedor no cadastro de modelo). */
+    @GetMapping("/provedores")
+    public TipoProvedorIa[] provedores() {
+        return TipoProvedorIa.values();
     }
 
     @GetMapping("/{id}")
@@ -52,6 +63,9 @@ public class ModeloIaController {
     @ResponseStatus(HttpStatus.CREATED)
     public ModeloIa criar(@Valid @RequestBody ModeloIa modelo) {
         modelo.setId(null);
+        if (modelo.getProvedor() == null) {
+            modelo.setProvedor(TipoProvedorIa.ANTHROPIC);
+        }
         // Normaliza igual ao atualizar(): o id é buscado SEMPRE trimado (CustoIaService/ConfigIaService),
         // então gravar com espaço nas pontas quebraria o match por id exato.
         modelo.setModeloId(modelo.getModeloId().trim());
@@ -66,6 +80,7 @@ public class ModeloIaController {
                 .map(existente -> {
                     dados.setId(id);
                     exigirModeloIdUnico(dados);
+                    existente.setProvedor(dados.getProvedor() == null ? TipoProvedorIa.ANTHROPIC : dados.getProvedor());
                     existente.setModeloId(dados.getModeloId().trim());
                     existente.setNome(dados.getNome().trim());
                     existente.setPrecoEntradaUsdMtok(dados.getPrecoEntradaUsdMtok());

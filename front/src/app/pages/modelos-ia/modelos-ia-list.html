@@ -57,6 +57,7 @@
           <thead>
             <tr>
               <th>Nome</th>
+              <th>Provedor</th>
               <th>Id do modelo</th>
               <th>Entrada (US$/MTok)</th>
               <th>Saída (US$/MTok)</th>
@@ -74,6 +75,7 @@
                 (keydown.enter)="editar(m)"
               >
                 <td><b>{{ m.nome }}</b></td>
+                <td>{{ rotuloProvedor(m.provedor) }}</td>
                 <td class="mono">{{ m.modeloId }}</td>
                 <td>US$ {{ preco(m.precoEntradaUsdMtok) }}</td>
                 <td>US$ {{ preco(m.precoSaidaUsdMtok) }}</td>

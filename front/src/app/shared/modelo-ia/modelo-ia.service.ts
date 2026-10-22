@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -16,9 +16,15 @@ export class ModeloIaService {
     return this.http.get<ModeloIa[]>(this.base);
   }
 
-  /** Só os modelos ativos — usados para popular os selects de modelo no cadastro da credencial de IA. */
-  ativos(): Observable<ModeloIa[]> {
-    return this.http.get<ModeloIa[]>(`${this.base}/ativos`);
+  /** Só os modelos ativos — alimentam os selects da credencial. {@code provedor} filtra pelo provedor. */
+  ativos(provedor?: string): Observable<ModeloIa[]> {
+    const params = provedor ? new HttpParams().set('provedor', provedor) : undefined;
+    return this.http.get<ModeloIa[]>(`${this.base}/ativos`, { params });
+  }
+
+  /** Todos os provedores de IA conhecidos (para o select de provedor no cadastro de modelo). */
+  provedores(): Observable<string[]> {
+    return this.http.get<string[]>(`${this.base}/provedores`);
   }
 
   buscarPorId(id: number): Observable<ModeloIa> {

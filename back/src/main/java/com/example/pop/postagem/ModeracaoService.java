@@ -3,19 +3,17 @@ package com.example.pop.postagem;
 import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.messages.Message;
-import com.anthropic.models.messages.MessageCreateParams;
 import com.example.pop.credencialia.ConfigIaService;
 import com.example.pop.credencialia.EscopoIa;
 import com.example.pop.credencialia.FrenteIa;
+import com.example.pop.credencialia.GeracaoIa;
+import com.example.pop.credencialia.RequisicaoIa;
 
 /**
  * Modera comentários com a IA (Claude/Haiku): decide se um comentário deve ir para revisão
@@ -61,33 +59,22 @@ public class ModeracaoService {
 
     /** Avalia o texto no escopo da unidade dona. Fail-closed: na dúvida/erro, devolve pendente. */
     public Moderacao avaliar(EscopoIa escopo, String texto) {
-        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
-        if (cliOpt.isEmpty()) {
-            return pendente("Validação automática indisponível (chave de IA não configurada).");
-        }
-        AnthropicClient c = cliOpt.get();
-        String modelo = configIa.modelo(escopo, FrenteIa.MODERACAO);
+        RequisicaoIa req = RequisicaoIa.unica(SISTEMA,
+                "Comentário a analisar:\n<<<\n" + sanitizar(texto) + "\n>>>",
+                120L, Duration.ofSeconds(timeoutSegundos));
+        Optional<GeracaoIa> gerOpt;
         try {
-            MessageCreateParams params = MessageCreateParams.builder()
-                    .model(modelo)
-                    .maxTokens(120L)
-                    .system(SISTEMA)
-                    .addUserMessage("Comentário a analisar:\n<<<\n" + sanitizar(texto) + "\n>>>")
-                    .build();
-            Message resposta = c.messages().create(params);
-            long tokensEntrada = resposta.usage().inputTokens();
-            long tokensSaida = resposta.usage().outputTokens();
-            String saida = resposta.content().stream()
-                    .flatMap(b -> b.text().stream())
-                    .map(t -> t.text())
-                    .collect(Collectors.joining(" "))
-                    .trim();
-            Moderacao base = interpretar(saida);
-            return new Moderacao(base.liberado(), base.motivo(), tokensEntrada, tokensSaida, modelo);
+            gerOpt = configIa.gerar(escopo, FrenteIa.MODERACAO, req);
         } catch (RuntimeException e) {
             log.warn("Moderação por IA falhou; comentário enviado para revisão (fail-closed): {}", e.toString());
             return pendente("Não foi possível validar automaticamente (enviado para revisão).");
         }
+        if (gerOpt.isEmpty()) {
+            return pendente("Validação automática indisponível (chave de IA não configurada).");
+        }
+        GeracaoIa g = gerOpt.get();
+        Moderacao base = interpretar(g.texto());
+        return new Moderacao(base.liberado(), base.motivo(), g.tokensEntrada(), g.tokensSaida(), g.modelo());
     }
 
     private Moderacao interpretar(String saida) {

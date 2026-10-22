@@ -1,29 +1,20 @@
 package com.example.pop.prontuario;
 
 import java.time.Duration;
-import java.util.Base64;
-import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.messages.Base64ImageSource;
-import com.anthropic.models.messages.Base64PdfSource;
-import com.anthropic.models.messages.ContentBlockParam;
-import com.anthropic.models.messages.DocumentBlockParam;
-import com.anthropic.models.messages.ImageBlockParam;
-import com.anthropic.models.messages.Message;
-import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.TextBlockParam;
+import com.example.pop.credencialia.Anexo;
 import com.example.pop.credencialia.ConfigIaService;
 import com.example.pop.credencialia.EscopoIa;
 import com.example.pop.credencialia.FrenteIa;
+import com.example.pop.credencialia.GeracaoIa;
+import com.example.pop.credencialia.RequisicaoIa;
 import com.example.pop.storage.StorageService;
 
 /**
@@ -95,58 +86,35 @@ public class AnaliseDocumentoService {
      * nulo/vazio = não avalia alerta (nunca marca "Aguardando validação").
      */
     public AnaliseResultado analisar(EscopoIa escopo, String url, String nomeArquivo, String promptResumo, String promptValidacao) {
-        Base64ImageSource.MediaType mediaImagem = mediaTypeImagem(nomeArquivo, url);
-        TipoArquivo tipo = tipoDe(nomeArquivo, url, mediaImagem);
+        String mimeImagem = mimeImagem(nomeArquivo, url);
+        TipoArquivo tipo = tipoDe(nomeArquivo, url, mimeImagem);
         if (tipo == TipoArquivo.NAO_SUPORTADO) {
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISAVEL, null, null, null, null);
         }
-        Optional<AnthropicClient> cliOpt = configIa.cliente(escopo, Duration.ofSeconds(timeoutSegundos));
-        if (cliOpt.isEmpty()) {
-            log.warn("Análise de documento sem chave de IA configurada; fica não analisado.");
-            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null);
-        }
-        AnthropicClient c = cliOpt.get();
-        String modelo = configIa.modelo(escopo, FrenteIa.PRONTUARIO);
         byte[] bytes = storageService.baixarBytes(url);
         if (bytes == null || bytes.length == 0) {
             log.warn("Não foi possível baixar o documento do S3 (url={}); fica não analisado.", url);
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null);
         }
+        boolean temValidacao = promptValidacao != null && !promptValidacao.isBlank();
+        String system = montarSystem(promptResumo, promptValidacao, temValidacao);
+        String mime = tipo == TipoArquivo.PDF ? "application/pdf" : mimeImagem;
+        RequisicaoIa req = RequisicaoIa.comAnexo(system, "Analise o documento anexado conforme as orientações.",
+                new Anexo(bytes, mime), maxTokens, Duration.ofSeconds(timeoutSegundos));
+        Optional<GeracaoIa> gerOpt;
         try {
-            String base64 = Base64.getEncoder().encodeToString(bytes);
-            ContentBlockParam bloco = tipo == TipoArquivo.PDF
-                    ? ContentBlockParam.ofDocument(DocumentBlockParam.builder()
-                            .source(Base64PdfSource.builder().data(base64).build()).build())
-                    : ContentBlockParam.ofImage(ImageBlockParam.builder()
-                            .source(Base64ImageSource.builder().data(base64).mediaType(mediaImagem).build()).build());
-
-            boolean temValidacao = promptValidacao != null && !promptValidacao.isBlank();
-            String system = montarSystem(promptResumo, promptValidacao, temValidacao);
-
-            MessageCreateParams params = MessageCreateParams.builder()
-                    .model(modelo)
-                    .maxTokens(maxTokens)
-                    .system(system)
-                    .addUserMessageOfBlockParams(List.of(
-                            bloco, // o documento vem ANTES do texto (recomendação da Anthropic)
-                            ContentBlockParam.ofText(TextBlockParam.builder()
-                                    .text("Analise o documento anexado conforme as orientações.").build())))
-                    .build();
-
-            Message resposta = c.messages().create(params);
-            long tokensEntrada = resposta.usage().inputTokens();
-            long tokensSaida = resposta.usage().outputTokens();
-            String saida = resposta.content().stream()
-                    .flatMap(b -> b.text().stream())
-                    .map(t -> t.text())
-                    .collect(Collectors.joining("\n"))
-                    .trim();
-            AnaliseResultado base = interpretar(saida, temValidacao);
-            return new AnaliseResultado(base.status(), base.resumo(), tokensEntrada, tokensSaida, modelo);
+            gerOpt = configIa.gerar(escopo, FrenteIa.PRONTUARIO, req);
         } catch (RuntimeException e) {
             log.warn("Análise de documento por IA falhou (url={}); fica não analisado: {}", url, e.toString());
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null);
         }
+        if (gerOpt.isEmpty()) {
+            log.warn("Análise de documento sem chave de IA configurada; fica não analisado.");
+            return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null);
+        }
+        GeracaoIa g = gerOpt.get();
+        AnaliseResultado base = interpretar(g.texto(), temValidacao);
+        return new AnaliseResultado(base.status(), base.resumo(), g.tokensEntrada(), g.tokensSaida(), g.modelo());
     }
 
     private String montarSystem(String promptResumo, String promptValidacao, boolean temValidacao) {
@@ -164,7 +132,10 @@ public class AnaliseDocumentoService {
             return new AnaliseResultado(StatusAnaliseDocumento.NAO_ANALISADO, null, null, null, null); // vazio = falha
         }
         boolean alerta = temValidacao && s.toUpperCase(Locale.ROOT).contains(MARCA_ALERTA);
+        // Alguns provedores (ex.: GPT-4o) ecoam os delimitadores da ORIENTAÇÃO (<<<RESUMO>>> etc.) em volta
+        // da resposta; o Claude não. Remove-os para o resumo ficar limpo independente do provedor.
         String resumo = s.replaceAll("(?i)" + MARCA_ALERTA, "")
+                .replaceAll("(?i)<<<\\s*(FIM_)?(RESUMO|VALIDACAO)\\s*>>>", "")
                 .replaceAll("[ \\t]+", " ")
                 .replaceAll(" *\\n *", "\n")
                 .replaceAll("\\n{3,}", "\n\n")
@@ -184,26 +155,26 @@ public class AnaliseDocumentoService {
         return texto.replaceAll("<{3,}", "< < <").replaceAll(">{3,}", "> > >");
     }
 
-    private TipoArquivo tipoDe(String nome, String url, Base64ImageSource.MediaType mediaImagem) {
+    private TipoArquivo tipoDe(String nome, String url, String mimeImagem) {
         if (temExtensao(nome, url, "pdf")) {
             return TipoArquivo.PDF;
         }
-        return mediaImagem != null ? TipoArquivo.IMAGEM : TipoArquivo.NAO_SUPORTADO;
+        return mimeImagem != null ? TipoArquivo.IMAGEM : TipoArquivo.NAO_SUPORTADO;
     }
 
-    /** Media type da imagem pela extensão (nome ou url); null se não for imagem suportada. */
-    private Base64ImageSource.MediaType mediaTypeImagem(String nome, String url) {
+    /** Mime type da imagem pela extensão (nome ou url); null se não for imagem suportada. */
+    private String mimeImagem(String nome, String url) {
         if (temExtensao(nome, url, "jpg", "jpeg")) {
-            return Base64ImageSource.MediaType.IMAGE_JPEG;
+            return "image/jpeg";
         }
         if (temExtensao(nome, url, "png")) {
-            return Base64ImageSource.MediaType.IMAGE_PNG;
+            return "image/png";
         }
         if (temExtensao(nome, url, "webp")) {
-            return Base64ImageSource.MediaType.IMAGE_WEBP;
+            return "image/webp";
         }
         if (temExtensao(nome, url, "gif")) {
-            return Base64ImageSource.MediaType.IMAGE_GIF;
+            return "image/gif";
         }
         return null;
     }

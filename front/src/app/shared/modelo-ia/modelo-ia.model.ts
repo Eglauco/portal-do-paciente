@@ -6,7 +6,9 @@
  */
 export interface ModeloIa {
   id?: number;
-  /** Id do modelo na API da Anthropic (ex.: "claude-opus-5"). Único. */
+  /** Provedor a que o modelo pertence (ANTHROPIC, OPENAI, …). */
+  provedor: string;
+  /** Id do modelo na API do provedor (ex.: "claude-opus-5", "gpt-4o"). Único. */
   modeloId: string;
   /** Nome amigável para exibir (ex.: "Claude Opus 5"). */
   nome: string;

@@ -1,5 +1,7 @@
 package com.example.pop.credencialia;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +31,12 @@ public class ConfiguracaoIaController {
     public ConfiguracaoIaController(ConfigIaService service, UnidadeRepository unidadeRepository) {
         this.service = service;
         this.unidadeRepository = unidadeRepository;
+    }
+
+    /** Provedores de IA oferecidos no select da credencial (suportados + com modelos ativos). */
+    @GetMapping("/provedores")
+    public List<TipoProvedorIa> provedores() {
+        return service.provedoresDisponiveis();
     }
 
     // ---- Por unidade ----

@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -32,9 +34,18 @@ public class ConfiguracaoIa {
     @Column(name = "unidade_id")
     private Long unidadeId;
 
-    /** API key da Anthropic, CIFRADA (nunca em claro). */
+    /** Provedor de IA deste escopo (pode diferir entre unidade e inquilino). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provedor", nullable = false, length = 30)
+    private TipoProvedorIa provedor = TipoProvedorIa.ANTHROPIC;
+
+    /** API key do provedor, CIFRADA (nunca em claro). */
     @Column(name = "api_key", nullable = false, columnDefinition = "text")
     private String apiKey;
+
+    /** URL base opcional do provedor (Azure OpenAI / endpoint compatível / self-hosted). NULL = padrão do provedor. */
+    @Column(name = "base_url", columnDefinition = "text")
+    private String baseUrl;
 
     @Column(name = "modelo_moderacao", length = 80)
     private String modeloModeracao;
