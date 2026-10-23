@@ -248,7 +248,8 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviar(@PathVariable Long id,
             @Valid @RequestBody MensagemRequest request, @AuthenticationPrincipal Jwt jwt) {
-        Chat chat = chatService.enviarComoUnidade(obter(id), request.texto(), request.clienteId(), uidDoToken(jwt));
+        Chat chat = chatService.enviarComoUnidade(obter(id), request.texto(), request.clienteId(), uidDoToken(jwt),
+                request.respondeAId());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 
@@ -261,7 +262,8 @@ public class ChatController {
     @Transactional
     public ResponseEntity<ChatDetalheResponse> enviarComoPaciente(@PathVariable Long id,
             @Valid @RequestBody MensagemRequest request) {
-        Chat chat = chatService.enviarComoPaciente(obter(id), request.texto(), request.clienteId(), null);
+        Chat chat = chatService.enviarComoPaciente(obter(id), request.texto(), request.clienteId(), null,
+                request.respondeAId());
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 

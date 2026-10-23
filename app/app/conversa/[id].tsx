@@ -4,9 +4,12 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated as RNAnimated,
   Image,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -27,6 +30,7 @@ import { podeLancar } from '@/services/sessao';
 import {
   buscarConversa,
   ChatDetalhe,
+  Citacao,
   confirmarEntrega,
   enviarMensagemPaciente,
   falarComHumano,
@@ -99,6 +103,136 @@ function iniciais(nome: string): string {
   return (a + b).toUpperCase();
 }
 
+/** Nome exibido do autor de uma mensagem/citação (mesma lógica dos rótulos dos balões). */
+function nomeAutorCitacao(
+  c: Pick<Mensagem, 'remetente' | 'geradaPorIa' | 'atendenteNome'>,
+  nomeUnidade: string,
+): string {
+  if (c.remetente === 'PACIENTE') return 'Você';
+  if (c.geradaPorIa) return 'Assistente virtual';
+  return c.atendenteNome || nomeUnidade || 'Atendente';
+}
+
+const LIMIAR_SWIPE = 52; // px de arrasto para disparar o "responder"
+const MAX_SWIPE = 64; // quanto o balão desliza no máximo
+
+interface BolhaProps {
+  m: Mensagem;
+  daUnidade: boolean;
+  styles: ReturnType<typeof criarEstilos>;
+  t: Tema;
+  nomeUnidade: string;
+  podeResponder: boolean;
+  onResponder: (m: Mensagem) => void;
+  onMenu: (m: Mensagem) => void;
+  onTocarCitacao: (c: Citacao) => void;
+  destacado: boolean;
+  reenviar: (m: Mensagem) => void;
+}
+
+/**
+ * Balão de mensagem com "responder" estilo WhatsApp: arrasta pro lado (swipe) pra citar e revela
+ * o ícone de responder; segurar abre o menu. Usa PanResponder + Animated do RN core (sem dep
+ * nativa extra). Só é arrastável quando a mensagem já tem id do servidor (não pendente/falha).
+ */
+function BolhaMensagem({
+  m, daUnidade, styles, t, nomeUnidade, podeResponder, onResponder, onMenu, onTocarCitacao, destacado, reenviar,
+}: BolhaProps) {
+  const tx = useRef(new RNAnimated.Value(0)).current;
+  // O PanResponder é criado uma única vez; lê os valores atuais por ref para não ficar "preso".
+  const ref = useRef({ m, podeResponder, onResponder });
+  ref.current = { m, podeResponder, onResponder };
+  const arrastavel = () => {
+    const { m: mm, podeResponder: pr } = ref.current;
+    return pr && mm.id > 0 && !mm.pendente && !mm.falha;
+  };
+
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        arrastavel() && g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
+      onPanResponderMove: (_e, g) => tx.setValue(Math.max(0, Math.min(g.dx, MAX_SWIPE))),
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx >= LIMIAR_SWIPE) ref.current.onResponder(ref.current.m);
+        RNAnimated.spring(tx, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
+      },
+      onPanResponderTerminate: () =>
+        RNAnimated.spring(tx, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start(),
+    }),
+  ).current;
+
+  const iconeOpacidade = tx.interpolate({ inputRange: [0, LIMIAR_SWIPE], outputRange: [0, 1], extrapolate: 'clamp' });
+  const podeSegurar = podeResponder && m.id > 0 && !m.pendente && !m.falha;
+
+  return (
+    <View style={[styles.bolhaRow, daUnidade ? styles.esquerda : styles.direita]} {...pan.panHandlers}>
+      {/* Ícone de responder revelado ao arrastar (igual WhatsApp). */}
+      <RNAnimated.View style={[styles.swipeIcone, { opacity: iconeOpacidade }]} pointerEvents="none">
+        <Ionicons name="arrow-undo" size={17} color={t.brandDeep} />
+      </RNAnimated.View>
+      <RNAnimated.View style={{ transform: [{ translateX: tx }] }}>
+        <Pressable
+          onLongPress={() => podeSegurar && onMenu(m)}
+          delayLongPress={280}
+          style={[
+            styles.bolha,
+            daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente,
+            daUnidade && m.geradaPorIa && styles.bolhaIa,
+            destacado && styles.bolhaDestacada,
+          ]}>
+          {m.respondeA ? (
+            <Pressable style={styles.citacaoBloco} onPress={() => onTocarCitacao(m.respondeA!)}>
+              <View style={styles.citacaoBarra} />
+              <View style={styles.citacaoTexto}>
+                <Text style={styles.citacaoNome} numberOfLines={1}>
+                  {nomeAutorCitacao(m.respondeA, nomeUnidade)}
+                </Text>
+                <Text style={styles.citacaoTrecho} numberOfLines={2}>
+                  {m.respondeA.texto}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
+          {daUnidade && m.geradaPorIa ? (
+            <Text style={styles.assistenteIa}>🤖 Assistente virtual</Text>
+          ) : daUnidade && m.atendenteNome ? (
+            <Text style={styles.atendente}>{m.atendenteNome}</Text>
+          ) : null}
+          {!daUnidade && m.responsavelNome ? (
+            <View style={styles.viaResp}>
+              <Ionicons name="people-outline" size={12} color="#8A5A00" />
+              <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
+            </View>
+          ) : null}
+          <Text style={styles.texto}>{m.texto}</Text>
+          <View style={styles.rodape}>
+            <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
+            {!daUnidade &&
+              (m.falha ? (
+                <Ionicons name="alert-circle" size={14} color="#E0524D" />
+              ) : m.pendente ? (
+                <Ionicons name="time-outline" size={13} color="#7C8C87" />
+              ) : (
+                <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
+              ))}
+          </View>
+        </Pressable>
+        {!daUnidade && m.falha && (
+          <Pressable
+            style={styles.reenviar}
+            onPress={() => reenviar(m)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Reenviar mensagem">
+            <Ionicons name="refresh" size={12} color="#E0524D" />
+            <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
+          </Pressable>
+        )}
+      </RNAnimated.View>
+    </View>
+  );
+}
+
 export default function ConversaScreen() {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
@@ -119,7 +253,15 @@ export default function ConversaScreen() {
   // Pedido "Falar com humano": enviando (trava o duplo toque). O botão fica desabilitado depois,
   // porque o status deixa de ser ATENDIMENTO_IA (a ação já foi feita).
   const [pedindoHumano, setPedindoHumano] = useState(false);
+  // Responder (citação): mensagem sendo respondida, menu do "segurar", e id em destaque ao tocar numa citação.
+  const [respondendo, setRespondendo] = useState<Mensagem | null>(null);
+  const [menuMsg, setMenuMsg] = useState<Mensagem | null>(null);
+  const [destacado, setDestacado] = useState<number | null>(null);
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+  // Posição Y de cada mensagem no conteúdo da lista (para rolar até a original ao tocar na citação).
+  const posicoesY = useRef<Map<number, number>>(new Map());
+  const timerDestaque = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jaCarregou = useRef(false);
   const ultimoSinalDigitando = useRef(0);
   const timerDigitando = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -288,7 +430,7 @@ export default function ConversaScreen() {
 
   // Tenta enviar com retentativas (conexão ruim); após esgotar, marca "falha" (reenviar).
   const tentarEnviar = useCallback(
-    async (tempId: number, clienteId: string, conteudo: string) => {
+    async (tempId: number, clienteId: string, conteudo: string, respondeAId?: number) => {
       if (!id) return;
       const ATRASOS = [2000, 4000, 8000, 16000]; // tentativa inicial + 4 retentativas ≈ 30s
       setDetalhe((d) =>
@@ -304,7 +446,7 @@ export default function ConversaScreen() {
       for (let i = 0; i <= ATRASOS.length; i++) {
         try {
           // clienteId torna o reenvio idempotente (não duplica se a resposta se perdeu).
-          const atualizado = await enviarMensagemPaciente(id, conteudo, clienteId);
+          const atualizado = await enviarMensagemPaciente(id, conteudo, clienteId, respondeAId);
           // Não substitui a lista inteira (preservaria outras mensagens ainda pendentes);
           // só marca ESTA como enviada (2 checks) e atualiza o status.
           setDetalhe((d) =>
@@ -348,6 +490,7 @@ export default function ConversaScreen() {
     // Otimista: mostra a mensagem na hora com o "relógio" (pendente) até o servidor confirmar.
     const tempId = -Date.now();
     const clienteId = novoClienteId();
+    const citada = respondendo; // mensagem citada (ou null se não é uma resposta)
     const otimista: Mensagem = {
       id: tempId,
       remetente: 'PACIENTE',
@@ -357,16 +500,52 @@ export default function ConversaScreen() {
       entregue: false,
       pendente: true,
       clienteId,
+      respondeA: citada
+        ? {
+            id: citada.id,
+            remetente: citada.remetente,
+            texto: citada.texto,
+            geradaPorIa: citada.geradaPorIa,
+            atendenteNome: citada.atendenteNome,
+          }
+        : null,
     };
     setDetalhe((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
     setTexto('');
+    setRespondendo(null);
     rolarParaFim();
-    tentarEnviar(tempId, clienteId, limpo);
+    tentarEnviar(tempId, clienteId, limpo, citada?.id);
   };
 
   const reenviar = (m: Mensagem) => {
-    if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto);
+    if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto, m.respondeA?.id);
   };
+
+  // Entra no modo "responder": guarda a mensagem citada, fecha o menu e foca o campo de texto.
+  const responderMensagem = useCallback((m: Mensagem) => {
+    setRespondendo(m);
+    setMenuMsg(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
+  // Toca na citação dentro de um balão: rola até a mensagem original e a destaca por um instante.
+  const tocarCitacao = useCallback(
+    (c: Citacao) => {
+      const y = posicoesY.current.get(c.id);
+      if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - headerH - 8), animated: true });
+      setDestacado(c.id);
+      if (timerDestaque.current) clearTimeout(timerDestaque.current);
+      timerDestaque.current = setTimeout(() => setDestacado(null), 1400);
+    },
+    [headerH],
+  );
+
+  useEffect(
+    () => () => {
+      if (timerDestaque.current) clearTimeout(timerDestaque.current);
+    },
+    [],
+  );
 
   // "Falar com humano": tira a conversa do modo assistente virtual. Idempotente e travado
   // contra duplo toque; a mensagem de confirmação chega na conversa (retorno + tempo real).
@@ -514,55 +693,27 @@ export default function ConversaScreen() {
               i === 0 || rotuloDia(mensagens[i - 1].enviadaEm) !== rotuloDia(m.enviadaEm);
             const daUnidade = m.remetente === 'UNIDADE';
             return (
-              <View key={m.id}>
+              <View
+                key={m.id}
+                onLayout={(e) => posicoesY.current.set(m.id, e.nativeEvent.layout.y)}>
                 {mostrarDia && (
                   <View style={styles.diaWrap}>
                     <Text style={styles.dia}>{rotuloDia(m.enviadaEm)}</Text>
                   </View>
                 )}
-                <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
-                  <View
-                    style={[
-                      styles.bolha,
-                      daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente,
-                      daUnidade && m.geradaPorIa && styles.bolhaIa,
-                    ]}>
-                    {daUnidade && m.geradaPorIa ? (
-                      <Text style={styles.assistenteIa}>🤖 Assistente virtual</Text>
-                    ) : daUnidade && m.atendenteNome ? (
-                      <Text style={styles.atendente}>{m.atendenteNome}</Text>
-                    ) : null}
-                    {!daUnidade && m.responsavelNome ? (
-                      <View style={styles.viaResp}>
-                        <Ionicons name="people-outline" size={12} color="#8A5A00" />
-                        <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
-                      </View>
-                    ) : null}
-                    <Text style={styles.texto}>{m.texto}</Text>
-                    <View style={styles.rodape}>
-                      <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
-                      {!daUnidade &&
-                        (m.falha ? (
-                          <Ionicons name="alert-circle" size={14} color="#E0524D" />
-                        ) : m.pendente ? (
-                          <Ionicons name="time-outline" size={13} color="#7C8C87" />
-                        ) : (
-                          <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
-                        ))}
-                    </View>
-                  </View>
-                  {!daUnidade && m.falha && (
-                    <Pressable
-                      style={styles.reenviar}
-                      onPress={() => reenviar(m)}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel="Reenviar mensagem">
-                      <Ionicons name="refresh" size={12} color="#E0524D" />
-                      <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
-                    </Pressable>
-                  )}
-                </View>
+                <BolhaMensagem
+                  m={m}
+                  daUnidade={daUnidade}
+                  styles={styles}
+                  t={t}
+                  nomeUnidade={detalhe?.unidadeSaude.nome ?? 'Atendente'}
+                  podeResponder={podeEnviar}
+                  onResponder={responderMensagem}
+                  onMenu={setMenuMsg}
+                  onTocarCitacao={tocarCitacao}
+                  destacado={destacado === m.id}
+                  reenviar={reenviar}
+                />
               </View>
             );
           })}
@@ -583,28 +734,50 @@ export default function ConversaScreen() {
       {/* Barra de digitação: translúcida e COLADA no teclado (sobe junto). */}
       {!carregando && !erro && podeEnviar && (
         <Animated.View style={[styles.barraFlutuante, barraInputAnim]}>
-          <View
-            style={styles.inputBar}
-            onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
-            <View style={styles.inputWrap}>
-              <TextInput
-                style={styles.input}
-                value={texto}
-                onChangeText={aoDigitar}
-                placeholder="Mensagem"
-                placeholderTextColor="#9AAAA5"
-                multiline
-              />
+          <View onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
+            {/* Prévia da mensagem citada (feature responder): barra + autor + trecho + fechar. */}
+            {respondendo ? (
+              <View style={styles.respostaFaixa}>
+                <View style={styles.respostaBarra} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.respostaNome} numberOfLines={1}>
+                    {nomeAutorCitacao(respondendo, detalhe?.unidadeSaude.nome ?? 'Atendente')}
+                  </Text>
+                  <Text style={styles.respostaTrecho} numberOfLines={1}>
+                    {respondendo.texto}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setRespondendo(null)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar resposta">
+                  <Ionicons name="close" size={20} color={t.muted} />
+                </Pressable>
+              </View>
+            ) : null}
+            <View style={styles.inputBar}>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  ref={inputRef}
+                  style={styles.input}
+                  value={texto}
+                  onChangeText={aoDigitar}
+                  placeholder="Mensagem"
+                  placeholderTextColor="#9AAAA5"
+                  multiline
+                />
+              </View>
+              <Pressable
+                style={[styles.enviar, !texto.trim() && styles.enviarDesativado]}
+                onPress={enviar}
+                disabled={!texto.trim()}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !texto.trim() }}
+                accessibilityLabel="Enviar mensagem">
+                <Ionicons name="send" size={19} color="#fff" />
+              </Pressable>
             </View>
-            <Pressable
-              style={[styles.enviar, !texto.trim() && styles.enviarDesativado]}
-              onPress={enviar}
-              disabled={!texto.trim()}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !texto.trim() }}
-              accessibilityLabel="Enviar mensagem">
-              <Ionicons name="send" size={19} color="#fff" />
-            </Pressable>
           </View>
           <Animated.View style={safeAreaAnim} />
         </Animated.View>
@@ -624,6 +797,27 @@ export default function ConversaScreen() {
           <View style={{ height: Math.max(insets.bottom, 10) }} />
         </View>
       )}
+
+      {/* Menu do "segurar" numa mensagem (estilo WhatsApp). */}
+      <Modal
+        visible={!!menuMsg}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMenuMsg(null)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setMenuMsg(null)}>
+          <View style={styles.menuCard}>
+            <Pressable
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPress]}
+              onPress={() => menuMsg && responderMensagem(menuMsg)}
+              accessibilityRole="button"
+              accessibilityLabel="Responder a esta mensagem">
+              <Ionicons name="arrow-undo-outline" size={19} color={t.ink} />
+              <Text style={styles.menuItemTxt}>Responder</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -655,10 +849,34 @@ const criarEstilos = (t: Tema) =>
       borderRadius: 10,
       overflow: 'hidden',
     },
-    bolhaWrap: { marginBottom: 8, maxWidth: '82%' },
+    bolhaRow: { position: 'relative', marginBottom: 8, maxWidth: '82%' },
     esquerda: { alignSelf: 'flex-start' },
     direita: { alignSelf: 'flex-end' },
     bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+    // Destaque breve do balão ao tocar numa citação e rolar até a original.
+    bolhaDestacada: { backgroundColor: '#BFE8DA' },
+    // Ícone de "responder" revelado ao arrastar o balão (fica atrás, à esquerda).
+    swipeIcone: {
+      position: 'absolute',
+      left: 6,
+      top: 0,
+      bottom: 0,
+      width: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // Bloco da mensagem citada dentro do balão (feature responder).
+    citacaoBloco: {
+      flexDirection: 'row',
+      backgroundColor: alpha(t.ink, 0.06),
+      borderRadius: 8,
+      overflow: 'hidden',
+      marginBottom: 5,
+    },
+    citacaoBarra: { width: 3.5, backgroundColor: t.brand },
+    citacaoTexto: { flex: 1, paddingVertical: 5, paddingHorizontal: 8 },
+    citacaoNome: { fontSize: 12, fontWeight: '700', color: t.brandDeep, marginBottom: 1 },
+    citacaoTrecho: { fontSize: 12.5, color: t.muted, lineHeight: 16 },
     bolhaUnidade: {
       backgroundColor: t.surface,
       borderTopLeftRadius: 4,
@@ -677,6 +895,44 @@ const criarEstilos = (t: Tema) =>
     hora: { fontSize: 10.5, color: '#7C8C87' },
     reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
     reenviarTxt: { fontSize: 11, color: '#E0524D', fontWeight: '600' },
+
+    // Prévia da mensagem citada acima do input (feature responder): cartão branco flutuante.
+    respostaFaixa: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 12,
+      marginBottom: 6,
+      paddingVertical: 7,
+      paddingHorizontal: 10,
+      backgroundColor: t.surface,
+      borderRadius: 12,
+      shadowColor: '#0B2E29',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    respostaBarra: { width: 3.5, alignSelf: 'stretch', minHeight: 30, borderRadius: 2, backgroundColor: t.brand },
+    respostaNome: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep, marginBottom: 1 },
+    respostaTrecho: { fontSize: 13, color: t.muted },
+
+    // Menu do "segurar" numa mensagem.
+    menuBackdrop: { flex: 1, backgroundColor: alpha(t.ink, 0.35), alignItems: 'center', justifyContent: 'center' },
+    menuCard: {
+      backgroundColor: t.surface,
+      borderRadius: 14,
+      paddingVertical: 6,
+      minWidth: 200,
+      shadowColor: '#0B2E29',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 18 },
+    menuItemPress: { backgroundColor: t.brandTint },
+    menuItemTxt: { fontSize: 15, color: t.ink, fontWeight: '600' },
 
     // Cabeçalho translúcido (absoluto, no topo; a lista rola por trás).
     headerWrap: {

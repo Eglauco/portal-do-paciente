@@ -29,6 +29,15 @@ export interface ChatItem {
   atualizadoEm: string;
 }
 
+/** Trecho da mensagem citada (feature "responder") — o bastante para desenhar o bloco de citação. */
+export interface Citacao {
+  id: number;
+  remetente: Remetente;
+  texto: string;
+  geradaPorIa?: boolean;
+  atendenteNome?: string | null;
+}
+
 export interface Mensagem {
   id: number;
   remetente: Remetente;
@@ -36,6 +45,8 @@ export interface Mensagem {
   enviadaEm: string;
   lida: boolean;
   entregue: boolean;
+  /** Mensagem citada quando esta é uma resposta (feature "responder"); nulo caso contrário. */
+  respondeA?: Citacao | null;
   /** Nome do atendente que enviou (só nas mensagens da unidade). */
   atendenteNome?: string | null;
   /** A mensagem da unidade foi gerada pela IA (assistente virtual), não por um atendente humano. */
@@ -120,16 +131,20 @@ export async function buscarConversa(id: number | string): Promise<ChatDetalhe> 
   return comoJson<ChatDetalhe>(resposta);
 }
 
-/** Envia uma mensagem em nome do paciente logado (clienteId torna o reenvio idempotente). */
+/**
+ * Envia uma mensagem em nome do paciente logado (clienteId torna o reenvio idempotente).
+ * `respondeAId` cita outra mensagem da conversa (feature "responder"); undefined quando não é resposta.
+ */
 export async function enviarMensagemPaciente(
   id: number | string,
   texto: string,
   clienteId?: string,
+  respondeAId?: number,
 ): Promise<ChatDetalhe> {
   const resposta = await fetchMeu(`/meu/chats/${id}/mensagem`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ texto, clienteId }),
+    body: JSON.stringify({ texto, clienteId, respondeAId }),
   });
   return comoJson<ChatDetalhe>(resposta);
 }

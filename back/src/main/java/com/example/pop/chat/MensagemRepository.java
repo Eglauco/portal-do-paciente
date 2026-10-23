@@ -13,9 +13,18 @@ public interface MensagemRepository extends JpaRepository<Mensagem, Long> {
     /** Idempotência: encontra a mensagem já gravada com este clienteId (evita duplicar em reenvios). */
     Optional<Mensagem> findByChatIdAndClienteId(Long chatId, String clienteId);
 
-    /** Thread completa; join fetch no atendente para exibir o nome sem N+1. */
-    @Query("select m from Mensagem m left join fetch m.usuario where m.chat.id = :chatId order by m.enviadaEm asc")
+    /**
+     * Thread completa; join fetch no atendente e na mensagem citada (+ atendente dela) para
+     * exibir os nomes e o trecho da citação sem N+1 nem LazyInitialization.
+     */
+    @Query("select m from Mensagem m left join fetch m.usuario "
+            + "left join fetch m.respondeA ra left join fetch ra.usuario "
+            + "where m.chat.id = :chatId order by m.enviadaEm asc")
     List<Mensagem> findByChatIdOrderByEnviadaEmAsc(@Param("chatId") Long chatId);
+
+    /** Mensagem citada com o atendente já carregado (para montar o trecho da citação ao publicar). */
+    @Query("select m from Mensagem m left join fetch m.usuario where m.id = :id")
+    Optional<Mensagem> findByIdComUsuario(@Param("id") Long id);
 
     Mensagem findFirstByChatIdOrderByEnviadaEmDesc(Long chatId);
 

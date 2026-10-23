@@ -115,7 +115,7 @@ public class MeuChatController {
         acessoService.exigirLancar(jwt, FuncionalidadeApp.CHAT);
         Responsavel responsavel = acessoService.responsavelDaSessao(jwt).orElse(null);
         Chat chat = chatService.enviarComoPaciente(minhaConversa(jwt, id), request.texto(), request.clienteId(),
-                responsavel);
+                responsavel, request.respondeAId());
         return semResponsavelId(chatService.toDetalhe(chat));
     }
 

@@ -157,12 +157,14 @@ public class ChatService {
      * é o cadastro dele — gravado na mensagem e mostrado como marcador; nulo quando é
      * o próprio paciente.
      */
-    public Chat enviarComoPaciente(Chat chat, String texto, String clienteId, Responsavel responsavel) {
+    public Chat enviarComoPaciente(Chat chat, String texto, String clienteId, Responsavel responsavel,
+            Long respondeAId) {
         if (jaEnviada(chat.getId(), clienteId)) {
             return chat; // idempotente: reenvio da mesma mensagem não duplica
         }
         Long responsavelId = responsavel != null ? responsavel.getId() : null;
-        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null, responsavelId, false);
+        Mensagem salva = criar(chat, RemetenteMensagem.PACIENTE, texto, clienteId, false, null, responsavelId, false,
+                resolverCitacao(chat, respondeAId));
 
         // O paciente enviou: a unidade ainda não visualizou.
         chat.setStatus(StatusChat.NAO_LIDA);
@@ -187,7 +189,7 @@ public class ChatService {
      */
     public Chat enviarComoIa(Chat chat, String texto, Long tokensEntrada, Long tokensSaida, String modelo) {
         marcarMensagensDoPacienteComoLidas(chat.getId());
-        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, null, true, null, null, true);
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, null, true, null, null, true, null);
         salva.setTokensEntrada(tokensEntrada);
         salva.setTokensSaida(tokensSaida);
         salva.setModeloIa(modelo);
@@ -221,7 +223,7 @@ public class ChatService {
         chat.setIaEncerrada(true);
         Mensagem encaminhamento = null;
         if (mensagemEncaminhamento != null && !mensagemEncaminhamento.isBlank()) {
-            encaminhamento = criar(chat, RemetenteMensagem.UNIDADE, mensagemEncaminhamento, null, true, null, null, true);
+            encaminhamento = criar(chat, RemetenteMensagem.UNIDADE, mensagemEncaminhamento, null, true, null, null, true, null);
             encaminhamento.setTokensEntrada(tokensEntrada);
             encaminhamento.setTokensSaida(tokensSaida);
             encaminhamento.setModeloIa(modelo);
@@ -254,7 +256,7 @@ public class ChatService {
         marcarMensagensDoPacienteComoLidas(chat.getId());
         Mensagem msg = null;
         if (despedida != null && !despedida.isBlank()) {
-            msg = criar(chat, RemetenteMensagem.UNIDADE, despedida, null, true, null, null, true);
+            msg = criar(chat, RemetenteMensagem.UNIDADE, despedida, null, true, null, null, true, null);
             msg.setTokensEntrada(tokensEntrada);
             msg.setTokensSaida(tokensSaida);
             msg.setModeloIa(modelo);
@@ -283,7 +285,7 @@ public class ChatService {
      * Registra uma mensagem da unidade (atendente), publica e notifica o paciente.
      * Só o atendente RESPONSÁVEL pela conversa pode enviar (regra "assumir conversa").
      */
-    public Chat enviarComoUnidade(Chat chat, String texto, String clienteId, Long usuarioId) {
+    public Chat enviarComoUnidade(Chat chat, String texto, String clienteId, Long usuarioId, Long respondeAId) {
         if (jaEnviada(chat.getId(), clienteId)) {
             return chat; // idempotente: mensagem já entregue quando o paciente ainda usava o app
         }
@@ -304,7 +306,8 @@ public class ChatService {
         }
         marcarMensagensDoPacienteComoLidas(chat.getId());
         // O remetente é o próprio atendente (garantido pelo guard acima); sem responsável do paciente.
-        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel, null, false);
+        Mensagem salva = criar(chat, RemetenteMensagem.UNIDADE, texto, clienteId, true, responsavel, null, false,
+                resolverCitacao(chat, respondeAId));
 
         StatusChat statusAntes = chat.getStatus();
         chat.setStatus(StatusChat.EM_ATENDIMENTO);
@@ -378,7 +381,7 @@ public class ChatService {
     }
 
     private Mensagem criar(Chat chat, RemetenteMensagem remetente, String texto, String clienteId, boolean lida,
-            Usuario usuario, Long responsavelId, boolean geradaPorIa) {
+            Usuario usuario, Long responsavelId, boolean geradaPorIa, Mensagem respondeA) {
         Mensagem mensagem = new Mensagem();
         mensagem.setChat(chat);
         mensagem.setRemetente(remetente);
@@ -389,7 +392,24 @@ public class ChatService {
         mensagem.setLida(lida);
         mensagem.setClienteId(clienteId != null && !clienteId.isBlank() ? clienteId.trim() : null);
         mensagem.setGeradaPorIa(geradaPorIa);
+        mensagem.setRespondeA(respondeA);
         return mensagemRepository.save(mensagem);
+    }
+
+    /**
+     * Resolve a mensagem citada (feature "responder") a partir do id vindo do cliente, exigindo
+     * que ela pertença ao MESMO chat (evita citar mensagem de outra conversa). Traz o atendente
+     * já carregado para montar o trecho da citação ao publicar. Null quando não é uma resposta.
+     */
+    private Mensagem resolverCitacao(Chat chat, Long respondeAId) {
+        if (respondeAId == null) {
+            return null;
+        }
+        Mensagem citada = mensagemRepository.findByIdComUsuario(respondeAId).orElse(null);
+        if (citada == null || !citada.getChat().getId().equals(chat.getId())) {
+            return null; // id inválido ou de outra conversa: ignora a citação em vez de falhar o envio
+        }
+        return citada;
     }
 
     /**

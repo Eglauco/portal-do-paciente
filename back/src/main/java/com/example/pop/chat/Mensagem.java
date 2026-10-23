@@ -47,6 +47,14 @@ public class Mensagem {
     private Usuario usuario;
 
     /**
+     * Mensagem citada (feature "responder mensagem", estilo WhatsApp) — sempre do mesmo chat;
+     * nula quando esta mensagem não é uma resposta. ON DELETE SET NULL no banco (V170).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "responde_a_id")
+    private Mensagem respondeA;
+
+    /**
      * Responsável do paciente que enviou esta mensagem em nome dele (perfil
      * dependente no app); nulo quando foi o próprio paciente. Não confundir com
      * {@code chat.responsavel_id}, que é o atendente do back-office.
