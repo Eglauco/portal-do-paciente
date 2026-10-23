@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -229,8 +230,15 @@ export default function ProntuarioScreen() {
 
   /** Abre o documento num visualizador in-app (renderiza o PDF). */
   const abrirNoVisualizador = async (link: string) => {
+    // URL inválida/vazia faria o SFSafariViewController estourar nativamente no iOS (fora do try/catch do JS).
+    if (!link || !/^https?:\/\//i.test(link)) {
+      Alert.alert('Ops', 'Não foi possível abrir o documento.');
+      return;
+    }
     try {
-      await WebBrowser.openBrowserAsync(link);
+      await WebBrowser.openBrowserAsync(link, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.AUTOMATIC,
+      });
     } catch {
       try {
         await Linking.openURL(link);
@@ -315,16 +323,38 @@ export default function ProntuarioScreen() {
     }
   };
 
+  /**
+   * Ação a rodar DEPOIS que o modal fecha. No iOS, apresentar o SFSafariViewController (Abrir) ou o
+   * UIActivityViewController (Compartilhar) enquanto o <Modal> ainda está sendo dispensado trava o app
+   * ("Attempt to present … while a presentation is in progress"). Então agendamos e disparamos no
+   * onDismiss do modal (iOS); no Android não há essa corrida, roda já.
+   */
+  const acaoAposFechar = useRef<(() => void) | null>(null);
+
+  const agendarAposFechar = (acao: () => void) => {
+    if (Platform.OS === 'ios') {
+      acaoAposFechar.current = acao;
+      setMenu(null); // dispara o onDismiss → executarAposFechar
+    } else {
+      setMenu(null);
+      acao();
+    }
+  };
+
+  const executarAposFechar = () => {
+    const acao = acaoAposFechar.current;
+    acaoAposFechar.current = null;
+    acao?.();
+  };
+
   const aoAbrir = () => {
     const atual = menu;
-    setMenu(null);
-    if (atual) abrirNoVisualizador(atual.link);
+    if (atual) agendarAposFechar(() => abrirNoVisualizador(atual.link));
   };
 
   const aoBaixar = () => {
     const atual = menu;
-    setMenu(null);
-    if (atual) baixarECompartilhar(atual.doc, atual.link);
+    if (atual) agendarAposFechar(() => baixarECompartilhar(atual.doc, atual.link));
   };
 
   if (!verProntuario) {
@@ -493,6 +523,7 @@ export default function ProntuarioScreen() {
         onAbrir={aoAbrir}
         onBaixar={aoBaixar}
         onFechar={() => setMenu(null)}
+        onFechado={executarAposFechar}
       />
     </>
   );

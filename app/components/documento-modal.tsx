@@ -10,13 +10,20 @@ interface Props {
   onAbrir: () => void;
   onBaixar: () => void;
   onFechar: () => void;
+  /** iOS: disparado quando o modal termina de fechar — hora segura para apresentar o navegador/compartilhamento. */
+  onFechado?: () => void;
 }
 
-export function DocumentoModal({ visivel, nome, onAbrir, onBaixar, onFechar }: Props) {
+export function DocumentoModal({ visivel, nome, onAbrir, onBaixar, onFechar, onFechado }: Props) {
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   return (
-    <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
+    <Modal
+      visible={visivel}
+      transparent
+      animationType="fade"
+      onRequestClose={onFechar}
+      onDismiss={onFechado}>
       <Pressable style={styles.backdrop} onPress={onFechar}>
         {/* Impede o toque no card de fechar o modal */}
         <Pressable style={styles.card} onPress={() => {}}>
