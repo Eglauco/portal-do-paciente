@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 
 import { AvisoBateria } from '@/components/aviso-bateria';
@@ -204,7 +205,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <KeyboardProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <SessaoProvider>
         {/* Tema e Funcionalidades DENTRO do SessaoProvider: cor e kill-switch de telas seguem o
             inquilino logado (usam o token da sessão; re-buscam quando o token muda). */}
@@ -217,6 +219,7 @@ export default function RootLayout() {
         </FuncionalidadesProvider>
       </SessaoProvider>
       <StatusBar style="auto" />
-    </ThemeProvider>
+      </ThemeProvider>
+    </KeyboardProvider>
   );
 }

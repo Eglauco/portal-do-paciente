@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -12,9 +14,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, { runOnJS, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type Tema, useTema } from '@/hooks/use-tema';
+import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useAtualizarComPush } from '@/hooks/use-atualizar-com-push';
 import { useSessao } from '@/hooks/use-sessao';
 import { podeLancar } from '@/services/sessao';
@@ -88,8 +92,56 @@ export default function ConversaScreen() {
   const ultimoSinalDigitando = useRef(0);
   const timerDigitando = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // --- Teclado + barras translúcidas (estilo WhatsApp) -------------------------------------------
+  // A lista é full-bleed; o cabeçalho e a barra de input ficam ABSOLUTOS por cima (com blur no iOS
+  // e translúcido no Android), então as mensagens passam por trás deles. O teclado é seguido em
+  // tempo real pelo reanimated: a barra sobe colada no teclado e a lista ganha um espaçador do
+  // tamanho do teclado para a última mensagem nunca ficar escondida.
+  const { height: kbAltura, progress: kbProgresso } = useReanimatedKeyboardAnimation();
+  const [headerH, setHeaderH] = useState(insets.top + 56);
+  // Altura só da LINHA da barra (input + enviar / aviso) — medida à parte da área de segurança
+  // animada, para não oscilar durante a animação do teclado nem travar alto após um multiline.
+  const [barraRowH, setBarraRowH] = useState(48);
+
+  const barraInputAnim = useAnimatedStyle(() => ({
+    transform: [{ translateY: -Math.abs(kbAltura.value) }],
+  }));
+  // Área de segurança (home indicator) na base da barra: insets.bottom com o teclado fechado,
+  // encolhe a 0 quando aberto — a barra fica rente ao teclado, sem vão.
+  const safeAreaAnim = useAnimatedStyle(
+    () => ({ height: Math.max(insets.bottom, 10) * (1 - kbProgresso.value) }),
+    [insets.bottom],
+  );
+  const espacadorAnim = useAnimatedStyle(() => ({ height: Math.abs(kbAltura.value) }));
+
   const rolarParaFim = (animado = true) =>
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: animado }));
+
+  // Rola para o fim quando o teclado COMEÇA a abrir (sincronizado com a animação), mas só se o
+  // usuário já estava perto do fim — não arranca quem está lendo o histórico para cima.
+  const pertoDoFim = useRef(true);
+  const aoRolar = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    pertoDoFim.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 140;
+  };
+  const rolarSeNoFim = useCallback(() => {
+    if (pertoDoFim.current) scrollRef.current?.scrollToEnd({ animated: true });
+  }, []);
+  useKeyboardHandler(
+    {
+      // onStart acompanha a abertura (sincronizado); onEnd garante o fim exato caso o espaçador
+      // ainda estivesse crescendo quando o onStart rolou.
+      onStart: (e) => {
+        'worklet';
+        if (e.height > 0) runOnJS(rolarSeNoFim)();
+      },
+      onEnd: (e) => {
+        'worklet';
+        if (e.height > 0) runOnJS(rolarSeNoFim)();
+      },
+    },
+    [rolarSeNoFim],
+  );
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -312,164 +364,194 @@ export default function ConversaScreen() {
   const iaAtendendo = detalhe?.status === 'ATENDIMENTO_IA';
   const mensagens = detalhe?.mensagens ?? [];
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      {/* Cabeçalho da conversa */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Voltar">
-          <Ionicons name="chevron-back" size={26} color={t.ink} />
-        </Pressable>
-        <View style={styles.avatar}>
-          {detalhe ? (
-            <Text style={styles.avatarTxt}>{iniciais(detalhe.unidadeSaude.nome)}</Text>
-          ) : (
-            <Ionicons name="medical" size={18} color={t.glow} />
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.contatoNome} numberOfLines={1}>
-            {detalhe?.unidadeSaude.nome ?? 'Conversa'}
+  // Conteúdo do cabeçalho (reaproveitado dentro da barra translúcida).
+  const conteudoHeader = (
+    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <Pressable
+        style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
+        onPress={() => router.back()}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel="Voltar">
+        <Ionicons name="chevron-back" size={26} color={t.ink} />
+      </Pressable>
+      <View style={styles.avatar}>
+        {detalhe ? (
+          <Text style={styles.avatarTxt}>{iniciais(detalhe.unidadeSaude.nome)}</Text>
+        ) : (
+          <Ionicons name="medical" size={18} color={t.glow} />
+        )}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.contatoNome} numberOfLines={1}>
+          {detalhe?.unidadeSaude.nome ?? 'Conversa'}
+        </Text>
+        {digitando ? (
+          <Text style={styles.digitando} numberOfLines={1}>
+            escrevendo…
           </Text>
-          {digitando ? (
-            <Text style={styles.digitando} numberOfLines={1}>
-              escrevendo…
-            </Text>
-          ) : conexao === 'conectado' ? (
-            <Text style={styles.contatoStatus} numberOfLines={1}>
-              {detalhe?.responsavelNome
-                ? `com ${detalhe.responsavelNome}`
-                : (detalhe?.statusDescricao ?? 'Carregando…')}
-            </Text>
+        ) : conexao === 'conectado' ? (
+          <Text style={styles.contatoStatus} numberOfLines={1}>
+            {detalhe?.responsavelNome
+              ? `com ${detalhe.responsavelNome}`
+              : (detalhe?.statusDescricao ?? 'Carregando…')}
+          </Text>
+        ) : (
+          <Text style={styles.contatoStatus} numberOfLines={1}>
+            {conexao === 'conectando'
+              ? 'conectando ao vivo…'
+              : `sem tempo real${conexaoDetalhe ? ' · ' + conexaoDetalhe : ''}`}
+          </Text>
+        )}
+      </View>
+      {/* Falar com humano: no topo, à direita. Só habilitado enquanto a IA está atendendo;
+          depois de acionado (o status muda) fica desabilitado — a ação já foi feita. */}
+      {detalhe && podeEnviar ? (
+        <Pressable
+          style={({ pressed }) => [
+            styles.humanoHeader,
+            pressed && iaAtendendo && styles.humanoHeaderPressed,
+            (!iaAtendendo || pedindoHumano) && styles.humanoHeaderOff,
+          ]}
+          onPress={pedirHumano}
+          disabled={!iaAtendendo || pedindoHumano}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !iaAtendendo || pedindoHumano }}
+          accessibilityLabel="Falar com um atendente humano">
+          {pedindoHumano ? (
+            <ActivityIndicator size="small" color={t.brandDeep} />
           ) : (
-            <Text style={styles.contatoStatus} numberOfLines={1}>
-              {conexao === 'conectando'
-                ? 'conectando ao vivo…'
-                : `sem tempo real${conexaoDetalhe ? ' · ' + conexaoDetalhe : ''}`}
-            </Text>
+            <Ionicons name="person-outline" size={15} color={iaAtendendo ? t.brandDeep : t.muted} />
           )}
+          <Text
+            style={[styles.humanoHeaderTxt, !iaAtendendo && styles.humanoHeaderTxtOff]}
+            numberOfLines={1}>
+            Falar com humano
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View style={styles.screen}>
+      {/* Lista (full-bleed) / estados. Renderizada ANTES das barras para o blur do iOS atualizar. */}
+      {carregando ? (
+        <View style={[styles.estado, { paddingTop: headerH }]}>
+          <ActivityIndicator color={t.brand} />
+          <Text style={styles.estadoTxt}>Carregando conversa…</Text>
         </View>
-        {/* Falar com humano: no topo, à direita. Só habilitado enquanto a IA está atendendo;
-            depois de acionado (o status muda) fica desabilitado — a ação já foi feita. */}
-        {detalhe && podeEnviar ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.humanoHeader,
-              pressed && iaAtendendo && styles.humanoHeaderPressed,
-              (!iaAtendendo || pedindoHumano) && styles.humanoHeaderOff,
-            ]}
-            onPress={pedirHumano}
-            disabled={!iaAtendendo || pedindoHumano}
-            hitSlop={6}
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !iaAtendendo || pedindoHumano }}
-            accessibilityLabel="Falar com um atendente humano">
-            {pedindoHumano ? (
-              <ActivityIndicator size="small" color={t.brandDeep} />
-            ) : (
-              <Ionicons name="person-outline" size={15} color={iaAtendendo ? t.brandDeep : t.muted} />
-            )}
-            <Text
-              style={[styles.humanoHeaderTxt, !iaAtendendo && styles.humanoHeaderTxtOff]}
-              numberOfLines={1}>
-              Falar com humano
-            </Text>
+      ) : erro ? (
+        <View style={[styles.estado, { paddingTop: headerH }]}>
+          <Ionicons name="cloud-offline-outline" size={28} color={t.muted} />
+          <Text style={styles.estadoTitulo}>Não foi possível abrir</Text>
+          <Pressable style={styles.estadoBtn} onPress={carregar}>
+            <Ionicons name="refresh" size={16} color="#fff" />
+            <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
           </Pressable>
-        ) : null}
+        </View>
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          style={styles.mensagens}
+          contentContainerStyle={[
+            styles.mensagensContent,
+            { paddingTop: headerH + 6, paddingBottom: barraRowH + Math.max(insets.bottom, 10) + 8 },
+          ]}
+          onContentSizeChange={() => {
+            // Só prende no fim se o usuário já estava lá — senão a animação do teclado (que muda o
+            // tamanho do conteúdo a cada frame) travaria a rolagem para o histórico.
+            if (pertoDoFim.current) rolarParaFim(false);
+          }}
+          onScroll={aoRolar}
+          scrollEventThrottle={16}
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustKeyboardInsets={false}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.avisoWrap}>
+            <Text style={styles.aviso}>🔒 Conversa protegida com a sua unidade de saúde</Text>
+          </View>
+
+          {mensagens.map((m: Mensagem, i) => {
+            const mostrarDia =
+              i === 0 || rotuloDia(mensagens[i - 1].enviadaEm) !== rotuloDia(m.enviadaEm);
+            const daUnidade = m.remetente === 'UNIDADE';
+            return (
+              <View key={m.id}>
+                {mostrarDia && (
+                  <View style={styles.diaWrap}>
+                    <Text style={styles.dia}>{rotuloDia(m.enviadaEm)}</Text>
+                  </View>
+                )}
+                <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
+                  <View
+                    style={[
+                      styles.bolha,
+                      daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente,
+                      daUnidade && m.geradaPorIa && styles.bolhaIa,
+                    ]}>
+                    {daUnidade && m.geradaPorIa ? (
+                      <Text style={styles.assistenteIa}>🤖 Assistente virtual</Text>
+                    ) : daUnidade && m.atendenteNome ? (
+                      <Text style={styles.atendente}>{m.atendenteNome}</Text>
+                    ) : null}
+                    {!daUnidade && m.responsavelNome ? (
+                      <View style={styles.viaResp}>
+                        <Ionicons name="people-outline" size={12} color="#8A5A00" />
+                        <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.texto}>{m.texto}</Text>
+                    <View style={styles.rodape}>
+                      <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
+                      {!daUnidade &&
+                        (m.falha ? (
+                          <Ionicons name="alert-circle" size={14} color="#E0524D" />
+                        ) : m.pendente ? (
+                          <Ionicons name="time-outline" size={13} color="#7C8C87" />
+                        ) : (
+                          <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
+                        ))}
+                    </View>
+                  </View>
+                  {!daUnidade && m.falha && (
+                    <Pressable
+                      style={styles.reenviar}
+                      onPress={() => reenviar(m)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel="Reenviar mensagem">
+                      <Ionicons name="refresh" size={12} color="#E0524D" />
+                      <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+          {/* Espaçador que cresce com o teclado: mantém a última mensagem acima do teclado. */}
+          <Animated.View style={espacadorAnim} />
+        </ScrollView>
+      )}
+
+      {/* Cabeçalho translúcido (blur no iOS, translúcido no Android). */}
+      <View
+        style={styles.headerWrap}
+        onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
+        <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.barOverlayHeader} />
+        {conteudoHeader}
       </View>
 
-      {carregando ? (
-          <View style={styles.estado}>
-            <ActivityIndicator color={t.brand} />
-            <Text style={styles.estadoTxt}>Carregando conversa…</Text>
-          </View>
-        ) : erro ? (
-          <View style={styles.estado}>
-            <Ionicons name="cloud-offline-outline" size={28} color={t.muted} />
-            <Text style={styles.estadoTitulo}>Não foi possível abrir</Text>
-            <Pressable style={styles.estadoBtn} onPress={carregar}>
-              <Ionicons name="refresh" size={16} color="#fff" />
-              <Text style={styles.estadoBtnTxt}>Tentar novamente</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <ScrollView
-            ref={scrollRef}
-            style={styles.mensagens}
-            contentContainerStyle={styles.mensagensContent}
-            onContentSizeChange={() => rolarParaFim(false)}>
-            <View style={styles.avisoWrap}>
-              <Text style={styles.aviso}>🔒 Conversa protegida com a sua unidade de saúde</Text>
-            </View>
-
-            {mensagens.map((m: Mensagem, i) => {
-              const mostrarDia =
-                i === 0 || rotuloDia(mensagens[i - 1].enviadaEm) !== rotuloDia(m.enviadaEm);
-              const daUnidade = m.remetente === 'UNIDADE';
-              return (
-                <View key={m.id}>
-                  {mostrarDia && (
-                    <View style={styles.diaWrap}>
-                      <Text style={styles.dia}>{rotuloDia(m.enviadaEm)}</Text>
-                    </View>
-                  )}
-                  <View style={[styles.bolhaWrap, daUnidade ? styles.esquerda : styles.direita]}>
-                    <View
-                      style={[
-                        styles.bolha,
-                        daUnidade ? styles.bolhaUnidade : styles.bolhaPaciente,
-                        daUnidade && m.geradaPorIa && styles.bolhaIa,
-                      ]}>
-                      {daUnidade && m.geradaPorIa ? (
-                        <Text style={styles.assistenteIa}>🤖 Assistente virtual</Text>
-                      ) : daUnidade && m.atendenteNome ? (
-                        <Text style={styles.atendente}>{m.atendenteNome}</Text>
-                      ) : null}
-                      {!daUnidade && m.responsavelNome ? (
-                        <View style={styles.viaResp}>
-                          <Ionicons name="people-outline" size={12} color="#8A5A00" />
-                          <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
-                        </View>
-                      ) : null}
-                      <Text style={styles.texto}>{m.texto}</Text>
-                      <View style={styles.rodape}>
-                        <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
-                        {!daUnidade &&
-                          (m.falha ? (
-                            <Ionicons name="alert-circle" size={14} color="#E0524D" />
-                          ) : m.pendente ? (
-                            <Ionicons name="time-outline" size={13} color="#7C8C87" />
-                          ) : (
-                            <Ionicons name="checkmark-done" size={15} color="#5B6B66" />
-                          ))}
-                      </View>
-                    </View>
-                    {!daUnidade && m.falha && (
-                      <Pressable
-                        style={styles.reenviar}
-                        onPress={() => reenviar(m)}
-                        hitSlop={6}
-                        accessibilityRole="button"
-                        accessibilityLabel="Reenviar mensagem">
-                        <Ionicons name="refresh" size={12} color="#E0524D" />
-                        <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
-
-        {/* Barra de digitação (oculta no modo só-leitura do responsável) */}
-        {!carregando && !erro && podeEnviar && (
-          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+      {/* Barra de digitação: translúcida e COLADA no teclado (sobe junto). */}
+      {!carregando && !erro && podeEnviar && (
+        <Animated.View style={[styles.barraFlutuante, barraInputAnim]}>
+          <View
+            style={styles.inputBar}
+            onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
             <View style={styles.inputWrap}>
               <TextInput
                 style={styles.input}
@@ -484,168 +566,225 @@ export default function ConversaScreen() {
               style={[styles.enviar, !texto.trim() && styles.enviarDesativado]}
               onPress={enviar}
               disabled={!texto.trim()}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !texto.trim() }}
               accessibilityLabel="Enviar mensagem">
               <Ionicons name="send" size={19} color="#fff" />
             </Pressable>
           </View>
-        )}
-        {!carregando && !erro && !podeEnviar && (
-          <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <Animated.View style={safeAreaAnim} />
+        </Animated.View>
+      )}
+      {!carregando && !erro && !podeEnviar && (
+        <View style={styles.barraWrap}>
+          <BlurView intensity={56} tint="light" style={StyleSheet.absoluteFill} />
+          <View style={styles.barOverlayInput} />
+          <View
+            style={styles.somenteLeitura}
+            onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
             <Ionicons name="eye-outline" size={15} color={t.muted} />
-            <Text style={styles.somenteLeituraTxt}>Você pode ler esta conversa, mas não enviar mensagens.</Text>
+            <Text style={styles.somenteLeituraTxt}>
+              Você pode ler esta conversa, mas não enviar mensagens.
+            </Text>
           </View>
-        )}
-    </KeyboardAvoidingView>
+          <View style={{ height: Math.max(insets.bottom, 10) }} />
+        </View>
+      )}
+    </View>
   );
 }
 
 const criarEstilos = (t: Tema) =>
   StyleSheet.create({
-  screen: { flex: 1, backgroundColor: t.brandTint },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 8,
-    paddingBottom: 10,
-    backgroundColor: t.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: t.line,
-  },
-  back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  backPressed: { backgroundColor: t.brandTint },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.brandDeep,
-  },
-  avatarTxt: { color: t.onBrand, fontSize: 14, fontWeight: '800' },
-  contatoNome: { fontSize: 15.5, fontWeight: '700', color: t.ink },
-  contatoStatus: { fontSize: 12, color: t.muted, marginTop: 1 },
-  digitando: { fontSize: 12, color: t.brand, fontWeight: '700', fontStyle: 'italic', marginTop: 1 },
+    screen: { flex: 1, backgroundColor: t.brandTint },
 
-  mensagens: { flex: 1 },
-  mensagensContent: { padding: 14, paddingBottom: 8 },
-  avisoWrap: { alignItems: 'center', marginBottom: 12 },
-  aviso: {
-    fontSize: 11.5,
-    color: '#6A7B76',
-    backgroundColor: '#FCF6E3',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  diaWrap: { alignItems: 'center', marginVertical: 10 },
-  dia: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#6A7B76',
-    backgroundColor: '#DDE7E3',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  bolhaWrap: { marginBottom: 8, maxWidth: '82%' },
-  esquerda: { alignSelf: 'flex-start' },
-  direita: { alignSelf: 'flex-end' },
-  bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-  bolhaUnidade: {
-    backgroundColor: t.surface,
-    borderTopLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: t.line,
-  },
-  bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
-  // Bolha da IA: fundo branco como as demais + borda na cor da marca para sinalizar que é IA.
-  bolhaIa: { backgroundColor: t.surface, borderColor: t.brand, borderWidth: 1.5 },
-  assistenteIa: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
-  atendente: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
-  viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  viaRespTxt: { fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
-  texto: { fontSize: 14.5, color: t.ink, lineHeight: 20 },
-  rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
-  hora: { fontSize: 10.5, color: '#7C8C87' },
-  reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
-  reenviarTxt: { fontSize: 11, color: '#E0524D', fontWeight: '600' },
+    mensagens: { flex: 1 },
+    mensagensContent: { paddingHorizontal: 14 },
+    avisoWrap: { alignItems: 'center', marginBottom: 12 },
+    aviso: {
+      fontSize: 11.5,
+      color: '#6A7B76',
+      backgroundColor: '#FCF6E3',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    diaWrap: { alignItems: 'center', marginVertical: 10 },
+    dia: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: '#6A7B76',
+      backgroundColor: '#DDE7E3',
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    bolhaWrap: { marginBottom: 8, maxWidth: '82%' },
+    esquerda: { alignSelf: 'flex-start' },
+    direita: { alignSelf: 'flex-end' },
+    bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
+    bolhaUnidade: {
+      backgroundColor: t.surface,
+      borderTopLeftRadius: 4,
+      borderWidth: 1,
+      borderColor: t.line,
+    },
+    bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
+    // Bolha da IA: fundo branco como as demais + borda na cor da marca para sinalizar que é IA.
+    bolhaIa: { backgroundColor: t.surface, borderColor: t.brand, borderWidth: 1.5 },
+    assistenteIa: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
+    atendente: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
+    viaResp: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
+    viaRespTxt: { fontSize: 11.5, fontWeight: '700', color: '#8A5A00' },
+    texto: { fontSize: 14.5, color: t.ink, lineHeight: 20 },
+    rodape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: 3 },
+    hora: { fontSize: 10.5, color: '#7C8C87' },
+    reenviar: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 2 },
+    reenviarTxt: { fontSize: 11, color: '#E0524D', fontWeight: '600' },
 
-  // Botão "Falar com humano" no cabeçalho (à direita do nome da unidade).
-  humanoHeader: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginLeft: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: t.brand,
-    backgroundColor: t.surface,
-  },
-  humanoHeaderPressed: { opacity: 0.6 },
-  // Desabilitado (ação já feita, ou sem IA atendendo): esmaecido e borda neutra.
-  humanoHeaderOff: { borderColor: t.line, opacity: 0.55 },
-  humanoHeaderTxt: { fontSize: 12, fontWeight: '700', color: t.brandDeep },
-  humanoHeaderTxtOff: { color: t.muted },
+    // Cabeçalho translúcido (absoluto, no topo; a lista rola por trás).
+    headerWrap: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: alpha(t.ink, 0.1),
+    },
+    // iOS: overlay leve — o blur nativo já suaviza o fundo (mostra o efeito "mensagens atrás").
+    // Android: sem blur real, overlay mais opaco para manter o texto do header legível sobre as bolhas.
+    barOverlayHeader: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: alpha(t.surface, Platform.OS === 'ios' ? 0.5 : 0.78),
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 8,
+      paddingBottom: 10,
+    },
+    back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    backPressed: { backgroundColor: t.brandTint },
+    avatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.brandDeep,
+    },
+    avatarTxt: { color: t.onBrand, fontSize: 14, fontWeight: '800' },
+    contatoNome: { fontSize: 15.5, fontWeight: '700', color: t.ink },
+    contatoStatus: { fontSize: 12, color: t.muted, marginTop: 1 },
+    digitando: { fontSize: 12, color: t.brand, fontWeight: '700', fontStyle: 'italic', marginTop: 1 },
 
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    backgroundColor: t.brandTint,
-  },
-  somenteLeitura: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    backgroundColor: t.brandTint,
-  },
-  somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
-  inputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: t.surface,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: t.line,
-    paddingHorizontal: 14,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 4,
-    minHeight: 46,
-  },
-  input: { flex: 1, fontSize: 15, color: t.ink, maxHeight: 100 },
-  enviar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.brand,
-  },
-  enviarDesativado: { opacity: 0.6 },
+    // Botão "Falar com humano" no cabeçalho (à direita do nome da unidade).
+    humanoHeader: {
+      flexShrink: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginLeft: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: t.brand,
+      backgroundColor: alpha(t.surface, 0.9),
+    },
+    humanoHeaderPressed: { opacity: 0.6 },
+    // Desabilitado (ação já feita, ou sem IA atendendo): esmaecido e borda neutra.
+    humanoHeaderOff: { borderColor: t.line, opacity: 0.55 },
+    humanoHeaderTxt: { fontSize: 12, fontWeight: '700', color: t.brandDeep },
+    humanoHeaderTxtOff: { color: t.muted },
 
-  estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
-  estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },
-  estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
-  estadoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginTop: 4,
-    height: 44,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    backgroundColor: t.brand,
-  },
-  estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
-});
+    // Barra de input / só-leitura (absoluta, no rodapé; cola no teclado).
+    barraWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: alpha(t.ink, 0.08),
+    },
+    // Barra de input "flutuante": sem fundo, sem borda — a pílula e o botão flutuam sobre as mensagens.
+    barraFlutuante: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    barOverlayInput: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: alpha(t.surface, Platform.OS === 'ios' ? 0.6 : 0.84),
+    },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
+    somenteLeitura: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 12,
+    },
+    somenteLeituraTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
+    // Pílula do input: fundo 100% branco (sólido) + borda, FLUTUANDO (sem barra de fundo atrás).
+    inputWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: t.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: alpha(t.ink, 0.14),
+      paddingHorizontal: 14,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+      minHeight: 46,
+      shadowColor: '#0B2E29',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 7,
+      elevation: 3,
+    },
+    input: { flex: 1, fontSize: 15, color: t.ink, maxHeight: 100 },
+    enviar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.brand,
+      shadowColor: '#0B2E29',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    enviarDesativado: { opacity: 0.6 },
+
+    estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+    estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },
+    estadoTxt: { fontSize: 13.5, color: t.muted, textAlign: 'center' },
+    estadoBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      marginTop: 4,
+      height: 44,
+      paddingHorizontal: 18,
+      borderRadius: 14,
+      backgroundColor: t.brand,
+    },
+    estadoBtnTxt: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  });
