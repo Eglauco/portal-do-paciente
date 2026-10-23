@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -13,6 +12,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardProvider, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AvatarFoto, AvatarPaciente } from '@/components/avatar-paciente';
@@ -54,10 +55,30 @@ interface Props {
   onNovoComentario?: (postagemId: number) => void;
 }
 
-export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentario }: Props) {
+export function ComentariosSheet(props: Props) {
+  // Teclado colado no input (igual à conversa do chat): dentro de um <Modal> o teclado roda em
+  // OUTRA janela no Android, então o KeyboardProvider da raiz não o enxerga — precisamos de um
+  // provider ANINHADO aqui dentro. O corpo que usa o hook do teclado fica num componente interno.
+  return (
+    <Modal visible={props.visivel} transparent animationType="slide" statusBarTranslucent onRequestClose={props.onFechar}>
+      <KeyboardProvider statusBarTranslucent navigationBarTranslucent>
+        <CorpoComentarios {...props} />
+      </KeyboardProvider>
+    </Modal>
+  );
+}
+
+function CorpoComentarios({ visivel, postagemId, onFechar, onNovoComentario }: Props) {
   const insets = useSafeAreaInsets();
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
+  // Barra de input segue o teclado: espaçador cresce com a altura do teclado (height é NEGATIVO
+  // com o teclado aberto → Math.abs) e o espaçador de área segura some conforme o teclado sobe.
+  const teclado = useReanimatedKeyboardAnimation();
+  const espacadorTeclado = useAnimatedStyle(() => ({ height: Math.abs(teclado.height.value) }));
+  const espacadorSeguro = useAnimatedStyle(() => ({
+    height: Math.max(insets.bottom, 10) * (1 - teclado.progress.value),
+  }));
   const { sessao } = useSessao();
   const AUTOR = sessao?.nome ?? 'Paciente';
   // Responsável só-leitura na Rede Social: lê os comentários, mas não comenta/responde.
@@ -326,11 +347,8 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
   );
 
   return (
-    <Modal visible={visivel} transparent animationType="slide" statusBarTranslucent onRequestClose={onFechar}>
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <Pressable style={styles.overlayTopo} onPress={onFechar} />
+    <View style={styles.overlay}>
+      <Pressable style={styles.overlayTopo} onPress={onFechar} />
         <View style={styles.sheet}>
           <View style={styles.puxador} />
           <View style={styles.cabecalho}>
@@ -383,7 +401,7 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
             </View>
           ) : null}
           {podeComentar ? (
-            <View style={[styles.input, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <View style={styles.input}>
               <AvatarPaciente
                 iniciais={iniciais(AUTOR)}
                 tamanho={34}
@@ -413,14 +431,17 @@ export function ComentariosSheet({ visivel, postagemId, onFechar, onNovoComentar
               </Pressable>
             </View>
           ) : (
-            <View style={[styles.somenteLeitura, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <View style={styles.somenteLeitura}>
               <Ionicons name="eye-outline" size={15} color={t.muted} />
               <Text style={styles.somenteLeituraTxt}>Você pode ler os comentários, mas não comentar.</Text>
             </View>
           )}
+          {/* Área segura (home indicator) quando fechado + espaço do teclado quando aberto:
+              juntos empurram a barra pra cima do teclado e a FlatList encolhe por layout. */}
+          <Animated.View style={espacadorSeguro} />
+          <Animated.View style={espacadorTeclado} />
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 
