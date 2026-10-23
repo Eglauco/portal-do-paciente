@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import 'react-native-reanimated';
 
@@ -205,7 +206,8 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <KeyboardProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <SessaoProvider>
         {/* Tema e Funcionalidades DENTRO do SessaoProvider: cor e kill-switch de telas seguem o
@@ -220,6 +222,7 @@ export default function RootLayout() {
       </SessaoProvider>
       <StatusBar style="auto" />
       </ThemeProvider>
-    </KeyboardProvider>
+      </KeyboardProvider>
+    </GestureHandlerRootView>
   );
 }

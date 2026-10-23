@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated as RNAnimated,
   Image,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -19,8 +18,16 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
-import Animated, { runOnJS, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
@@ -113,8 +120,13 @@ function nomeAutorCitacao(
   return c.atendenteNome || nomeUnidade || 'Atendente';
 }
 
-const LIMIAR_SWIPE = 52; // px de arrasto para disparar o "responder"
-const MAX_SWIPE = 64; // quanto o balão desliza no máximo
+const LIMIAR_SWIPE = 56; // px de arrasto para disparar o "responder"
+const SEGUE_LIVRE = 104; // segue o dedo ~1:1 até aqui; além disso, resistência suave (igual WhatsApp)
+
+/** Toque tátil leve ao cruzar o limiar do swipe (igual WhatsApp). Best-effort (ignora falha). */
+const toqueLeve = () => {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+};
 
 interface BolhaProps {
   m: Mensagem;
@@ -131,46 +143,64 @@ interface BolhaProps {
 }
 
 /**
- * Balão de mensagem com "responder" estilo WhatsApp: arrasta pro lado (swipe) pra citar e revela
- * o ícone de responder; segurar abre o menu. Usa PanResponder + Animated do RN core (sem dep
- * nativa extra). Só é arrastável quando a mensagem já tem id do servidor (não pendente/falha).
+ * Balão de mensagem com "responder" estilo WhatsApp. O swipe roda na THREAD DE UI
+ * (react-native-gesture-handler + reanimated worklets) → fluido, sem engasgo. Arrastar pro lado
+ * desliza o balão e revela o ícone; ao soltar passando do limiar, dispara a resposta e volta com
+ * mola. Segurar abre o menu. Memoizado para NÃO re-renderizar a lista inteira a cada estado.
  */
-function BolhaMensagem({
+const BolhaMensagem = memo(function BolhaMensagem({
   m, daUnidade, styles, t, nomeUnidade, podeResponder, onResponder, onMenu, onTocarCitacao, destacado, reenviar,
 }: BolhaProps) {
-  const tx = useRef(new RNAnimated.Value(0)).current;
-  // O PanResponder é criado uma única vez; lê os valores atuais por ref para não ficar "preso".
-  const ref = useRef({ m, podeResponder, onResponder });
-  ref.current = { m, podeResponder, onResponder };
-  const arrastavel = () => {
-    const { m: mm, podeResponder: pr } = ref.current;
-    return pr && mm.id > 0 && !mm.pendente && !mm.falha;
-  };
+  const tx = useSharedValue(0);
+  const cruzou = useSharedValue(false); // já passou do limiar nesta arrastada? (para vibrar uma vez)
+  const arrastavel = podeResponder && m.id > 0 && !m.pendente && !m.falha;
 
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) =>
-        arrastavel() && g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.4,
-      onPanResponderMove: (_e, g) => tx.setValue(Math.max(0, Math.min(g.dx, MAX_SWIPE))),
-      onPanResponderRelease: (_e, g) => {
-        if (g.dx >= LIMIAR_SWIPE) ref.current.onResponder(ref.current.m);
-        RNAnimated.spring(tx, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start();
-      },
-      onPanResponderTerminate: () =>
-        RNAnimated.spring(tx, { toValue: 0, useNativeDriver: true, speed: 20, bounciness: 0 }).start(),
-    }),
-  ).current;
+  const pan = Gesture.Pan()
+    .enabled(arrastavel)
+    .activeOffsetX(12) // só ativa no arraste horizontal pra direita; rolar vertical continua funcionando
+    .failOffsetY([-14, 14]) // movimento vertical cede para a lista rolar
+    .onUpdate((e) => {
+      'worklet';
+      const x = e.translationX;
+      // segue o dedo ~1:1 até SEGUE_LIVRE; além disso, resistência suave (não trava seco, igual WhatsApp)
+      tx.value = x <= 0 ? 0 : x <= SEGUE_LIVRE ? x : SEGUE_LIVRE + (x - SEGUE_LIVRE) * 0.55;
+      // vibra uma vez ao cruzar o limiar (feedback tátil igual WhatsApp)
+      if (!cruzou.value && x >= LIMIAR_SWIPE) {
+        cruzou.value = true;
+        runOnJS(toqueLeve)();
+      } else if (cruzou.value && x < LIMIAR_SWIPE) {
+        cruzou.value = false;
+      }
+    })
+    .onEnd((e) => {
+      'worklet';
+      if (e.translationX >= LIMIAR_SWIPE) runOnJS(onResponder)(m);
+      tx.value = withSpring(0, { damping: 16, stiffness: 230, mass: 0.5 });
+    })
+    .onFinalize(() => {
+      'worklet';
+      cruzou.value = false;
+    });
 
-  const iconeOpacidade = tx.interpolate({ inputRange: [0, LIMIAR_SWIPE], outputRange: [0, 1], extrapolate: 'clamp' });
+  const bolhaAnim = useAnimatedStyle(() => ({ transform: [{ translateX: tx.value }] }));
+  const iconeAnim = useAnimatedStyle(() => ({
+    opacity: interpolate(tx.value, [12, LIMIAR_SWIPE], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      // acompanha o balão, ficando no vão entre a origem e a bolha (igual WhatsApp), e cresce até o limiar
+      { translateX: tx.value * 0.45 },
+      { scale: interpolate(tx.value, [10, LIMIAR_SWIPE], [0.4, 1], Extrapolation.CLAMP) },
+    ],
+  }));
   const podeSegurar = podeResponder && m.id > 0 && !m.pendente && !m.falha;
 
   return (
-    <View style={[styles.bolhaRow, daUnidade ? styles.esquerda : styles.direita]} {...pan.panHandlers}>
+    <View style={[styles.bolhaRow, daUnidade ? styles.esquerda : styles.direita]}>
       {/* Ícone de responder revelado ao arrastar (igual WhatsApp). */}
-      <RNAnimated.View style={[styles.swipeIcone, { opacity: iconeOpacidade }]} pointerEvents="none">
+      <Animated.View style={[styles.swipeIcone, iconeAnim]} pointerEvents="none">
         <Ionicons name="arrow-undo" size={17} color={t.brandDeep} />
-      </RNAnimated.View>
-      <RNAnimated.View style={{ transform: [{ translateX: tx }] }}>
+      </Animated.View>
+      <GestureDetector gesture={pan}>
+        <Animated.View style={bolhaAnim}>
         <Pressable
           onLongPress={() => podeSegurar && onMenu(m)}
           delayLongPress={280}
@@ -228,10 +258,11 @@ function BolhaMensagem({
             <Text style={styles.reenviarTxt}>Não enviada. Toque para reenviar</Text>
           </Pressable>
         )}
-      </RNAnimated.View>
+        </Animated.View>
+      </GestureDetector>
     </View>
   );
-}
+});
 
 export default function ConversaScreen() {
   const t = useTema();
@@ -517,9 +548,12 @@ export default function ConversaScreen() {
     tentarEnviar(tempId, clienteId, limpo, citada?.id);
   };
 
-  const reenviar = (m: Mensagem) => {
-    if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto, m.respondeA?.id);
-  };
+  const reenviar = useCallback(
+    (m: Mensagem) => {
+      if (m.clienteId) tentarEnviar(m.id, m.clienteId, m.texto, m.respondeA?.id);
+    },
+    [tentarEnviar],
+  );
 
   // Entra no modo "responder": guarda a mensagem citada, fecha o menu e foca o campo de texto.
   const responderMensagem = useCallback((m: Mensagem) => {
