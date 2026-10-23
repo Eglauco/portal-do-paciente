@@ -112,6 +112,15 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
       </div>
       <span class="field-hint">O preço (US$/MTok de entrada / saída) vem do cadastro Modelos de IA e é o que calcula o custo de uso.</span>
 
+      @if (avisoPdfProntuario(); as aviso) {
+        <div class="ia-pdf-aviso" role="alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+          </svg>
+          <span>{{ aviso }}</span>
+        </div>
+      }
+
       <label class="ia-check">
         <input type="checkbox" [formControl]="form.controls.ativo" />
         <span>Ativo (quando desligado, a IA deste escopo fica indisponível)</span>
@@ -163,6 +172,9 @@ import { EscopoIaInput, FormIa, ResultadoTesteIa, StatusIa } from './credencial-
     .ia-teste--erro { background: #fdecea; color: #b42318; }
     .ia-sem-modelos { margin-top: 0.9rem; padding: 0.7rem 0.95rem; border-radius: 0.55rem; font-size: 0.9rem;
       background: #fdf3e2; color: #8a5a00; border: 1px solid #f2d9a8; }
+    .ia-pdf-aviso { display: flex; gap: 0.55rem; align-items: flex-start; margin-top: 0.6rem; padding: 0.7rem 0.95rem;
+      border-radius: 0.55rem; font-size: 0.88rem; background: #fdf3e2; color: #8a5a00; border: 1px solid #f2d9a8; }
+    .ia-pdf-aviso svg { width: 1.1rem; height: 1.1rem; flex: 0 0 auto; margin-top: 0.05rem; }
     .ia-padrao { display: flex; gap: 0.6rem; align-items: flex-start; margin: 0 0 1.1rem;
       padding: 0.75rem 0.9rem; border-radius: 0.55rem; background: #e2f4ec; color: #1e6f54; border: 1px solid #bfe4d3; }
     .ia-padrao svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; margin-top: 0.1rem; }
@@ -199,6 +211,21 @@ export class CredencialIaForm {
 
   protected readonly usandoPadrao = computed(() => this.escopo().tipo === 'unidade' && !this.configurado());
 
+  /** Id do modelo escolhido para o Prontuário — rastreado para avisar quando não aceitar PDF. */
+  protected readonly modeloProntuarioSel = signal('');
+  /**
+   * Aviso quando o modelo de PRONTUÁRIO escolhido não aceita PDF: a análise de documento manda o PDF
+   * nativo, então um modelo sem suporte a PDF não conseguiria analisar esses documentos (imagens, sim).
+   */
+  protected readonly avisoPdfProntuario = computed(() => {
+    const id = this.modeloProntuarioSel();
+    if (!id) return null;
+    const m = this.modelos().find((x) => x.modeloId === id);
+    if (!m || m.suportaPdf !== false) return null;
+    return `O modelo de prontuário "${m.nome}" não aceita PDF — documentos em PDF não serão analisados por ele `
+      + `(imagens continuam funcionando). Para analisar PDFs, escolha um modelo com suporte a PDF.`;
+  });
+
   /** Enquanto aplicamos o status carregado, não reagir ao valueChanges do provedor (que limparia os modelos). */
   private aplicandoStatus = false;
 
@@ -222,6 +249,8 @@ export class CredencialIaForm {
       this.form.controls.modeloProntuario.setValue('');
       this.carregarModelos(prov);
     });
+    // Rastreia o modelo de prontuário escolhido para o aviso de PDF.
+    this.form.controls.modeloProntuario.valueChanges.subscribe((v) => this.modeloProntuarioSel.set(v ?? ''));
     effect(() => {
       const escopo = this.escopo();
       this.carregar(escopo);
@@ -325,6 +354,7 @@ export class CredencialIaForm {
       ativo: s.configurado ? s.ativo : true,
     });
     this.aplicandoStatus = false;
+    this.modeloProntuarioSel.set(s.modeloProntuario ?? '');
     this.carregarModelos(provedor);
     this.apiKeyPreenchida.set(s.apiKeyPreenchida);
     this.configurado.set(s.configurado);

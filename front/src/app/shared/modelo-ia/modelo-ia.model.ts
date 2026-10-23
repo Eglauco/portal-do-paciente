@@ -17,4 +17,6 @@ export interface ModeloIa {
   /** Preço de SAÍDA em US$ por 1 milhão de tokens. */
   precoSaidaUsdMtok: number;
   ativo: boolean;
+  /** O modelo aceita PDF nativo como anexo? (análise do prontuário manda o PDF; se false, o front avisa). */
+  suportaPdf: boolean;
 }

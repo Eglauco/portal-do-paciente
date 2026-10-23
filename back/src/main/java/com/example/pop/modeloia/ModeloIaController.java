@@ -86,6 +86,7 @@ public class ModeloIaController {
                     existente.setPrecoEntradaUsdMtok(dados.getPrecoEntradaUsdMtok());
                     existente.setPrecoSaidaUsdMtok(dados.getPrecoSaidaUsdMtok());
                     existente.setAtivo(dados.isAtivo());
+                    existente.setSuportaPdf(dados.isSuportaPdf());
                     return ResponseEntity.ok(repository.save(existente));
                 })
                 .orElse(ResponseEntity.notFound().build());

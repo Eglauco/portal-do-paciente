@@ -45,6 +45,7 @@ export class ModeloIaForm implements PodeSair {
       validators: [Validators.required, Validators.min(0)],
     }),
     ativo: new FormControl(true, { nonNullable: true }),
+    suportaPdf: new FormControl(true, { nonNullable: true }),
   });
 
   protected readonly editando = signal(false);
@@ -76,6 +77,7 @@ export class ModeloIaForm implements PodeSair {
             precoEntradaUsdMtok: m.precoEntradaUsdMtok,
             precoSaidaUsdMtok: m.precoSaidaUsdMtok,
             ativo: m.ativo,
+            suportaPdf: m.suportaPdf ?? true,
           }),
         error: () => this.erroCarregar.set(true),
       });
@@ -118,6 +120,7 @@ export class ModeloIaForm implements PodeSair {
       precoEntradaUsdMtok: v.precoEntradaUsdMtok!,
       precoSaidaUsdMtok: v.precoSaidaUsdMtok!,
       ativo: v.ativo,
+      suportaPdf: v.suportaPdf,
     };
     const requisicao = this.editando()
       ? this.service.atualizar(this.id()!, dados)

@@ -67,4 +67,12 @@ public class ModeloIa {
 
     @Column(nullable = false)
     private boolean ativo = true;
+
+    /**
+     * O modelo aceita documentos PDF como anexo (visão nativa de PDF)? A análise do prontuário usa o
+     * MODELO — PRONTUÁRIO; se ele não suportar PDF, o front avisa o usuário na escolha. Default true
+     * (a maioria dos modelos de visão atuais — Claude, GPT-4o, Gemini — aceita PDF nativo).
+     */
+    @Column(name = "suporta_pdf", nullable = false)
+    private boolean suportaPdf = true;
 }
