@@ -11,14 +11,15 @@ import {
   NativeSyntheticEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+// ScrollView do gesture-handler: coordena nativamente a rolagem com o swipe dos balões (sem o
+// engasgo da ScrollView do RN quando há muitos gesture-handlers por item).
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, {
   Extrapolation,
@@ -59,10 +60,12 @@ import {
 // Tile do fundo de ícones de saúde. Tilamos manualmente numa grade (o resizeMode="repeat" do
 // <Image> do RN não tila de forma confiável no Android — mostra só 1 tile).
 const PATTERN_FUNDO = require('../../assets/images/chat-pattern.png');
-const TILE_FUNDO = 280; // tamanho de exibição de cada tile (pt) — controla a densidade
+const TILE_FUNDO = 560; // tamanho de exibição de cada tile (pt). Tile 640px/14x14 (mesma densidade do
+// antigo 320/7x7 a 280), mas MENOS tiles na tela (~20 vs ~48) = menos views = mais leve no aparelho fraco.
 
-/** Fundo de ícones de saúde cobrindo a tela inteira (grade de tiles calculada pela dimensão). */
-function FundoSaude() {
+/** Fundo de ícones de saúde cobrindo a tela inteira (grade de tiles calculada pela dimensão).
+ *  Memoizado: só re-renderiza quando a dimensão muda (rotação), não a cada estado da conversa. */
+const FundoSaude = memo(function FundoSaude() {
   const { width, height } = useWindowDimensions();
   const cols = Math.ceil(width / TILE_FUNDO) + 1;
   const rows = Math.ceil(height / TILE_FUNDO) + 1;
@@ -83,7 +86,7 @@ function FundoSaude() {
       {tiles}
     </View>
   );
-}
+});
 const styles_fundo = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, opacity: 0.16, overflow: 'hidden' as const };
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
@@ -711,8 +714,8 @@ export default function ConversaScreen() {
             // tamanho do conteúdo a cada frame) travaria a rolagem para o histórico.
             if (pertoDoFim.current) rolarParaFim(false);
           }}
-          onScroll={aoRolar}
-          scrollEventThrottle={16}
+          onScrollEndDrag={aoRolar}
+          onMomentumScrollEnd={aoRolar}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentInsetAdjustmentBehavior="never"
