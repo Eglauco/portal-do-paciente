@@ -580,14 +580,14 @@ export class ConfiguracaoAgendaForm implements PodeSair {
       },
       error: () => {
         this.salvando.set(false);
-        this.toastr.error('Não foi possível salvar o configuracaoAgenda.');
+        this.toastr.error('Não foi possível salvar a configuração de agenda.');
       },
     });
   }
 
   protected async excluir(): Promise<void> {
     if (!this.editando() || this.codigo() == null) return;
-    const confirmado = await this.confirmar('Deseja excluir o configuracaoAgenda?');
+    const confirmado = await this.confirmar('Deseja excluir a configuração de agenda?');
     if (!confirmado) return;
     this.excluindo.set(true);
     this.service.excluir(this.codigo()!).subscribe({
@@ -598,7 +598,7 @@ export class ConfiguracaoAgendaForm implements PodeSair {
       },
       error: () => {
         this.excluindo.set(false);
-        this.toastr.error('Não foi possível excluir o configuracaoAgenda.');
+        this.toastr.error('Não foi possível excluir a configuração de agenda.');
       },
     });
   }

@@ -99,11 +99,11 @@
           [items]="configuracaoAgendas()"
           bindLabel="nome"
           bindValue="id"
-          placeholder="Selecione o configuracaoAgenda"
-          notFoundText="Nenhum configuracaoAgenda encontrado"
+          placeholder="Selecione a configuração de agenda"
+          notFoundText="Nenhuma configuração de agenda encontrada"
         ></ng-select>
         @if (invalido('configuracaoAgendaId')) {
-          <span class="field-error">Selecione o configuracaoAgenda.</span>
+          <span class="field-error">Selecione a configuração de agenda.</span>
         }
       </div>
 

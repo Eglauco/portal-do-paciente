@@ -2,7 +2,7 @@
   <header class="page-head">
     <div>
       <h1 class="page-title">Configuração da Agenda</h1>
-      <p class="page-sub">Cadastre e organize os configuracaoAgendas disponíveis.</p>
+      <p class="page-sub">Cadastre e organize as configurações de agenda disponíveis.</p>
     </div>
     <div class="page-head__actions">
       <button type="button" class="btn btn--ghost" (click)="abrirExportacao('xlsx')" [disabled]="exportando() !== null">
@@ -21,7 +21,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M12 5v14M5 12h14" />
         </svg>
-        Novo configuracaoAgenda
+        Nova configuração de agenda
       </a>
     </div>
   </header>
@@ -79,7 +79,7 @@
     @if (loading()) {
       <div class="state">
         <span class="spinner" aria-hidden="true"></span>
-        <p>Carregando configuracaoAgendas…</p>
+        <p>Carregando configurações de agenda…</p>
       </div>
     } @else if (error()) {
       <div class="state">
@@ -95,9 +95,9 @@
             <path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" /><path d="M14 10h4a2 2 0 0 1 2 2v9" /><path d="M3 21h18" />
           </svg>
         </span>
-        <h3>Nenhum configuracaoAgenda encontrado</h3>
-        <p>Ajuste os filtros ou cadastre um novo configuracaoAgenda.</p>
-        <a class="btn btn--ghost" routerLink="/configuracao-agenda/novo">Cadastrar configuracaoAgenda</a>
+        <h3>Nenhuma configuração de agenda encontrada</h3>
+        <p>Ajuste os filtros ou cadastre uma nova configuração de agenda.</p>
+        <a class="btn btn--ghost" routerLink="/configuracao-agenda/novo">Cadastrar configuração de agenda</a>
       </div>
     } @else {
       <div class="table-wrap">
