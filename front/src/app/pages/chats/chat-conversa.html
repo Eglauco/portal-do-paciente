@@ -40,8 +40,8 @@
           @if (mostraSeparador(i)) {
             <div class="wa__dia">{{ m.enviadaEm | date: 'dd/MM/yyyy' }}</div>
           }
-          <div class="wa__bolha-wrap" [class.wa--dir]="m.remetente === 'UNIDADE'" [class.wa--esq]="m.remetente === 'PACIENTE'">
-            <div class="wa__bolha" [class.wa__bolha--unidade]="m.remetente === 'UNIDADE'">
+          <div class="wa__bolha-wrap" [id]="'msg-' + m.id" [class.wa--dir]="m.remetente === 'UNIDADE'" [class.wa--esq]="m.remetente === 'PACIENTE'">
+            <div class="wa__bolha" [class.wa__bolha--unidade]="m.remetente === 'UNIDADE'" [class.wa--destacado]="destacadoId() === m.id">
               @if (m.remetente === 'UNIDADE') {
                 @if (m.geradaPorIa) {
                   <span class="wa__ia">
@@ -61,6 +61,15 @@
                   </svg>
                   via <b>{{ m.responsavelNome }}</b> (responsável)
                 </span>
+              }
+              @if (m.respondeA; as cit) {
+                <button type="button" class="wa__citacao" (click)="irParaMensagem(cit)" title="Ir para a mensagem citada">
+                  <span class="wa__citacao-barra" aria-hidden="true"></span>
+                  <span class="wa__citacao-texto">
+                    <span class="wa__citacao-nome">{{ nomeAutorCitacao(cit) }}</span>
+                    <span class="wa__citacao-trecho">{{ cit.texto }}</span>
+                  </span>
+                </button>
               }
               <span class="wa__texto">{{ m.texto }}</span>
               @if (m.geradaPorIa && m.tokensEntrada != null) {
@@ -91,7 +100,7 @@
                   }
                 }
               </span>
-              @if (m.remetente === 'UNIDADE' && !m.pendente && !m.falha) {
+              @if (!m.pendente && !m.falha && (m.remetente === 'UNIDADE' || podeResponder())) {
                 <button
                   type="button"
                   class="wa__menu-btn"
@@ -139,18 +148,33 @@
           }
         </div>
       } @else {
-        <div class="wa__input">
-          <textarea
-            class="wa__campo"
-            rows="1"
-            placeholder="Escreva uma mensagem"
-            [value]="texto()"
-            (input)="aoDigitar($event)"
-            (keydown)="aoTeclar($event)"
-          ></textarea>
-          <button type="button" class="wa__enviar" (click)="enviar()" aria-label="Enviar">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
-          </button>
+        <div class="wa__compositor">
+          @if (respondendo(); as r) {
+            <div class="wa__resposta">
+              <span class="wa__resposta-barra" aria-hidden="true"></span>
+              <span class="wa__resposta-texto">
+                <span class="wa__resposta-nome">{{ nomeAutorCitacao(r) }}</span>
+                <span class="wa__resposta-trecho">{{ r.texto }}</span>
+              </span>
+              <button type="button" class="wa__resposta-x" (click)="cancelarResposta()" aria-label="Cancelar resposta">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+          }
+          <div class="wa__input">
+            <textarea
+              #campo
+              class="wa__campo"
+              rows="1"
+              placeholder="Escreva uma mensagem"
+              [value]="texto()"
+              (input)="aoDigitar($event)"
+              (keydown)="aoTeclar($event)"
+            ></textarea>
+            <button type="button" class="wa__enviar" (click)="enviar()" aria-label="Enviar">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+            </button>
+          </div>
         </div>
       }
     } @else {
@@ -335,12 +359,24 @@
       [style.right.px]="menuPos()?.right"
       (keydown.escape)="fecharMenu()"
     >
-      <button type="button" class="wa__menu-item" role="menuitem" (click)="abrirDados(menuAbertoId())">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" />
-        </svg>
-        Dados da mensagem
-      </button>
+      @if (menuMensagem(); as mm) {
+        @if (podeResponder()) {
+          <button type="button" class="wa__menu-item" role="menuitem" (click)="responder(mm)">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" />
+            </svg>
+            Responder
+          </button>
+        }
+        @if (mm.remetente === 'UNIDADE') {
+          <button type="button" class="wa__menu-item" role="menuitem" (click)="abrirDados(mm.id)">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" />
+            </svg>
+            Dados da mensagem
+          </button>
+        }
+      }
     </div>
   }
 

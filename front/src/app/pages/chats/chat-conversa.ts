@@ -7,7 +7,7 @@ import { retry, throwError, timer } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { Usuario } from '../usuarios/usuario.model';
 import { UsuarioService } from '../usuarios/usuario.service';
-import { ChatDetalhe, ChatLog, Mensagem, TipoLogChat, novoClienteId, statusLabel } from './chat.model';
+import { ChatDetalhe, ChatLog, Citacao, Mensagem, TipoLogChat, novoClienteId, statusLabel } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
 
@@ -106,6 +106,52 @@ export class ChatConversa {
     if (id == null) return null;
     return this.detalhe()?.mensagens.find((m) => m.id === id) ?? null;
   });
+
+  // --- Responder mensagem (citação estilo WhatsApp) ---
+  /** Mensagem sendo respondida (citada) — mostra a prévia acima do compositor. */
+  protected readonly respondendo = signal<Mensagem | null>(null);
+  /** Id da mensagem em destaque ao clicar numa citação (rola até a original e pisca). */
+  protected readonly destacadoId = signal<number | null>(null);
+  private timerDestaque: ReturnType<typeof setTimeout> | null = null;
+  private readonly campoRef = viewChild<ElementRef<HTMLTextAreaElement>>('campo');
+  /** Mensagem do menu de contexto aberto (alvo do "Responder"/"Dados da mensagem"). */
+  protected readonly menuMensagem = computed<Mensagem | null>(() => {
+    const id = this.menuAbertoId();
+    if (id == null) return null;
+    return this.detalhe()?.mensagens.find((m) => m.id === id) ?? null;
+  });
+  /** Posso responder agora? (sou o responsável, o paciente usa o app e a conversa não está resolvida). */
+  protected readonly podeResponder = computed(() => {
+    const d = this.detalhe();
+    return !!d && this.souResponsavel() && d.pacienteUsandoApp !== false && d.status !== 'RESOLVIDO';
+  });
+
+  /** Nome exibido do autor de uma mensagem/citação (mesma lógica dos rótulos dos balões). */
+  protected nomeAutorCitacao(c: Pick<Mensagem, 'remetente' | 'geradaPorIa' | 'atendenteNome'>): string {
+    if (c.remetente === 'PACIENTE') return this.detalhe()?.paciente.nome ?? 'Paciente';
+    if (c.geradaPorIa) return 'Assistente virtual';
+    return c.atendenteNome || 'Atendente';
+  }
+
+  /** Entra no modo "responder": guarda a mensagem citada, fecha o menu e foca o compositor. */
+  protected responder(m: Mensagem): void {
+    this.respondendo.set(m);
+    this.fecharMenu();
+    requestAnimationFrame(() => this.campoRef()?.nativeElement?.focus());
+  }
+
+  protected cancelarResposta(): void {
+    this.respondendo.set(null);
+  }
+
+  /** Clica numa citação: rola até a mensagem original e a destaca por um instante. */
+  protected irParaMensagem(c: Citacao): void {
+    const el = document.getElementById('msg-' + c.id);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    this.destacadoId.set(c.id);
+    if (this.timerDestaque) clearTimeout(this.timerDestaque);
+    this.timerDestaque = setTimeout(() => this.destacadoId.set(null), 1600);
+  }
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -442,6 +488,7 @@ export class ChatConversa {
     this.cancelamentos.forEach((c) => c());
     this.cancelamentos = [];
     if (this.timerDigitando) clearTimeout(this.timerDigitando);
+    if (this.timerDestaque) clearTimeout(this.timerDestaque);
     this.digitando.set(false);
   }
 
@@ -492,6 +539,7 @@ export class ChatConversa {
     // Otimista: mostra a mensagem com o "relógio" (pendente) até o back confirmar.
     const tempId = -Date.now();
     const clienteId = novoClienteId();
+    const citada = this.respondendo(); // mensagem citada (ou null se não é uma resposta)
     const otimista: Mensagem = {
       id: tempId,
       remetente: 'UNIDADE',
@@ -501,25 +549,35 @@ export class ChatConversa {
       entregue: false,
       pendente: true,
       clienteId,
+      respondeA: citada
+        ? {
+            id: citada.id,
+            remetente: citada.remetente,
+            texto: citada.texto,
+            geradaPorIa: citada.geradaPorIa,
+            atendenteNome: citada.atendenteNome,
+          }
+        : null,
     };
     this.detalhe.update((d) => (d ? { ...d, mensagens: [...d.mensagens, otimista] } : d));
     this.texto.set('');
+    this.respondendo.set(null);
     this.rolarParaFim();
-    this.tentarEnviar(tempId, clienteId, conteudo);
+    this.tentarEnviar(tempId, clienteId, conteudo, citada?.id);
   }
 
   protected reenviar(m: Mensagem): void {
-    if (m.clienteId) this.tentarEnviar(m.id, m.clienteId, m.texto);
+    if (m.clienteId) this.tentarEnviar(m.id, m.clienteId, m.texto, m.respondeA?.id);
   }
 
   /** Envia com retentativas (conexão ruim); após esgotar, marca "falha" (reenviar). */
-  private tentarEnviar(tempId: number, clienteId: string, conteudo: string): void {
+  private tentarEnviar(tempId: number, clienteId: string, conteudo: string, respondeAId?: number): void {
     const id = this.idAtual();
     if (id == null) return;
     this.marcarMensagem(tempId, { pendente: true, falha: false });
 
     this.service
-      .enviar(id, conteudo, clienteId)
+      .enviar(id, conteudo, clienteId, respondeAId)
       .pipe(
         retry({
           count: this.ATRASOS.length,

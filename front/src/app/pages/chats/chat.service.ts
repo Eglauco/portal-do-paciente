@@ -65,8 +65,8 @@ export class ChatService {
     return this.http.get<ChatLog[]>(`${this.base}/${id}/logs`);
   }
 
-  enviar(id: number, texto: string, clienteId?: string): Observable<ChatDetalhe> {
-    return this.http.post<ChatDetalhe>(`${this.base}/${id}/mensagem`, { texto, clienteId });
+  enviar(id: number, texto: string, clienteId?: string, respondeAId?: number): Observable<ChatDetalhe> {
+    return this.http.post<ChatDetalhe>(`${this.base}/${id}/mensagem`, { texto, clienteId, respondeAId });
   }
 
   resolver(id: number): Observable<ChatDetalhe> {

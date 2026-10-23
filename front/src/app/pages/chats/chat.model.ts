@@ -29,6 +29,15 @@ export interface Chat {
   responsavelNome?: string | null;
 }
 
+/** Trecho da mensagem citada (feature "responder") — o bastante para desenhar o bloco de citação. */
+export interface Citacao {
+  id: number;
+  remetente: Remetente;
+  texto: string;
+  geradaPorIa?: boolean;
+  atendenteNome?: string | null;
+}
+
 export interface Mensagem {
   id: number;
   remetente: Remetente;
@@ -36,6 +45,8 @@ export interface Mensagem {
   enviadaEm: string;
   lida: boolean;
   entregue: boolean;
+  /** Mensagem citada quando esta é uma resposta (feature "responder"); nulo caso contrário. */
+  respondeA?: Citacao | null;
   /** Quando foi entregue ao aparelho (2º check); null se ainda não entregue. */
   entregueEm?: string | null;
   /** Quando o paciente visualizou (recibo "lido"); null se ainda não visualizada. */
