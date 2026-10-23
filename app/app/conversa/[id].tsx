@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -12,6 +13,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
@@ -42,6 +44,36 @@ import {
   observarStatus,
   sinalizarDigitando,
 } from '@/services/chat-realtime';
+
+// Tile do fundo de ícones de saúde. Tilamos manualmente numa grade (o resizeMode="repeat" do
+// <Image> do RN não tila de forma confiável no Android — mostra só 1 tile).
+const PATTERN_FUNDO = require('../../assets/images/chat-pattern.png');
+const TILE_FUNDO = 280; // tamanho de exibição de cada tile (pt) — controla a densidade
+
+/** Fundo de ícones de saúde cobrindo a tela inteira (grade de tiles calculada pela dimensão). */
+function FundoSaude() {
+  const { width, height } = useWindowDimensions();
+  const cols = Math.ceil(width / TILE_FUNDO) + 1;
+  const rows = Math.ceil(height / TILE_FUNDO) + 1;
+  const tiles = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      tiles.push(
+        <Image
+          key={`p-${r}-${c}`}
+          source={PATTERN_FUNDO}
+          style={{ position: 'absolute', left: c * TILE_FUNDO, top: r * TILE_FUNDO, width: TILE_FUNDO, height: TILE_FUNDO }}
+        />,
+      );
+    }
+  }
+  return (
+    <View style={styles_fundo} pointerEvents="none">
+      {tiles}
+    </View>
+  );
+}
+const styles_fundo = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, opacity: 0.16, overflow: 'hidden' as const };
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -436,6 +468,8 @@ export default function ConversaScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* Fundo de ícones de saúde cobrindo a tela inteira (igual ao padrão do WhatsApp). */}
+      <FundoSaude />
       {/* Lista (full-bleed) / estados. Renderizada ANTES das barras para o blur do iOS atualizar. */}
       {carregando ? (
         <View style={[styles.estado, { paddingTop: headerH }]}>
@@ -631,7 +665,7 @@ const criarEstilos = (t: Tema) =>
       borderWidth: 1,
       borderColor: t.line,
     },
-    bolhaPaciente: { backgroundColor: '#D6F0E7', borderTopRightRadius: 4 },
+    bolhaPaciente: { backgroundColor: '#A6E1CE', borderTopRightRadius: 4 },
     // Bolha da IA: fundo branco como as demais + borda na cor da marca para sinalizar que é IA.
     bolhaIa: { backgroundColor: t.surface, borderColor: t.brand, borderWidth: 1.5 },
     assistenteIa: { fontSize: 11.5, fontWeight: '700', color: t.brandDeep, marginBottom: 2 },
