@@ -31,8 +31,8 @@ import {
 import { podeLancar } from '@/services/sessao';
 
 const TAMANHO = 20;
-// Folga entre a barra de comentar e o teclado (espelha o respiro acima da barra).
-const MARGEM_ACIMA_TECLADO = 10;
+// Folga embaixo da barra de comentar: acima do teclado (aberto) e acima da barra do sistema (fechado).
+const MARGEM_BARRA = 10;
 
 function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/);
@@ -78,11 +78,12 @@ function CorpoComentarios({ visivel, postagemId, onFechar, onNovoComentario }: P
   // com o teclado aberto → Math.abs) e o espaçador de área segura some conforme o teclado sobe.
   const teclado = useReanimatedKeyboardAnimation();
   const espacadorTeclado = useAnimatedStyle(() => ({
-    // + margem só quando o teclado sobe (progress 0→1), pra a barra não encostar nele.
-    height: Math.abs(teclado.height.value) + MARGEM_ACIMA_TECLADO * teclado.progress.value,
+    // Aberto: altura do teclado + margem (progress 0→1) pra a barra não encostar nele.
+    height: Math.abs(teclado.height.value) + MARGEM_BARRA * teclado.progress.value,
   }));
   const espacadorSeguro = useAnimatedStyle(() => ({
-    height: Math.max(insets.bottom, 10) * (1 - teclado.progress.value),
+    // Fechado: área segura (barra do sistema) + a MESMA margem, pra a barra não encostar no rodapé.
+    height: (Math.max(insets.bottom, 10) + MARGEM_BARRA) * (1 - teclado.progress.value),
   }));
   const { sessao } = useSessao();
   const AUTOR = sessao?.nome ?? 'Paciente';
