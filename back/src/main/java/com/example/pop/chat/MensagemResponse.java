@@ -3,6 +3,8 @@ package com.example.pop.chat;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 public record MensagemResponse(
         Long id,
         RemetenteMensagem remetente,
@@ -21,15 +23,28 @@ public record MensagemResponse(
         String responsavelNome,
         /** Mensagem gerada pela assistente virtual (IA), não por um atendente humano. */
         boolean geradaPorIa,
+        // Campos de IA: SÓ do back-office. @JsonInclude(NON_NULL) os omite do JSON quando nulos — então
+        // já somem de toda mensagem não-IA (p/ todos) e, no app do paciente, de todas (ver semCamposIa()).
         /** Tokens gastos pela IA neste turno (só em mensagens da IA); exibidos apenas no back-office. */
-        Long tokensEntrada,
-        Long tokensSaida,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Long tokensEntrada,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Long tokensSaida,
         /** Modelo de IA usado (só em mensagens da IA); exibido apenas no back-office. */
-        String modeloIa,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String modeloIa,
         /** Custo (US$) do turno da IA; exibido apenas no back-office. */
-        BigDecimal custoUsd,
+        @JsonInclude(JsonInclude.Include.NON_NULL) BigDecimal custoUsd,
         /** Mensagem citada (feature "responder", estilo WhatsApp); nula quando não é uma resposta. */
         Citacao respondeA) {
+
+    /**
+     * Cópia SEM os campos de IA (tokens/modelo/custo) — são dados do back-office. Usada nos endpoints
+     * do PACIENTE (ver {@code MeuChatController}): o app não exibe nem precisa deles. Com o
+     * {@code @JsonInclude(NON_NULL)} acima, nulos somem do JSON (não trafega nem a chave).
+     */
+    public MensagemResponse semCamposIa() {
+        return new MensagemResponse(id, remetente, texto, enviadaEm, lida, entregue, entregueEm,
+                visualizadaEm, clienteId, atendenteNome, responsavelNome, geradaPorIa,
+                null, null, null, null, respondeA);
+    }
 
     /**
      * Trecho da mensagem citada — o suficiente pro cliente desenhar o bloco de citação

@@ -167,12 +167,14 @@ public class MeuChatController {
     }
 
     /**
-     * Remove o id interno do atendente (PK de usuário) das respostas ao paciente:
-     * o app só precisa do NOME do responsável, não do identificador do admin.
+     * Prepara o detalhe para o PACIENTE: (1) remove o id interno do atendente (PK de usuário) — o app
+     * só precisa do NOME do responsável, não do identificador do admin; (2) remove os campos de IA
+     * (tokens/modelo/custo) de cada mensagem — são dados do back-office, o app não exibe nem precisa.
      */
     private ChatDetalheResponse semResponsavelId(ChatDetalheResponse d) {
+        List<MensagemResponse> mensagens = d.mensagens().stream().map(MensagemResponse::semCamposIa).toList();
         return new ChatDetalheResponse(d.id(), d.paciente(), d.pacienteFotoUrl(), d.unidadeSaude(), d.status(),
-                d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.pacienteLeuEm(), d.mensagens());
+                d.statusDescricao(), d.pacienteUsandoApp(), null, d.responsavelNome(), d.pacienteLeuEm(), mensagens);
     }
 
     private ChatResponse semResponsavelId(ChatResponse c) {
