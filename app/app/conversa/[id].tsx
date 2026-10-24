@@ -17,9 +17,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-// ScrollView do gesture-handler: coordena nativamente a rolagem com o swipe dos balões (sem o
-// engasgo da ScrollView do RN quando há muitos gesture-handlers por item).
-import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+// Lista = FlashList (Shopify) v2: RECICLA as views em vez de montar/desmontar (como o RecyclerView do
+// Android). Montar um balão aqui é CARO (árvore de views + gesto de swipe nativo + mappers do
+// reanimated); o FlatList refazia isso a cada balão que cruzava a borda no fling → travava no tablet
+// fraco. O FlashList monta um punhado de células UMA vez e, ao rolar, só troca os dados → fling liso.
+// v2 (New Arch): sem estimatedItemSize (mede sozinho), e `maintainVisibleContentPosition` já dá o
+// "começa no fim" (startRenderingFromBottom) e o "rola pro fim só se perto" (autoscroll) de graça.
+import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useKeyboardHandler, useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Animated, {
   Extrapolation,
@@ -62,6 +67,7 @@ import {
 const PATTERN_FUNDO = require('../../assets/images/chat-pattern.png');
 const TILE_FUNDO = 560; // tamanho de exibição de cada tile (pt). Tile 640px/14x14 (mesma densidade do
 // antigo 320/7x7 a 280), mas MENOS tiles na tela (~20 vs ~48) = menos views = mais leve no aparelho fraco.
+const OPACIDADE_FUNDO = 0.16; // ver nota no styles_fundo (opacidade POR-TILE, não no container)
 
 /** Fundo de ícones de saúde cobrindo a tela inteira (grade de tiles calculada pela dimensão).
  *  Memoizado: só re-renderiza quando a dimensão muda (rotação), não a cada estado da conversa. */
@@ -76,7 +82,7 @@ const FundoSaude = memo(function FundoSaude() {
         <Image
           key={`p-${r}-${c}`}
           source={PATTERN_FUNDO}
-          style={{ position: 'absolute', left: c * TILE_FUNDO, top: r * TILE_FUNDO, width: TILE_FUNDO, height: TILE_FUNDO }}
+          style={{ position: 'absolute', left: c * TILE_FUNDO, top: r * TILE_FUNDO, width: TILE_FUNDO, height: TILE_FUNDO, opacity: OPACIDADE_FUNDO }}
         />,
       );
     }
@@ -87,7 +93,11 @@ const FundoSaude = memo(function FundoSaude() {
     </View>
   );
 });
-const styles_fundo = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, opacity: 0.16, overflow: 'hidden' as const };
+// PERF: a opacidade (16%) fica em CADA imagem (folha), NÃO aqui no container. `opacity` num container
+// com vários filhos obriga o Android a renderizar tudo num buffer offscreen e recompor a cada frame —
+// era o MAIOR vilão da rolagem lenta (median 105ms→23ms ao tirar a opacity do container). Nos tiles
+// (folhas, sem sobreposição) o resultado visual é idêntico e barato (blend direto, sem buffer).
+const styles_fundo = { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' as const };
 
 const doisDigitos = (n: number) => String(n).padStart(2, '0');
 
@@ -291,10 +301,11 @@ export default function ConversaScreen() {
   const [respondendo, setRespondendo] = useState<Mensagem | null>(null);
   const [menuMsg, setMenuMsg] = useState<Mensagem | null>(null);
   const [destacado, setDestacado] = useState<number | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<FlashListRef<Mensagem>>(null);
   const inputRef = useRef<TextInput>(null);
-  // Posição Y de cada mensagem no conteúdo da lista (para rolar até a original ao tocar na citação).
-  const posicoesY = useRef<Map<number, number>>(new Map());
+  // Espelho das mensagens para callbacks estáveis (ex.: achar o índice da citada p/ scrollToIndex)
+  // sem recriar a função a cada nova mensagem (senão re-renderiza todos os balões memoizados).
+  const mensagensRef = useRef<Mensagem[]>([]);
   const timerDestaque = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jaCarregou = useRef(false);
   const ultimoSinalDigitando = useRef(0);
@@ -327,6 +338,8 @@ export default function ConversaScreen() {
 
   // Rola para o fim quando o teclado COMEÇA a abrir (sincronizado com a animação), mas só se o
   // usuário já estava perto do fim — não arranca quem está lendo o histórico para cima.
+  // (O "começa no fim" e o "anda até o fim real no load" agora são do FlashList via
+  //  maintainVisibleContentPosition/startRenderingFromBottom — sem a gambiarra de fixar no fim.)
   const pertoDoFim = useRef(true);
   const aoRolar = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
@@ -566,16 +579,17 @@ export default function ConversaScreen() {
   }, []);
 
   // Toca na citação dentro de um balão: rola até a mensagem original e a destaca por um instante.
-  const tocarCitacao = useCallback(
-    (c: Citacao) => {
-      const y = posicoesY.current.get(c.id);
-      if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - headerH - 8), animated: true });
-      setDestacado(c.id);
-      if (timerDestaque.current) clearTimeout(timerDestaque.current);
-      timerDestaque.current = setTimeout(() => setDestacado(null), 1400);
-    },
-    [headerH],
-  );
+  // Com a lista virtualizada a original pode estar desmontada, então rolamos por ÍNDICE
+  // (scrollToIndex) — não por posição Y guardada (que só existe para itens já renderizados).
+  const tocarCitacao = useCallback((c: Citacao) => {
+    const idx = mensagensRef.current.findIndex((m) => m.id === c.id);
+    if (idx >= 0) {
+      scrollRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.35 });
+    }
+    setDestacado(c.id);
+    if (timerDestaque.current) clearTimeout(timerDestaque.current);
+    timerDestaque.current = setTimeout(() => setDestacado(null), 1400);
+  }, []);
 
   useEffect(
     () => () => {
@@ -611,6 +625,41 @@ export default function ConversaScreen() {
   // A IA está atendendo agora? (habilita o botão "Falar com humano"; ao acionar, o status muda e some.)
   const iaAtendendo = detalhe?.status === 'ATENDIMENTO_IA';
   const mensagens = detalhe?.mensagens ?? [];
+  mensagensRef.current = mensagens; // espelho p/ callbacks estáveis (tocarCitacao)
+  const nomeUnidade = detalhe?.unidadeSaude.nome ?? 'Atendente';
+
+  // Render de cada mensagem na lista. O separador de dia compara com a mensagem anterior (índice).
+  const renderItem = useCallback(
+    ({ item: m, index: i }: ListRenderItemInfo<Mensagem>) => {
+      const anterior = mensagens[i - 1];
+      const mostrarDia = i === 0 || (!!anterior && rotuloDia(anterior.enviadaEm) !== rotuloDia(m.enviadaEm));
+      const daUnidade = m.remetente === 'UNIDADE';
+      return (
+        <View>
+          {mostrarDia && (
+            <View style={styles.diaWrap}>
+              <Text style={styles.dia}>{rotuloDia(m.enviadaEm)}</Text>
+            </View>
+          )}
+          <BolhaMensagem
+            m={m}
+            daUnidade={daUnidade}
+            styles={styles}
+            t={t}
+            nomeUnidade={nomeUnidade}
+            podeResponder={podeEnviar}
+            onResponder={responderMensagem}
+            onMenu={setMenuMsg}
+            onTocarCitacao={tocarCitacao}
+            destacado={destacado === m.id}
+            reenviar={reenviar}
+          />
+        </View>
+      );
+    },
+    [mensagens, styles, t, nomeUnidade, podeEnviar, destacado, responderMensagem, tocarCitacao, reenviar],
+  );
+  const keyExtractor = useCallback((m: Mensagem) => String(m.id), []);
 
   // Conteúdo do cabeçalho (reaproveitado dentro da barra translúcida).
   const conteudoHeader = (
@@ -702,68 +751,44 @@ export default function ConversaScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView
+        <FlashList
           ref={scrollRef}
           style={styles.mensagens}
-          contentContainerStyle={[
-            styles.mensagensContent,
-            { paddingTop: headerH + 6, paddingBottom: barraRowH + Math.max(insets.bottom, 10) + 8 },
-          ]}
-          onContentSizeChange={() => {
-            // Só prende no fim se o usuário já estava lá — senão a animação do teclado (que muda o
-            // tamanho do conteúdo a cada frame) travaria a rolagem para o histórico.
-            if (pertoDoFim.current) rolarParaFim(false);
+          data={mensagens}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          extraData={destacado}
+          ListHeaderComponent={
+            <View style={styles.avisoWrap}>
+              <Text style={styles.aviso}>🔒 Conversa protegida com a sua unidade de saúde</Text>
+            </View>
+          }
+          ListFooterComponent={<Animated.View style={espacadorAnim} />}
+          contentContainerStyle={{
+            paddingHorizontal: 14,
+            paddingTop: headerH + 6,
+            paddingBottom: barraRowH + Math.max(insets.bottom, 10) + 8,
           }}
+          // Chat: começa no fim e, ao chegar msg nova, rola pro fim só se o usuário já estava perto
+          // (não arranca quem lê o histórico). Tudo nativo do FlashList v2 — sem gambiarra.
+          maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
           onScrollEndDrag={aoRolar}
           onMomentumScrollEnd={aoRolar}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentInsetAdjustmentBehavior="never"
           automaticallyAdjustKeyboardInsets={false}
-          showsVerticalScrollIndicator={false}>
-          <View style={styles.avisoWrap}>
-            <Text style={styles.aviso}>🔒 Conversa protegida com a sua unidade de saúde</Text>
-          </View>
-
-          {mensagens.map((m: Mensagem, i) => {
-            const mostrarDia =
-              i === 0 || rotuloDia(mensagens[i - 1].enviadaEm) !== rotuloDia(m.enviadaEm);
-            const daUnidade = m.remetente === 'UNIDADE';
-            return (
-              <View
-                key={m.id}
-                onLayout={(e) => posicoesY.current.set(m.id, e.nativeEvent.layout.y)}>
-                {mostrarDia && (
-                  <View style={styles.diaWrap}>
-                    <Text style={styles.dia}>{rotuloDia(m.enviadaEm)}</Text>
-                  </View>
-                )}
-                <BolhaMensagem
-                  m={m}
-                  daUnidade={daUnidade}
-                  styles={styles}
-                  t={t}
-                  nomeUnidade={detalhe?.unidadeSaude.nome ?? 'Atendente'}
-                  podeResponder={podeEnviar}
-                  onResponder={responderMensagem}
-                  onMenu={setMenuMsg}
-                  onTocarCitacao={tocarCitacao}
-                  destacado={destacado === m.id}
-                  reenviar={reenviar}
-                />
-              </View>
-            );
-          })}
-          {/* Espaçador que cresce com o teclado: mantém a última mensagem acima do teclado. */}
-          <Animated.View style={espacadorAnim} />
-        </ScrollView>
+          showsVerticalScrollIndicator={false}
+        />
       )}
 
       {/* Cabeçalho translúcido (blur no iOS, translúcido no Android). */}
       <View
         style={styles.headerWrap}
         onLayout={(e) => setHeaderH(Math.round(e.nativeEvent.layout.height))}>
-        <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />
+        {/* Blur nativo só no iOS. No Android o blur do expo-blur re-borra o conteúdo que rola atrás a
+            cada frame (pesa ~15ms/frame no tablet fraco); o overlay sólido (0.78) já dá o fundo. */}
+        {Platform.OS === 'ios' && <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />}
         <View style={styles.barOverlayHeader} />
         {conteudoHeader}
       </View>
@@ -780,7 +805,7 @@ export default function ConversaScreen() {
                   <Text style={styles.respostaNome} numberOfLines={1}>
                     {nomeAutorCitacao(respondendo, detalhe?.unidadeSaude.nome ?? 'Atendente')}
                   </Text>
-                  <Text style={styles.respostaTrecho} numberOfLines={1}>
+                  <Text style={styles.respostaTrecho} numberOfLines={3}>
                     {respondendo.texto}
                   </Text>
                 </View>
@@ -821,7 +846,7 @@ export default function ConversaScreen() {
       )}
       {!carregando && !erro && !podeEnviar && (
         <View style={styles.barraWrap}>
-          <BlurView intensity={56} tint="light" style={StyleSheet.absoluteFill} />
+          {Platform.OS === 'ios' && <BlurView intensity={56} tint="light" style={StyleSheet.absoluteFill} />}
           <View style={styles.barOverlayInput} />
           <View
             style={styles.somenteLeitura}

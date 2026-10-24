@@ -64,10 +64,10 @@ function garantirCliente(): Client {
     // recompomos o NULL no recebimento.
     forceBinaryWSFrames: true,
     appendMissingNULLonIncoming: true,
-    // Log do ciclo de vida (visível em `adb logcat` / dev) para diagnosticar a conexão.
-    debug: (msg) => {
-      if (msg) console.log('[STOMP]', msg);
-    },
+    // STOMP chama isto a CADA frame (inclui heartbeats). Em dev, cada console.log vai pro Metro pela
+    // ponte e TRAVA a thread JS (deixava o chat lento durante a rolagem). Desligado — os logs de
+    // conexão/erro abaixo bastam para diagnosticar. (Em produção o console.log nem roda.)
+    debug: () => {},
     onConnect: () => {
       definirEstado('conectado');
       console.log('[STOMP] conectado a', urlWs());
