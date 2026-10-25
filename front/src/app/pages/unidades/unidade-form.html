@@ -75,6 +75,135 @@
     </div>
     }
 
+    @if (abaAtiva() === 'perfil') {
+    <div class="perfil-aba">
+      <p class="field-hint">
+        Como a unidade aparece no app do paciente ao tocar no nome da unidade dentro da conversa.
+      </p>
+      @if (codigo() == null) {
+        <p class="field-hint">Salve a unidade primeiro para enviar a logo e a capa.</p>
+      }
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label">Capa</label>
+          <div class="perfil-capa">
+            @if (capa) {
+              <img [src]="capa" alt="Capa da unidade" />
+            } @else {
+              <span class="perfil-capa__vazio">Sem capa</span>
+            }
+          </div>
+          @if (codigo() != null) {
+            <div class="perfil-acoes">
+              <label class="btn btn--ghost btn--sm">
+                {{ enviandoCapa() ? 'Enviando…' : (capa ? 'Trocar capa' : 'Enviar capa') }}
+                <input type="file" accept="image/*" hidden [disabled]="enviandoCapa()" (change)="onSelectCapa($event)" />
+              </label>
+              @if (capa) {
+                <button type="button" class="btn btn--ghost btn--sm" (click)="removerCapa()">Remover</button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="form-field">
+          <label class="label">Logo</label>
+          <div class="perfil-logo">
+            @if (logo) {
+              <img [src]="logo" alt="Logo da unidade" />
+            } @else {
+              <span class="perfil-logo__vazio">Sem logo</span>
+            }
+          </div>
+          @if (codigo() != null) {
+            <div class="perfil-acoes">
+              <label class="btn btn--ghost btn--sm">
+                {{ enviandoLogo() ? 'Enviando…' : (logo ? 'Trocar logo' : 'Enviar logo') }}
+                <input type="file" accept="image/*" hidden [disabled]="enviandoLogo()" (change)="onSelectLogo($event)" />
+              </label>
+              @if (logo) {
+                <button type="button" class="btn btn--ghost btn--sm" (click)="removerLogo()">Remover</button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label class="label" for="sobre">Sobre</label>
+        <textarea
+          id="sobre"
+          class="input input--area"
+          formControlName="sobre"
+          rows="3"
+          placeholder="Descrição curta da unidade (ex.: Clínica de especialidades médicas)."
+        ></textarea>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-field">
+          <label class="label" for="telefone">Telefone</label>
+          <input
+            id="telefone"
+            class="input"
+            formControlName="telefone"
+            placeholder="(18) 99999-9999"
+            autocomplete="off"
+            inputmode="tel"
+          />
+          <span class="field-hint">Usado no botão "Ligar" do app.</span>
+        </div>
+        <div class="form-field">
+          <label class="label" for="endereco">Endereço</label>
+          <textarea
+            id="endereco"
+            class="input input--area"
+            formControlName="endereco"
+            rows="2"
+            placeholder="Rua, número, bairro, cidade — UF"
+          ></textarea>
+          <span class="field-hint">Usado no botão "Como chegar" (abre o mapa no celular).</span>
+        </div>
+      </div>
+
+      <fieldset class="form-field">
+        <legend class="section-label">Horário de funcionamento</legend>
+        <label class="horario-sempre">
+          <input type="checkbox" [checked]="sempreAberta()" (change)="alternarSempreAberta($event)" />
+          Aberta 24 horas todos os dias (sempre aberta)
+        </label>
+        <div class="horario-lista" formArrayName="horarios">
+          @for (grupo of horariosItens.controls; track grupo; let i = $index) {
+            <div class="horario-linha" [formGroupName]="i">
+              <span class="horario-dia">{{ dias[i].label }}</span>
+              <select class="input input--sm horario-modo" formControlName="modo" [attr.aria-label]="'Situação de ' + dias[i].label">
+                <option value="ABERTO">Horário</option>
+                <option value="H24">24 horas</option>
+                <option value="FECHADO">Fechada</option>
+              </select>
+              @switch (grupo.controls.modo.value) {
+                @case ('ABERTO') {
+                  <div class="horario-tempos">
+                    <input type="time" class="input input--sm" formControlName="abertura" aria-label="Horário de abertura" />
+                    <span class="horario-sep">às</span>
+                    <input type="time" class="input input--sm" formControlName="fechamento" aria-label="Horário de fechamento" />
+                  </div>
+                }
+                @case ('H24') {
+                  <span class="horario-info">Aberta 24 horas</span>
+                }
+                @default {
+                  <span class="horario-info">Fechada</span>
+                }
+              }
+            </div>
+          }
+        </div>
+      </fieldset>
+    </div>
+    }
+
     @if (abaAtiva() === 'faq') {
     <fieldset class="form-field">
       <legend class="section-label">FAQ da assistente virtual</legend>

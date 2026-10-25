@@ -142,6 +142,7 @@ function Navegacao() {
         <Stack.Screen name="responsaveis" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/nova" options={{ headerShown: false }} />
         <Stack.Screen name="conversa/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="unidade/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="postagem/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="sau/nova" options={{ headerShown: false }} />
         <Stack.Screen name="sau/[id]" options={{ headerShown: false }} />

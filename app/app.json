@@ -19,6 +19,11 @@
     "android": {
       "package": "br.com.eglauco.integrasaude",
       "googleServicesFile": "./google-services.json",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAnz7tsPPsbmKcQVLOs2JkgQOXETwUGq9c"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#0C5570",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
