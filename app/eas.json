@@ -35,6 +35,16 @@
         "EXPO_PUBLIC_API_URL": "https://amiable-flow-production-a405.up.railway.app",
         "EXPO_PUBLIC_INQUILINO": "nascente"
       }
+    },
+    "teste": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://amiable-flow-production-a405.up.railway.app",
+        "EXPO_PUBLIC_INQUILINO": "teste"
+      }
     }
   },
   "submit": {
