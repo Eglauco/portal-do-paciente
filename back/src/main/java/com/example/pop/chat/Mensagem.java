@@ -68,6 +68,10 @@ public class Mensagem {
     @Column(name = "enviada_em", nullable = false)
     private LocalDateTime enviadaEm;
 
+    /** Quando a mensagem foi editada pelo autor (estilo WhatsApp); nulo se nunca editada. */
+    @Column(name = "editada_em")
+    private LocalDateTime editadaEm;
+
     /** A unidade já visualizou a mensagem do paciente (recibo de leitura interno). */
     @Column(nullable = false)
     private boolean lida;

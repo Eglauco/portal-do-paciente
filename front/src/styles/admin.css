@@ -2399,6 +2399,27 @@
 .wa__bolha--unidade { background: #d6f0e7; border-color: #cdeae1; border-top-left-radius: 14px; border-top-right-radius: 4px; }
 .wa__texto { display: block; font-size: 14.5px; color: var(--ink); line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
 .wa__rodape { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 3px; font-size: 10.5px; color: #7c8c87; }
+/* "Editada" discreto antes da hora (estilo WhatsApp). */
+.wa__editada { font-style: italic; color: #7c8c87; }
+
+/* Barra de pesquisa na conversa (estilo WhatsApp): campo + contador + setas ^/v + fechar. */
+.wa__busca { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.wa__busca-campo { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; background: color-mix(in srgb, var(--ink) 5%, transparent); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px; }
+.wa__busca-lupa { width: 1.05rem; height: 1.05rem; stroke: var(--muted); fill: none; flex: 0 0 auto; }
+.wa__busca-input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; font-size: 14px; color: var(--ink); }
+.wa__busca-limpar { border: 0; background: transparent; cursor: pointer; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.wa__busca-limpar svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; }
+.wa__busca-contador { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wa__busca-nav { display: flex; align-items: center; }
+.wa__busca-seta { border: 0; background: transparent; cursor: pointer; color: var(--ink); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; }
+.wa__busca-seta:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.wa__busca-seta:disabled { color: var(--muted); opacity: 0.45; cursor: default; }
+.wa__busca-seta svg { width: 1.2rem; height: 1.2rem; stroke: currentColor; fill: none; }
+.wa__busca-fechar { border: 0; background: transparent; cursor: pointer; color: var(--ink); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; }
+.wa__busca-fechar:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.wa__busca-fechar svg { width: 1.25rem; height: 1.25rem; stroke: currentColor; fill: none; }
+/* Destaque âmbar das ocorrências dentro do texto da mensagem. */
+.wa__marca { background: #e8a23c; color: #2b2007; border-radius: 3px; padding: 0 1px; }
 /* Checks de entrega (relógio -> 1 check no back -> 2 checks no app do paciente) */
 .wa__tick { width: 15px; height: 15px; stroke: #8a9b96; fill: none; flex-shrink: 0; }
 .wa__checks { display: inline-flex; align-items: center; }
@@ -2468,10 +2489,12 @@
 /* Chevron do menu também nas mensagens do paciente (bolha branca): fade na cor da bolha. */
 .wa--esq .wa__menu-btn { background: linear-gradient(to left, var(--surface) 58%, rgba(255, 255, 255, 0)); }
 /* Destaque breve (anel) ao clicar numa citação e rolar até a original. */
-.wa--destacado { animation: wa-flash 1.5s ease; }
+.wa--destacado { animation: wa-flash 1.6s ease; }
+/* "Acende" âmbar (glow que esvanece) ao rolar até uma citação ou à ocorrência atual da busca. */
 @keyframes wa-flash {
-  0%, 55% { box-shadow: 0 0 0 2px var(--brand); }
-  100% { box-shadow: 0 0 0 2px rgba(0, 0, 0, 0); }
+  0% { box-shadow: 0 0 0 3px rgba(249, 193, 78, 0.95), 0 0 14px 3px rgba(249, 193, 78, 0.65); }
+  25% { box-shadow: 0 0 0 3px rgba(249, 193, 78, 0.85), 0 0 14px 3px rgba(249, 193, 78, 0.55); }
+  100% { box-shadow: 0 0 0 3px rgba(249, 193, 78, 0), 0 0 14px 3px rgba(249, 193, 78, 0); }
 }
 /* Bloco da mensagem citada dentro do balão. */
 .wa__citacao {
@@ -2497,6 +2520,10 @@
 .wa__resposta-trecho { font-size: 13px; color: #7c8c87; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wa__resposta-x { border: 0; background: transparent; cursor: pointer; color: #7c8c87; display: grid; place-items: center; padding: 0 2px; }
 .wa__resposta-x svg { width: 1.1rem; height: 1.1rem; stroke: currentColor; fill: none; }
+/* Variante "editar mensagem" da prévia acima do compositor (ícone de lápis, sem trecho). */
+.wa__resposta--editar { align-items: center; }
+.wa__resposta-icone { flex: 0 0 auto; display: grid; place-items: center; color: var(--brand-deep); }
+.wa__resposta-icone svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; fill: none; }
 .wa__resolvido { padding: 16px; text-align: center; font-size: 0.9rem; color: var(--muted); background: var(--surface); border-top: 1px solid var(--line); }
 
 /* Nome do atendente que enviou a mensagem (bolha da unidade). */

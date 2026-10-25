@@ -19,6 +19,11 @@
           }
         </div>
         <span class="status-pill" [attr.data-st]="chat.status">{{ chat.statusDescricao }}</span>
+        <button type="button" class="wa__icone-acao" (click)="abrirBusca()" aria-label="Pesquisar na conversa" title="Pesquisar">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+          </svg>
+        </button>
         <button type="button" class="wa__icone-acao" (click)="abrirLogs()" aria-label="Ver histórico da conversa" title="Histórico">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 8v4l2.5 1.5" />
@@ -33,6 +38,55 @@
           <button type="button" class="btn btn--ghost wa__acao" (click)="resolver()">Resolver</button>
         }
       </header>
+
+      @if (buscando()) {
+        <div class="wa__busca">
+          <div class="wa__busca-campo">
+            <svg class="wa__busca-lupa" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input
+              #campoBusca
+              type="text"
+              class="wa__busca-input"
+              placeholder="Pesquisar"
+              [value]="termoBusca()"
+              (input)="aoDigitarBusca(campoBusca.value)"
+              (keydown.escape)="fecharBusca()"
+              aria-label="Pesquisar na conversa"
+            />
+            @if (termoBusca()) {
+              <button type="button" class="wa__busca-limpar" (click)="aoDigitarBusca('')" aria-label="Limpar pesquisa">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            }
+          </div>
+          <span class="wa__busca-contador" role="status" aria-live="polite" aria-atomic="true">{{ contadorBusca() }}</span>
+          <div class="wa__busca-nav">
+            <button
+              type="button"
+              class="wa__busca-seta"
+              (click)="irResultado(1)"
+              [disabled]="!termoBuscaNorm() || indiceBusca() >= resultadosBusca().length - 1"
+              aria-label="Ocorrência anterior"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+            </button>
+            <button
+              type="button"
+              class="wa__busca-seta"
+              (click)="irResultado(-1)"
+              [disabled]="!termoBuscaNorm() || indiceBusca() <= 0"
+              aria-label="Próxima ocorrência"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+          </div>
+          <button type="button" class="wa__busca-fechar" (click)="fecharBusca()" aria-label="Fechar pesquisa">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          </button>
+        </div>
+      }
 
       <div class="wa__mensagens" #mensagens>
         <div class="wa__aviso">🔒 Conversa entre o paciente e a unidade</div>
@@ -71,11 +125,18 @@
                   </span>
                 </button>
               }
-              <span class="wa__texto">{{ m.texto }}</span>
+              @if (buscando() && termoBuscaNorm()) {
+                <span class="wa__texto" [innerHTML]="m.texto | destacarBusca: termoBuscaNorm()"></span>
+              } @else {
+                <span class="wa__texto">{{ m.texto }}</span>
+              }
               @if (m.geradaPorIa && m.tokensEntrada != null) {
                 <span class="wa__tokens">@if (m.modeloIa; as mod) {{{ mod }} · }{{ m.tokensEntrada | number }} tokens entrada · {{ m.tokensSaida | number }} saída@if (m.custoUsd != null) { · US$ {{ m.custoUsd | number: '1.2-6' }}}</span>
               }
               <span class="wa__rodape">
+                @if (m.editadaEm) {
+                  <span class="wa__editada">Editada</span>
+                }
                 {{ m.enviadaEm | date: 'HH:mm' }}
                 @if (m.remetente === 'UNIDADE') {
                   @if (m.falha) {
@@ -149,7 +210,22 @@
         </div>
       } @else {
         <div class="wa__compositor">
-          @if (respondendo(); as r) {
+          @if (editando()) {
+            <div class="wa__resposta wa__resposta--editar">
+              <span class="wa__resposta-barra" aria-hidden="true"></span>
+              <span class="wa__resposta-icone" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </span>
+              <span class="wa__resposta-texto">
+                <span class="wa__resposta-nome">Editar mensagem</span>
+              </span>
+              <button type="button" class="wa__resposta-x" (click)="cancelarEdicao()" aria-label="Cancelar edição">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+          } @else if (respondendo(); as r) {
             <div class="wa__resposta">
               <span class="wa__resposta-barra" aria-hidden="true"></span>
               <span class="wa__resposta-texto">
@@ -171,8 +247,12 @@
               (input)="aoDigitar($event)"
               (keydown)="aoTeclar($event)"
             ></textarea>
-            <button type="button" class="wa__enviar" (click)="enviar()" aria-label="Enviar">
-              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+            <button type="button" class="wa__enviar" (click)="enviar()" [disabled]="!texto().trim()" [attr.aria-label]="editando() ? 'Salvar edição' : 'Enviar'">
+              @if (editando()) {
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+              } @else {
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+              }
             </button>
           </div>
         </div>
@@ -366,6 +446,14 @@
               <path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 5 5v6" />
             </svg>
             Responder
+          </button>
+        }
+        @if (podeEditar(mm)) {
+          <button type="button" class="wa__menu-item" role="menuitem" (click)="editar(mm)">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+            Editar
           </button>
         }
         @if (mm.remetente === 'UNIDADE') {

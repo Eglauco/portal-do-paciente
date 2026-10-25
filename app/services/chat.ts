@@ -43,6 +43,8 @@ export interface Mensagem {
   remetente: Remetente;
   texto: string;
   enviadaEm: string;
+  /** Quando a mensagem foi editada (estilo WhatsApp); nulo/ausente se nunca editada. */
+  editadaEm?: string | null;
   lida: boolean;
   entregue: boolean;
   /** Mensagem citada quando esta é uma resposta (feature "responder"); nulo caso contrário. */
@@ -145,6 +147,24 @@ export async function enviarMensagemPaciente(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto, clienteId, respondeAId }),
+  });
+  return comoJson<ChatDetalhe>(resposta);
+}
+
+/**
+ * Edita (altera o texto) de uma mensagem do paciente logado (estilo WhatsApp). Só funciona na própria
+ * mensagem e dentro da janela de 15 min (o backend valida); devolve o detalhe atualizado — a mensagem
+ * também chega atualizada via tempo real (o cliente troca a bolha pelo id).
+ */
+export async function editarMensagemPaciente(
+  id: number | string,
+  mensagemId: number,
+  texto: string,
+): Promise<ChatDetalhe> {
+  const resposta = await fetchMeu(`/meu/chats/${id}/mensagem/${mensagemId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto }),
   });
   return comoJson<ChatDetalhe>(resposta);
 }

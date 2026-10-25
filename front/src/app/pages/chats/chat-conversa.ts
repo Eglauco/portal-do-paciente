@@ -10,10 +10,11 @@ import { UsuarioService } from '../usuarios/usuario.service';
 import { ChatDetalhe, ChatLog, Citacao, Mensagem, TipoLogChat, novoClienteId, statusLabel } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
+import { DestacarBuscaPipe } from './destacar-busca.pipe';
 
 @Component({
   selector: 'app-chat-conversa',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, DestacarBuscaPipe],
   templateUrl: './chat-conversa.html',
 })
 export class ChatConversa {
@@ -133,8 +134,12 @@ export class ChatConversa {
     return c.atendenteNome || 'Atendente';
   }
 
-  /** Entra no modo "responder": guarda a mensagem citada, fecha o menu e foca o compositor. */
+  /** Entra no modo "responder": guarda a mensagem citada, sai do editar, fecha o menu e foca o compositor. */
   protected responder(m: Mensagem): void {
+    // Sair do modo edição descarta o texto que fora pré-preenchido (senão ele vazaria como resposta);
+    // um rascunho digitado fora da edição é preservado.
+    if (this.editando()) this.texto.set('');
+    this.editando.set(null);
     this.respondendo.set(m);
     this.fecharMenu();
     requestAnimationFrame(() => this.campoRef()?.nativeElement?.focus());
@@ -142,6 +147,37 @@ export class ChatConversa {
 
   protected cancelarResposta(): void {
     this.respondendo.set(null);
+  }
+
+  // --- Editar mensagem (estilo WhatsApp) ---
+  /** Mensagem sendo editada (prévia acima do compositor + campo preenchido); null = não editando. */
+  protected readonly editando = signal<Mensagem | null>(null);
+
+  /** Posso editar esta mensagem? (minha, da unidade, não-IA, recente — 15 min). O back valida o autor. */
+  protected podeEditar(m: Mensagem): boolean {
+    return (
+      m.remetente === 'UNIDADE' &&
+      !m.geradaPorIa &&
+      m.id > 0 &&
+      !m.pendente &&
+      !m.falha &&
+      this.podeResponder() &&
+      Date.now() - new Date(m.enviadaEm).getTime() < 15 * 60 * 1000
+    );
+  }
+
+  /** Entra no modo "editar": preenche o campo com o texto atual, sai do responder, fecha o menu e foca. */
+  protected editar(m: Mensagem): void {
+    this.respondendo.set(null);
+    this.editando.set(m);
+    this.texto.set(m.texto);
+    this.fecharMenu();
+    requestAnimationFrame(() => this.campoRef()?.nativeElement?.focus());
+  }
+
+  protected cancelarEdicao(): void {
+    this.editando.set(null);
+    this.texto.set('');
   }
 
   /** Clica numa citação: rola até a mensagem original e a destaca por um instante. */
@@ -152,6 +188,82 @@ export class ChatConversa {
     if (this.timerDestaque) clearTimeout(this.timerDestaque);
     this.timerDestaque = setTimeout(() => this.destacadoId.set(null), 1600);
   }
+
+  // --- Pesquisar na conversa (estilo WhatsApp) ---
+  protected readonly buscando = signal(false);
+  protected readonly termoBusca = signal('');
+  protected readonly indiceBusca = signal(0); // 0 = ocorrência MAIS RECENTE
+  private readonly campoBuscaRef = viewChild<ElementRef<HTMLInputElement>>('campoBusca');
+  protected readonly termoBuscaNorm = computed(() => this.termoBusca().trim().toLowerCase());
+  /** Ids das mensagens que contêm o termo, da MAIS RECENTE para a mais antiga. */
+  protected readonly resultadosBusca = computed<number[]>(() => {
+    const termo = this.termoBuscaNorm();
+    if (!termo) return [];
+    const msgs = this.detalhe()?.mensagens ?? [];
+    const ids: number[] = [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].texto?.toLowerCase().includes(termo)) ids.push(msgs[i].id);
+    }
+    return ids;
+  });
+  protected readonly contadorBusca = computed(() => {
+    const total = this.resultadosBusca().length;
+    if (!this.termoBuscaNorm()) return '';
+    if (total === 0) return 'Nenhum resultado';
+    const idx = Math.min(this.indiceBusca(), total - 1);
+    return `${idx + 1} de ${total} ${total === 1 ? 'resultado' : 'resultados'}`;
+  });
+
+  /** Elemento que tinha o foco ao abrir a busca (a lupa), para devolver ao fechar (WCAG 2.4.3). */
+  private focoBusca: HTMLElement | null = null;
+
+  protected abrirBusca(): void {
+    this.focoBusca = document.activeElement as HTMLElement | null;
+    this.respondendo.set(null);
+    this.buscando.set(true);
+    this.termoBusca.set('');
+    this.indiceBusca.set(0);
+    requestAnimationFrame(() => this.campoBuscaRef()?.nativeElement?.focus());
+  }
+
+  protected fecharBusca(): void {
+    this.buscando.set(false);
+    this.termoBusca.set('');
+    this.indiceBusca.set(0);
+    // Devolve o foco à lupa que abriu a busca (acessibilidade por teclado).
+    this.focoBusca?.focus();
+    this.focoBusca = null;
+  }
+
+  /** Digita no campo: reseta para a ocorrência mais recente e rola até ela. */
+  protected aoDigitarBusca(valor: string): void {
+    this.termoBusca.set(valor);
+    this.indiceBusca.set(0);
+    const ids = this.resultadosBusca();
+    if (ids.length > 0) this.rolarParaMsg(ids[0]);
+  }
+
+  /** Setas ^/v: +1 = ocorrência mais ANTIGA (sobe), -1 = mais NOVA (desce). */
+  protected irResultado(delta: number): void {
+    const ids = this.resultadosBusca();
+    if (ids.length === 0) return;
+    const atual = Math.min(this.indiceBusca(), ids.length - 1);
+    const novo = Math.min(Math.max(atual + delta, 0), ids.length - 1);
+    if (novo === atual) return;
+    this.indiceBusca.set(novo);
+    this.rolarParaMsg(ids[novo]);
+  }
+
+  private rolarParaMsg(id: number): void {
+    requestAnimationFrame(() =>
+      document.getElementById('msg-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    );
+    // A bolha da ocorrência atual "acende" por um instante (igual WhatsApp), marcando qual é.
+    this.destacadoId.set(id);
+    if (this.timerDestaque) clearTimeout(this.timerDestaque);
+    this.timerDestaque = setTimeout(() => this.destacadoId.set(null), 1500);
+  }
+
 
   constructor() {
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -495,6 +607,15 @@ export class ChatConversa {
   private aoReceberMensagem(mensagem: Mensagem): void {
     if (this.idAtual() == null) return;
     this.digitando.set(false); // chegou mensagem: parou de digitar
+    // Já existe uma bolha com esse id → é uma EDIÇÃO (estilo WhatsApp): troca no lugar
+    // (texto/editadaEm) em vez de ignorar como duplicata; não rola nem mexe em entrega.
+    const ehEdicao = this.detalhe()?.mensagens.some((x) => x.id === mensagem.id) ?? false;
+    if (ehEdicao) {
+      this.detalhe.update((d) =>
+        d ? { ...d, mensagens: d.mensagens.map((x) => (x.id === mensagem.id ? mensagem : x)) } : d,
+      );
+      return;
+    }
     this.detalhe.update((d) => {
       if (!d) return d;
       if (d.mensagens.some((x) => x.id === mensagem.id)) return d; // evita duplicar
@@ -531,6 +652,38 @@ export class ChatConversa {
     const conteudo = this.texto().trim();
     const id = this.idAtual();
     if (!conteudo || id == null) return;
+
+    // Modo edição (estilo WhatsApp): troca o texto no lugar + marca "Editada".
+    const emEdicao = this.editando();
+    if (emEdicao) {
+      this.editando.set(null);
+      this.texto.set('');
+      if (conteudo !== emEdicao.texto) {
+        this.detalhe.update((d) =>
+          d
+            ? {
+                ...d,
+                mensagens: d.mensagens.map((x) =>
+                  x.id === emEdicao.id ? { ...x, texto: conteudo, editadaEm: new Date().toISOString() } : x,
+                ),
+              }
+            : d,
+        );
+        this.service
+          .editar(id, emEdicao.id, conteudo)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            // Falha (fora dos 15 min, não-autor, rede…): reverte pro texto do servidor com um
+            // resync PASSIVO (sem re-marcar leitura/auditoria nem rolar) e avisa o atendente.
+            error: () => {
+              this.ressincronizar(id);
+              this.toastr.error('Não foi possível editar a mensagem.');
+            },
+          });
+      }
+      return;
+    }
+
     // Bloqueia só quando o back confirma que o paciente não usa mais o app
     // (pacienteUsandoApp === false). Se o campo vier ausente/indefinido, não
     // bloqueia na UI — o back ainda é a autoridade (responde 422 se preciso).

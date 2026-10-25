@@ -2,10 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  BackHandler,
   Image,
+  Keyboard,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -45,6 +48,7 @@ import {
   ChatDetalhe,
   Citacao,
   confirmarEntrega,
+  editarMensagemPaciente,
   enviarMensagemPaciente,
   falarComHumano,
   marcarLido,
@@ -141,6 +145,37 @@ const toqueLeve = () => {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 };
 
+/** Retângulo da bolha na janela — ancora o menu de contexto (estilo iOS) sobre a mensagem. */
+export type AncoraBolha = { x: number; y: number; width: number; height: number };
+
+/**
+ * Quebra o texto nas ocorrências do termo (case-insensitive) e envolve cada uma num <Text> com
+ * fundo âmbar (destaque da pesquisa, estilo WhatsApp). Sem termo (ou sem ocorrência) devolve o
+ * texto puro — custo zero fora do modo busca.
+ */
+function comDestaque(texto: string, termo: string, styles: ReturnType<typeof criarEstilos>): ReactNode {
+  if (!termo) return texto;
+  const alvo = texto.toLowerCase();
+  const t = termo.toLowerCase();
+  let pos = alvo.indexOf(t);
+  if (pos < 0) return texto;
+  const partes: ReactNode[] = [];
+  let i = 0;
+  let k = 0;
+  while (pos >= 0) {
+    if (pos > i) partes.push(texto.slice(i, pos));
+    partes.push(
+      <Text key={k++} style={styles.buscaDestaque}>
+        {texto.slice(pos, pos + termo.length)}
+      </Text>,
+    );
+    i = pos + termo.length;
+    pos = alvo.indexOf(t, i);
+  }
+  if (i < texto.length) partes.push(texto.slice(i));
+  return partes;
+}
+
 interface BolhaProps {
   m: Mensagem;
   daUnidade: boolean;
@@ -149,10 +184,12 @@ interface BolhaProps {
   nomeUnidade: string;
   podeResponder: boolean;
   onResponder: (m: Mensagem) => void;
-  onMenu: (m: Mensagem) => void;
+  onMenu: (m: Mensagem, ancora: AncoraBolha) => void;
   onTocarCitacao: (c: Citacao) => void;
   destacado: boolean;
   reenviar: (m: Mensagem) => void;
+  /** Termo da pesquisa a destacar no texto (vazio = sem destaque). */
+  termoBusca: string;
 }
 
 /**
@@ -162,7 +199,7 @@ interface BolhaProps {
  * mola. Segurar abre o menu. Memoizado para NÃO re-renderizar a lista inteira a cada estado.
  */
 const BolhaMensagem = memo(function BolhaMensagem({
-  m, daUnidade, styles, t, nomeUnidade, podeResponder, onResponder, onMenu, onTocarCitacao, destacado, reenviar,
+  m, daUnidade, styles, t, nomeUnidade, podeResponder, onResponder, onMenu, onTocarCitacao, destacado, reenviar, termoBusca,
 }: BolhaProps) {
   const tx = useSharedValue(0);
   const cruzou = useSharedValue(false); // já passou do limiar nesta arrastada? (para vibrar uma vez)
@@ -205,6 +242,13 @@ const BolhaMensagem = memo(function BolhaMensagem({
     ],
   }));
   const podeSegurar = podeResponder && m.id > 0 && !m.pendente && !m.falha;
+  const bolhaRef = useRef<View>(null);
+  // Segurar: mede a bolha na janela e abre o menu de contexto ancorado sobre ela (estilo iOS).
+  const abrirMenu = () => {
+    if (!podeSegurar) return;
+    toqueLeve();
+    bolhaRef.current?.measureInWindow((x, y, width, height) => onMenu(m, { x, y, width, height }));
+  };
 
   return (
     <View style={[styles.bolhaRow, daUnidade ? styles.esquerda : styles.direita]}>
@@ -215,7 +259,8 @@ const BolhaMensagem = memo(function BolhaMensagem({
       <GestureDetector gesture={pan}>
         <Animated.View style={bolhaAnim}>
         <Pressable
-          onLongPress={() => podeSegurar && onMenu(m)}
+          ref={bolhaRef}
+          onLongPress={abrirMenu}
           delayLongPress={280}
           style={[
             styles.bolha,
@@ -247,8 +292,9 @@ const BolhaMensagem = memo(function BolhaMensagem({
               <Text style={styles.viaRespTxt}>via {m.responsavelNome} (responsável)</Text>
             </View>
           ) : null}
-          <Text style={styles.texto}>{m.texto}</Text>
+          <Text style={styles.texto}>{comDestaque(m.texto, termoBusca, styles)}</Text>
           <View style={styles.rodape}>
+            {m.editadaEm ? <Text style={styles.editada}>Editada</Text> : null}
             <Text style={styles.hora}>{horaMsg(m.enviadaEm)}</Text>
             {!daUnidade &&
               (m.falha ? (
@@ -300,7 +346,24 @@ export default function ConversaScreen() {
   // Responder (citação): mensagem sendo respondida, menu do "segurar", e id em destaque ao tocar numa citação.
   const [respondendo, setRespondendo] = useState<Mensagem | null>(null);
   const [menuMsg, setMenuMsg] = useState<Mensagem | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<AncoraBolha | null>(null);
+  const [editando, setEditando] = useState<Mensagem | null>(null);
   const [destacado, setDestacado] = useState<number | null>(null);
+  // Pesquisar na conversa (estilo WhatsApp iOS): modo busca, termo e ocorrência atual.
+  const [buscando, setBuscando] = useState(false);
+  const [termoBusca, setTermoBusca] = useState('');
+  const [indiceResultado, setIndiceResultado] = useState(0); // 0 = ocorrência MAIS RECENTE
+  const buscaRef = useRef<TextInput>(null);
+  const idResultadoRef = useRef<number | null>(null); // id da ocorrência atual (reancora ao chegar msg nova)
+  const buscandoRef = useRef(false); // espelho p/ callbacks estáveis (ex.: não rolar pro fim na busca)
+  // Menu de contexto estilo iOS: a bolha "sobe" (escala) e o menu surge com mola; fundo escurece.
+  const janela = useWindowDimensions();
+  const ctxProg = useSharedValue(0);
+  const ctxBolhaAnim = useAnimatedStyle(() => ({ transform: [{ scale: interpolate(ctxProg.value, [0, 1], [1, 1.035]) }] }));
+  const ctxMenuAnim = useAnimatedStyle(() => ({
+    opacity: ctxProg.value,
+    transform: [{ scale: interpolate(ctxProg.value, [0, 1], [0.92, 1]) }],
+  }));
   const scrollRef = useRef<FlashListRef<Mensagem>>(null);
   const inputRef = useRef<TextInput>(null);
   // Espelho das mensagens para callbacks estáveis (ex.: achar o índice da citada p/ scrollToIndex)
@@ -410,15 +473,22 @@ export default function ConversaScreen() {
   useEffect(() => {
     if (!id) return;
     const cancelarMsg = observarMensagens(id, (m) => {
-      // Chegou mensagem da unidade: some com "digitando…" na hora e cancela o auto-ocultar.
-      if (timerDigitando.current) {
-        clearTimeout(timerDigitando.current);
-        timerDigitando.current = null;
+      const ehEdicao = mensagensRef.current.some((x) => x.id === m.id);
+      // Mensagem NOVA (não um eco de edição de mensagem antiga): some com "digitando…" na
+      // hora e cancela o auto-ocultar. Edição não deve mexer no indicador de digitação.
+      if (!ehEdicao) {
+        if (timerDigitando.current) {
+          clearTimeout(timerDigitando.current);
+          timerDigitando.current = null;
+        }
+        setDigitando(false);
       }
-      setDigitando(false);
       setDetalhe((d) => {
         if (!d) return d;
-        if (d.mensagens.some((x) => x.id === m.id)) return d; // evita duplicar
+        // Já existe (edição de mensagem) → troca a bolha pelo id (atualiza texto/editadaEm no lugar).
+        if (ehEdicao) {
+          return { ...d, mensagens: d.mensagens.map((x) => (x.id === m.id ? m : x)) };
+        }
         // Reconcilia o eco da própria mensagem otimista (temporária, id < 0) pelo clienteId
         // (1-para-1; cai no texto só se o eco não trouxer clienteId).
         const ehOtimista = (x: Mensagem) =>
@@ -426,12 +496,16 @@ export default function ConversaScreen() {
         const base = m.remetente === 'PACIENTE' ? d.mensagens.filter((x) => !ehOtimista(x)) : d.mensagens;
         return { ...d, mensagens: [...base, m] };
       });
-      // Mensagem da unidade chegou enquanto estou na conversa: confirma entrega E marca lida.
-      if (m.remetente === 'UNIDADE') {
-        confirmarEntrega(id);
-        marcarLido(id);
+      // Edição não mexe em entrega/leitura nem rola pro fim (a mensagem antiga só mudou no lugar).
+      if (!ehEdicao) {
+        // Mensagem da unidade chegou enquanto estou na conversa: confirma entrega E marca lida.
+        if (m.remetente === 'UNIDADE') {
+          confirmarEntrega(id);
+          marcarLido(id);
+        }
+        // Durante a pesquisa não puxa pro fim (mantém o usuário na ocorrência que está vendo).
+        if (!buscandoRef.current) rolarParaFim();
       }
-      rolarParaFim();
     });
     const cancelarDig = observarDigitando(id, (e) => {
       if (e.de !== 'UNIDADE') return; // só mostra quando o outro lado digita
@@ -534,6 +608,43 @@ export default function ConversaScreen() {
   const enviar = () => {
     const limpo = texto.trim();
     if (!limpo || !id) return;
+    // Modo edição (estilo WhatsApp): troca o texto da mensagem no lugar + marca "Editada".
+    if (editando) {
+      const alvo = editando;
+      setEditando(null);
+      setTexto('');
+      if (limpo !== alvo.texto) {
+        // Guarda o texto/selo originais para reverter se o servidor recusar (fora dos 15 min, rede…).
+        const textoOriginal = alvo.texto;
+        const editadaEmOriginal = alvo.editadaEm ?? null;
+        setDetalhe((d) =>
+          d
+            ? {
+                ...d,
+                mensagens: d.mensagens.map((x) =>
+                  x.id === alvo.id ? { ...x, texto: limpo, editadaEm: new Date().toISOString() } : x,
+                ),
+              }
+            : d,
+        );
+        editarMensagemPaciente(id, alvo.id, limpo).catch(() => {
+          // Falhou: desfaz a edição otimista NESTA mensagem (por id) e avisa — nunca deixa
+          // a bolha presa num texto que não chegou ao servidor nem reverte em silêncio.
+          setDetalhe((d) =>
+            d
+              ? {
+                  ...d,
+                  mensagens: d.mensagens.map((x) =>
+                    x.id === alvo.id ? { ...x, texto: textoOriginal, editadaEm: editadaEmOriginal } : x,
+                  ),
+                }
+              : d,
+          );
+          Alert.alert('Não foi possível editar', 'A mensagem não pôde ser editada. Tente novamente.');
+        });
+      }
+      return;
+    }
     // Otimista: mostra a mensagem na hora com o "relógio" (pendente) até o servidor confirmar.
     const tempId = -Date.now();
     const clienteId = novoClienteId();
@@ -571,11 +682,57 @@ export default function ConversaScreen() {
     [tentarEnviar],
   );
 
-  // Entra no modo "responder": guarda a mensagem citada, fecha o menu e foca o campo de texto.
-  const responderMensagem = useCallback((m: Mensagem) => {
-    setRespondendo(m);
+  const JANELA_EDICAO_MS = 15 * 60 * 1000;
+  // Só edita a PRÓPRIA mensagem (do paciente), recente (15 min) e já confirmada pelo servidor.
+  const editavel = (m: Mensagem | null) =>
+    !!m &&
+    m.remetente === 'PACIENTE' &&
+    m.id > 0 &&
+    !m.pendente &&
+    !m.falha &&
+    Date.now() - new Date(m.enviadaEm).getTime() < JANELA_EDICAO_MS;
+
+  const abrirMenuMsg = useCallback(
+    (m: Mensagem, ancora: AncoraBolha) => {
+      setMenuMsg(m);
+      setMenuAnchor(ancora);
+      ctxProg.value = 0;
+      ctxProg.value = withSpring(1, { damping: 18, stiffness: 240, mass: 0.6 });
+    },
+    [ctxProg],
+  );
+
+  const fecharMenu = useCallback(() => {
     setMenuMsg(null);
-    requestAnimationFrame(() => inputRef.current?.focus());
+    setMenuAnchor(null);
+  }, []);
+
+  // Entra no modo "responder": guarda a mensagem citada, sai do modo editar, fecha o menu e foca.
+  const responderMensagem = useCallback(
+    (m: Mensagem) => {
+      setEditando(null);
+      setRespondendo(m);
+      fecharMenu();
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [fecharMenu],
+  );
+
+  // Entra no modo "editar": preenche o campo com o texto atual, sai do modo responder, fecha o menu e foca.
+  const editarMensagem = useCallback(
+    (m: Mensagem) => {
+      setRespondendo(null);
+      setEditando(m);
+      setTexto(m.texto);
+      fecharMenu();
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [fecharMenu],
+  );
+
+  const cancelarEdicao = useCallback(() => {
+    setEditando(null);
+    setTexto('');
   }, []);
 
   // Toca na citação dentro de um balão: rola até a mensagem original e a destaca por um instante.
@@ -626,7 +783,105 @@ export default function ConversaScreen() {
   const iaAtendendo = detalhe?.status === 'ATENDIMENTO_IA';
   const mensagens = detalhe?.mensagens ?? [];
   mensagensRef.current = mensagens; // espelho p/ callbacks estáveis (tocarCitacao)
+  buscandoRef.current = buscando; // espelho p/ o handler de mensagem nova não rolar pro fim durante a busca
   const nomeUnidade = detalhe?.unidadeSaude.nome ?? 'Atendente';
+
+  // --- Pesquisar na conversa (estilo WhatsApp iOS) ---
+  const termoNorm = termoBusca.trim().toLowerCase();
+  // Índices (em `mensagens`) das mensagens que contêm o termo, da MAIS RECENTE para a mais antiga:
+  // assim resultados[0] é a ocorrência mais nova (igual WhatsApp, que abre na mais recente).
+  const resultados = useMemo(() => {
+    if (!termoNorm) return [] as number[];
+    const achados: number[] = [];
+    for (let i = mensagens.length - 1; i >= 0; i--) {
+      if (mensagens[i].texto?.toLowerCase().includes(termoNorm)) achados.push(i);
+    }
+    return achados;
+  }, [mensagens, termoNorm]);
+  const totalResultados = resultados.length;
+  const temTermo = termoNorm.length > 0;
+  const indiceSeguro = Math.min(indiceResultado, Math.max(totalResultados - 1, 0));
+  const semMaisNovo = indiceSeguro <= 0; // já na ocorrência mais recente → seta "baixo" desligada
+  const semMaisVelho = indiceSeguro >= totalResultados - 1; // já na mais antiga → seta "cima" desligada
+  const contadorBusca = !temTermo
+    ? ''
+    : totalResultados === 0
+      ? 'Nenhum resultado'
+      : `${indiceSeguro + 1} de ${totalResultados} ${totalResultados === 1 ? 'resultado' : 'resultados'}`;
+
+  const rolarParaResultado = useCallback((idxMensagem: number) => {
+    requestAnimationFrame(() =>
+      scrollRef.current?.scrollToIndex({ index: idxMensagem, animated: true, viewPosition: 0.5 }),
+    );
+    // A bolha da ocorrência atual "acende" por um instante (igual WhatsApp), marcando qual é.
+    const id = mensagensRef.current[idxMensagem]?.id;
+    if (id != null) {
+      idResultadoRef.current = id;
+      setDestacado(id);
+      if (timerDestaque.current) clearTimeout(timerDestaque.current);
+      timerDestaque.current = setTimeout(() => setDestacado(null), 1800);
+    }
+  }, []);
+
+  // Ao mudar o termo (ou abrir a busca): volta para a ocorrência mais recente e rola até ela.
+  // Depende só de termoNorm/buscando (não de `resultados`) para NÃO resetar a posição quando chega
+  // uma mensagem nova durante a busca — `resultados` é derivado no mesmo render, então está fresco.
+  useEffect(() => {
+    if (!buscando) return;
+    setIndiceResultado(0);
+    idResultadoRef.current = null;
+    if (resultados.length > 0) rolarParaResultado(resultados[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termoNorm, buscando]);
+
+  // Reancora a posição na MESMA ocorrência quando a lista muda (ex.: chega mensagem nova durante a
+  // busca): sem isso o índice posicional passaria a apontar outra ocorrência e o contador divergiria.
+  useEffect(() => {
+    if (!buscando || idResultadoRef.current == null) return;
+    const idx = mensagensRef.current.findIndex((m) => m.id === idResultadoRef.current);
+    const pos = idx >= 0 ? resultados.indexOf(idx) : -1;
+    if (pos >= 0) setIndiceResultado(pos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultados]);
+
+  // Setas ^/v: +1 = ocorrência mais ANTIGA (sobe), -1 = mais NOVA (desce).
+  const irResultado = useCallback(
+    (delta: number) => {
+      if (resultados.length === 0) return;
+      const novo = Math.min(Math.max(indiceSeguro + delta, 0), resultados.length - 1);
+      if (novo === indiceSeguro) return;
+      setIndiceResultado(novo);
+      rolarParaResultado(resultados[novo]);
+    },
+    [resultados, indiceSeguro, rolarParaResultado],
+  );
+
+  const abrirBusca = useCallback(() => {
+    setRespondendo(null);
+    setBuscando(true);
+    setTermoBusca('');
+    setIndiceResultado(0);
+    requestAnimationFrame(() => buscaRef.current?.focus());
+  }, []);
+
+  const fecharBusca = useCallback(() => {
+    setBuscando(false);
+    setTermoBusca('');
+    setIndiceResultado(0);
+    idResultadoRef.current = null;
+    setRespondendo(null); // descarta uma citação que um swipe acidental tenha deixado durante a busca
+    Keyboard.dismiss();
+  }, []);
+
+  // Android: o "voltar" do sistema fecha a busca antes de sair da tela.
+  useEffect(() => {
+    if (!buscando) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      fecharBusca();
+      return true;
+    });
+    return () => sub.remove();
+  }, [buscando, fecharBusca]);
 
   // Render de cada mensagem na lista. O separador de dia compara com a mensagem anterior (índice).
   const renderItem = useCallback(
@@ -647,17 +902,18 @@ export default function ConversaScreen() {
             styles={styles}
             t={t}
             nomeUnidade={nomeUnidade}
-            podeResponder={podeEnviar}
+            podeResponder={podeEnviar && !buscando}
             onResponder={responderMensagem}
-            onMenu={setMenuMsg}
+            onMenu={abrirMenuMsg}
             onTocarCitacao={tocarCitacao}
             destacado={destacado === m.id}
             reenviar={reenviar}
+            termoBusca={buscando ? termoNorm : ''}
           />
         </View>
       );
     },
-    [mensagens, styles, t, nomeUnidade, podeEnviar, destacado, responderMensagem, tocarCitacao, reenviar],
+    [mensagens, styles, t, nomeUnidade, podeEnviar, destacado, responderMensagem, abrirMenuMsg, tocarCitacao, reenviar, buscando, termoNorm],
   );
   const keyExtractor = useCallback((m: Mensagem) => String(m.id), []);
 
@@ -672,35 +928,54 @@ export default function ConversaScreen() {
         accessibilityLabel="Voltar">
         <Ionicons name="chevron-back" size={26} color={t.ink} />
       </Pressable>
-      <View style={styles.avatar}>
-        {detalhe ? (
-          <Text style={styles.avatarTxt}>{iniciais(detalhe.unidadeSaude.nome)}</Text>
-        ) : (
-          <Ionicons name="medical" size={18} color={t.glow} />
-        )}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.contatoNome} numberOfLines={1}>
-          {detalhe?.unidadeSaude.nome ?? 'Conversa'}
-        </Text>
-        {digitando ? (
-          <Text style={styles.digitando} numberOfLines={1}>
-            escrevendo…
+      {/* Avatar + nome: toca para abrir o perfil da unidade (estilo WhatsApp). */}
+      <Pressable
+        style={({ pressed }) => [styles.headerInfo, pressed && styles.headerInfoPressed]}
+        onPress={() => detalhe && router.push({ pathname: '/unidade/[id]', params: { id: detalhe.unidadeSaude.id } })}
+        disabled={!detalhe}
+        accessibilityRole="button"
+        accessibilityLabel="Ver dados da unidade">
+        <View style={styles.avatar}>
+          {detalhe ? (
+            <Text style={styles.avatarTxt}>{iniciais(detalhe.unidadeSaude.nome)}</Text>
+          ) : (
+            <Ionicons name="medical" size={18} color={t.glow} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.contatoNome} numberOfLines={1}>
+            {detalhe?.unidadeSaude.nome ?? 'Conversa'}
           </Text>
-        ) : conexao === 'conectado' ? (
-          <Text style={styles.contatoStatus} numberOfLines={1}>
-            {detalhe?.responsavelNome
-              ? `com ${detalhe.responsavelNome}`
-              : (detalhe?.statusDescricao ?? 'Carregando…')}
-          </Text>
-        ) : (
-          <Text style={styles.contatoStatus} numberOfLines={1}>
-            {conexao === 'conectando'
-              ? 'conectando ao vivo…'
-              : `sem tempo real${conexaoDetalhe ? ' · ' + conexaoDetalhe : ''}`}
-          </Text>
-        )}
-      </View>
+          {digitando ? (
+            <Text style={styles.digitando} numberOfLines={1}>
+              escrevendo…
+            </Text>
+          ) : conexao === 'conectado' ? (
+            <Text style={styles.contatoStatus} numberOfLines={1}>
+              {detalhe?.responsavelNome
+                ? `com ${detalhe.responsavelNome}`
+                : (detalhe?.statusDescricao ?? 'Carregando…')}
+            </Text>
+          ) : (
+            <Text style={styles.contatoStatus} numberOfLines={1}>
+              {conexao === 'conectando'
+                ? 'conectando ao vivo…'
+                : `sem tempo real${conexaoDetalhe ? ' · ' + conexaoDetalhe : ''}`}
+            </Text>
+          )}
+        </View>
+      </Pressable>
+      {/* Lupa: abre a pesquisa dentro da conversa (estilo WhatsApp). */}
+      {detalhe ? (
+        <Pressable
+          style={({ pressed }) => [styles.headerLupa, pressed && styles.headerLupaPressed]}
+          onPress={abrirBusca}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Pesquisar na conversa">
+          <Ionicons name="search" size={20} color={t.ink} />
+        </Pressable>
+      ) : null}
       {/* Falar com humano: no topo, à direita. Só habilitado enquanto a IA está atendendo;
           depois de acionado (o status muda) fica desabilitado — a ação já foi feita. */}
       {detalhe && podeEnviar ? (
@@ -728,6 +1003,40 @@ export default function ConversaScreen() {
           </Text>
         </Pressable>
       ) : null}
+    </View>
+  );
+
+  // Campo de pesquisa que SUBSTITUI o cabeçalho no modo busca (lupa + campo + limpar + fechar).
+  const conteudoBusca = (
+    <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={styles.buscaCampo}>
+        <Ionicons name="search" size={18} color={t.muted} />
+        <TextInput
+          ref={buscaRef}
+          style={styles.buscaInput}
+          value={termoBusca}
+          onChangeText={setTermoBusca}
+          placeholder="Pesquisar"
+          placeholderTextColor={t.muted}
+          autoFocus
+          autoCorrect={false}
+          returnKeyType="search"
+          accessibilityLabel="Pesquisar na conversa"
+        />
+        {termoBusca.length > 0 ? (
+          <Pressable onPress={() => setTermoBusca('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Limpar pesquisa">
+            <Ionicons name="close-circle" size={18} color={t.muted} />
+          </Pressable>
+        ) : null}
+      </View>
+      <Pressable
+        style={({ pressed }) => [styles.buscaFechar, pressed && styles.headerLupaPressed]}
+        onPress={fecharBusca}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Fechar pesquisa">
+        <Ionicons name="close" size={22} color={t.ink} />
+      </Pressable>
     </View>
   );
 
@@ -790,15 +1099,70 @@ export default function ConversaScreen() {
             cada frame (pesa ~15ms/frame no tablet fraco); o overlay sólido (0.78) já dá o fundo. */}
         {Platform.OS === 'ios' && <BlurView intensity={48} tint="light" style={StyleSheet.absoluteFill} />}
         <View style={styles.barOverlayHeader} />
-        {conteudoHeader}
+        {buscando ? conteudoBusca : conteudoHeader}
       </View>
 
+      {/* Modo pesquisa: navega entre as ocorrências (pílula ^/v + contador), colado no teclado. */}
+      {!carregando && !erro && buscando && (
+        <Animated.View style={[styles.barraFlutuante, barraInputAnim]}>
+          {/* Fundo de toolbar (igual WhatsApp): a pílula ^/v e o contador ficam SOBRE a barra, não soltos. */}
+          {Platform.OS === 'ios' && <BlurView intensity={56} tint="light" style={StyleSheet.absoluteFill} />}
+          <View style={styles.buscaBarFundo} />
+          <View style={styles.buscaNav} onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
+            <View style={styles.buscaNavPilula}>
+              <Pressable
+                style={styles.buscaNavBtn}
+                onPress={() => irResultado(1)}
+                disabled={!temTermo || semMaisVelho}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !temTermo || semMaisVelho }}
+                accessibilityLabel="Ocorrência anterior">
+                <Ionicons name="chevron-up" size={22} color={!temTermo || semMaisVelho ? t.muted : t.ink} />
+              </Pressable>
+              <View style={styles.buscaNavDivisor} />
+              <Pressable
+                style={styles.buscaNavBtn}
+                onPress={() => irResultado(-1)}
+                disabled={!temTermo || semMaisNovo}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !temTermo || semMaisNovo }}
+                accessibilityLabel="Próxima ocorrência">
+                <Ionicons name="chevron-down" size={22} color={!temTermo || semMaisNovo ? t.muted : t.ink} />
+              </Pressable>
+            </View>
+            <Text style={styles.buscaContador}>{contadorBusca}</Text>
+          </View>
+          <Animated.View style={safeAreaAnim} />
+        </Animated.View>
+      )}
+
       {/* Barra de digitação: translúcida e COLADA no teclado (sobe junto). */}
-      {!carregando && !erro && podeEnviar && (
+      {!carregando && !erro && !buscando && podeEnviar && (
         <Animated.View style={[styles.barraFlutuante, barraInputAnim]}>
           <View onLayout={(e) => setBarraRowH(Math.round(e.nativeEvent.layout.height))}>
-            {/* Prévia da mensagem citada (feature responder): barra + autor + trecho + fechar. */}
-            {respondendo ? (
+            {/* Prévia: modo EDITAR (estilo WhatsApp) ou RESPONDER (citação). */}
+            {editando ? (
+              <View style={styles.respostaFaixa}>
+                <Ionicons name="create-outline" size={18} color={t.brandDeep} style={{ marginRight: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.respostaNome} numberOfLines={1}>
+                    Editar mensagem
+                  </Text>
+                  <Text style={styles.respostaTrecho} numberOfLines={3}>
+                    {editando.texto}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={cancelarEdicao}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar edição">
+                  <Ionicons name="close" size={20} color={t.muted} />
+                </Pressable>
+              </View>
+            ) : respondendo ? (
               <View style={styles.respostaFaixa}>
                 <View style={styles.respostaBarra} />
                 <View style={{ flex: 1 }}>
@@ -836,15 +1200,15 @@ export default function ConversaScreen() {
                 disabled={!texto.trim()}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: !texto.trim() }}
-                accessibilityLabel="Enviar mensagem">
-                <Ionicons name="send" size={19} color="#fff" />
+                accessibilityLabel={editando ? 'Salvar edição' : 'Enviar mensagem'}>
+                <Ionicons name={editando ? 'checkmark' : 'send'} size={editando ? 23 : 19} color="#fff" />
               </Pressable>
             </View>
           </View>
           <Animated.View style={safeAreaAnim} />
         </Animated.View>
       )}
-      {!carregando && !erro && !podeEnviar && (
+      {!carregando && !erro && !buscando && !podeEnviar && (
         <View style={styles.barraWrap}>
           {Platform.OS === 'ios' && <BlurView intensity={56} tint="light" style={StyleSheet.absoluteFill} />}
           <View style={styles.barOverlayInput} />
@@ -860,25 +1224,77 @@ export default function ConversaScreen() {
         </View>
       )}
 
-      {/* Menu do "segurar" numa mensagem (estilo WhatsApp). */}
+      {/* Menu de contexto estilo iOS: segurar a mensagem → fundo escurece, a bolha "sobe" e o menu surge. */}
       <Modal
-        visible={!!menuMsg}
+        visible={!!menuMsg && !!menuAnchor}
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={() => setMenuMsg(null)}>
-        <Pressable style={styles.menuBackdrop} onPress={() => setMenuMsg(null)}>
-          <View style={styles.menuCard}>
-            <Pressable
-              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPress]}
-              onPress={() => menuMsg && responderMensagem(menuMsg)}
-              accessibilityRole="button"
-              accessibilityLabel="Responder a esta mensagem">
-              <Ionicons name="arrow-undo-outline" size={19} color={t.ink} />
-              <Text style={styles.menuItemTxt}>Responder</Text>
-            </Pressable>
-          </View>
-        </Pressable>
+        onRequestClose={fecharMenu}>
+        {menuMsg && menuAnchor
+          ? (() => {
+              const daUnidadeMenu = menuMsg.remetente === 'UNIDADE';
+              const comEditar = editavel(menuMsg);
+              const alturaMenu = (comEditar ? 2 : 1) * 50 + 8;
+              const cabeAbaixo =
+                menuAnchor.y + menuAnchor.height + 10 + alturaMenu < janela.height - (insets.bottom + 20);
+              const topoMenu = cabeAbaixo
+                ? menuAnchor.y + menuAnchor.height + 8
+                : Math.max(insets.top + 8, menuAnchor.y - 8 - alturaMenu);
+              const lado = daUnidadeMenu
+                ? { left: Math.max(10, menuAnchor.x) }
+                : { right: Math.max(10, janela.width - (menuAnchor.x + menuAnchor.width)) };
+              return (
+                <Pressable style={styles.ctxBackdrop} onPress={fecharMenu}>
+                  {Platform.OS === 'ios' && <BlurView intensity={16} tint="dark" style={StyleSheet.absoluteFill} />}
+                  {/* Cópia da bolha no mesmo lugar, com leve "pop" (a mensagem "sobe"). */}
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      { position: 'absolute', top: menuAnchor.y, left: menuAnchor.x, width: menuAnchor.width },
+                      ctxBolhaAnim,
+                    ]}>
+                    <View
+                      style={[
+                        styles.bolha,
+                        daUnidadeMenu ? styles.bolhaUnidade : styles.bolhaPaciente,
+                        daUnidadeMenu && menuMsg.geradaPorIa && styles.bolhaIa,
+                      ]}>
+                      <Text style={styles.texto}>{menuMsg.texto}</Text>
+                      <View style={styles.rodape}>
+                        {menuMsg.editadaEm ? <Text style={styles.editada}>Editada</Text> : null}
+                        <Text style={styles.hora}>{horaMsg(menuMsg.enviadaEm)}</Text>
+                      </View>
+                    </View>
+                  </Animated.View>
+                  {/* Menu flutuante (ações), ancorado abaixo/acima da bolha. */}
+                  <Animated.View style={[styles.ctxMenu, { top: topoMenu }, lado, ctxMenuAnim]}>
+                    <Pressable
+                      style={({ pressed }) => [styles.ctxItem, pressed && styles.ctxItemPress]}
+                      onPress={() => responderMensagem(menuMsg)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Responder a esta mensagem">
+                      <Text style={styles.ctxItemTxt}>Responder</Text>
+                      <Ionicons name="arrow-undo-outline" size={20} color={t.ink} />
+                    </Pressable>
+                    {comEditar ? (
+                      <>
+                        <View style={styles.ctxSep} />
+                        <Pressable
+                          style={({ pressed }) => [styles.ctxItem, pressed && styles.ctxItemPress]}
+                          onPress={() => editarMensagem(menuMsg)}
+                          accessibilityRole="button"
+                          accessibilityLabel="Editar esta mensagem">
+                          <Text style={styles.ctxItemTxt}>Editar</Text>
+                          <Ionicons name="create-outline" size={20} color={t.ink} />
+                        </Pressable>
+                      </>
+                    ) : null}
+                  </Animated.View>
+                </Pressable>
+              );
+            })()
+          : null}
       </Modal>
     </View>
   );
@@ -915,8 +1331,10 @@ const criarEstilos = (t: Tema) =>
     esquerda: { alignSelf: 'flex-start' },
     direita: { alignSelf: 'flex-end' },
     bolha: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8 },
-    // Destaque breve do balão ao tocar numa citação e rolar até a original.
-    bolhaDestacada: { backgroundColor: '#BFE8DA' },
+    // "Acende" âmbar: ao navegar na busca (ou tocar numa citação), a bolha atual fica com fundo
+    // âmbar por um instante. Sobrepõe o fundo branco/verde (visível nas duas); some via o timer do
+    // `destacado`. Sem overlay/overflow (que quebravam o texto das bolhas verdes no Android).
+    bolhaDestacada: { backgroundColor: '#F6D592' },
     // Ícone de "responder" revelado ao arrastar o balão (fica atrás, à esquerda).
     swipeIcone: {
       position: 'absolute',
@@ -979,6 +1397,35 @@ const criarEstilos = (t: Tema) =>
     respostaNome: { fontSize: 12.5, fontWeight: '700', color: t.brandDeep, marginBottom: 1 },
     respostaTrecho: { fontSize: 13, color: t.muted },
 
+    // Rótulo "Editada" no rodapé do balão (igual à hora, estilo WhatsApp).
+    editada: { fontSize: 10.5, color: '#7C8C87' },
+
+    // Menu de contexto estilo iOS (segurar a mensagem): fundo escurece + card flutuante com ações.
+    ctxBackdrop: { flex: 1, backgroundColor: alpha(t.ink, 0.28) },
+    ctxMenu: {
+      position: 'absolute',
+      minWidth: 216,
+      backgroundColor: t.surface,
+      borderRadius: 14,
+      paddingVertical: 4,
+      shadowColor: '#000',
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 10,
+    },
+    ctxItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+    },
+    ctxItemPress: { backgroundColor: t.brandTint },
+    ctxItemTxt: { fontSize: 16, color: t.ink, fontWeight: '500' },
+    ctxSep: { height: StyleSheet.hairlineWidth, backgroundColor: alpha(t.ink, 0.1), marginHorizontal: 14 },
+
     // Menu do "segurar" numa mensagem.
     menuBackdrop: { flex: 1, backgroundColor: alpha(t.ink, 0.35), alignItems: 'center', justifyContent: 'center' },
     menuCard: {
@@ -1020,6 +1467,8 @@ const criarEstilos = (t: Tema) =>
     },
     back: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     backPressed: { backgroundColor: t.brandTint },
+    headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+    headerInfoPressed: { opacity: 0.6 },
     avatar: {
       width: 40,
       height: 40,
@@ -1124,6 +1573,67 @@ const criarEstilos = (t: Tema) =>
       elevation: 4,
     },
     enviarDesativado: { opacity: 0.6 },
+
+    // --- Pesquisar na conversa (estilo WhatsApp iOS) ---
+    headerLupa: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+    headerLupaPressed: { backgroundColor: t.brandTint },
+    // Campo de pesquisa que substitui o cabeçalho no modo busca.
+    buscaCampo: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: alpha(t.ink, 0.06),
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: alpha(t.ink, 0.1),
+      paddingHorizontal: 14,
+      minHeight: 44,
+    },
+    buscaInput: { flex: 1, fontSize: 16, color: t.ink, paddingVertical: Platform.OS === 'ios' ? 0 : 2 },
+    buscaFechar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: alpha(t.ink, 0.06),
+    },
+    // Destaque âmbar das ocorrências dentro do texto da mensagem.
+    buscaDestaque: { backgroundColor: '#E8A23C', color: '#2B2007' },
+    // Fundo da barra de busca (toolbar com linha no topo, estilo WhatsApp): a pílula ^/v e o contador
+    // ficam SOBRE a barra, não soltos. iOS mantém translucidez (blur por trás); Android fica sólido.
+    buscaBarFundo: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: alpha(t.surface, Platform.OS === 'ios' ? 0.72 : 1),
+      borderTopWidth: 1,
+      borderTopColor: alpha(t.ink, 0.14),
+    },
+    // Barra do rodapé no modo busca: pílula com setas ^/v + contador.
+    buscaNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 8,
+    },
+    buscaNavPilula: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: t.surface,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: alpha(t.ink, 0.12),
+      shadowColor: '#0B2E29',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 7,
+      elevation: 3,
+    },
+    buscaNavBtn: { width: 48, height: 40, alignItems: 'center', justifyContent: 'center' },
+    buscaNavDivisor: { width: StyleSheet.hairlineWidth, height: 22, backgroundColor: alpha(t.ink, 0.12) },
+    buscaContador: { fontSize: 14, color: t.muted, fontWeight: '600' },
 
     estado: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
     estadoTitulo: { fontSize: 16, fontWeight: '800', color: t.ink },

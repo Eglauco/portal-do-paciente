@@ -43,6 +43,8 @@ export interface Mensagem {
   remetente: Remetente;
   texto: string;
   enviadaEm: string;
+  /** Quando a mensagem foi editada (estilo WhatsApp); nulo/ausente se nunca editada. */
+  editadaEm?: string | null;
   lida: boolean;
   entregue: boolean;
   /** Mensagem citada quando esta é uma resposta (feature "responder"); nulo caso contrário. */

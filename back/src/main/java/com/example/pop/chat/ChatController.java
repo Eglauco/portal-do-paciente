@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -250,6 +251,15 @@ public class ChatController {
             @Valid @RequestBody MensagemRequest request, @AuthenticationPrincipal Jwt jwt) {
         Chat chat = chatService.enviarComoUnidade(obter(id), request.texto(), request.clienteId(), uidDoToken(jwt),
                 request.respondeAId());
+        return ResponseEntity.ok(chatService.toDetalhe(chat));
+    }
+
+    /** Edita uma mensagem da unidade (só o atendente que a enviou, dentro de 15 min). */
+    @PutMapping("/{id}/mensagem/{mensagemId}")
+    @Transactional
+    public ResponseEntity<ChatDetalheResponse> editar(@PathVariable Long id, @PathVariable Long mensagemId,
+            @Valid @RequestBody MensagemRequest request, @AuthenticationPrincipal Jwt jwt) {
+        Chat chat = chatService.editarComoUnidade(obter(id), mensagemId, request.texto(), uidDoToken(jwt));
         return ResponseEntity.ok(chatService.toDetalhe(chat));
     }
 

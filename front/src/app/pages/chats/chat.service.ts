@@ -69,6 +69,11 @@ export class ChatService {
     return this.http.post<ChatDetalhe>(`${this.base}/${id}/mensagem`, { texto, clienteId, respondeAId });
   }
 
+  /** Edita (altera o texto) de uma mensagem da unidade enviada pelo próprio atendente (até 15 min). */
+  editar(id: number, mensagemId: number, texto: string): Observable<ChatDetalhe> {
+    return this.http.put<ChatDetalhe>(`${this.base}/${id}/mensagem/${mensagemId}`, { texto });
+  }
+
   resolver(id: number): Observable<ChatDetalhe> {
     return this.http.post<ChatDetalhe>(`${this.base}/${id}/resolver`, {});
   }

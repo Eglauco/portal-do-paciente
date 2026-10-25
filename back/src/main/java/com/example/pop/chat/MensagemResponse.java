@@ -10,6 +10,8 @@ public record MensagemResponse(
         RemetenteMensagem remetente,
         String texto,
         LocalDateTime enviadaEm,
+        /** Quando foi editada (estilo WhatsApp); nulo se nunca editada. */
+        LocalDateTime editadaEm,
         boolean lida,
         boolean entregue,
         /** Quando foi entregue ao aparelho (2º check); nulo se ainda não entregue. */
@@ -41,7 +43,7 @@ public record MensagemResponse(
      * {@code @JsonInclude(NON_NULL)} acima, nulos somem do JSON (não trafega nem a chave).
      */
     public MensagemResponse semCamposIa() {
-        return new MensagemResponse(id, remetente, texto, enviadaEm, lida, entregue, entregueEm,
+        return new MensagemResponse(id, remetente, texto, enviadaEm, editadaEm, lida, entregue, entregueEm,
                 visualizadaEm, clienteId, atendenteNome, responsavelNome, geradaPorIa,
                 null, null, null, null, respondeA);
     }
@@ -62,6 +64,7 @@ public record MensagemResponse(
 
     public static MensagemResponse from(Mensagem m, String responsavelNome) {
         return new MensagemResponse(m.getId(), m.getRemetente(), m.getTexto(), m.getEnviadaEm(),
+                m.getEditadaEm(),
                 m.isLida(), m.isEntregue(), m.getEntregueEm(), m.getVisualizadaEm(), m.getClienteId(),
                 m.getUsuario() != null ? m.getUsuario().getNome() : null,
                 responsavelNome,

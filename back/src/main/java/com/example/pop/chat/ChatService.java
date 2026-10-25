@@ -1,6 +1,7 @@
 package com.example.pop.chat;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -326,6 +327,71 @@ public class ChatService {
         // Notifica o paciente (o app suprime se ele já estiver nessa conversa).
         pushService.notificarNovaMensagem(chat);
         return chat;
+    }
+
+    /** Janela de edição (estilo WhatsApp): só é possível editar a mensagem nos primeiros 15 minutos. */
+    private static final Duration JANELA_EDICAO = Duration.ofMinutes(15);
+
+    /**
+     * Edita (altera o texto) de uma mensagem do PACIENTE na conversa dele (estilo WhatsApp). Só
+     * mensagens do próprio paciente e dentro da janela de 15 min. Atualiza no lugar + publica no
+     * tempo real (o cliente troca a bolha pelo id).
+     */
+    public Chat editarComoPaciente(Chat chat, Long mensagemId, String texto) {
+        Mensagem m = mensagemParaEditar(chat, mensagemId);
+        if (m.getRemetente() != RemetenteMensagem.PACIENTE) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só é possível editar as suas mensagens.");
+        }
+        aplicarEdicao(chat, m, texto);
+        return chat;
+    }
+
+    /**
+     * Edita uma mensagem da UNIDADE (atendente) na conversa. Só mensagens de um atendente humano
+     * (não da IA), enviadas pelo próprio {@code usuarioId}, dentro da janela de 15 min.
+     */
+    public Chat editarComoUnidade(Chat chat, Long mensagemId, String texto, Long usuarioId) {
+        Mensagem m = mensagemParaEditar(chat, mensagemId);
+        if (m.getRemetente() != RemetenteMensagem.UNIDADE || m.isGeradaPorIa()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só é possível editar as suas mensagens.");
+        }
+        if (m.getUsuario() == null || !m.getUsuario().getId().equals(usuarioId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Só quem enviou a mensagem pode editá-la.");
+        }
+        aplicarEdicao(chat, m, texto);
+        return chat;
+    }
+
+    /** Carrega a mensagem garantindo que é do chat e ainda está na janela de edição (senão 404/422). */
+    private Mensagem mensagemParaEditar(Chat chat, Long mensagemId) {
+        Mensagem m = mensagemRepository.findByIdComUsuario(mensagemId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada"));
+        if (!m.getChat().getId().equals(chat.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem não encontrada");
+        }
+        if (m.getEnviadaEm().isBefore(LocalDateTime.now().minus(JANELA_EDICAO))) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Esta mensagem não pode mais ser editada (prazo de 15 minutos).");
+        }
+        return m;
+    }
+
+    /** Aplica o novo texto, carimba {@code editadaEm} e publica a mensagem atualizada no tempo real. */
+    private void aplicarEdicao(Chat chat, Mensagem m, String texto) {
+        String novo = texto == null ? "" : texto.trim();
+        if (novo.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A mensagem não pode ficar vazia.");
+        }
+        if (novo.equals(m.getTexto())) {
+            return; // sem mudança: não marca como editada nem republica
+        }
+        m.setTexto(novo);
+        m.setEditadaEm(LocalDateTime.now());
+        mensagemRepository.save(m);
+        // Nome do responsável que enviou (quando foi por perfil dependente), para o payload do WS.
+        String responsavelNome = m.getResponsavelId() == null ? null
+                : responsavelRepository.findById(m.getResponsavelId()).map(Responsavel::getNome).orElse(null);
+        publicar(chat.getId(), m, responsavelNome);
     }
 
     /**
