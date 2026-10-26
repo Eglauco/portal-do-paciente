@@ -50,11 +50,13 @@ public class HorarioController {
     private final PushService pushService;
     private final TermoAssinaturaService termoAssinaturaService;
     private final StorageService storageService;
+    private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
 
     public HorarioController(HorarioRepository repository, AgendaRepository agendaRepository,
             PacienteRepository pacienteRepository, HorarioLogService logService, HorarioEntregaService entregaService,
             HorarioEntregaRepository entregaRepository, NpsService npsService, PushService pushService,
-            TermoAssinaturaService termoAssinaturaService, StorageService storageService) {
+            TermoAssinaturaService termoAssinaturaService, StorageService storageService,
+            com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService) {
         this.repository = repository;
         this.agendaRepository = agendaRepository;
         this.pacienteRepository = pacienteRepository;
@@ -65,6 +67,7 @@ public class HorarioController {
         this.pushService = pushService;
         this.termoAssinaturaService = termoAssinaturaService;
         this.storageService = storageService;
+        this.vinculoService = vinculoService;
     }
 
     /** URL de exibição (pré-assinada, 6h) da foto do paciente do horário; null quando não há foto. */
@@ -179,6 +182,9 @@ public class HorarioController {
         h.setHoraFim(request.horaFim());
         h.setPaciente(pacienteRepository.findById(request.pacienteId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
+        // Marcar o paciente numa agenda dá acesso à unidade dela (perfil/feed/chat/SAU) — idempotente.
+        vinculoService.garantir(request.pacienteId(),
+                agenda.getUnidadeSaude() == null ? null : agenda.getUnidadeSaude().getId());
     }
 
     private static Long uidDoToken(Jwt jwt) {

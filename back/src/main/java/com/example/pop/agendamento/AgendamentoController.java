@@ -88,6 +88,7 @@ public class AgendamentoController {
     private final HorarioEntregaService entregaService;
     private final HorarioEntregaRepository entregaRepository;
     private final TermoAssinaturaService termoAssinaturaService;
+    private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
 
     public AgendamentoController(HorarioRepository repository, AgendaRepository agendaRepository,
             PacienteRepository pacienteRepository,
@@ -96,7 +97,8 @@ public class AgendamentoController {
             MotivoFaltaRepository motivoFaltaRepository, NpsService npsService, PushService pushService,
             ExportacaoService exportacaoService, HorarioLogService logService,
             HorarioEntregaService entregaService, HorarioEntregaRepository entregaRepository,
-            TermoAssinaturaService termoAssinaturaService) {
+            TermoAssinaturaService termoAssinaturaService,
+            com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService) {
         this.repository = repository;
         this.agendaRepository = agendaRepository;
         this.pacienteRepository = pacienteRepository;
@@ -112,6 +114,7 @@ public class AgendamentoController {
         this.entregaService = entregaService;
         this.entregaRepository = entregaRepository;
         this.termoAssinaturaService = termoAssinaturaService;
+        this.vinculoService = vinculoService;
     }
 
     /**
@@ -466,5 +469,7 @@ public class AgendamentoController {
         horario.setAgenda(agendaRepository.save(agenda));
         horario.setPaciente(pacienteRepository.findById(request.pacienteId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
+        // Agendar dá ao paciente acesso à unidade (perfil/feed/chat/SAU) — idempotente.
+        vinculoService.garantir(request.pacienteId(), request.unidadeSaudeId());
     }
 }

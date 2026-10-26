@@ -55,6 +55,7 @@ public class ChatService {
     private final ChatIaOrchestrator iaOrchestrator;
     private final com.example.pop.configuracao.CustoIaService custoIaService;
     private final com.example.pop.usoia.UsoIaService usoIaService;
+    private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
 
     public ChatService(ChatRepository repository, MensagemRepository mensagemRepository,
             PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
@@ -63,7 +64,8 @@ public class ChatService {
             SimpMessagingTemplate messagingTemplate, PushService pushService, StorageService storageService,
             @Lazy ChatIaOrchestrator iaOrchestrator,
             com.example.pop.configuracao.CustoIaService custoIaService,
-            com.example.pop.usoia.UsoIaService usoIaService) {
+            com.example.pop.usoia.UsoIaService usoIaService,
+            com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService) {
         this.repository = repository;
         this.mensagemRepository = mensagemRepository;
         this.pacienteRepository = pacienteRepository;
@@ -78,6 +80,7 @@ public class ChatService {
         this.iaOrchestrator = iaOrchestrator;
         this.custoIaService = custoIaService;
         this.usoIaService = usoIaService;
+        this.vinculoService = vinculoService;
     }
 
     /** Registra no ledger o uso de IA de uma mensagem (só quando a IA rodou de fato: modelo != null). */
@@ -106,6 +109,14 @@ public class ChatService {
      * marcada para rollback não conseguiria reconsultar).
      */
     public AberturaConversa abrirOuCriar(Long pacienteId, Long unidadeId) {
+        AberturaConversa abertura = resolverConversa(pacienteId, unidadeId);
+        // Vincula o paciente à unidade (idempotente): sem isso ele conversa, mas não abre o perfil
+        // da unidade (403 em GET /meu/unidades/{id}) nem vê feed/SAU dela. Cobre criar e reabrir.
+        vinculoService.garantir(pacienteId, unidadeId);
+        return abertura;
+    }
+
+    private AberturaConversa resolverConversa(Long pacienteId, Long unidadeId) {
         Optional<Chat> existente = repository.findByPacienteIdAndUnidadeSaudeId(pacienteId, unidadeId);
         if (existente.isPresent()) {
             return new AberturaConversa(existente.get(), false);

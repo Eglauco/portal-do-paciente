@@ -81,13 +81,15 @@ public class SirespAgendamentoService {
     private final HorarioEntregaService entregaService;
     private final PushService pushService;
     private final SirespConfigService configService;
+    private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
 
     public SirespAgendamentoService(SirespRepository repository, EspecialidadeRepository especialidadeRepository,
             ExameRepository exameRepository, UnidadeRepository unidadeRepository,
             ProfissionalSaudeRepository profissionalRepository, PacienteRepository pacienteRepository,
             HorarioRepository agendamentoRepository, AgendaRepository agendaRepository,
             HorarioLogService agendamentoLogService,
-            HorarioEntregaService entregaService, PushService pushService, SirespConfigService configService) {
+            HorarioEntregaService entregaService, PushService pushService, SirespConfigService configService,
+            com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService) {
         this.repository = repository;
         this.especialidadeRepository = especialidadeRepository;
         this.exameRepository = exameRepository;
@@ -100,6 +102,7 @@ public class SirespAgendamentoService {
         this.entregaService = entregaService;
         this.pushService = pushService;
         this.configService = configService;
+        this.vinculoService = vinculoService;
     }
 
     /** Motivos de CANCELAMENTO do CROSS (ID_MOTIVO) → nome, para o log. */
@@ -686,6 +689,9 @@ public class SirespAgendamentoService {
         Horario salvo = agendamentoRepository.save(ag);
         agendamentoLogService.registrarDaUnidade(salvo, null, StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE,
                 usuarioId);
+        // Agendamento do SIRESP dá ao paciente acesso à unidade (perfil/feed/chat/SAU) — idempotente.
+        vinculoService.garantir(a.paciente() == null ? null : a.paciente().getId(),
+                a.unidade() == null ? null : a.unidade().getId());
         return salvo;
     }
 

@@ -64,6 +64,7 @@ public class AgendaImportacaoService {
     private final HorarioRepository horarioRepository;
     private final HorarioLogService logService;
     private final HorarioEntregaService entregaService;
+    private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
 
     public AgendaImportacaoService(AgendaPlanilhaParser parser,
             ProfissionalSaudeRepository profissionalRepository,
@@ -74,7 +75,8 @@ public class AgendaImportacaoService {
             AgendaRepository agendaRepository,
             HorarioRepository horarioRepository,
             HorarioLogService logService,
-            HorarioEntregaService entregaService) {
+            HorarioEntregaService entregaService,
+            com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService) {
         this.parser = parser;
         this.profissionalRepository = profissionalRepository;
         this.especialidadeRepository = especialidadeRepository;
@@ -85,6 +87,7 @@ public class AgendaImportacaoService {
         this.horarioRepository = horarioRepository;
         this.logService = logService;
         this.entregaService = entregaService;
+        this.vinculoService = vinculoService;
     }
 
     /** Referência de cadastro para casar por id/código. {@code codigo} nulo = sem código de integração. */
@@ -172,6 +175,8 @@ public class AgendaImportacaoService {
             Horario salvo = horarioRepository.save(h);
             logService.registrarDaUnidade(salvo, null, STATUS_INICIAL, uid);
             horarioIds.add(salvo.getId());
+            // Importar agendamento dá ao paciente acesso à unidade (perfil/feed/chat/SAU) — idempotente.
+            vinculoService.garantir(hr.paciente().valor(), r.unidade().valor());
         }
         return new ResultadoImportacao(agendaSalva.getId(), horarioIds);
     }
