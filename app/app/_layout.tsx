@@ -123,7 +123,10 @@ function Navegacao() {
     // do perfil ativo E ligada no kill switch (evita cair numa aba escondida/desligada).
     // (A tela "Trocar unidade" navega sozinha após a troca — não depende daqui, senão ela
     // seria fechada ao abrir, já que a sessão continua resolvida.)
-    if (naRaiz) roteador.replace(abaInicial(sessao, telaHabilitada));
+    // Inclui 'definir-senha': uma conta de PERFIL ÚNICO (perfilSelecionado já true) cai aqui
+    // logo após criar a senha (precisaDefinirSenha vira false) — sem este caso ela ficaria
+    // presa girando na tela de definir senha, pois 'definir-senha' não é a raiz.
+    if (naRaiz || rota === 'definir-senha') roteador.replace(abaInicial(sessao, telaHabilitada));
   }, [sessao, carregando, segments, roteador, telaHabilitada]);
 
   return (
