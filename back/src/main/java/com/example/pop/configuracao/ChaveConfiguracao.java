@@ -217,9 +217,10 @@ public final class ChaveConfiguracao {
      */
     public static final String SMS_CONVITE_APP_HABILITADO = "SMS_CONVITE_APP_HABILITADO";
 
-    /** Link da loja Android (Google Play) incluído no SMS de convite (TEXTO). Em branco = omitido. */
-    public static final String SMS_CONVITE_APP_LINK_ANDROID = "SMS_CONVITE_APP_LINK_ANDROID";
-
-    /** Link da loja iOS (App Store) incluído no SMS de convite (TEXTO). Em branco = omitido. */
-    public static final String SMS_CONVITE_APP_LINK_IOS = "SMS_CONVITE_APP_LINK_IOS";
+    /**
+     * Texto do SMS de convite (TEXTO). É a mensagem INTEIRA (o admin inclui os links das lojas no
+     * próprio texto). Editado inline junto do {@link #SMS_CONVITE_APP_HABILITADO}: obrigatório quando
+     * o convite está habilitado. Oculto da lista genérica de Configurações (editado só pelo toggle).
+     */
+    public static final String SMS_CONVITE_APP_TEXTO = "SMS_CONVITE_APP_TEXTO";
 }

@@ -33,6 +33,15 @@ export interface ConfiguracaoFiltro {
   tipo?: TipoConfiguracao | null;
 }
 
+/**
+ * Convite por SMS: liga/desliga + texto (a mensagem inteira), editados juntos inline no toggle.
+ * O texto é obrigatório quando habilitado (validado no front e no back).
+ */
+export interface SmsConvite {
+  habilitado: boolean;
+  texto: string;
+}
+
 export interface Pagina<T> {
   content: T[];
   page: number;

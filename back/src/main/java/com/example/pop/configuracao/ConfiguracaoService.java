@@ -238,6 +238,33 @@ public class ConfiguracaoService {
         invalidarCacheAposCommit();
     }
 
+    // ---------- Convite por SMS (liga/desliga + texto, editados inline/atômico) ----------
+
+    /** Config atual do convite por SMS (liga/desliga + texto), para a edição inline no toggle. */
+    @Transactional(readOnly = true)
+    public SmsConviteConfig lerSmsConvite() {
+        boolean habilitado = lerBooleano(ChaveConfiguracao.SMS_CONVITE_APP_HABILITADO);
+        String texto = lerTexto(ChaveConfiguracao.SMS_CONVITE_APP_TEXTO);
+        return new SmsConviteConfig(habilitado, texto == null ? "" : texto);
+    }
+
+    /**
+     * Salva o convite por SMS (liga/desliga + texto) numa ÚNICA transação. Quando habilitado, o texto
+     * é OBRIGATÓRIO (422 se vazio) — a mensagem nunca vai em branco. Reusa {@link #salvarTexto}/
+     * {@link #salvarBooleano} (self-invocation → mesma transação, cache invalidado uma vez no commit).
+     */
+    @Transactional
+    public SmsConviteConfig salvarSmsConvite(boolean habilitado, String texto, Long usuarioId) {
+        String limpo = texto == null ? "" : texto.trim();
+        if (habilitado && limpo.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Informe o texto do SMS quando o convite estiver habilitado.");
+        }
+        salvarTexto(ChaveConfiguracao.SMS_CONVITE_APP_TEXTO, limpo, usuarioId);
+        salvarBooleano(ChaveConfiguracao.SMS_CONVITE_APP_HABILITADO, habilitado, usuarioId);
+        return new SmsConviteConfig(habilitado, limpo);
+    }
+
     private static String vazioParaNulo(String s) {
         return s == null || s.isBlank() ? null : s.trim();
     }

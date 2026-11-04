@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Ordenacao, ordenacoesParaParametros } from '../../shared/ordenacao/ordenacao.model';
-import { Configuracao, ConfiguracaoFiltro, ConfiguracaoValor, Pagina } from './configuracao.model';
+import { Configuracao, ConfiguracaoFiltro, ConfiguracaoValor, Pagina, SmsConvite } from './configuracao.model';
 
 @Injectable({ providedIn: 'root' })
 export class ConfiguracaoService {
@@ -33,5 +33,15 @@ export class ConfiguracaoService {
   /** Atualiza SÓ o valor da configuração (o servidor aplica o campo do tipo). */
   atualizar(id: number, valor: ConfiguracaoValor): Observable<Configuracao> {
     return this.http.put<Configuracao>(`${this.base}/${id}`, valor);
+  }
+
+  /** Convite por SMS (liga/desliga + texto), editados juntos no toggle. */
+  lerSmsConvite(): Observable<SmsConvite> {
+    return this.http.get<SmsConvite>(`${this.base}/sms-convite`);
+  }
+
+  /** Salva o convite por SMS de forma atômica (422 do back quando habilitado e texto vazio). */
+  salvarSmsConvite(dados: SmsConvite): Observable<SmsConvite> {
+    return this.http.put<SmsConvite>(`${this.base}/sms-convite`, dados);
   }
 }

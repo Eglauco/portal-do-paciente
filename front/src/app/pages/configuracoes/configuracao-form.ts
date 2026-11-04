@@ -1,4 +1,4 @@
-import { Component, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
@@ -38,6 +38,7 @@ import { ConfiguracaoService } from './configuracao.service';
       .img-config__acoes { display: flex; gap: 0.5rem; flex-wrap: wrap; }
       .img-config__acoes .btn { cursor: pointer; }
       .img-config__acoes .is-disabled { opacity: 0.6; pointer-events: none; }
+      .campo-erro { color: #b3261e; font-size: 0.85rem; margin-top: 0.25rem; }
     `,
   ],
 })
@@ -61,6 +62,16 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
   protected readonly codigo = signal<number | null>(null);
   protected readonly salvando = signal(false);
   protected readonly erroCarregar = signal(false);
+
+  // --- Caso especial: convite por SMS (liga/desliga + texto da mensagem editados JUNTOS no toggle) ---
+  /** Chave cuja edição combina o liga/desliga com o texto obrigatório da mensagem. */
+  private static readonly CHAVE_SMS_CONVITE = 'SMS_CONVITE_APP_HABILITADO';
+  protected readonly ehSmsConvite = computed(() => this.config()?.chave === ConfiguracaoForm.CHAVE_SMS_CONVITE);
+  protected readonly smsHabilitado = signal(false);
+  protected readonly smsTexto = signal('');
+  protected readonly smsSujo = signal(false);
+  /** Texto é obrigatório quando o convite está habilitado (espelha a validação do backend). */
+  protected readonly smsErro = computed(() => this.smsHabilitado() && this.smsTexto().trim().length === 0);
 
   /** Só o valor é editável; o servidor aplica o campo do tipo do registro. */
   protected readonly form = new FormGroup({
@@ -86,6 +97,16 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
     this.service.buscarPorId(id).subscribe({
       next: (c) => {
         this.config.set(c);
+        // Convite por SMS: além do liga/desliga, carrega o texto da mensagem (editados juntos).
+        if (c.chave === ConfiguracaoForm.CHAVE_SMS_CONVITE) {
+          this.service.lerSmsConvite().subscribe({
+            next: (s) => {
+              this.smsHabilitado.set(s.habilitado);
+              this.smsTexto.set(s.texto ?? '');
+            },
+            error: () => this.erroCarregar.set(true),
+          });
+        }
         this.form.patchValue({
           valorBooleano: c.valorBooleano ?? false,
           valorTexto: c.valorTexto ?? '',
@@ -109,8 +130,23 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
   }
 
   podeSair(): boolean | Promise<boolean> {
-    if (this.saidaAutorizada || !this.form.dirty) return true;
+    if (this.saidaAutorizada) return true;
+    // No caso SMS a edição usa signals (não o FormGroup), então a sujeira é rastreada à parte.
+    const sujo = this.ehSmsConvite() ? this.smsSujo() : this.form.dirty;
+    if (!sujo) return true;
     return this.confirmar('Existe alteração não salva na tela, deseja sair?');
+  }
+
+  /** Atualiza o liga/desliga do convite por SMS (marca a tela como alterada). */
+  protected setSmsHabilitado(valor: boolean): void {
+    this.smsHabilitado.set(valor);
+    this.smsSujo.set(true);
+  }
+
+  /** Atualiza o texto do convite por SMS (marca a tela como alterada). */
+  protected setSmsTexto(valor: string): void {
+    this.smsTexto.set(valor);
+    this.smsSujo.set(true);
   }
 
   /**
@@ -225,6 +261,10 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
     event.preventDefault();
     const c = this.config();
     if (!c || this.codigo() == null) return;
+    if (this.ehSmsConvite()) {
+      this.salvarSmsConvite();
+      return;
+    }
     const v = this.form.getRawValue();
     const dados: ConfiguracaoValor =
       c.tipoConfiguracao === 'BOOLEANO'
@@ -253,6 +293,28 @@ export class ConfiguracaoForm implements PodeSair, OnDestroy {
         this.toastr.error('Não foi possível salvar a configuração.');
       },
     });
+  }
+
+  /** Salva o convite por SMS (toggle + texto, atômico). Bloqueia texto vazio quando habilitado (espelha o 422). */
+  private salvarSmsConvite(): void {
+    if (this.smsErro()) {
+      this.toastr.error('Informe o texto do SMS quando o convite estiver habilitado.');
+      return;
+    }
+    this.salvando.set(true);
+    this.service
+      .salvarSmsConvite({ habilitado: this.smsHabilitado(), texto: this.smsTexto().trim() })
+      .subscribe({
+        next: () => {
+          this.saidaAutorizada = true;
+          this.toastr.success('Configuração salva');
+          this.router.navigate(['/configuracoes']);
+        },
+        error: () => {
+          this.salvando.set(false);
+          this.toastr.error('Não foi possível salvar a configuração.');
+        },
+      });
   }
 
   protected cancelar(): void {

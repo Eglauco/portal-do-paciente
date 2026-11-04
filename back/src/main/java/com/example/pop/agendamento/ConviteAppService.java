@@ -77,7 +77,7 @@ public class ConviteAppService {
             }
             String corpo = montarMensagem();
             if (corpo == null) {
-                log.debug("Convite por SMS ligado, mas sem link de loja configurado — nada enviado.");
+                log.debug("Convite por SMS ligado, mas o texto da mensagem está em branco — nada enviado.");
                 return;
             }
             if (!smsService.configurado()) {
@@ -103,24 +103,13 @@ public class ConviteAppService {
         }
     }
 
-    /** Corpo do SMS com os links disponíveis; {@code null} se nenhum link estiver configurado. */
+    /**
+     * Corpo do SMS: o texto configurado em {@link ChaveConfiguracao#SMS_CONVITE_APP_TEXTO} — é a
+     * mensagem INTEIRA (o admin inclui os links das lojas no próprio texto). {@code null} se em branco
+     * (fail-safe: não envia SMS vazio, embora a tela já exija o texto quando o convite está habilitado).
+     */
     private String montarMensagem() {
-        String android = vazioParaNulo(configuracaoService.lerTexto(ChaveConfiguracao.SMS_CONVITE_APP_LINK_ANDROID));
-        String ios = vazioParaNulo(configuracaoService.lerTexto(ChaveConfiguracao.SMS_CONVITE_APP_LINK_IOS));
-        if (android == null && ios == null) {
-            return null;
-        }
-        String marca = vazioParaNulo(configuracaoService.lerTexto(ChaveConfiguracao.NOME_PLATAFORMA));
-        String nomeApp = marca == null ? "nosso aplicativo" : marca;
-        StringBuilder sb = new StringBuilder("Olá! Você tem um atendimento agendado. Baixe o ")
-                .append(nomeApp).append(" para acompanhar e confirmar.");
-        if (android != null) {
-            sb.append(" Android: ").append(android);
-        }
-        if (ios != null) {
-            sb.append(" iOS: ").append(ios);
-        }
-        return sb.toString();
+        return vazioParaNulo(configuracaoService.lerTexto(ChaveConfiguracao.SMS_CONVITE_APP_TEXTO));
     }
 
     /** Telefones (E.164, só celular, sem repetição) das pessoas SEM app ligadas a este paciente. */

@@ -43,6 +43,21 @@ public class ConfiguracaoController {
         return service.listar(busca, tipo, ordenar, page, size);
     }
 
+    /**
+     * Convite por SMS: liga/desliga + texto da mensagem, editados juntos (inline no toggle). Fica ANTES
+     * de {@code /{id}} — "sms-convite" não é um Long, mas o caminho literal tem prioridade de qualquer forma.
+     */
+    @GetMapping("/sms-convite")
+    public SmsConviteConfig lerSmsConvite() {
+        return service.lerSmsConvite();
+    }
+
+    /** Salva o convite por SMS (atômico). 422 quando habilitado e texto em branco. */
+    @PutMapping("/sms-convite")
+    public SmsConviteConfig salvarSmsConvite(@RequestBody SmsConviteConfig dados, @AuthenticationPrincipal Jwt jwt) {
+        return service.salvarSmsConvite(dados.habilitado(), dados.texto(), uid(jwt));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ConfiguracaoResponse> buscar(@PathVariable Long id) {
         return service.buscar(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());

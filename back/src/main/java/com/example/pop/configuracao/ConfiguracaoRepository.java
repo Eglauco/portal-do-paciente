@@ -12,7 +12,8 @@ public interface ConfiguracaoRepository extends JpaRepository<Configuracao, Long
 
     /**
      * Busca do CRUD genérico: por nome OU chave (texto) e por tipo (ambos opcionais). EXCLUI os SEGREDO —
-     * credenciais (tokens dos provedores) só aparecem/editam na tela dedicada de Provedores de assinatura.
+     * credenciais (tokens dos provedores) só aparecem/editam na tela dedicada de Provedores de assinatura —
+     * e o SMS_CONVITE_APP_TEXTO, que é editado inline junto do liga/desliga do convite por SMS.
      */
     @Query("""
             select c from Configuracao c
@@ -20,6 +21,7 @@ public interface ConfiguracaoRepository extends JpaRepository<Configuracao, Long
                    or lower(c.chave) like lower(concat('%', :busca, '%')))
               and (:tipo is null or c.tipoConfiguracao = :tipo)
               and c.tipoConfiguracao <> com.example.pop.configuracao.TipoConfiguracao.SEGREDO
+              and c.chave <> 'SMS_CONVITE_APP_TEXTO'
             """)
     Page<Configuracao> search(@Param("busca") String busca, @Param("tipo") TipoConfiguracao tipo, Pageable pageable);
 
