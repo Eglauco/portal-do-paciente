@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -45,6 +47,8 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/paciente-auth")
 public class PacienteAuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(PacienteAuthController.class);
 
     private final PacienteAcessoService acessoService;
     private final StorageService storageService;
@@ -240,8 +244,9 @@ public class PacienteAuthController {
     /**
      * Clínicas (ATIVAS) do CPF onde a identidade (CPF + data + telefone) confere — fixa o schema de cada uma
      * e pergunta ao serviço. Para o app COMPARTILHADO escolher a clínica no fluxo de OTP (antes do ativar).
+     * Package-private: o teste de regressão da blindagem (pular inquilino quebrado) chama direto.
      */
-    private List<ClinicaLogin> clinicasComIdentidade(String cpfBruto, LocalDate dataNascimento, String telefone) {
+    List<ClinicaLogin> clinicasComIdentidade(String cpfBruto, LocalDate dataNascimento, String telefone) {
         String cpf = Documentos.somenteDigitos(cpfBruto);
         if (cpf == null || cpf.isEmpty()) {
             return List.of();
@@ -252,9 +257,18 @@ public class PacienteAuthController {
         String anterior = TenantContext.atualBruto();
         try {
             for (InquilinoService.Clinica clinica : inquilinoService.clinicasAtivas(ids)) {
-                TenantContext.definir(inquilinoService.schemaPorId(clinica.id()));
-                if (acessoService.identidadeConfereNoTenant(cpf, dataNascimento, telefone)) {
-                    confere.add(new ClinicaLogin(clinica.id(), clinica.nome()));
+                // RESILIÊNCIA: um inquilino com schema inconsistente (ex.: migration atrasada → coluna
+                // ausente) NÃO pode derrubar o login de TODOS os CPFs que varrem essa clínica. Isola a
+                // checagem por-tenant: loga e pula o problemático, seguindo com os demais. Cada chamada ao
+                // serviço (@Transactional) roda em transação própria, então a falha de um não suja o próximo.
+                try {
+                    TenantContext.definir(inquilinoService.schemaPorId(clinica.id()));
+                    if (acessoService.identidadeConfereNoTenant(cpf, dataNascimento, telefone)) {
+                        confere.add(new ClinicaLogin(clinica.id(), clinica.nome()));
+                    }
+                } catch (RuntimeException e) {
+                    log.error("Falha ao conferir identidade no inquilino '{}' (id {}) — pulando: {}",
+                            clinica.nome(), clinica.id(), e.getMessage());
                 }
             }
         } finally {

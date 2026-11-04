@@ -42,9 +42,26 @@ public class GeocodingService {
     private static final Pattern LOGRADOURO =
             Pattern.compile("(?i)^\\s*(av\\.?|avenida|r\\.?|rua|rod\\.?|rodovia|al\\.?|alameda|pra[cç]a|travessa|tv\\.?)\\s+");
 
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(6))
-            .build();
+    // Criado PREGUIÇOSAMENTE (na 1ª geocodificação), não no construtor: montar o HttpClient abre um
+    // socketpair de loopback (wakeup do selector NIO) já na construção do bean, o que quebra o START
+    // da aplicação em ambientes restritos (CI/sandbox sem socket). Lazy = o contexto sobe sem tocar na
+    // rede; o comportamento do geocode é idêntico (o client é criado na 1ª chamada e reaproveitado).
+    private volatile HttpClient http;
+
+    /** HttpClient compartilhado, criado sob demanda (double-checked locking). */
+    private HttpClient http() {
+        HttpClient local = http;
+        if (local == null) {
+            synchronized (this) {
+                local = http;
+                if (local == null) {
+                    local = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(6)).build();
+                    http = local;
+                }
+            }
+        }
+        return local;
+    }
 
     /** Coordenadas [latitude, longitude] do endereço (tenta do mais específico ao mais amplo). */
     public Optional<double[]> geocodificar(String endereco) {
@@ -97,7 +114,7 @@ public class GeocodingService {
                     .timeout(Duration.ofSeconds(8))
                     .GET()
                     .build();
-            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> resp = http().send(req, HttpResponse.BodyHandlers.ofString());
             if (resp.statusCode() != 200) {
                 log.warn("Geocodificação retornou status {}", resp.statusCode());
                 return Optional.empty();

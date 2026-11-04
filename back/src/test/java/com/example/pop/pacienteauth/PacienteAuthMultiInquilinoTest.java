@@ -49,6 +49,7 @@ class PacienteAuthMultiInquilinoTest {
     private static final String CPF = "52998224725";
     private static final String PIN = "123456";
     private static final String DISPOSITIVO = "disp-teste-pacauth";
+    private static final String TELEFONE = "18988172191";
 
     @Autowired
     private PacienteAuthController pacienteAuthController;
@@ -98,6 +99,7 @@ class PacienteAuthMultiInquilinoTest {
             paciente.setCpf(CPF);
             paciente.setDataNascimento(LocalDate.of(1990, 1, 1));
             paciente.setSituacao(SituacaoCadastro.ATIVO);
+            paciente.getTelefonesAdicionais().add(TELEFONE); // identidade do OTP confere por telefone
             pacienteRepository.save(paciente);
         } finally {
             if (anterior != null) {
@@ -150,6 +152,29 @@ class PacienteAuthMultiInquilinoTest {
         assertNotNull(escolhida.sessao(), "após escolher a clínica certa, entra");
         assertEquals(tenantId.longValue(), inqDoToken(escolhida.sessao().token()),
                 "o token carrega o inquilino escolhido");
+    }
+
+    /**
+     * BLINDAGEM (regressão): a varredura cross-clínica do OTP ({@code clinicasComIdentidade}) NÃO pode ser
+     * derrubada por um inquilino com schema inconsistente. Aqui a 2ª clínica está registrada e ATIVA, mas
+     * SEM schema provisionado — qualquer query nela estoura (simula migration atrasada → coluna ausente).
+     * A varredura deve CONFERIR na clínica boa e PULAR a quebrada, sem propagar a exceção (antes da
+     * blindagem, um único tenant quebrado derrubava o login — 500 — de TODOS os CPFs que o varriam).
+     */
+    @Test
+    void varreduraPulaInquilinoQuebradoSemDerrubarOLogin() {
+        Inquilino quebrada = new Inquilino();
+        quebrada.setNome("Clinica Quebrada");
+        quebrada.setSchemaName(SCHEMA2);
+        Long quebradaId = inquilinoRepository.save(quebrada).getId();
+        roteamentoPacienteService.registrar(CPF, quebradaId);
+
+        var clinicas = pacienteAuthController.clinicasComIdentidade(CPF, LocalDate.of(1990, 1, 1), TELEFONE);
+
+        assertEquals(1, clinicas.size(),
+                "retorna só a clínica boa; a quebrada é pulada (antes da blindagem derrubava tudo com 500)");
+        assertEquals(tenantId.longValue(), clinicas.get(0).inquilinoId(),
+                "a clínica boa (tenant provisionado) é conferida normalmente");
     }
 
     /** Lê o claim {@code inq} do payload do JWT (sem verificar assinatura — basta inspecionar o conteúdo). */
