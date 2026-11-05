@@ -1,7 +1,6 @@
 package com.example.pop.agendamento;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +31,7 @@ import lombok.Setter;
 /**
  * "Horário" = a MARCAÇÃO de um paciente dentro de uma {@link Agenda} (nível {@code ID_AGE_CONSULTA_HOR} do CROSS).
  * Guarda o paciente, o status + histórico, os destinatários da notificação e a falta. A data/hora específica da
- * marcação fica aqui ({@code dataHora}, timestamp cheio = dia da agenda + hora de início; {@code horaFim} opcional).
+ * marcação fica aqui ({@code dataHora}, timestamp cheio = dia da agenda + hora de início).
  *
  * <p>Os campos de SLOT (especialidade, profissional, configuracaoAgenda, unidade) moram na {@link Agenda}; os getters
  * {@code getEspecialidade()/getProfissionalSaude()/getConfiguracaoAgenda()/getUnidadeSaude()} aqui delegam para a agenda
@@ -74,10 +73,6 @@ public class Horario {
     @Column(name = "data_hora", nullable = false)
     private LocalDateTime dataHora;
 
-    /** Hora de término (opcional; do CROSS HOR_FIM). */
-    @Column(name = "hora_fim")
-    private LocalTime horaFim;
-
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "paciente_id", nullable = false)
     private Paciente paciente;
@@ -85,6 +80,35 @@ public class Horario {
     @Enumerated(EnumType.STRING)
     @Column(name = "status_agendamento", nullable = false, length = 40)
     private StatusAgendamento statusAgendamento;
+
+    // ---------- Dados do paciente informados na linha da IMPORTAÇÃO por Excel ----------
+    // O paciente é localizado pelo identificador (id/prontuário/código); estes campos são só o que veio na
+    // planilha, gravado junto ao horário — NÃO criam nem alteram o cadastro do Paciente. Nulos em marcação
+    // manual e na importada do SIRESP. Ver V177 e AgendaImportacaoService.
+
+    /** CPF (só dígitos, 11) informado na linha da importação. */
+    @Column(name = "importacao_cpf", length = 11)
+    private String importacaoCpf;
+
+    /** Nome informado na linha da importação. */
+    @Column(name = "importacao_nome", length = 160)
+    private String importacaoNome;
+
+    /** Nome social informado na linha da importação (opcional). */
+    @Column(name = "importacao_nome_social", length = 120)
+    private String importacaoNomeSocial;
+
+    /** "Utiliza nome social" do registro importado — verdadeiro quando o nome social veio preenchido. */
+    @Column(name = "importacao_utiliza_nome_social", nullable = false)
+    private boolean importacaoUtilizaNomeSocial;
+
+    /** Telefone (só dígitos) informado na linha da importação. */
+    @Column(name = "importacao_telefone", length = 20)
+    private String importacaoTelefone;
+
+    /** Data de nascimento informada na linha da importação. */
+    @Column(name = "importacao_data_nascimento")
+    private java.time.LocalDate importacaoDataNascimento;
 
     /** Texto livre com o porquê da falta, informado pelo paciente no app. */
     @Column(name = "justificativa_falta", columnDefinition = "TEXT")

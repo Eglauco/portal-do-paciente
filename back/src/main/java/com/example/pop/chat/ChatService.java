@@ -88,7 +88,7 @@ public class ChatService {
         if (modelo == null) {
             return;
         }
-        String paciente = chat.getPaciente() == null ? "" : chat.getPaciente().getNome();
+        String paciente = chat.getPaciente() == null ? "" : chat.getPaciente().nomeExibicao();
         Long unidadeId = chat.getUnidadeSaude() == null ? null : chat.getUnidadeSaude().getId();
         usoIaService.registrar(com.example.pop.usoia.UsoIaTipo.CHAT_MENSAGEM,
                 "Mensagem do chat — " + paciente, modelo, tokensEntrada, tokensSaida, custo,
@@ -637,7 +637,7 @@ public class ChatService {
                 .countByChatIdAndRemetenteAndLidaFalse(chat.getId(), RemetenteMensagem.PACIENTE);
         return new ChatResponse(
                 chat.getId(),
-                new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(chat.getPaciente()),
                 storageService.urlFotoPaciente(chat.getPaciente().getFotoUrl()),
                 new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
                 chat.getStatus(),
@@ -668,7 +668,7 @@ public class ChatService {
                 .toList();
         return new ChatDetalheResponse(
                 chat.getId(),
-                new Ref(chat.getPaciente().getId(), chat.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(chat.getPaciente()),
                 storageService.urlFotoPaciente(chat.getPaciente().getFotoUrl()),
                 new Ref(chat.getUnidadeSaude().getId(), chat.getUnidadeSaude().getNome()),
                 chat.getStatus(),

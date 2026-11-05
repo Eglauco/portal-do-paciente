@@ -80,6 +80,11 @@ public class NotificacaoService {
         n.setTitulo(titulo);
         n.setCorpo(corpo);
         n.setReferenciaId(referenciaId);
+        // AGENDAMENTO/FALTA/LEMBRETE referenciam um HORÁRIO (referenciaId = id do horário) — grava o vínculo para a
+        // FK ON DELETE CASCADE (V179): excluir o horário apaga a notificação, evitando o "toque que não leva a nada".
+        if (tipo == TipoNotificacao.AGENDAMENTO || tipo == TipoNotificacao.FALTA || tipo == TipoNotificacao.LEMBRETE) {
+            n.setHorarioId(referenciaId);
+        }
         n.setLida(false);
         n.setCriadoEm(LocalDateTime.now());
         return n;

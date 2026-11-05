@@ -6,11 +6,13 @@ package com.example.pop.paciente;
  * RESPONSAVEL fica reservado para eventos originados por um responsável no app. SISTEMA
  * cobre ações sem ator identificado (ex.: sem token). IMPORTACAO_SIRESP = criação/alteração
  * do cadastro feita pela importação do XML do SIRESP (o usuário importador fica como ator).
+ * IMPORTACAO_AGENDA = criação do cadastro feita pela importação de agenda por Excel.
  */
 public enum AutorLogPaciente {
     UNIDADE,
     PACIENTE,
     RESPONSAVEL,
     SISTEMA,
-    IMPORTACAO_SIRESP
+    IMPORTACAO_SIRESP,
+    IMPORTACAO_AGENDA
 }

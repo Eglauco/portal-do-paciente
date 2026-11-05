@@ -383,7 +383,7 @@ public class PacienteAuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nenhum perfil disponível para este CPF");
         }
         String token = gerarToken(conta, padrao.paciente(), dispositivoId, inquilinoId);
-        return new AtivarResponse(token, padrao.paciente().getId(), padrao.paciente().getNome(),
+        return new AtivarResponse(token, padrao.paciente().getId(), padrao.paciente().nomeExibicao(),
                 perfis.stream().map(this::paraResposta).toList(), precisaDefinirSenha,
                 inquilinoService.nomePorId(inquilinoId));
     }
@@ -403,19 +403,19 @@ public class PacienteAuthController {
         Paciente perfil = acessoService.perfilDaConta(conta.getCpf(), request.pacienteId());
         // Reemite o token mantendo o MESMO inquilino da sessão (o TenantFilter já fixou o schema pelo inq).
         String token = gerarToken(conta, perfil, jwt.getClaimAsString("dev"), inquilinoDoToken(jwt));
-        return new PacienteSessaoResponse(token, perfil.getId(), perfil.getNome());
+        return new PacienteSessaoResponse(token, perfil.getId(), perfil.nomeExibicao());
     }
 
     /** Reidrata a sessão (valida token + aparelho ativo) devolvendo o perfil atual. */
     @GetMapping("/me")
     public PacienteSessaoResponse me(@AuthenticationPrincipal Jwt jwt) {
         Paciente paciente = acessoService.pacienteDoToken(jwt);
-        return new PacienteSessaoResponse(null, paciente.getId(), paciente.getNome());
+        return new PacienteSessaoResponse(null, paciente.getId(), paciente.nomeExibicao());
     }
 
     private PerfilResponse paraResposta(Perfil perfil) {
         Paciente p = perfil.paciente();
-        return new PerfilResponse(p.getId(), p.getNome(),
+        return new PerfilResponse(p.getId(), p.nomeExibicao(),
                 storageService.urlFotoPaciente(p.getFotoUrl()), perfil.proprio(), perfil.permissoes());
     }
 

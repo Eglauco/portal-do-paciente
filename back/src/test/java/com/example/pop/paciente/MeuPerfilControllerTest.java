@@ -89,7 +89,7 @@ class MeuPerfilControllerTest {
         MeuPerfilRequest req = new MeuPerfilRequest("Paciente Editado", List.of(TEL, "11955551234"),
                 Sexo.FEMININO, java.time.LocalDate.of(1991, 2, 3), "12.345.678-9", null,
                 "Mãe Editada", "Pai Editado", "Novo@Example.com",
-                "Rua Nova", "200", "Casa", "Centro", "São Paulo", "sp", "01001-000");
+                "Rua Nova", "200", "Casa", "Centro", "São Paulo", "sp", "01001-000", null, null);
 
         MeuPerfilResponse perfil = controller.atualizar(jwt, req);
         assertEquals("Paciente Editado", perfil.nome());
@@ -110,7 +110,7 @@ class MeuPerfilControllerTest {
     @Test
     void atualizarSemNenhumTelefoneRetorna422() {
         MeuPerfilRequest req = new MeuPerfilRequest("Paciente Perfil", List.of(),
-                null, DOB, null, null, null, null, null, null, null, null, null, null, null, null);
+                null, DOB, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> controller.atualizar(jwt, req));
         assertEquals(422, ex.getStatusCode().value());
     }

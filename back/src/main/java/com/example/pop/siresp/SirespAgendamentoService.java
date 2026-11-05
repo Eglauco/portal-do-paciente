@@ -242,7 +242,7 @@ public class SirespAgendamentoService {
         }
         Criacao c = criarOuReaproveitar(s, a, usuarioId);
         s.setAgendamentoId(c.agendamentoId());
-        preencherFaltantes(s, a.paciente(), a.especialidade(), a.profissional(), a.unidade(), a.dataHora(), null);
+        preencherFaltantes(s, a.paciente(), a.especialidade(), a.profissional(), a.unidade(), a.dataHora());
         s.setLogIntegracao(montarLog(a, c.nota()));
         Siresp salvo = repository.save(s);
         // Notifica o paciente/responsáveis (push + rastreio de entrega) — FORA de transação, como o cadastro manual.
@@ -269,7 +269,7 @@ public class SirespAgendamentoService {
         }
         // Achou o horário → preenche os dados de exibição do registro (o XML de cancelamento é enxuto) p/ a tela/busca.
         preencherFaltantes(s, h.getPaciente(), h.getEspecialidade(), h.getProfissionalSaude(), h.getUnidadeSaude(),
-                h.getDataHora(), h.getHoraFim());
+                h.getDataHora());
         ResultadoCancelamento r = cancelarHorario(h, usuarioId);
         String nota;
         switch (r) {
@@ -357,7 +357,7 @@ public class SirespAgendamentoService {
         Criacao c = criarOuReaproveitar(s, a, usuarioId);
         s.setAgendamentoId(c.agendamentoId());
         // Preenche o que o XML de transferência não traz (nome/CPF do paciente) a partir do que foi resolvido.
-        preencherFaltantes(s, a.paciente(), a.especialidade(), a.profissional(), a.unidade(), a.dataHora(), null);
+        preencherFaltantes(s, a.paciente(), a.especialidade(), a.profissional(), a.unidade(), a.dataHora());
         s.setLogIntegracao(montarLog(a, "Transferência" + sufixoMotivo(MOTIVO_TRANSFERENCIA, s) + ": "
                 + notaOrigem + " " + c.nota()));
         Siresp salvo = repository.save(s);
@@ -486,7 +486,7 @@ public class SirespAgendamentoService {
      * nulas são ignoradas.
      */
     private static void preencherFaltantes(Siresp s, Paciente p, Especialidade esp, ProfissionalSaude prof,
-            Unidade unidade, LocalDateTime dataHora, LocalTime horaFim) {
+            Unidade unidade, LocalDateTime dataHora) {
         boolean preencheu = false;
 
         // --- Paciente (completo) ---
@@ -541,9 +541,6 @@ public class SirespAgendamentoService {
         if (dataHora != null) {
             preencheu |= setSeVazio(s::getDataAgenda, s::setDataAgenda, dataHora.toLocalDate().toString());
             preencheu |= setSeVazio(s::getHorIni, s::setHorIni, dataHora.toLocalTime().format(HORA_HMS));
-        }
-        if (horaFim != null) {
-            preencheu |= setSeVazio(s::getHorFim, s::setHorFim, horaFim.format(HORA_HMS));
         }
 
         if (preencheu) {
@@ -683,7 +680,6 @@ public class SirespAgendamentoService {
         // Tipo pareado com o código (consistente com o índice único composto): só quando há código.
         ag.setTipoAtendimento(codHor.isEmpty() ? null : tipo);
         ag.setDataHora(a.dataHora());
-        ag.setHoraFim(parseHora(trim(s.getHorFim())));
         ag.setPaciente(a.paciente());
         ag.setStatusAgendamento(StatusAgendamento.AGUARDANDO_CONFIRMACAO_PACIENTE);
         Horario salvo = agendamentoRepository.save(ag);

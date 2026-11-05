@@ -28,6 +28,7 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
             select p from Paciente p
             where p.situacao = com.example.pop.paciente.SituacaoCadastro.ATIVO
               and (lower(p.nome) like lower(concat('%', :termo, '%'))
+                   or lower(p.nomeSocial) like lower(concat('%', :termo, '%'))
                    or lower(p.prontuario) like lower(concat('%', :termo, '%'))
                    or (:digitos <> '' and p.cpf like concat('%', :digitos, '%')))
             order by p.nome asc
@@ -55,7 +56,8 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
             select p from Paciente p
             where (:id is null or p.id = :id)
               and (:situacao is null or p.situacao = :situacao)
-              and lower(p.nome) like lower(concat('%', :nome, '%'))
+              and (lower(p.nome) like lower(concat('%', :nome, '%'))
+                   or lower(coalesce(p.nomeSocial, '')) like lower(concat('%', :nome, '%')))
               and (:cpf = '' or p.cpf like concat('%', :cpf, '%'))
               and (:prontuario = '' or lower(p.prontuario) like lower(concat('%', :prontuario, '%')))
             """,
@@ -63,7 +65,8 @@ public interface PacienteRepository extends JpaRepository<Paciente, Long> {
             select count(p) from Paciente p
             where (:id is null or p.id = :id)
               and (:situacao is null or p.situacao = :situacao)
-              and lower(p.nome) like lower(concat('%', :nome, '%'))
+              and (lower(p.nome) like lower(concat('%', :nome, '%'))
+                   or lower(coalesce(p.nomeSocial, '')) like lower(concat('%', :nome, '%')))
               and (:cpf = '' or p.cpf like concat('%', :cpf, '%'))
               and (:prontuario = '' or lower(p.prontuario) like lower(concat('%', :prontuario, '%')))
             """)

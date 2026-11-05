@@ -47,6 +47,25 @@ public class Paciente {
     @Column(nullable = false, length = 120)
     private String nome;
 
+    /**
+     * Nome social: o nome pelo qual o paciente deseja ser identificado e chamado,
+     * independentemente do registro civil (Decreto nº 8.727/2016; Portaria MS nº 1.820/2009 —
+     * Carta dos Direitos dos Usuários da Saúde). Opcional. O nome civil ({@link #nome}) é
+     * SEMPRE preservado no banco — nunca é substituído; só a EXIBIÇÃO passa a usar o nome
+     * social quando {@link #utilizaNomeSocial} está marcado (ver {@link #nomeExibicao()}).
+     */
+    @Column(name = "nome_social", length = 120)
+    private String nomeSocial;
+
+    /**
+     * Quando {@code true} (e há nome social preenchido), o sistema exibe o nome social em todo
+     * o atendimento (chat, listas, notificações, app) no lugar do nome civil. Dado
+     * potencialmente sensível — pode revelar identidade de gênero (LGPD, art. 5º, II): as
+     * alterações são auditadas e o nome civil não é divulgado quando o paciente usa nome social.
+     */
+    @Column(name = "utiliza_nome_social", nullable = false)
+    private boolean utilizaNomeSocial = false;
+
     /** Código do paciente em um sistema externo (integração). Único quando preenchido. */
     @Column(name = "codigo_integracao", length = 60)
     private String codigoIntegracao;
@@ -195,5 +214,30 @@ public class Paciente {
     /** Um telefone para exibição/snapshot (o primeiro da lista); {@code null} se não houver. */
     public String primeiroTelefone() {
         return telefonesAdicionais == null || telefonesAdicionais.isEmpty() ? null : telefonesAdicionais.get(0);
+    }
+
+    /**
+     * Nome para EXIBIÇÃO/atendimento: o nome social quando o paciente opta por usá-lo (e ele está
+     * preenchido); senão, o nome civil. É este o nome que deve aparecer no chat, nas listas, nas
+     * notificações e no app — o nome civil fica reservado ao uso estritamente necessário
+     * (identificação legal/clínica). Documentos legais mostram os dois ("Nome Social (Nome Civil)").
+     */
+    public String nomeExibicao() {
+        if (utilizaNomeSocial && nomeSocial != null && !nomeSocial.isBlank()) {
+            return nomeSocial;
+        }
+        return nome;
+    }
+
+    /**
+     * Nome para DOCUMENTOS legais/clínicos (termos/TCLE, prontuário em PDF, receituário, signatário
+     * da assinatura): quando o paciente usa nome social, mostra os DOIS — "Nome Social (Nome Civil)" —
+     * preservando a identificação legal exigida nesses documentos; senão, apenas o nome civil.
+     */
+    public String nomeDocumentoLegal() {
+        if (utilizaNomeSocial && nomeSocial != null && !nomeSocial.isBlank()) {
+            return nomeSocial + " (" + nome + ")";
+        }
+        return nome;
     }
 }

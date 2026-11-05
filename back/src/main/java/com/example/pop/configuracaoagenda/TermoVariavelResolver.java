@@ -39,7 +39,7 @@ public class TermoVariavelResolver {
     private String valor(VariavelTermo v, Horario ag, LocalDateTime agora) {
         Paciente p = ag.getPaciente();
         switch (v) {
-            case NOME_PACIENTE: return nn(p.getNome());
+            case NOME_PACIENTE: return nn(p.nomeDocumentoLegal());
             case CPF_PACIENTE: return mascararCpf(p.getCpf());
             case RG_PACIENTE: return nn(p.getRg());
             case DATA_NASCIMENTO: return p.getDataNascimento() == null ? "" : p.getDataNascimento().format(DATA);

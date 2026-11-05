@@ -258,7 +258,7 @@ public class AgendamentoController {
         return List.of(
                 ColunaExport.de("Código", a -> String.valueOf(a.getId())),
                 ColunaExport.de("Data/Hora", a -> a.getDataHora() == null ? "" : a.getDataHora().format(DATA_HORA)),
-                ColunaExport.de("Paciente", a -> a.getPaciente().getNome()),
+                ColunaExport.de("Paciente", a -> a.getPaciente().nomeDocumentoLegal()),
                 ColunaExport.de("CPF do paciente", a -> formatarCpf(a.getPaciente().getCpf())),
                 ColunaExport.de("Telefone do paciente", a -> a.getPaciente().getTelefonesAdicionais() == null ? ""
                         : a.getPaciente().getTelefonesAdicionais().stream().map(AgendamentoController::formatarTelefone)

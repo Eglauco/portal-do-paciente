@@ -65,7 +65,9 @@ public class ProntuarioMedicoService {
                 .count();
 
         HistoricoMedicoResponse.PacienteCabecalho cab = new HistoricoMedicoResponse.PacienteCabecalho(
-                p.getId(), p.getNome(), p.getCpf(), p.getDataNascimento(),
+                p.getId(), p.nomeExibicao(), p.getNome(),
+                p.isUtilizaNomeSocial() && p.getNomeSocial() != null && !p.getNomeSocial().isBlank(),
+                p.getCpf(), p.getDataNascimento(),
                 p.getSexo() == null ? null : p.getSexo().name(),
                 storageService.urlFotoPaciente(p.getFotoUrl()),
                 p.getProntuario(),
@@ -129,7 +131,7 @@ public class ProntuarioMedicoService {
         p.setResumoHistoricoGeracoes(zero(p.getResumoHistoricoGeracoes()) + 1);
         pacienteRepository.save(p);
         // Ledger de auditoria: uma linha por geração do resumo do histórico.
-        usoIaService.registrar(UsoIaTipo.PRONTUARIO_RESUMO, "Resumo do histórico — " + p.getNome(),
+        usoIaService.registrar(UsoIaTipo.PRONTUARIO_RESUMO, "Resumo do histórico — " + p.nomeExibicao(),
                 resumo.modelo(), resumo.tokensEntrada(), resumo.tokensSaida(), custo,
                 "/prontuario-medico/" + p.getId(), unidadeId);
     }

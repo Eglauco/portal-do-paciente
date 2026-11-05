@@ -140,7 +140,7 @@ public class ChatController {
     private List<FiltroAplicado> filtrosChat(Long pacienteId, Long unidadeId, Long responsavelId,
             StatusChat status, boolean naoResolvidas) {
         String paciente = pacienteId == null ? "Todos"
-                : pacienteRepository.findById(pacienteId).map(p -> p.getNome()).orElse("#" + pacienteId);
+                : pacienteRepository.findById(pacienteId).map(p -> p.nomeDocumentoLegal()).orElse("#" + pacienteId);
         String responsavel = responsavelId == null ? "Todos"
                 : usuarioRepository.findById(responsavelId).map(u -> u.getNome()).orElse("#" + responsavelId);
         String unidade = unidadeId == null ? "Todas"
@@ -156,7 +156,7 @@ public class ChatController {
     private static List<ColunaExport<ChatResponse>> colunasChat() {
         return List.of(
                 ColunaExport.de("Código", c -> String.valueOf(c.id())),
-                ColunaExport.de("Paciente", c -> c.paciente().nome()),
+                ColunaExport.de("Paciente", c -> c.paciente() == null ? "" : c.paciente().nomeDocumento()),
                 ColunaExport.de("Unidade", c -> c.unidadeSaude().nome()),
                 ColunaExport.de("Status", ChatResponse::statusDescricao),
                 ColunaExport.de("Responsável", c -> c.responsavelNome() != null ? c.responsavelNome() : "Sem responsável"),

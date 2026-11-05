@@ -53,6 +53,14 @@ public class Notificacao {
     @Column(name = "referencia_id")
     private Long referenciaId;
 
+    /**
+     * Horário vinculado — preenchido nos tipos que apontam para um horário (AGENDAMENTO, FALTA, LEMBRETE), com o
+     * mesmo valor de {@link #referenciaId}. Existe uma FK {@code ON DELETE CASCADE} (V179): ao excluir o horário, a
+     * notificação some sozinha, para o paciente não tocar numa notificação que não leva a nada. Nulo nos demais tipos.
+     */
+    @Column(name = "horario_id")
+    private Long horarioId;
+
     @Column(nullable = false)
     private boolean lida;
 

@@ -47,7 +47,8 @@ public class AgendaPlanilhaParser {
     }
 
     public record LinhaBruta(int linhaExcel, String pacienteId, String pacienteProntuario,
-            String pacienteCodigo, String inicio, String fim) {
+            String pacienteCodigo, String cpf, String nome, String nomeSocial, String telefone,
+            String dataNascimento, String inicio) {
     }
 
     public Bruta parse(byte[] bytes) {
@@ -94,13 +95,19 @@ public class AgendaPlanilhaParser {
                 String pacienteId = texto(celula(row, colunas, "pacienteId"));
                 String pacienteProntuario = texto(celula(row, colunas, "pacienteProntuario"));
                 String pacienteCodigo = texto(celula(row, colunas, "pacienteCodigo"));
+                String cpf = texto(celula(row, colunas, "cpf"));
+                String nome = texto(celula(row, colunas, "nome"));
+                String nomeSocial = texto(celula(row, colunas, "nomeSocial"));
+                String telefone = texto(celula(row, colunas, "telefone"));
+                String dataNascimento = lerData(celula(row, colunas, "dataNascimento"));
                 String inicio = lerHora(celula(row, colunas, "inicio"));
-                String fim = lerHora(celula(row, colunas, "fim"));
                 if (pacienteId.isBlank() && pacienteProntuario.isBlank() && pacienteCodigo.isBlank()
-                        && inicio.isBlank() && fim.isBlank()) {
+                        && cpf.isBlank() && nome.isBlank() && nomeSocial.isBlank() && telefone.isBlank()
+                        && dataNascimento.isBlank() && inicio.isBlank()) {
                     continue; // linha totalmente vazia: ignora (não vira erro)
                 }
-                horarios.add(new LinhaBruta(r + 1, pacienteId, pacienteProntuario, pacienteCodigo, inicio, fim));
+                horarios.add(new LinhaBruta(r + 1, pacienteId, pacienteProntuario, pacienteCodigo, cpf, nome,
+                        nomeSocial, telefone, dataNascimento, inicio));
             }
 
             return new Bruta(agenda, horarios);
@@ -159,10 +166,19 @@ public class AgendaPlanilhaParser {
                 } else if (r.contains("id interno")) {
                     colunas.putIfAbsent("pacienteId", c.getColumnIndex());
                 }
+            } else if (r.startsWith("cpf")) {
+                colunas.putIfAbsent("cpf", c.getColumnIndex());
+            } else if (r.contains("social")) {
+                // "Nome social" — checar ANTES de "nome" para não colidir.
+                colunas.putIfAbsent("nomeSocial", c.getColumnIndex());
+            } else if (r.startsWith("nome")) {
+                colunas.putIfAbsent("nome", c.getColumnIndex());
+            } else if (r.startsWith("telefone")) {
+                colunas.putIfAbsent("telefone", c.getColumnIndex());
+            } else if (r.contains("nascimento")) {
+                colunas.putIfAbsent("dataNascimento", c.getColumnIndex());
             } else if (r.contains("inicio")) {
                 colunas.putIfAbsent("inicio", c.getColumnIndex());
-            } else if (r.contains("fim")) {
-                colunas.putIfAbsent("fim", c.getColumnIndex());
             }
         }
         return colunas;

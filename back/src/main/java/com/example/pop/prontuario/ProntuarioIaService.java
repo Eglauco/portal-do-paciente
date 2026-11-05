@@ -194,7 +194,7 @@ public class ProntuarioIaService {
     private void notificarUnidade(Prontuario p, Documento d) {
         Horario a = p.getHorario();
         Long unidadeId = a.getUnidadeSaude() == null ? null : a.getUnidadeSaude().getId();
-        String paciente = a.getPaciente() == null ? "" : a.getPaciente().getNome();
+        String paciente = a.getPaciente() == null ? "" : a.getPaciente().nomeExibicao();
         Long documentoId = d.getId();
         Long prontuarioId = p.getId();
         String nomeDoc = d.getNome();

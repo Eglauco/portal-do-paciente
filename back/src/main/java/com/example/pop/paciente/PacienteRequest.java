@@ -36,19 +36,24 @@ public record PacienteRequest(
         List<String> telefonesAdicionais,
         List<ResponsavelRequest> responsaveis,
         /** Ids das unidades de saúde que o paciente pode acessar (feed/chat/SAU). */
-        List<Long> unidadeIds) {
+        List<Long> unidadeIds,
+        /** Nome social (opcional): nome de identificação/exibição do paciente. Ver {@link Paciente#nomeExibicao()}. */
+        @Size(max = 120) String nomeSocial,
+        /** Quando marcado, o atendimento exibe o nome social no lugar do civil; exige {@code nomeSocial} preenchido. */
+        Boolean utilizaNomeSocial) {
 
     /** Atalho (nome + telefone) usado em testes e cadastros mínimos: o telefone entra na lista. */
     public PacienteRequest(String nome, String telefone) {
-        // 17 nulos = codigoIntegracao..cns (posições 2-18); depois telefonesAdicionais, responsaveis, unidadeIds.
+        // 17 nulos = codigoIntegracao..cns (posições 2-18); depois telefonesAdicionais, responsaveis,
+        // unidadeIds, nomeSocial, utilizaNomeSocial.
         this(nome, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                telefone == null ? List.of() : List.of(telefone), null, null);
+                telefone == null ? List.of() : List.of(telefone), null, null, null, null);
     }
 
     /** Atalho (nome + telefone + unidades de acesso) usado em testes: o telefone entra na lista. */
     public PacienteRequest(String nome, String telefone, List<Long> unidadeIds) {
         this(nome, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                telefone == null ? List.of() : List.of(telefone), null, unidadeIds);
+                telefone == null ? List.of() : List.of(telefone), null, unidadeIds, null, null);
     }
 
     /**

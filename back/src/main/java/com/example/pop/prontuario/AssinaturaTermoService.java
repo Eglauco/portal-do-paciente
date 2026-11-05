@@ -336,7 +336,7 @@ public class AssinaturaTermoService {
             }
             out.add(new TermoProfissionalResponse(
                     primeiro.getProntuario().getId(),
-                    ag.getPaciente() == null ? null : ag.getPaciente().getNome(),
+                    ag.getPaciente() == null ? null : ag.getPaciente().nomeExibicao(),
                     ag.getEspecialidade() == null ? null : ag.getEspecialidade().getNome(),
                     ag.getDataHora(),
                     signUrl,
@@ -540,7 +540,7 @@ public class AssinaturaTermoService {
         // Paciente SEM e-mail (null) de propósito: na Autentique o paciente assina name-only (short_link no app);
         // passar e-mail dispararia e-mail e zeraria o link. O e-mail só é usado p/ pré-preencher o profissional.
         return new AssinaturaProvider.Signatario(
-                paciente.getNome(), digitos(paciente.getCpf()), "55", digitos(primeiroTelefone(paciente)),
+                paciente.nomeDocumentoLegal(), digitos(paciente.getCpf()), "55", digitos(primeiroTelefone(paciente)),
                 null, "paciente-" + paciente.getId());
     }
 

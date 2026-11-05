@@ -293,7 +293,7 @@ public class FeedController {
         Comentario salvo = comentarioRepository.save(comentario);
         marcarComentarioNovo(postagem);
         notificarModeracaoSePendente(postagem, salvo);
-        String autor = autorService.autorPaciente(paciente.getNome());
+        String autor = autorService.autorPaciente(paciente.nomeExibicao());
         String nomeResponsavel = autorService.nomeResponsavel(responsavel);
         return ComentarioResponse.from(salvo, paciente.getId(), null, c -> autor, umaFoto(paciente),
                 rid -> nomeResponsavel, janelaEdicaoMinutos());
@@ -337,7 +337,7 @@ public class FeedController {
         Comentario salva = comentarioRepository.save(resposta);
         marcarComentarioNovo(postagem);
         notificarModeracaoSePendente(postagem, salva);
-        String autor = autorService.autorPaciente(paciente.getNome());
+        String autor = autorService.autorPaciente(paciente.nomeExibicao());
         String nomeResponsavel = autorService.nomeResponsavel(responsavel);
         return ComentarioResponse.from(salva, paciente.getId(), null, c -> autor, umaFoto(paciente),
                 rid -> nomeResponsavel, janelaEdicaoMinutos());

@@ -100,7 +100,7 @@ public class HorarioEntregaService {
         Map<String, Boolean> aceitoPorToken = new HashMap<>();
         Map<String, String> receiptIdPorToken = new HashMap<>();
         if (!donoDoToken.isEmpty()) {
-            String titulo = comPrefixo(a.getPaciente().getNome(), "Novo agendamento");
+            String titulo = comPrefixo(a.getPaciente().nomeExibicao(), "Novo agendamento");
             Map<String, Object> data = Map.of("tipo", "AGENDAMENTO", "agendamentoId", a.getId(), "pacienteId", pacienteId);
             for (PushService.ResultadoEnvio r : pushService.enviarComResultado(titulo, corpo, data,
                     List.copyOf(donoDoToken.keySet()))) {
@@ -284,7 +284,7 @@ public class HorarioEntregaService {
     /** Paciente + responsáveis ATIVOS com acesso a Agendamentos (mesma regra do fan-out do push). */
     private List<Destinatario> resolverDestinatarios(Paciente paciente) {
         List<Destinatario> destinatarios = new ArrayList<>();
-        destinatarios.add(new Destinatario(TipoDestinatario.PACIENTE, null, paciente.getNome(),
+        destinatarios.add(new Destinatario(TipoDestinatario.PACIENTE, null, paciente.nomeExibicao(),
                 paciente.primeiroTelefone(), tokensDe(paciente.getCpf(), paciente.getId())));
         for (Responsavel r : responsavelRepository.findByPaciente_Id(paciente.getId())) {
             if (!r.isAtivo()) {

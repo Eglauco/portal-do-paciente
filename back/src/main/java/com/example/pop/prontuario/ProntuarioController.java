@@ -152,7 +152,7 @@ public class ProntuarioController {
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
     private List<FiltroAplicado> filtrosProntuario(String numero, Long pacienteId, Long unidadeId, String especialidade) {
         String paciente = pacienteId == null ? "Todos"
-                : pacienteRepository.findById(pacienteId).map(p -> p.getNome()).orElse("#" + pacienteId);
+                : pacienteRepository.findById(pacienteId).map(p -> p.nomeDocumentoLegal()).orElse("#" + pacienteId);
         String unidade = unidadeId == null ? "Todas"
                 : unidadeRepository.findById(unidadeId).map(u -> u.getNome()).orElse("#" + unidadeId);
         return List.of(
@@ -165,7 +165,7 @@ public class ProntuarioController {
     private static List<ColunaExport<Prontuario>> colunasProntuario() {
         return List.of(
                 ColunaExport.de("Nº atendimento", Prontuario::getNumeroAtendimento),
-                ColunaExport.de("Paciente", p -> p.getHorario().getPaciente().getNome()),
+                ColunaExport.de("Paciente", p -> p.getHorario().getPaciente().nomeDocumentoLegal()),
                 ColunaExport.de("CPF do paciente", p -> formatarCpf(p.getHorario().getPaciente().getCpf())),
                 ColunaExport.de("Prontuário do paciente", p -> texto(p.getHorario().getPaciente().getProntuario())),
                 ColunaExport.de("Telefone do paciente", p -> p.getHorario().getPaciente().getTelefonesAdicionais() == null ? ""

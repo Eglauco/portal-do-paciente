@@ -92,6 +92,12 @@ public class PacienteLogService {
                 AutorLogPaciente.IMPORTACAO_SIRESP), novo);
     }
 
+    /** Criação originada pela importação de agenda por Excel: autor = IMPORTACAO_AGENDA (usuário importador como ator). */
+    public void registrarCriacaoImportacaoAgenda(Paciente novo, Long usuarioId) {
+        gravarCriacao(novoEventoComAutor(novo, TipoEventoPaciente.CRIACAO, usuarioId,
+                AutorLogPaciente.IMPORTACAO_AGENDA), novo);
+    }
+
     private void gravarCriacao(PacienteLog log, Paciente novo) {
         List<PacienteLogAlteracao> mudancas = log.getAlteracoes();
 

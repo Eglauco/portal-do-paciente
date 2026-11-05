@@ -135,7 +135,7 @@ public class NpsController {
     /** Filtros aplicados (mesmos da tela) para o cabeçalho do PDF — mostra o que estava ativo. */
     private List<FiltroAplicado> filtrosNps(StatusNps status, Long pacienteId, Long unidadeId) {
         String paciente = pacienteId == null ? "Todos"
-                : pacienteRepository.findById(pacienteId).map(Paciente::getNome).orElse("#" + pacienteId);
+                : pacienteRepository.findById(pacienteId).map(Paciente::nomeDocumentoLegal).orElse("#" + pacienteId);
         String unidade = unidadeId == null ? "Todas"
                 : unidadeRepository.findById(unidadeId).map(Unidade::getNome).orElse("#" + unidadeId);
         return List.of(
@@ -150,7 +150,7 @@ public class NpsController {
                 ColunaExport.de("Código", n -> String.valueOf(n.getId())),
                 ColunaExport.de("Atendimento",
                         n -> n.getHorario().getDataHora() == null ? "" : n.getHorario().getDataHora().format(DATA_HORA)),
-                ColunaExport.de("Paciente", n -> n.getHorario().getPaciente().getNome()),
+                ColunaExport.de("Paciente", n -> n.getHorario().getPaciente().nomeDocumentoLegal()),
                 ColunaExport.de("Unidade", n -> n.getHorario().getUnidadeSaude().getNome()),
                 ColunaExport.de("Especialidade", n -> n.getHorario().getEspecialidade().getNome()),
                 ColunaExport.de("Profissional", n -> n.getHorario().getProfissionalSaude().getNome()),

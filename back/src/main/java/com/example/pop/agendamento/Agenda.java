@@ -25,7 +25,7 @@ import lombok.Setter;
 /**
  * "Agenda" = o SLOT/sessão do profissional (nível superior do CROSS: {@code ID_AGE_CONSULTA}). Guarda o dia,
  * o profissional, a especialidade, o configuracaoAgenda e a unidade. Uma Agenda tem N {@link Horario} (os pacientes
- * marcados). A hora específica de cada marcação fica no {@link Horario} ({@code dataHora}/{@code horaFim}).
+ * marcados). A hora específica de cada marcação fica no {@link Horario} ({@code dataHora}).
  */
 @Entity
 @Table(name = "agenda")

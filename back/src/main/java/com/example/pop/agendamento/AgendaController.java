@@ -28,7 +28,9 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.pop.common.Pagina;
 import com.example.pop.especialidade.EspecialidadeRepository;
 import com.example.pop.configuracaoagenda.ConfiguracaoAgendaRepository;
+import com.example.pop.nps.NpsRepository;
 import com.example.pop.profissional.ProfissionalSaudeRepository;
+import com.example.pop.prontuario.ProntuarioRepository;
 import com.example.pop.unidade.UnidadeRepository;
 
 import jakarta.validation.Valid;
@@ -50,16 +52,21 @@ public class AgendaController {
     private final ProfissionalSaudeRepository profissionalRepository;
     private final ConfiguracaoAgendaRepository configuracaoAgendaRepository;
     private final UnidadeRepository unidadeRepository;
+    private final NpsRepository npsRepository;
+    private final ProntuarioRepository prontuarioRepository;
 
     public AgendaController(AgendaRepository repository, HorarioRepository horarioRepository,
             EspecialidadeRepository especialidadeRepository, ProfissionalSaudeRepository profissionalRepository,
-            ConfiguracaoAgendaRepository configuracaoAgendaRepository, UnidadeRepository unidadeRepository) {
+            ConfiguracaoAgendaRepository configuracaoAgendaRepository, UnidadeRepository unidadeRepository,
+            NpsRepository npsRepository, ProntuarioRepository prontuarioRepository) {
         this.repository = repository;
         this.horarioRepository = horarioRepository;
         this.especialidadeRepository = especialidadeRepository;
         this.profissionalRepository = profissionalRepository;
         this.configuracaoAgendaRepository = configuracaoAgendaRepository;
         this.unidadeRepository = unidadeRepository;
+        this.npsRepository = npsRepository;
+        this.prontuarioRepository = prontuarioRepository;
     }
 
     @GetMapping
@@ -113,15 +120,29 @@ public class AgendaController {
         return AgendaResponse.from(a, horarioRepository.findByAgenda_IdOrderByDataHoraAsc(id));
     }
 
+    /**
+     * Exclui a agenda JUNTO com TODOS os seus horários (marcações), numa única transação — a confirmação explícita
+     * é feita no front (modal). A exclusão de cada horário cascateia no banco para o log de status, a entrega, os
+     * motivos de falta e os lembretes (FKs {@code ON DELETE CASCADE}, V135). Se algum horário não puder ser removido
+     * (ex.: NPS/prontuário vinculados, sem cascade), a transação inteira é desfeita e nada é excluído.
+     */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     public void excluir(@PathVariable Long id) {
         if (!repository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Agenda não encontrada.");
         }
-        if (horarioRepository.countByAgenda_Id(id) > 0) {
+        // Registro clínico/avaliação é retido por lei: um horário com prontuário ou NPS não pode ser apagado. Em vez
+        // de deixar a FK estourar numa 409 opaca, avisamos de forma clara ANTES — e nada é alterado.
+        if (prontuarioRepository.existsByHorario_Agenda_Id(id) || npsRepository.existsByHorario_Agenda_Id(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Agenda com horários marcados não pode ser excluída. Remova os horários primeiro.");
+                    "Esta agenda tem horário(s) com prontuário ou avaliação (NPS) vinculado(s) — registros clínicos "
+                            + "que não podem ser removidos. A exclusão foi cancelada e nada foi alterado.");
+        }
+        List<Horario> horarios = horarioRepository.findByAgenda_IdOrderByDataHoraAsc(id);
+        if (!horarios.isEmpty()) {
+            horarioRepository.deleteAll(horarios);
         }
         repository.deleteById(id);
     }

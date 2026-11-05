@@ -11,6 +11,8 @@ import java.util.List;
 public record MeuPerfilResponse(
         Long id,
         String nome,
+        String nomeSocial,
+        boolean utilizaNomeSocial,
         List<String> telefonesAdicionais,
         String email,
         String cpf,
@@ -33,7 +35,8 @@ public record MeuPerfilResponse(
 
     public static MeuPerfilResponse from(Paciente p, String fotoUrl) {
         return new MeuPerfilResponse(
-                p.getId(), p.getNome(), List.copyOf(p.getTelefonesAdicionais()),
+                p.getId(), p.getNome(), p.getNomeSocial(), p.isUtilizaNomeSocial(),
+                List.copyOf(p.getTelefonesAdicionais()),
                 p.getEmail(), p.getCpf(), p.getRg(), p.getCns(), p.getDataNascimento(), p.getSexo(),
                 p.getNomeMae(), p.getNomePai(), p.getCodigoIntegracao(), p.getProntuario(),
                 p.getRua(), p.getNumero(), p.getComplemento(), p.getBairro(), p.getMunicipio(),

@@ -7,7 +7,7 @@ import com.example.pop.common.Ref;
 /** Item da listagem de manifestações (app do paciente e CRUD do SAU). */
 public record ManifestacaoResponse(
         Long id,
-        Ref paciente,
+        com.example.pop.paciente.PacienteRef paciente,
         /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
         String pacienteFotoUrl,
         Ref unidadeSaude,

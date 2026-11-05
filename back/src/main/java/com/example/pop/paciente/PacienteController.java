@@ -195,6 +195,8 @@ public class PacienteController {
         return List.of(
                 ColunaExport.de("Código", p -> String.valueOf(p.getId())),
                 ColunaExport.de("Nome", Paciente::getNome),
+                ColunaExport.de("Nome social", p -> texto(p.getNomeSocial())),
+                ColunaExport.de("Usa nome social", p -> p.isUtilizaNomeSocial() ? "Sim" : "Não"),
                 ColunaExport.de("Sexo", p -> sexoLabel(p.getSexo())),
                 ColunaExport.de("Data de nascimento", p -> p.getDataNascimento() == null ? "" : p.getDataNascimento().format(DATA)),
                 ColunaExport.de("RG", p -> texto(p.getRg())),
@@ -363,6 +365,8 @@ public class PacienteController {
     /** Copia o request para a entidade, normalizando dígitos e validando CPF/CNS. */
     private void aplicar(Paciente p, PacienteRequest r) {
         p.setNome(r.nome().trim());
+        p.setNomeSocial(limpar(r.nomeSocial()));
+        p.setUtilizaNomeSocial(Boolean.TRUE.equals(r.utilizaNomeSocial()));
         p.setCodigoIntegracao(limpar(r.codigoIntegracao()));
         p.setProntuario(limpar(r.prontuario()));
         p.setSexo(r.sexo());
@@ -388,6 +392,11 @@ public class PacienteController {
         if (p.getTelefonesAdicionais().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Informe pelo menos um telefone do paciente.");
+        }
+        // Nome social: quando o paciente opta por usá-lo, ele é obrigatório (não há "usar" nome vazio).
+        if (p.isUtilizaNomeSocial() && (p.getNomeSocial() == null || p.getNomeSocial().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Informe o nome social quando a opção \"Utiliza nome social\" estiver marcada.");
         }
         if (p.getCpf() != null && !Documentos.cpfValido(p.getCpf())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CPF inválido");

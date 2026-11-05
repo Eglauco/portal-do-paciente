@@ -251,7 +251,7 @@ public class SauService {
         ManifestacaoMensagem ultima = mensagemRepository.findFirstByManifestacaoIdOrderByCriadoEmDesc(m.getId());
         return new ManifestacaoResponse(
                 m.getId(),
-                new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(m.getPaciente()),
                 storageService.urlFotoPaciente(m.getPaciente().getFotoUrl()),
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
@@ -292,7 +292,7 @@ public class SauService {
         List<MensagemSauResponse> mensagens = msgs.stream().map(msg -> toMensagem(m, msg, nomes)).toList();
         return new ManifestacaoDetalheResponse(
                 m.getId(),
-                new Ref(m.getPaciente().getId(), m.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(m.getPaciente()),
                 storageService.urlFotoPaciente(m.getPaciente().getFotoUrl()),
                 new Ref(m.getUnidadeSaude().getId(), m.getUnidadeSaude().getNome()),
                 new Ref(m.getTipo().getId(), m.getTipo().getNome()),
@@ -307,7 +307,7 @@ public class SauService {
         if (msg.getAutor() == AutorManifestacao.SAU) {
             autorNome = msg.getUsuario() != null ? msg.getUsuario().getNome() : "Atendimento SAU";
         } else {
-            autorNome = m.getPaciente().getNome();
+            autorNome = m.getPaciente().nomeExibicao();
         }
         String responsavelNome = msg.getResponsavelId() == null ? null : nomes.get(msg.getResponsavelId());
         return new MensagemSauResponse(msg.getId(), msg.getAutor(), autorNome, responsavelNome, msg.getTexto(),

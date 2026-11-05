@@ -7,7 +7,7 @@ import com.example.pop.common.Ref;
 /** Item da listagem de chats (estilo lista de conversas). */
 public record ChatResponse(
         Long id,
-        Ref paciente,
+        com.example.pop.paciente.PacienteRef paciente,
         /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
         String pacienteFotoUrl,
         Ref unidadeSaude,

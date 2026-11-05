@@ -18,6 +18,10 @@ import java.util.function.Function;
 public enum CampoPaciente {
 
     NOME("Nome", Paciente::getNome),
+    NOME_SOCIAL("Nome social", Paciente::getNomeSocial),
+    // Só registra quando ativado (valor null quando desligado): evita poluir a trilha de todo
+    // paciente que nunca usou nome social. Desligar fica como "Sim → (vazio)".
+    UTILIZA_NOME_SOCIAL("Utiliza nome social", p -> p.isUtilizaNomeSocial() ? "Sim" : null),
     CODIGO_INTEGRACAO("Código de integração", Paciente::getCodigoIntegracao),
     PRONTUARIO("Prontuário", Paciente::getProntuario),
     SEXO("Sexo", p -> sexoLabel(p.getSexo())),

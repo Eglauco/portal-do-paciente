@@ -73,7 +73,7 @@ class PacienteControllerTest {
                 Sexo.FEMININO, LocalDate.of(1990, 5, 20), "12.345.678-9", CPF_A,
                 "Mãe Teste", "Pai Teste", "Rua A", "100", "Centro", "São Paulo", "sp",
                 "01001-000", "Apto 1", "Fulano@Email.com", CNS_OK,
-                List.of("(11) 90000-0002", "11900000002", "   "), List.of(), List.of()), null);
+                List.of("(11) 90000-0002", "11900000002", "   "), List.of(), List.of(), null, null), null);
         try {
             assertEquals("52998224725", p.getCpf(), "CPF normalizado (só dígitos)");
             assertEquals("SP", p.getUf(), "UF em maiúsculas");
@@ -103,7 +103,7 @@ class PacienteControllerTest {
                 List.of(
                         new PacienteRequest.ResponsavelRequest(null, "Maria Mãe", "(11) 98888-1111"),
                         new PacienteRequest.ResponsavelRequest(null, "   ", "irrelevante"),
-                        new PacienteRequest.ResponsavelRequest(null, "João Pai", null)), List.of()), null);
+                        new PacienteRequest.ResponsavelRequest(null, "João Pai", null)), List.of(), null, null), null);
         try {
             assertEquals(2, criado.getResponsaveis().size(), "linha em branco é ignorada");
             Responsavel maria = acharPorNome(criado, "Maria Mãe");
@@ -117,7 +117,7 @@ class PacienteControllerTest {
                     List.of("11955550001"),
                     List.of(
                             new PacienteRequest.ResponsavelRequest(maria.getId(), "Maria Silva", "11988881111"),
-                            new PacienteRequest.ResponsavelRequest(null, "Ana Avó", "11977772222")), List.of()), null).getBody();
+                            new PacienteRequest.ResponsavelRequest(null, "Ana Avó", "11977772222")), List.of(), null, null), null).getBody();
             List<String> nomes = atualizado.getResponsaveis().stream().map(Responsavel::getNome).sorted().toList();
             assertEquals(List.of("Ana Avó", "Maria Silva"), nomes, "João removido, Maria renomeada, Ana criada");
             // O id da Maria foi preservado (atualização, não recriação).
@@ -143,7 +143,7 @@ class PacienteControllerTest {
                         List.of(
                                 new PacienteRequest.ResponsavelRequest(null, "Ana", "11988887777"),
                                 new PacienteRequest.ResponsavelRequest(null, "Bia", "(11) 98888-7777")),
-                        List.of()), null));
+                        List.of(), null, null), null));
         assertEquals(409, ex.getStatusCode().value(), "dois responsáveis com o mesmo telefone");
     }
 
@@ -157,7 +157,7 @@ class PacienteControllerTest {
                         null, null, null, null, null, null, null, null, null,
                         List.of("11955550003"),
                         List.of(new PacienteRequest.ResponsavelRequest(null, "Clone", "11955550003")),
-                        List.of()), null));
+                        List.of(), null, null), null));
         assertEquals(422, ex.getStatusCode().value(), "responsável com o telefone do próprio paciente");
     }
 
@@ -191,7 +191,7 @@ class PacienteControllerTest {
     /** Request com nome + (opcional) cpf/cns e nada mais. */
     private static PacienteRequest minimo(String nome, String cpf, String cns) {
         return new PacienteRequest(nome, null, null, null, null, null, cpf, null, null, null, null, null, null,
-                null, null, null, null, cns, List.of("11900000000"), null, null);
+                null, null, null, null, cns, List.of("11900000000"), null, null, null, null);
     }
 
     private void limparResiduos(String telefone, String cpf) {

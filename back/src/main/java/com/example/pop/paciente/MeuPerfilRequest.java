@@ -30,5 +30,9 @@ public record MeuPerfilRequest(
         @Size(max = 120) String bairro,
         @Size(max = 120) String municipio,
         @Size(max = 2) String uf,
-        @Size(max = 9) String cep) {
+        @Size(max = 9) String cep,
+        /** Nome social (opcional): o próprio paciente define como quer ser identificado. */
+        @Size(max = 120) String nomeSocial,
+        /** Quando marcado, o app/atendimento exibe o nome social; exige {@code nomeSocial} preenchido. */
+        Boolean utilizaNomeSocial) {
 }

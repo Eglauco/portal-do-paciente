@@ -8,7 +8,7 @@ import com.example.pop.common.Ref;
 /** Item da listagem de NPS. */
 public record NpsResponse(
         Long id,
-        Ref paciente,
+        com.example.pop.paciente.PacienteRef paciente,
         Ref unidadeSaude,
         Ref especialidade,
         LocalDateTime dataHora,
@@ -27,7 +27,7 @@ public record NpsResponse(
         Horario a = nps.getHorario();
         return new NpsResponse(
                 nps.getId(),
-                new Ref(a.getPaciente().getId(), a.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(a.getPaciente()),
                 new Ref(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 new Ref(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),
                 a.getDataHora(),

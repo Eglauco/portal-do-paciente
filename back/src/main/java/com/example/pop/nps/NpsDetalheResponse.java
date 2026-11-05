@@ -9,7 +9,7 @@ import com.example.pop.common.Ref;
 /** Detalhamento do NPS (inclui os dados do atendimento e as notas por categoria). */
 public record NpsDetalheResponse(
         Long id,
-        Ref paciente,
+        com.example.pop.paciente.PacienteRef paciente,
         /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
         String pacienteFotoUrl,
         Ref unidadeSaude,
@@ -47,7 +47,7 @@ public record NpsDetalheResponse(
                 .toList();
         return new NpsDetalheResponse(
                 nps.getId(),
-                new Ref(a.getPaciente().getId(), a.getPaciente().getNome()),
+                com.example.pop.paciente.PacienteRef.de(a.getPaciente()),
                 pacienteFotoUrl,
                 new Ref(a.getUnidadeSaude().getId(), a.getUnidadeSaude().getNome()),
                 new Ref(a.getEspecialidade().getId(), a.getEspecialidade().getNome()),

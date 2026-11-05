@@ -14,6 +14,9 @@ public interface NpsRepository extends JpaRepository<Nps, Long> {
 
     boolean existsByHorarioId(Long agendamentoId);
 
+    /** Existe algum NPS em QUALQUER horário desta agenda? Trava a exclusão da agenda (registro clínico não some). */
+    boolean existsByHorario_Agenda_Id(Long agendaId);
+
     /** O responsável respondeu algum NPS (lançamento)? Trava a remoção do responsável. */
     boolean existsByResponsavelId(Long responsavelId);
 

@@ -20,6 +20,23 @@ public interface AgendaRepository extends JpaRepository<Agenda, Long> {
             TipoAtendimento tipoAtendimento);
 
     /**
+     * Anti-duplicação da importação por Excel: já existe uma agenda (slot) com a MESMA Data + Profissional +
+     * Especialidade + Nome na mesma unidade? O nome é comparado sem espaços nas pontas e sem diferenciar
+     * maiúsculas/minúsculas. Usada para recusar uma reimportação da mesma agenda (ver AgendaImportacaoService).
+     */
+    @Query("""
+            select count(a) > 0 from Agenda a
+            where a.unidadeSaude.id = :unidadeId
+              and a.data = :data
+              and a.profissionalSaude.id = :profissionalId
+              and a.especialidade.id = :especialidadeId
+              and lower(trim(a.nome)) = lower(trim(:nome))
+            """)
+    boolean existeAgendaMesmaIdentidade(@Param("unidadeId") Long unidadeId, @Param("data") LocalDate data,
+            @Param("profissionalId") Long profissionalId, @Param("especialidadeId") Long especialidadeId,
+            @Param("nome") String nome);
+
+    /**
      * Busca de agendas da tela: por unidade (escopo), dia e nome de profissional/especialidade (parcial).
      * Params nuláveis = sem filtro. Ordenação vem do Pageable.
      */

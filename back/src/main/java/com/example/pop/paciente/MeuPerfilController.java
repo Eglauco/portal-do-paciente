@@ -159,6 +159,8 @@ public class MeuPerfilController {
     /** Copia os campos editáveis do request para a entidade, normalizando dígitos e validando. */
     private void aplicar(Paciente p, MeuPerfilRequest r) {
         p.setNome(r.nome().trim());
+        p.setNomeSocial(limpar(r.nomeSocial()));
+        p.setUtilizaNomeSocial(Boolean.TRUE.equals(r.utilizaNomeSocial()));
         p.setSexo(r.sexo());
         p.setDataNascimento(r.dataNascimento());
         p.setRg(limpar(r.rg()));
@@ -178,6 +180,11 @@ public class MeuPerfilController {
 
         if (p.getTelefonesAdicionais().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Informe pelo menos um telefone.");
+        }
+        // Nome social: quando o paciente opta por usá-lo, ele é obrigatório.
+        if (p.isUtilizaNomeSocial() && (p.getNomeSocial() == null || p.getNomeSocial().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "Informe o nome social quando a opção \"Utiliza nome social\" estiver marcada.");
         }
         if (p.getCns() != null && !Documentos.cnsValido(p.getCns())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CNS inválido");

@@ -25,7 +25,7 @@ public record HorarioLogResponse(
         return new HorarioLogResponse(
                 l.getId(),
                 l.getAutor(),
-                l.getPaciente() != null ? l.getPaciente().getNome() : null,
+                l.getPaciente() != null ? l.getPaciente().nomeExibicao() : null,
                 l.getResponsavel() != null ? l.getResponsavel().getNome() : null,
                 l.getUsuario() != null ? l.getUsuario().getNome() : null,
                 l.getStatusAnterior(),

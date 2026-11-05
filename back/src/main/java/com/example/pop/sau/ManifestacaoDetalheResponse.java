@@ -8,7 +8,7 @@ import com.example.pop.common.Ref;
 /** Detalhe da manifestação + thread de mensagens. */
 public record ManifestacaoDetalheResponse(
         Long id,
-        Ref paciente,
+        com.example.pop.paciente.PacienteRef paciente,
         /** Foto (pré-assinada) do paciente para o avatar; null se não tiver. */
         String pacienteFotoUrl,
         Ref unidadeSaude,

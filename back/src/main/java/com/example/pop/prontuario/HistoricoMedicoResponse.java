@@ -24,6 +24,9 @@ public record HistoricoMedicoResponse(
     public record PacienteCabecalho(
             Long id,
             String nome,
+            /** Nome civil (de registro): o admin revela ao focar o marcador de nome social. */
+            String nomeRegistro,
+            boolean temNomeSocial,
             String cpf,
             LocalDate dataNascimento,
             String sexo,

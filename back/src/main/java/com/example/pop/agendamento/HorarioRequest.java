@@ -12,6 +12,5 @@ public record HorarioRequest(
         @NotNull Long agendaId,
         @NotNull Long pacienteId,
         @NotNull LocalTime horaInicio,
-        LocalTime horaFim,
         StatusAgendamento statusAgendamento) {
 }

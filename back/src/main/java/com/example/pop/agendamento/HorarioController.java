@@ -179,7 +179,6 @@ public class HorarioController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Agenda não encontrada"));
         h.setAgenda(agenda);
         h.setDataHora(agenda.getData().atTime(request.horaInicio()));
-        h.setHoraFim(request.horaFim());
         h.setPaciente(pacienteRepository.findById(request.pacienteId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Paciente não encontrado")));
         // Marcar o paciente numa agenda dá acesso à unidade dela (perfil/feed/chat/SAU) — idempotente.

@@ -385,7 +385,7 @@ public class PacienteAcessoService {
             }
         }
         List<Long> contaIds = cpfs.isEmpty() ? List.of() : contaRepository.findIdsByCpfIn(cpfs);
-        return new DestinoPush(pacienteId, p.getNome(), contaIds);
+        return new DestinoPush(pacienteId, p.nomeExibicao(), contaIds);
     }
 
     /**
