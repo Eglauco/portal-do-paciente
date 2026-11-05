@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MapaUnidade } from '@/components/mapa-unidade';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
-import { buscarPerfilUnidade, DiaSemana, HorarioUnidade, PerfilUnidade } from '@/services/unidade';
+import { abrirComoChegar, buscarPerfilUnidade, DiaSemana, HorarioUnidade, PerfilUnidade } from '@/services/unidade';
 
 /** Rótulo pt-BR de cada dia (na ordem de exibição segunda → domingo). */
 const DIAS: { dia: DiaSemana; label: string }[] = [
@@ -90,9 +90,7 @@ export default function UnidadePerfilScreen() {
 
   const abrir = (url: string) => Linking.openURL(url).catch(() => {});
   const ligar = () => unidade?.telefone && abrir(`tel:${unidade.telefone.replace(/\s+/g, '')}`);
-  const comoChegar = () =>
-    unidade?.endereco &&
-    abrir(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(unidade.endereco)}`);
+  const comoChegar = () => unidade?.endereco && abrirComoChegar(unidade.endereco);
 
   // Horário de hoje em destaque (resumo + "aberto agora").
   const hoje = POR_GETDAY[new Date().getDay()];

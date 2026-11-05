@@ -144,7 +144,7 @@ export default function PerfilEditarScreen() {
   const styles = useMemo(() => criarEstilos(t), [t]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { sessao } = useSessao();
+  const { sessao, atualizarNomeSessao } = useSessao();
   // Perfil próprio SEMPRE pode; responsável só com "Ver e lançar" em MEU_PERFIL.
   const podeEditar = podeLancar(sessao, 'MEU_PERFIL');
 
@@ -156,6 +156,8 @@ export default function PerfilEditarScreen() {
   // CPF é só exibição (identidade de login): guardado apenas para mostrar travado.
   const [cpf, setCpf] = useState('');
   const [nome, setNome] = useState('');
+  const [nomeSocial, setNomeSocial] = useState('');
+  const [utilizaNomeSocial, setUtilizaNomeSocial] = useState(false);
   const [telefones, setTelefones] = useState<string[]>(['']); // só dígitos
   const [sexo, setSexo] = useState<SexoPaciente | null>(null);
   const [data, setData] = useState(''); // só dígitos "ddmmaaaa"
@@ -175,6 +177,8 @@ export default function PerfilEditarScreen() {
   function preencher(p: MeuPerfil) {
     setCpf(soDigitos(p.cpf ?? ''));
     setNome(p.nome ?? '');
+    setNomeSocial(p.nomeSocial ?? '');
+    setUtilizaNomeSocial(p.utilizaNomeSocial ?? false);
     setTelefones(p.telefonesAdicionais.length ? p.telefonesAdicionais.map(soDigitos) : ['']);
     setSexo(p.sexo);
     setData(isoParaDigitos(p.dataNascimento));
@@ -268,6 +272,9 @@ export default function PerfilEditarScreen() {
       setSalvando(true);
       const dados: PerfilEditavel = {
         nome: nome.trim(),
+        // Sem nome social não há como "usar" nome social: zera o toggle (o backend também exige isso).
+        nomeSocial: nomeSocial.trim() || null,
+        utilizaNomeSocial: nomeSocial.trim() ? utilizaNomeSocial : false,
         telefonesAdicionais: telefonesPreenchidos,
         sexo,
         dataNascimento: data.length === 8 ? dataParaIso(data) : null,
@@ -284,7 +291,11 @@ export default function PerfilEditarScreen() {
         uf: uf.trim().toUpperCase() || null,
         cep: cep.length > 0 ? cep : null,
       };
-      await atualizarPerfil(dados);
+      const salvo = await atualizarPerfil(dados);
+      // Atualiza o nome de exibição da sessão (saudação "Olá, X" e seletor de perfis) na hora,
+      // sem precisar re-logar: usa o nome social quando o paciente opta por ele; senão o civil.
+      const nomeExib = salvo.utilizaNomeSocial && salvo.nomeSocial?.trim() ? salvo.nomeSocial : salvo.nome;
+      await atualizarNomeSessao(nomeExib);
       // Volta ao perfil, que recarrega ao ganhar foco e já mostra os dados atualizados.
       router.back();
     } catch (e) {
@@ -332,15 +343,60 @@ export default function PerfilEditarScreen() {
               <CampoTexto
                 styles={styles}
                 cor={t.muted}
-                label="Nome completo"
+                label="Nome de registro"
                 espaco={false}
                 value={nome}
                 onChangeText={setNome}
-                placeholder="Seu nome completo"
+                placeholder="Seu nome de registro (civil)"
                 autoCapitalize="words"
                 maxLength={120}
                 editable={!salvando}
               />
+
+              <CampoTexto
+                styles={styles}
+                cor={t.muted}
+                label="Nome social"
+                value={nomeSocial}
+                onChangeText={setNomeSocial}
+                placeholder="Como você quer ser identificado(a)"
+                autoCapitalize="words"
+                maxLength={120}
+                editable={!salvando}
+              />
+
+              <Text style={[styles.label, styles.labelEspaco]}>Utilizar o nome social no atendimento</Text>
+              <View style={styles.seg}>
+                {[
+                  { valor: true, rotulo: 'Sim' },
+                  { valor: false, rotulo: 'Não' },
+                ].map((o) => {
+                  const sel = utilizaNomeSocial === o.valor;
+                  const desabilitado = salvando || (o.valor === true && !nomeSocial.trim());
+                  return (
+                    <Pressable
+                      key={String(o.valor)}
+                      style={({ pressed }) => [
+                        styles.segBtn,
+                        sel && styles.segBtnSel,
+                        pressed && !sel && styles.segBtnPressed,
+                      ]}
+                      onPress={() => setUtilizaNomeSocial(o.valor)}
+                      disabled={desabilitado}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: sel, disabled: desabilitado }}
+                      accessibilityLabel={`Utilizar nome social: ${o.rotulo}`}>
+                      <Text style={[styles.segBtnTxt, sel && styles.segBtnTxtSel]}>{o.rotulo}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.nota}>
+                <Ionicons name="information-circle-outline" size={13} color={t.muted} />
+                <Text style={styles.notaTxt}>
+                  Quando ativado, seu nome social aparece no app e no atendimento. Seu nome civil é preservado.
+                </Text>
+              </View>
 
               <Text style={[styles.label, styles.labelEspaco]}>Sexo</Text>
               <View style={styles.seg}>

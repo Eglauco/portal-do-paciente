@@ -467,6 +467,21 @@ export async function definirSenha(senha: string): Promise<SessaoPaciente | null
 }
 
 /**
+ * Atualiza o NOME de exibição da sessão (e o do perfil ATIVO na lista de perfis) depois que o
+ * paciente edita o próprio perfil — ex.: liga/desliga o nome social. Assim a saudação ("Olá, X")
+ * e o seletor de perfis refletem o novo nome NA HORA, sem precisar re-logar. Só mexe no nome.
+ */
+export async function atualizarNomeSessao(nome: string): Promise<SessaoPaciente | null> {
+  await carregarSessao();
+  if (!cache) return null;
+  const idAtivo = cache.pacienteId;
+  const perfis = cache.perfis.map((p) => (p.pacienteId === idAtivo ? { ...p, nome } : p));
+  cache = { ...cache, nome, perfis };
+  await persistir();
+  return cache;
+}
+
+/**
  * Altera o PIN de acesso da conta logada (Meu Perfil). Exige a senha atual. Usa o token atual.
  * Mensagem do backend em caso de erro (ex.: 401 senha atual incorreta, 422 PIN inválido).
  */

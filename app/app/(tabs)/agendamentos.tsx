@@ -23,10 +23,9 @@ import {
   listarMotivosFalta,
 } from '@/services/agendamentos';
 
-type Filtro = 'todos' | 'proximos' | 'concluidos';
+type Filtro = 'proximos' | 'concluidos';
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
-  { chave: 'todos', rotulo: 'Todos' },
   { chave: 'proximos', rotulo: 'Próximos' },
   { chave: 'concluidos', rotulo: 'Concluídos' },
 ];
@@ -83,7 +82,9 @@ export default function AgendamentosScreen() {
   const verAgenda = podeVer(sessao, 'AGENDAMENTOS');
   const podeLancarAgenda = podeLancar(sessao, 'AGENDAMENTOS');
   const [lista, setLista] = useState<Agendamento[]>([]);
-  const [filtro, setFiltro] = useState<Filtro>('todos');
+  // Padrão: "Próximos" — o paciente abre a aba vendo só os agendamentos que ainda vão acontecer
+  // (aguardando/confirmado); os concluídos ficam a um toque de distância na aba "Concluídos".
+  const [filtro, setFiltro] = useState<Filtro>('proximos');
   const [selecionado, setSelecionado] = useState<Agendamento | null>(null);
   const [modoModal, setModoModal] = useState<'confirmar' | 'cancelar'>('confirmar');
   const [carregando, setCarregando] = useState(true);
@@ -165,10 +166,7 @@ export default function AgendamentosScreen() {
       ),
     [lista],
   );
-  const filtrados = useMemo(
-    () => (filtro === 'todos' ? demais : demais.filter((a) => a.grupo === filtro)),
-    [demais, filtro],
-  );
+  const filtrados = useMemo(() => demais.filter((a) => a.grupo === filtro), [demais, filtro]);
 
   const confirmar = async () => {
     const alvo = selecionado;
@@ -424,7 +422,9 @@ export default function AgendamentosScreen() {
             </View>
 
             {filtrados.length === 0 ? (
-              <Text style={styles.semItens}>Nenhum agendamento neste filtro.</Text>
+              <Text style={styles.semItens}>
+                {filtro === 'proximos' ? 'Nenhum agendamento próximo.' : 'Nenhum agendamento concluído.'}
+              </Text>
             ) : (
               filtrados.map((a) => {
                 const cor = Status[a.status];

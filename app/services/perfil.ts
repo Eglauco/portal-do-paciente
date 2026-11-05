@@ -7,7 +7,12 @@ export type SexoPaciente = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 /** Dados do paciente logado para a tela "Meu perfil" (somente leitura). */
 export interface MeuPerfil {
   id: number;
+  /** Nome civil (registro). */
   nome: string;
+  /** Nome social (opcional): como o paciente quer ser identificado. */
+  nomeSocial: string | null;
+  /** Quando true (e há nome social), o atendimento exibe o nome social. */
+  utilizaNomeSocial: boolean;
   /** Telefones do cadastro (o backend não expõe mais um "telefone" único). */
   telefonesAdicionais: string[];
   email: string | null;
@@ -69,6 +74,10 @@ export async function carregarPerfil(): Promise<MeuPerfil> {
  */
 export interface PerfilEditavel {
   nome: string;
+  /** Nome social (opcional). Null quando vazio. */
+  nomeSocial: string | null;
+  /** Usa o nome social no atendimento. Exige nomeSocial preenchido. */
+  utilizaNomeSocial: boolean;
   /** Telefones do paciente (o backend exige ao menos 1). Só dígitos. */
   telefonesAdicionais: string[];
   sexo: SexoPaciente | null;

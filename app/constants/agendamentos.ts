@@ -29,6 +29,8 @@ export interface Agendamento {
   profissional: string;
   hora: string;
   unidade: string;
+  /** Id da unidade — para buscar o endereço e abrir o "Como chegar" no modal. */
+  unidadeId: number;
   /** Data/hora crua (ISO) do agendamento — usada para calcular o prazo de cancelamento. */
   dataHoraIso: string;
   /** Antecedência (horas) para poder cancelar; da configuração da agenda. null = sem prazo. */

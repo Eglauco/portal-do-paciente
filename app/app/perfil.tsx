@@ -77,7 +77,9 @@ function montarSecoes(p: MeuPerfil) {
     {
       titulo: 'Dados pessoais',
       campos: [
-        campo('person-outline', 'Nome completo', p.nome),
+        campo('person-outline', 'Nome de registro', p.nome),
+        campo('sparkles-outline', 'Nome social', p.nomeSocial),
+        campo('checkmark-circle-outline', 'Utiliza nome social', p.nomeSocial ? (p.utilizaNomeSocial ? 'Sim' : 'Não') : null),
         campo('calendar-outline', 'Data de nascimento', fmtNascimento(p.dataNascimento)),
         campo('male-female-outline', 'Sexo', p.sexo ? SEXO_LABEL[p.sexo] : null),
         campo('woman-outline', 'Nome da mãe', p.nomeMae),
@@ -122,7 +124,7 @@ export default function PerfilScreen() {
   const styles = useMemo(() => criarEstilos(t), [t]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { sessao, sair, minhasClinicas } = useSessao();
+  const { sessao, sair, minhasClinicas, atualizarNomeSessao } = useSessao();
   const { definirFoto } = usePerfilFoto();
   // Travas do perfil dependente: ver os dados vs. lançar (alterar foto e editar dados).
   // Editar e trocar foto exigem "Ver e lançar"; o perfil próprio sempre pode.
@@ -155,6 +157,15 @@ export default function PerfilScreen() {
     },
     [definirFoto],
   );
+
+  // Mantém a saudação ("Olá, X") e o seletor de perfis em sincronia com o nome de exibição do
+  // perfil ATIVO: se o nome social foi ligado/alterado (aqui ou pelo admin), atualiza o nome da
+  // sessão ao carregar o perfil — sem re-login. O guard (nome !== atual) evita repetição/loop.
+  useEffect(() => {
+    if (!perfil || !sessao || sessao.pacienteId !== perfil.id) return;
+    const nomeExib = perfil.utilizaNomeSocial && perfil.nomeSocial?.trim() ? perfil.nomeSocial : perfil.nome;
+    if (sessao.nome !== nomeExib) atualizarNomeSessao(nomeExib).catch(() => {});
+  }, [perfil, sessao, atualizarNomeSessao]);
 
   // App compartilhado: descobre em quantas clínicas o CPF logado está (o botão "Trocar unidade"
   // só aparece com mais de uma). No app A-baked é uma clínica só — nem busca. Falha em silêncio
@@ -285,7 +296,14 @@ export default function PerfilScreen() {
     );
   }
 
-  const nome = perfil?.nome ?? sessao?.nome ?? 'Paciente';
+  // Cabeçalho mostra o NOME DE EXIBIÇÃO: nome social quando o paciente opta por usá-lo; senão civil.
+  // (sessao?.nome já vem como nome de exibição do backend.)
+  const nome =
+    (perfil
+      ? perfil.utilizaNomeSocial && perfil.nomeSocial
+        ? perfil.nomeSocial
+        : perfil.nome
+      : sessao?.nome) ?? 'Paciente';
   const secoes = perfil ? montarSecoes(perfil) : [];
 
   return (

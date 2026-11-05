@@ -77,6 +77,7 @@ function paraViewModel(b: AgendamentoBackend): Agendamento {
     profissional: b.agenda.profissionalSaude.nome,
     hora: `${doisDigitos(data.getHours())}:${doisDigitos(data.getMinutes())}`,
     unidade: b.agenda.unidadeSaude.nome,
+    unidadeId: b.agenda.unidadeSaude.id,
     status,
     statusLabel: b.statusDescricao,
     grupo,

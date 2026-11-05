@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Agendamento } from '@/constants/agendamentos';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
+import { abrirComoChegar, buscarPerfilUnidade } from '@/services/unidade';
 
 interface Props {
   visivel: boolean;
@@ -31,6 +32,23 @@ export function AgendamentoModal({
   const t = useTema();
   const styles = useMemo(() => criarEstilos(t), [t]);
   const cancelarModo = modo === 'cancelar';
+
+  // Endereço da unidade do agendamento (para o botão "Como chegar"). Reaproveita o perfil da
+  // unidade do chat (/meu/unidades/{id}); o botão só aparece quando a unidade tem endereço.
+  const [endereco, setEndereco] = useState<string | null>(null);
+  useEffect(() => {
+    let ativo = true;
+    setEndereco(null);
+    const unidadeId = agendamento?.unidadeId;
+    if (!visivel || !unidadeId) return;
+    buscarPerfilUnidade(unidadeId)
+      .then((u) => ativo && setEndereco(u.endereco ?? null))
+      .catch(() => ativo && setEndereco(null));
+    return () => {
+      ativo = false;
+    };
+  }, [visivel, agendamento?.unidadeId]);
+
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
       <View style={styles.backdrop}>
@@ -78,6 +96,18 @@ export function AgendamentoModal({
               </View>
             </View>
           )}
+
+          {/* "Como chegar" aparece nos dois modos (aguardando e confirmado), quando a unidade tem endereço. */}
+          {endereco ? (
+            <Pressable
+              style={({ pressed }) => [styles.btnComoChegar, pressed && styles.pressed]}
+              onPress={() => abrirComoChegar(endereco)}
+              accessibilityRole="button"
+              accessibilityLabel="Como chegar à unidade">
+              <Ionicons name="navigate" size={20} color={t.brandDeep} />
+              <Text style={styles.btnComoChegarTxt}>Como chegar</Text>
+            </Pressable>
+          ) : null}
 
           {cancelarModo ? (
             podeCancelar ? (
@@ -204,6 +234,18 @@ const criarEstilos = (t: Tema) =>
     backgroundColor: '#B23B4E',
   },
   btnCancelarPrimarioTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  btnComoChegar: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: t.brandTint,
+    marginBottom: 12,
+  },
+  btnComoChegarTxt: { color: t.brandDeep, fontSize: 15.5, fontWeight: '700' },
   semCancelamento: {
     width: '100%',
     flexDirection: 'row',

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 import { registrarParaPush } from '@/services/notificacoes';
 import {
+  atualizarNomeSessao as atualizarNomeSessaoServico,
   ativar as ativarServico,
   carregarSessao,
   definirSenha as definirSenhaServico,
@@ -58,6 +59,8 @@ interface SessaoContexto {
   definirSenha: (senha: string) => Promise<void>;
   /** Escolhe o perfil ativo (tela "Selecionar Perfil"). Nunca refaz OTP. */
   trocarPerfil: (pacienteId: number) => Promise<void>;
+  /** Atualiza o nome de exibição da sessão (após o paciente editar o próprio perfil). */
+  atualizarNomeSessao: (nome: string) => Promise<void>;
   /** Clínicas (ativas) do CPF logado — app compartilhado, para oferecer "trocar unidade". */
   minhasClinicas: () => Promise<ClinicaLogin[]>;
   /**
@@ -138,6 +141,11 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     setSessao(await trocarPerfilServico(pacienteId));
   }
 
+  async function atualizarNomeSessao(nome: string) {
+    const nova = await atualizarNomeSessaoServico(nome);
+    if (nova) setSessao({ ...nova });
+  }
+
   async function minhasClinicas() {
     return minhasClinicasServico();
   }
@@ -165,6 +173,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         ativar,
         definirSenha,
         trocarPerfil,
+        atualizarNomeSessao,
         minhasClinicas,
         trocarClinica,
         sair,

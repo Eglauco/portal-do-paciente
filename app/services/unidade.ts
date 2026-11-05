@@ -1,3 +1,5 @@
+import { Linking } from 'react-native';
+
 import { fetchMeu } from '@/services/sessao';
 
 /** Dia da semana como o backend serializa (java.time.DayOfWeek). */
@@ -45,3 +47,10 @@ export async function buscarPerfilUnidade(id: number | string): Promise<PerfilUn
   }
   return resposta.json() as Promise<PerfilUnidade>;
 }
+
+/** URL do Google Maps para traçar rota até um endereço. */
+export const urlComoChegar = (endereco: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+
+/** Abre o Google Maps com a rota até o endereço da unidade (reutilizado no perfil e no agendamento). */
+export const abrirComoChegar = (endereco: string) => Linking.openURL(urlComoChegar(endereco)).catch(() => {});
