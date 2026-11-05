@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { PacienteSelecao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { AgendaBuscaStore } from './agenda-busca.store';
@@ -31,7 +32,7 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
  */
 @Component({
   selector: 'app-agendas-por-paciente',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, NomePaciente],
   templateUrl: './agendas-por-paciente.html',
   styles: [
     `

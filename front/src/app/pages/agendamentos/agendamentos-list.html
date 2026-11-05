@@ -155,7 +155,7 @@
                 (keydown.enter)="editar(a)"
               >
                 <td class="cell-data">{{ a.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td><b>{{ a.paciente.nome }}</b></td>
+                <td><b><app-nome-paciente [paciente]="a.paciente" /></b></td>
                 <td class="muted-cell">{{ a.especialidade.nome }}</td>
                 <td class="muted-cell">{{ a.profissionalSaude.nome }}</td>
                 <td class="muted-cell">{{ a.configuracaoAgenda.nome }}</td>

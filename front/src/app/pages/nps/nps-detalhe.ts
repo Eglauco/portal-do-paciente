@@ -2,12 +2,13 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, afterNextRender, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { NpsDetalhe, statusLabel } from './nps.model';
 import { NpsService } from './nps.service';
 
 @Component({
   selector: 'app-nps-detalhe',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, NomePaciente],
   templateUrl: './nps-detalhe.html',
 })
 export class NpsDetalheComponent {

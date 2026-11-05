@@ -122,7 +122,7 @@
             <span class="nps-paciente__avatar">{{ iniciais(d.paciente.nome) }}</span>
           }
           <div>
-            <b class="nps-paciente__nome">{{ d.paciente.nome }}</b>
+            <b class="nps-paciente__nome"><app-nome-paciente [paciente]="d.paciente" /></b>
             <span class="nps-paciente__unidade">{{ d.unidadeSaude.nome }}</span>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { afterNextRender, Component, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { AuthService } from '../../core/auth.service';
@@ -30,7 +31,7 @@ const ESTADOS_ENTREGA: EstadoEntrega[] = [
 
 @Component({
   selector: 'app-agendamentos-list',
-  imports: [RouterLink, DatePipe, RelatorioColunasModal, Ordenavel],
+  imports: [RouterLink, DatePipe, RelatorioColunasModal, Ordenavel, NomePaciente],
   templateUrl: './agendamentos-list.html',
 })
 export class AgendamentosList {

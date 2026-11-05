@@ -33,7 +33,6 @@ export interface Horario {
   dataHora: string;
   /** HH:mm:ss */
   horaInicio: string;
-  horaFim?: string | null;
   paciente: Ref;
   pacienteCpf?: string | null;
   /** Foto do paciente (URL direta do objeto no S3) — avatar na tela do horário. */
@@ -82,7 +81,6 @@ export interface HorarioRequest {
   pacienteId: number;
   /** HH:mm */
   horaInicio: string;
-  horaFim?: string | null;
   statusAgendamento?: StatusAgendamento;
 }
 

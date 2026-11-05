@@ -42,7 +42,14 @@
           bindLabel="nome"
           bindValue="id"
           placeholder="Todos os pacientes"
-        ></ng-select>
+        >
+          <ng-template ng-label-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+          <ng-template ng-option-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+        </ng-select>
       </div>
       <div class="form-field">
         <label class="label" for="f-especialidade">Especialidade</label>
@@ -139,7 +146,7 @@
                 (keydown.enter)="editar(p)"
               >
                 <td><b>{{ p.numeroAtendimento }}</b></td>
-                <td>{{ p.paciente.nome }}</td>
+                <td><app-nome-paciente [paciente]="p.paciente" /></td>
                 <td class="muted-cell">{{ p.especialidade.nome }}</td>
                 <td class="muted-cell">{{ p.unidadeSaude.nome }}</td>
                 <td class="cell-data">{{ p.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>

@@ -3,9 +3,10 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
-import { Paciente } from './paciente.model';
+import { Paciente, nomeExibicao, refExibicao } from './paciente.model';
 import { PacienteBuscaStore } from './paciente-busca.store';
 import { PacienteService } from './paciente.service';
 
@@ -13,7 +14,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-pacientes-list',
-  imports: [RouterLink, RelatorioColunasModal, DatePipe, Ordenavel],
+  imports: [RouterLink, RelatorioColunasModal, DatePipe, Ordenavel, NomePaciente],
   templateUrl: './pacientes-list.html',
 })
 export class PacientesList {
@@ -226,6 +227,11 @@ export class PacientesList {
     link.click();
     URL.revokeObjectURL(url);
   }
+
+  /** Nome de exibição (social quando o paciente usa; senão civil) — para as iniciais e o aria-label. */
+  protected readonly nomeExibicao = nomeExibicao;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nome de exibição + registro + flag). */
+  protected readonly refExibicao = refExibicao;
 
   protected iniciais(nome: string): string {
     const partes = nome.trim().split(/\s+/);

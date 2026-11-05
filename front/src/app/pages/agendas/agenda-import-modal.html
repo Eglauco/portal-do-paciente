@@ -90,8 +90,12 @@
                   <tr>
                     <th class="col-linha">Linha</th>
                     <th>Paciente (id/prontuário/código)</th>
+                    <th>CPF</th>
+                    <th>Nome</th>
+                    <th>Nome social</th>
+                    <th>Telefone</th>
+                    <th>Data nasc.</th>
                     <th>Hora início</th>
-                    <th>Hora fim</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -109,18 +113,52 @@
                         @if (h.paciente.erro) { <div class="cell__msg">{{ h.paciente.mensagem }}</div> }
                       </td>
 
+                      <td class="cell" [class.is-erro]="h.cpf.erro">
+                        <div class="cell__val">
+                          @if (h.cpf.valor) { {{ h.cpf.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (!h.cpf.erro && h.cpf.resolvido && h.cpf.resolvido !== h.cpf.valor) {
+                          <div class="cell__resolvido">{{ h.cpf.resolvido }}</div>
+                        }
+                        @if (h.cpf.erro) { <div class="cell__msg">{{ h.cpf.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.nome.erro">
+                        <div class="cell__val">
+                          @if (h.nome.valor) { {{ h.nome.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (h.nome.erro) { <div class="cell__msg">{{ h.nome.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.nomeSocial.erro">
+                        <div class="cell__val">
+                          @if (h.nomeSocial.valor) { {{ h.nomeSocial.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (h.nomeSocial.erro) { <div class="cell__msg">{{ h.nomeSocial.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.telefone.erro">
+                        <div class="cell__val">
+                          @if (h.telefone.valor) { {{ h.telefone.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (h.telefone.erro) { <div class="cell__msg">{{ h.telefone.mensagem }}</div> }
+                      </td>
+
+                      <td class="cell" [class.is-erro]="h.dataNascimento.erro">
+                        <div class="cell__val">
+                          @if (h.dataNascimento.valor) { {{ h.dataNascimento.valor }} } @else { <span class="vazio">—</span> }
+                        </div>
+                        @if (!h.dataNascimento.erro && h.dataNascimento.resolvido && h.dataNascimento.resolvido !== h.dataNascimento.valor) {
+                          <div class="cell__resolvido">{{ h.dataNascimento.resolvido }}</div>
+                        }
+                        @if (h.dataNascimento.erro) { <div class="cell__msg">{{ h.dataNascimento.mensagem }}</div> }
+                      </td>
+
                       <td class="cell" [class.is-erro]="h.horaInicio.erro">
                         <div class="cell__val">
                           @if (h.horaInicio.valor) { {{ h.horaInicio.valor }} } @else { <span class="vazio">—</span> }
                         </div>
                         @if (h.horaInicio.erro) { <div class="cell__msg">{{ h.horaInicio.mensagem }}</div> }
-                      </td>
-
-                      <td class="cell" [class.is-erro]="h.horaFim.erro">
-                        <div class="cell__val">
-                          @if (h.horaFim.valor) { {{ h.horaFim.valor }} } @else { <span class="vazio">—</span> }
-                        </div>
-                        @if (h.horaFim.erro) { <div class="cell__msg">{{ h.horaFim.mensagem }}</div> }
                       </td>
                     </tr>
                   }

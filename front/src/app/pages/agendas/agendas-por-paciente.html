@@ -15,8 +15,11 @@
     notFoundText="Nenhum paciente encontrado"
     (change)="selecionar($event)"
   >
+    <ng-template ng-label-tmp let-item="item">
+      <app-nome-paciente [paciente]="item" />
+    </ng-template>
     <ng-template ng-option-tmp let-item="item">
-      <div class="opt__nome">{{ item.nome }}</div>
+      <div class="opt__nome"><app-nome-paciente [paciente]="item" /></div>
       <div class="opt__meta">
         @if (item.cpf) { CPF {{ item.cpf }} }
         @if (item.cpf && item.prontuario) { · }
@@ -39,7 +42,7 @@
   <div class="pac-head">
     <div class="pac-head__av" aria-hidden="true">{{ iniciais() }}</div>
     <div>
-      <div class="pac-head__nome">{{ paciente()!.nome }}</div>
+      <div class="pac-head__nome"><app-nome-paciente [paciente]="paciente()!" /></div>
       <div class="pac-head__meta">
         @if (paciente()!.cpf) { CPF {{ paciente()!.cpf }} }
         @if (paciente()!.cpf && paciente()!.prontuario) { · }
@@ -75,7 +78,7 @@
             <div class="marc__dia">{{ m.data | date: 'dd/MM/yyyy' }}</div>
             <div class="marc__hora">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-              {{ m.horaInicio.slice(0, 5) }}@if (m.horaFim) {–{{ m.horaFim.slice(0, 5) }}}
+              {{ m.horaInicio.slice(0, 5) }}
             </div>
           </div>
           <div class="marc__quem">

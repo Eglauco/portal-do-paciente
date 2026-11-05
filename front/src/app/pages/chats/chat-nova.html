@@ -23,7 +23,14 @@
           typeToSearchText="Digite ao menos 2 letras para buscar o paciente"
           placeholder="Busque o paciente pelo nome"
           notFoundText="Nenhum paciente encontrado"
-        ></ng-select>
+        >
+          <ng-template ng-label-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+          <ng-template ng-option-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+        </ng-select>
         @if (invalido()) {
           <span class="field-error" role="alert">Selecione o paciente.</span>
         }

@@ -3,8 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { catchError, debounceTime, distinctUntilChanged, finalize, map, of, switchMap } from 'rxjs';
-import { Paciente, PacienteFiltro } from '../pacientes/paciente.model';
+import { nomeExibicao, Paciente, PacienteFiltro, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { idadeRotulo, iniciais, sexoRotulo } from './prontuario-medico.util';
 
 /**
@@ -14,7 +15,7 @@ import { idadeRotulo, iniciais, sexoRotulo } from './prontuario-medico.util';
  */
 @Component({
   selector: 'app-prontuario-medico-busca',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, NomePaciente],
   templateUrl: './prontuario-medico-busca.html',
 })
 export class ProntuarioMedicoBusca {
@@ -37,6 +38,9 @@ export class ProntuarioMedicoBusca {
   protected readonly iniciais = iniciais;
   protected readonly idadeRotulo = idadeRotulo;
   protected readonly sexoRotulo = sexoRotulo;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nome de exibição + registro + flag). */
+  protected readonly refExibicao = refExibicao;
+  protected readonly nomeExibicao = nomeExibicao;
 
   constructor() {
     this.busca.valueChanges

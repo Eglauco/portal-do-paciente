@@ -20,7 +20,7 @@ interface CampoAgenda {
   styles: [
     `
       .modal__overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 3rem 1rem; overflow: auto; }
-      .modal { width: 100%; max-width: 960px; background: var(--surface, #fff); color: var(--ink); border-radius: 0.8rem; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22); }
+      .modal { width: 100%; max-width: 1120px; background: var(--surface, #fff); color: var(--ink); border-radius: 0.8rem; box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22); }
       .modal__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem 0.5rem; }
       .modal__title { font-size: 1.1rem; font-weight: 700; margin: 0; }
       .modal__sub { font-size: 0.85rem; color: var(--muted); margin: 0.15rem 0 0; }

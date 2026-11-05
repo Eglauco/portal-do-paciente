@@ -25,6 +25,7 @@ import {
   NIVEIS_ACESSO,
   NIVEIS_SEM_LANCAMENTO,
   NivelAcesso,
+  nomeExibicao,
   PacienteEntrada,
   PermissoesResponsavel,
   Responsavel,
@@ -72,6 +73,18 @@ function aoMenosUmTelefoneValidator(control: AbstractControl): ValidationErrors 
   const array = control as FormArray<FormControl<string>>;
   const algumPreenchido = array.controls.some((c) => ((c.value ?? '') as string).trim().length > 0);
   return algumPreenchido ? null : { telefoneObrigatorio: true };
+}
+
+/**
+ * Nome social é obrigatório quando "Utiliza nome social" está marcado (não dá para "usar" um nome
+ * vazio). Lê o controle irmão `utilizaNomeSocial` do mesmo FormGroup. Revalidado quando o toggle muda.
+ */
+function nomeSocialObrigatorioValidator(control: AbstractControl): ValidationErrors | null {
+  const grupo = control.parent as FormGroup | null;
+  if (!grupo) return null;
+  const usa = grupo.get('utilizaNomeSocial')?.value === true;
+  const preenchido = ((control.value ?? '') as string).trim().length > 0;
+  return usa && !preenchido ? { nomeSocialObrigatorio: true } : null;
 }
 
 /** Data no formato dd/mm/aaaa: opcional, mas se preenchida precisa ser válida e não futura. */
@@ -127,6 +140,7 @@ export class PacienteForm implements PodeSair {
       case 'pessoais':
         return [
           this.form.controls.nome,
+          this.form.controls.nomeSocial,
           this.form.controls.dataNascimento,
           this.form.controls.cpf,
           this.form.controls.cns,
@@ -152,6 +166,11 @@ export class PacienteForm implements PodeSair {
       nonNullable: true,
       validators: [Validators.required, Validators.minLength(3)],
     }),
+    nomeSocial: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.maxLength(120), nomeSocialObrigatorioValidator],
+    }),
+    utilizaNomeSocial: new FormControl(false, { nonNullable: true }),
     sexo: new FormControl<string | null>(null),
     dataNascimento: new FormControl('', {
       nonNullable: true,
@@ -210,6 +229,11 @@ export class PacienteForm implements PodeSair {
     this.form.controls.cep.valueChanges.pipe(takeUntilDestroyed()).subscribe((cep) => {
       if (this.preenchendo) return;
       if ((cep ?? '').replace(/\D/g, '').length === 8) this.buscarCep();
+    });
+
+    // Revalida o nome social quando o toggle "Utiliza nome social" muda (validador cruzado).
+    this.form.controls.utilizaNomeSocial.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      this.form.controls.nomeSocial.updateValueAndValidity();
     });
 
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -408,6 +432,8 @@ export class PacienteForm implements PodeSair {
           codigoIntegracao: p.codigoIntegracao ?? '',
           prontuario: p.prontuario ?? '',
           nome: p.nome,
+          nomeSocial: p.nomeSocial ?? '',
+          utilizaNomeSocial: p.utilizaNomeSocial ?? false,
           sexo: p.sexo ?? null,
           dataNascimento: this.isoParaData(p.dataNascimento ?? null),
           rg: p.rg ?? '',
@@ -429,7 +455,7 @@ export class PacienteForm implements PodeSair {
         this.form.controls.unidadeIds.setValue((p.unidades ?? []).map((u) => u.id));
         this.preenchendo = false;
         this.ativo.set(!!p.ativo);
-        this.nomePaciente.set(p.nome ?? '');
+        this.nomePaciente.set(nomeExibicao(p));
         this.aplicarSituacao(p.situacao ?? 'ATIVO');
         this.fotoUrl.set(p.fotoUrl ?? null);
       },
@@ -496,6 +522,8 @@ export class PacienteForm implements PodeSair {
     const texto = (v: string) => (v.trim() ? v.trim() : null);
     return {
       nome: f.nome.trim(),
+      nomeSocial: texto(f.nomeSocial),
+      utilizaNomeSocial: f.utilizaNomeSocial,
       codigoIntegracao: texto(f.codigoIntegracao),
       prontuario: texto(f.prontuario),
       sexo: (f.sexo as PacienteEntrada['sexo']) ?? null,

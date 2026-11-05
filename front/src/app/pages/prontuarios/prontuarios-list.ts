@@ -8,7 +8,8 @@ import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { AuthService } from '../../core/auth.service';
-import { Paciente } from '../pacientes/paciente.model';
+import { NomePaciente } from '../../shared/nome-paciente';
+import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Prontuario, StatusAlertaProntuario } from './prontuario.model';
 import { ProntuarioBuscaStore } from './prontuario-busca.store';
@@ -18,7 +19,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-prontuarios-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal, Ordenavel],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal, Ordenavel, NomePaciente],
   templateUrl: './prontuarios-list.html',
 })
 export class ProntuariosList {
@@ -35,6 +36,8 @@ export class ProntuariosList {
   protected readonly base = this.service.base;
 
   protected readonly tamanhos = ProntuarioService.TAMANHOS;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do filtro). */
+  protected readonly refExibicao = refExibicao;
   protected readonly pacientes = signal<Paciente[]>([]);
 
   protected readonly filtro = new FormGroup({

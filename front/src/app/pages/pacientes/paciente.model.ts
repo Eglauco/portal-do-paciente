@@ -1,6 +1,33 @@
 /** Sexo do paciente (chave do enum no backend). */
 export type Sexo = 'MASCULINO' | 'FEMININO' | 'OUTRO' | 'NAO_INFORMADO';
 
+/**
+ * Nome de EXIBIÇÃO do paciente: o nome social quando o paciente opta por usá-lo (e ele está
+ * preenchido); senão, o nome civil. Usado nas telas que mostram a entidade completa (lista/cadastro).
+ * Os demais payloads (Ref de chat/agendamento/NPS/…) já chegam com o nome de exibição pronto do backend.
+ */
+export function nomeExibicao(
+  p: { nome: string; nomeSocial?: string | null; utilizaNomeSocial?: boolean } | null | undefined,
+): string {
+  if (!p) return '';
+  return p.utilizaNomeSocial && p.nomeSocial?.trim() ? p.nomeSocial : p.nome;
+}
+
+/**
+ * Converte a entidade Paciente completa (lista/cadastro) na forma esperada por `<app-nome-paciente>`:
+ * nome de exibição + nome de registro (civil) + flag. Para Refs vindos do backend (chat, agenda, …)
+ * os três campos já chegam prontos; este helper é para onde o front tem a entidade inteira.
+ */
+export function refExibicao(
+  p: { nome: string; nomeSocial?: string | null; utilizaNomeSocial?: boolean },
+): { nome: string; nomeRegistro: string; temNomeSocial: boolean } {
+  return {
+    nome: nomeExibicao(p),
+    nomeRegistro: p.nome,
+    temNomeSocial: !!(p.utilizaNomeSocial && p.nomeSocial?.trim()),
+  };
+}
+
 /** Situação do cadastro (soft-delete). Não confundir com `ativo` (acesso ao app). */
 export type SituacaoCadastro = 'ATIVO' | 'INATIVO';
 
@@ -85,7 +112,12 @@ export interface ResponsavelEntrada {
 
 export interface Paciente {
   id?: number;
+  /** Nome civil (registro). Sempre preservado. */
   nome: string;
+  /** Nome social (opcional): nome de identificação/exibição do paciente. */
+  nomeSocial?: string | null;
+  /** Quando true (e há nome social), o atendimento exibe o nome social no lugar do civil. */
+  utilizaNomeSocial?: boolean;
   codigoIntegracao?: string | null;
   prontuario?: string | null;
   sexo?: Sexo | null;
@@ -119,6 +151,10 @@ export interface Paciente {
 /** Campos aceitos ao criar/editar (ativo/código são geridos pelo backend). */
 export interface PacienteEntrada {
   nome: string;
+  /** Nome social (opcional). */
+  nomeSocial?: string | null;
+  /** Usa o nome social no atendimento. Exige nomeSocial preenchido. */
+  utilizaNomeSocial?: boolean;
   codigoIntegracao?: string | null;
   prontuario?: string | null;
   sexo?: Sexo | null;

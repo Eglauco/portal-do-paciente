@@ -8,7 +8,8 @@ import { AuthService } from '../../core/auth.service';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
-import { Paciente } from '../pacientes/paciente.model';
+import { NomePaciente } from '../../shared/nome-paciente';
+import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Nps, STATUS_OPTIONS, StatusNps, statusLabel } from './nps.model';
 import { NpsBuscaStore } from './nps-busca.store';
@@ -18,7 +19,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-nps-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, RelatorioColunasModal, Ordenavel],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, DecimalPipe, RelatorioColunasModal, Ordenavel, NomePaciente],
   templateUrl: './nps-list.html',
 })
 export class NpsList {
@@ -37,6 +38,8 @@ export class NpsList {
   protected readonly tamanhos = NpsService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly rotuloStatus = statusLabel;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do filtro). */
+  protected readonly refExibicao = refExibicao;
 
   protected readonly pacientes = signal<Paciente[]>([]);
 

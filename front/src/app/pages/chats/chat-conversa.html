@@ -11,7 +11,7 @@
           <span class="convo__avatar convo__avatar--lg">{{ iniciais(chat.paciente.nome) }}</span>
         }
         <div class="wa__cabecalho-info">
-          <b class="wa__cabecalho-nome">{{ chat.paciente.nome }}</b>
+          <b class="wa__cabecalho-nome"><app-nome-paciente [paciente]="chat.paciente" /></b>
           @if (digitando()) {
             <span class="wa__cabecalho-sub wa__digitando">digitando…</span>
           } @else {

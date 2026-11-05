@@ -18,7 +18,7 @@
         </button>
         <div>
           <h1 class="page-title">{{ m.tipo.nome }}</h1>
-          <p class="page-sub">{{ m.paciente.nome }} · {{ m.unidadeSaude.nome }}</p>
+          <p class="page-sub"><app-nome-paciente [paciente]="m.paciente" /> · {{ m.unidadeSaude.nome }}</p>
         </div>
       </div>
       <div class="sau-head__acoes">

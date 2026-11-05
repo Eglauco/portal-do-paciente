@@ -64,7 +64,7 @@
         }
 
         <div class="pm-header__ident">
-          <h1 class="pm-header__nome">{{ pac.nome }}</h1>
+          <h1 class="pm-header__nome"><app-nome-paciente [paciente]="pac" /></h1>
           <p class="pm-header__meta">
             {{ idadeRotulo(pac.dataNascimento) }}@if (sexoRotulo(pac.sexo); as s) { · {{ s }} }
           </p>

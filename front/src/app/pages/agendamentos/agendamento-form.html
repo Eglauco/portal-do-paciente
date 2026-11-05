@@ -117,7 +117,14 @@
           bindValue="id"
           placeholder="Selecione o paciente"
           notFoundText="Nenhum paciente encontrado"
-        ></ng-select>
+        >
+          <ng-template ng-label-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+          <ng-template ng-option-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+        </ng-select>
         @if (invalido('pacienteId')) {
           <span class="field-error">Selecione o paciente.</span>
         }

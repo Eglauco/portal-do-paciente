@@ -6,7 +6,8 @@ import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { Subject, catchError, debounceTime, distinctUntilChanged, finalize, map, of, switchMap } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
-import { Paciente } from '../pacientes/paciente.model';
+import { NomePaciente } from '../../shared/nome-paciente';
+import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { ChatService } from './chat.service';
 
@@ -19,7 +20,7 @@ import { ChatService } from './chat.service';
  */
 @Component({
   selector: 'app-chat-nova',
-  imports: [ReactiveFormsModule, NgSelectModule],
+  imports: [ReactiveFormsModule, NgSelectModule, NomePaciente],
   templateUrl: './chat-nova.html',
 })
 export class ChatNova {
@@ -29,6 +30,8 @@ export class ChatNova {
   private readonly auth = inject(AuthService);
 
   protected readonly unidadeNome = this.auth.unidadeNome;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do seletor). */
+  protected readonly refExibicao = refExibicao;
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly carregandoPacientes = signal(false);
   protected readonly iniciando = signal(false);

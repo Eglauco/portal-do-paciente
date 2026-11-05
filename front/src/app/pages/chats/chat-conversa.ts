@@ -7,6 +7,7 @@ import { retry, throwError, timer } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
 import { Usuario } from '../usuarios/usuario.model';
 import { UsuarioService } from '../usuarios/usuario.service';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { ChatDetalhe, ChatLog, Citacao, Mensagem, TipoLogChat, novoClienteId, statusLabel } from './chat.model';
 import { ChatRealtimeService, DigitandoEvento } from './chat-realtime.service';
 import { ChatService } from './chat.service';
@@ -14,7 +15,7 @@ import { DestacarBuscaPipe } from './destacar-busca.pipe';
 
 @Component({
   selector: 'app-chat-conversa',
-  imports: [DatePipe, DecimalPipe, DestacarBuscaPipe],
+  imports: [DatePipe, DecimalPipe, DestacarBuscaPipe, NomePaciente],
   templateUrl: './chat-conversa.html',
 })
 export class ChatConversa {

@@ -22,12 +22,18 @@ export interface AgendaPreview {
 /**
  * Uma marcação (um paciente) da planilha. `linha` é o número da linha no Excel para localizar/corrigir.
  * O paciente é localizado por id/prontuário/código; `paciente.resolvido` traz o nome encontrado.
+ * CPF/Nome/Telefone/Data de nascimento são obrigatórios por linha; Nome social é opcional. Esses dados ficam
+ * gravados junto ao horário (não alteram o cadastro do paciente).
  */
 export interface HorarioPreview {
   linha: number;
   paciente: CampoPreview;
+  cpf: CampoPreview;
+  nome: CampoPreview;
+  nomeSocial: CampoPreview;
+  telefone: CampoPreview;
+  dataNascimento: CampoPreview;
   horaInicio: CampoPreview;
-  horaFim: CampoPreview;
 }
 
 /** Preview completo devolvido pelo backend. */

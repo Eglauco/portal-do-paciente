@@ -7,7 +7,8 @@ import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { AuthService } from '../../core/auth.service';
 import { PodeSair } from '../../core/pending-changes.guard';
-import { Paciente } from '../pacientes/paciente.model';
+import { NomePaciente } from '../../shared/nome-paciente';
+import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { ConfiguracaoAgenda } from '../configuracao-agenda/configuracao-agenda.model';
 import { ConfiguracaoAgendaService } from '../configuracao-agenda/configuracao-agenda.service';
@@ -48,7 +49,7 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
 
 @Component({
   selector: 'app-agendamento-form',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, NomePaciente],
   templateUrl: './agendamento-form.html',
   styles: [`
     /* Abas do agendamento: separam Dados / Destinatários / Histórico (uma visível por vez). */
@@ -87,6 +88,8 @@ export class AgendamentoForm implements PodeSair {
   protected readonly unidadeNome = this.auth.unidadeNome;
 
   protected readonly statusOpcoes = STATUS_OPTIONS;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do seletor). */
+  protected readonly refExibicao = refExibicao;
 
   /** Aba ativa (só aparece na edição): dados, destinatários da notificação ou histórico. */
   protected readonly abaAtiva = signal<AbaId>('dados');

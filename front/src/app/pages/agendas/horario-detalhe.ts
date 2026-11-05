@@ -3,6 +3,7 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { NomePaciente } from '../../shared/nome-paciente';
 import {
   AgendamentoEntrega,
   AgendamentoLog,
@@ -28,7 +29,7 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
  */
 @Component({
   selector: 'app-horario-detalhe',
-  imports: [ReactiveFormsModule, DatePipe, RouterLink],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink, NomePaciente],
   templateUrl: './horario-detalhe.html',
   styles: [`
     /* Dois cartões (acima das abas): Paciente (hero com avatar) e Agenda (contexto do slot). */
@@ -163,7 +164,6 @@ export class HorarioDetalhe {
       agendaId: h.agendaId,
       pacienteId: h.paciente.id,
       horaInicio: (h.horaInicio ?? '').slice(0, 5),
-      horaFim: h.horaFim ? h.horaFim.slice(0, 5) : null,
       statusAgendamento: status,
     };
     this.salvandoStatus.set(true);

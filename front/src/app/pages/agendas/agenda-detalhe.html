@@ -1,4 +1,4 @@
-<section class="dash">
+<section class="dash" [inert]="confirmandoExclusao()">
   <header class="page-head">
     <div>
       <a class="btn btn--ghost btn--sm" routerLink="/agendas">← Voltar</a>
@@ -8,7 +8,7 @@
     @if (agenda(); as a) {
       <div class="page-head__actions">
         <a class="btn btn--ghost" [routerLink]="['/agendas', a.id, 'editar']">Editar agenda</a>
-        <button type="button" class="btn btn--ghost" (click)="excluirAgenda()" [disabled]="excluindoAgenda()">Excluir</button>
+        <button #btnExcluir type="button" class="btn btn--ghost" (click)="abrirExclusao()" [disabled]="excluindoAgenda()">Excluir</button>
       </div>
     }
   </header>
@@ -37,15 +37,18 @@
       <form class="add-row" [formGroup]="novoHorario" (submit)="adicionar(); $event.preventDefault()">
         <div class="form-field form-field--paciente">
           <label class="label" for="h-pac">Paciente</label>
-          <ng-select id="h-pac" formControlName="pacienteId" [items]="pacientes()" bindValue="id" bindLabel="nome" placeholder="Selecione o paciente" [clearable]="false"></ng-select>
+          <ng-select id="h-pac" formControlName="pacienteId" [items]="pacientes()" bindValue="id" bindLabel="nome" placeholder="Selecione o paciente" [clearable]="false">
+            <ng-template ng-label-tmp let-item="item">
+              <app-nome-paciente [paciente]="refExibicao(item)" />
+            </ng-template>
+            <ng-template ng-option-tmp let-item="item">
+              <app-nome-paciente [paciente]="refExibicao(item)" />
+            </ng-template>
+          </ng-select>
         </div>
         <div class="form-field form-field--hora">
           <label class="label" for="h-ini">Início</label>
           <input id="h-ini" type="time" class="input" formControlName="horaInicio" />
-        </div>
-        <div class="form-field form-field--hora">
-          <label class="label" for="h-fim">Fim (opcional)</label>
-          <input id="h-fim" type="time" class="input" formControlName="horaFim" />
         </div>
         <button type="submit" class="btn btn--solid" [disabled]="adicionando()">
           {{ adicionando() ? 'Adicionando…' : 'Adicionar' }}
@@ -61,7 +64,6 @@
             <thead>
               <tr>
                 <th>Início</th>
-                <th>Fim</th>
                 <th>Paciente</th>
                 <th>CPF</th>
                 <th>Cód. integração</th>
@@ -73,8 +75,7 @@
               @for (h of a.horarios; track h.id) {
                 <tr>
                   <td class="cell-data">{{ h.horaInicio?.slice(0, 5) }}</td>
-                  <td class="muted-cell">{{ h.horaFim ? h.horaFim.slice(0, 5) : '—' }}</td>
-                  <td>{{ h.paciente.nome }}</td>
+                  <td><app-nome-paciente [paciente]="h.paciente" /></td>
                   <td class="muted-cell">{{ h.pacienteCpf || '—' }}</td>
                   <td>@if (h.codigoIntegracao) { <span class="cod">{{ h.codigoIntegracao }}</span> } @else { <span class="muted-cell">—</span> }</td>
                   <td><span class="status-pill">{{ h.statusDescricao || h.statusAgendamento }}</span></td>
@@ -90,3 +91,71 @@
     </section>
   }
 </section>
+
+@if (confirmandoExclusao() && agenda(); as a) {
+  <div class="modal__overlay" (click)="cancelarExclusao()">
+    <div
+      #dialogExclusao
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="excl-titulo"
+      aria-describedby="excl-desc"
+      tabindex="-1"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="modal__head">
+        <h2 class="modal__title" id="excl-titulo">Excluir agenda</h2>
+        <button type="button" class="modal__x" (click)="cancelarExclusao()" aria-label="Fechar" [disabled]="excluindoAgenda()">×</button>
+      </div>
+
+      <div class="modal__body" id="excl-desc">
+        <p class="excl-alert">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+          <span>Esta ação é permanente e não pode ser desfeita.</span>
+        </p>
+
+        <p>
+          Você vai <b>excluir esta agenda</b> e, junto com ela,
+          <b>remover TODOS os {{ a.horarios.length }} horário(s)</b> (pacientes marcados) vinculados a ela.
+        </p>
+
+        <ul class="excl-resumo">
+          <li>Data: <b>{{ a.data | date: 'dd/MM/yyyy' }}</b></li>
+          <li>Profissional: <b>{{ a.profissionalSaude.nome }}</b></li>
+          <li>Especialidade: <b>{{ a.especialidade.nome }}</b></li>
+          @if (a.nome) { <li>Nome: <b>{{ a.nome }}</b></li> }
+          <li>Horários que serão removidos: <b>{{ a.horarios.length }}</b></li>
+        </ul>
+
+        @if (a.horarios.length > 0) {
+          <p>
+            Os <b>{{ a.horarios.length }}</b> paciente(s) marcado(s) <b>perderão esta marcação</b>. A remoção também
+            apaga, de cada horário, o histórico de status e os registros de entrega de notificação. <b>Nada será
+            recuperável.</b>
+          </p>
+        } @else {
+          <p>Esta agenda não tem horários marcados — apenas a agenda será excluída.</p>
+        }
+
+        <p class="excl-nota">
+          Observação: horários com <b>prontuário</b> ou <b>avaliação (NPS)</b> vinculados são registros clínicos e
+          <b>não podem ser removidos</b>. Se a agenda tiver algum, a exclusão é cancelada e nada é alterado.
+        </p>
+      </div>
+
+      <div class="modal__foot">
+        <button type="button" class="btn btn--ghost" (click)="cancelarExclusao()" [disabled]="excluindoAgenda()">Cancelar</button>
+        <button type="button" class="btn btn--danger" (click)="confirmarExclusao()" [disabled]="excluindoAgenda()">
+          @if (excluindoAgenda()) {
+            Excluindo…
+          } @else if (a.horarios.length > 0) {
+            Excluir agenda e {{ a.horarios.length }} horário(s)
+          } @else {
+            Excluir agenda
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+}

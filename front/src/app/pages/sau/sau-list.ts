@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { AuthService } from '../../core/auth.service';
 import { TipoManifestacao } from '../tipos-manifestacao/tipo-manifestacao.model';
 import { TipoManifestacaoService } from '../tipos-manifestacao/tipo-manifestacao.service';
@@ -16,7 +17,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-sau-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RelatorioColunasModal],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RelatorioColunasModal, NomePaciente],
   templateUrl: './sau-list.html',
 })
 export class SauList {

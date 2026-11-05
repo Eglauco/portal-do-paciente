@@ -87,16 +87,16 @@
             <a
               class="pm-card"
               [routerLink]="['/prontuario-medico', p.id]"
-              [attr.aria-label]="'Abrir prontuário médico de ' + p.nome"
+              [attr.aria-label]="'Abrir prontuário médico de ' + nomeExibicao(p)"
             >
               <span class="pm-card__top">
                 @if (p.fotoUrl) {
                   <img class="pm-avatar pm-avatar--foto" [src]="p.fotoUrl" (error)="p.fotoUrl = null" alt="" />
                 } @else {
-                  <span class="pm-avatar" aria-hidden="true">{{ iniciais(p.nome) }}</span>
+                  <span class="pm-avatar" aria-hidden="true">{{ iniciais(nomeExibicao(p)) }}</span>
                 }
                 <span class="pm-card__ident">
-                  <b class="pm-card__nome">{{ p.nome }}</b>
+                  <b class="pm-card__nome"><app-nome-paciente [paciente]="refExibicao(p)" /></b>
                   <span class="pm-card__meta">
                     {{ idadeRotulo(p.dataNascimento) }}@if (sexoRotulo(p.sexo); as s) { · {{ s }} }
                   </span>

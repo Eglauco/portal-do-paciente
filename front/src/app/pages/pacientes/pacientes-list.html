@@ -147,7 +147,7 @@
               <tr
                 tabindex="0"
                 role="button"
-                [attr.aria-label]="'Editar ' + p.nome"
+                [attr.aria-label]="'Editar ' + nomeExibicao(p)"
                 (click)="editar(p)"
                 (keydown.enter)="editar(p)"
                 (keydown.space)="$event.preventDefault(); editar(p)"
@@ -158,9 +158,9 @@
                     @if (p.fotoUrl) {
                       <img class="avatar av-foto" [src]="p.fotoUrl" (error)="p.fotoUrl = null" alt="" />
                     } @else {
-                      <span class="avatar" aria-hidden="true">{{ iniciais(p.nome) }}</span>
+                      <span class="avatar" aria-hidden="true">{{ iniciais(nomeExibicao(p)) }}</span>
                     }
-                    <b>{{ p.nome }}</b>
+                    <b><app-nome-paciente [paciente]="refExibicao(p)" /></b>
                     @if (p.situacao === 'INATIVO') {
                       <span class="badge-inativo">Inativo</span>
                     }

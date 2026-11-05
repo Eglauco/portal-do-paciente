@@ -105,7 +105,7 @@
               }
               <span class="convo__body">
                 <span class="convo__top">
-                  <b class="convo__nome">{{ m.paciente.nome }}</b>
+                  <b class="convo__nome"><app-nome-paciente [paciente]="m.paciente" /></b>
                   <span class="convo__hora">{{ m.criadoEm | date: 'dd/MM HH:mm' }}</span>
                 </span>
                 <span class="convo__meta">

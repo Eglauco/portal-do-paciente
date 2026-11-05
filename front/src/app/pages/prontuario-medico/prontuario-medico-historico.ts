@@ -7,6 +7,7 @@ import { ToastrService } from 'ngx-toastr';
 import { DecisaoValidacao, DocumentoAdmin, ProntuarioDetalhe } from '../prontuarios/prontuario.model';
 import { ProntuarioService } from '../prontuarios/prontuario.service';
 import { StorageService } from '../prontuarios/storage.service';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { DocumentoAberto, HistoricoMedico, TipoArquivo } from './prontuario-medico.model';
 import { ProntuarioMedicoService } from './prontuario-medico.service';
 import {
@@ -31,7 +32,7 @@ interface MarcoTimeline {
  */
 @Component({
   selector: 'app-prontuario-medico-historico',
-  imports: [DatePipe, DecimalPipe, MarkdownPipe],
+  imports: [DatePipe, DecimalPipe, MarkdownPipe, NomePaciente],
   templateUrl: './prontuario-medico-historico.html',
   host: {
     '(document:keydown.escape)': 'aoEscape()',

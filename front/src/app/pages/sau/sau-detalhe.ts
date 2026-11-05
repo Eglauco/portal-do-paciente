@@ -2,12 +2,13 @@ import { DatePipe } from '@angular/common';
 import { Component, ElementRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { ManifestacaoDetalhe } from './sau.model';
 import { SauService } from './sau.service';
 
 @Component({
   selector: 'app-sau-detalhe',
-  imports: [DatePipe],
+  imports: [DatePipe, NomePaciente],
   templateUrl: './sau-detalhe.html',
 })
 export class SauDetalhe {

@@ -44,7 +44,14 @@
           bindLabel="nome"
           bindValue="id"
           placeholder="Todos os pacientes"
-        ></ng-select>
+        >
+          <ng-template ng-label-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+          <ng-template ng-option-tmp let-item="item">
+            <app-nome-paciente [paciente]="refExibicao(item)" />
+          </ng-template>
+        </ng-select>
       </div>
     </div>
     <div class="filters__actions">
@@ -124,7 +131,7 @@
               >
                 <td class="cell-data">{{ n.dataHora | date: 'dd/MM/yyyy HH:mm' }}</td>
                 <td>
-                  <b>{{ n.paciente.nome }}</b>
+                  <b><app-nome-paciente [paciente]="n.paciente" /></b>
                   @if (n.responsavelNome) {
                     <span class="cell-via-resp">
                       <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

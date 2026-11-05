@@ -5,8 +5,9 @@ import { Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
 import { RelatorioColunasModal } from '../../shared/relatorio-colunas-modal';
+import { NomePaciente } from '../../shared/nome-paciente';
 import { AuthService } from '../../core/auth.service';
-import { Paciente } from '../pacientes/paciente.model';
+import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
 import { Usuario } from '../usuarios/usuario.model';
 import { UsuarioService } from '../usuarios/usuario.service';
@@ -19,7 +20,7 @@ export type PaginaItem = number | 'ellipsis';
 
 @Component({
   selector: 'app-chats-list',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, RelatorioColunasModal, NomePaciente],
   templateUrl: './chats-list.html',
 })
 export class ChatsList {
@@ -41,6 +42,8 @@ export class ChatsList {
   protected readonly tamanhos = ChatService.TAMANHOS;
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly rotuloStatus = statusLabel;
+  /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do filtro). */
+  protected readonly refExibicao = refExibicao;
 
   protected readonly pacientes = signal<Paciente[]>([]);
   protected readonly usuarios = signal<Usuario[]>([]);
