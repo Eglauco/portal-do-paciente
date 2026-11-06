@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EscolherMapaSheet } from '@/components/escolher-mapa-sheet';
 import { MapaUnidade } from '@/components/mapa-unidade';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
-import { abrirComoChegar, buscarPerfilUnidade, DiaSemana, HorarioUnidade, PerfilUnidade } from '@/services/unidade';
+import { buscarPerfilUnidade, DiaSemana, HorarioUnidade, PerfilUnidade } from '@/services/unidade';
 
 /** Rótulo pt-BR de cada dia (na ordem de exibição segunda → domingo). */
 const DIAS: { dia: DiaSemana; label: string }[] = [
@@ -71,6 +72,7 @@ export default function UnidadePerfilScreen() {
   const [unidade, setUnidade] = useState<PerfilUnidade | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(false);
+  const [mapaAberto, setMapaAberto] = useState(false);
 
   const carregar = useCallback(async () => {
     if (!id) return;
@@ -90,7 +92,10 @@ export default function UnidadePerfilScreen() {
 
   const abrir = (url: string) => Linking.openURL(url).catch(() => {});
   const ligar = () => unidade?.telefone && abrir(`tel:${unidade.telefone.replace(/\s+/g, '')}`);
-  const comoChegar = () => unidade?.endereco && abrirComoChegar(unidade.endereco);
+  // Em vez de abrir o Google Maps direto, pergunta em qual app abrir a rota (Google Maps/Waze/Apple).
+  const comoChegar = () => {
+    if (unidade?.endereco) setMapaAberto(true);
+  };
 
   // Horário de hoje em destaque (resumo + "aberto agora").
   const hoje = POR_GETDAY[new Date().getDay()];
@@ -255,6 +260,16 @@ export default function UnidadePerfilScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+
+      {unidade.endereco ? (
+        <EscolherMapaSheet
+          visivel={mapaAberto}
+          endereco={unidade.endereco}
+          latitude={unidade.latitude}
+          longitude={unidade.longitude}
+          onFechar={() => setMapaAberto(false)}
+        />
+      ) : null}
     </View>
   );
 }

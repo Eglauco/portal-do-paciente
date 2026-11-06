@@ -1,4 +1,4 @@
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { fetchMeu } from '@/services/sessao';
 
@@ -48,9 +48,64 @@ export async function buscarPerfilUnidade(id: number | string): Promise<PerfilUn
   return resposta.json() as Promise<PerfilUnidade>;
 }
 
-/** URL do Google Maps para traçar rota até um endereço. */
-export const urlComoChegar = (endereco: string) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+/** App de mapa oferecido no seletor "Como chegar". */
+export interface OpcaoMapa {
+  chave: 'google' | 'waze' | 'apple';
+  nome: string;
+  /** Nome do ícone Ionicons exibido na linha do seletor. */
+  icone: string;
+  /** URL universal: abre o app instalado (App Link/Universal Link); se não houver, cai no navegador. */
+  url: string;
+}
 
-/** Abre o Google Maps com a rota até o endereço da unidade (reutilizado no perfil e no agendamento). */
-export const abrirComoChegar = (endereco: string) => Linking.openURL(urlComoChegar(endereco)).catch(() => {});
+/** Alvo do deep link: coordenada "lat,lng" (preferida, mais precisa) ou a string do endereço. */
+function alvoMapa(endereco: string, latitude?: number | null, longitude?: number | null): string {
+  if (typeof latitude === 'number' && typeof longitude === 'number') return `${latitude},${longitude}`;
+  return endereco;
+}
+
+/**
+ * Opções de "Como chegar" conforme a plataforma. Usa URLs UNIVERSAIS (App Links/Universal Links):
+ * abrem o app instalado e, se não houver, caem no navegador — sem precisar de `canOpenURL` (logo sem
+ * declarar schemes no Info.plist/AndroidManifest). Prefere coordenadas quando a unidade foi
+ * geocodificada; senão usa o endereço. Apple Maps só entra no iOS.
+ */
+export function opcoesComoChegar(
+  endereco: string,
+  latitude?: number | null,
+  longitude?: number | null,
+): OpcaoMapa[] {
+  const alvo = encodeURIComponent(alvoMapa(endereco, latitude, longitude));
+  const temCoord = typeof latitude === 'number' && typeof longitude === 'number';
+  const wazeAlvo = temCoord
+    ? `ll=${encodeURIComponent(`${latitude},${longitude}`)}`
+    : `q=${encodeURIComponent(endereco)}`;
+
+  const opcoes: OpcaoMapa[] = [
+    {
+      chave: 'google',
+      nome: 'Google Maps',
+      icone: 'navigate',
+      url: `https://www.google.com/maps/dir/?api=1&destination=${alvo}`,
+    },
+    {
+      chave: 'waze',
+      nome: 'Waze',
+      icone: 'car-sport',
+      url: `https://waze.com/ul?${wazeAlvo}&navigate=yes`,
+    },
+  ];
+  // Apple Maps só existe no iOS; no Android as opções são Google Maps e Waze.
+  if (Platform.OS === 'ios') {
+    opcoes.push({
+      chave: 'apple',
+      nome: 'Mapas (Apple)',
+      icone: 'map',
+      url: `https://maps.apple.com/?daddr=${alvo}`,
+    });
+  }
+  return opcoes;
+}
+
+/** Abre a rota no app escolhido (handoff externo pro SO; o `.catch` cobre falha de abertura). */
+export const abrirEmApp = (opcao: OpcaoMapa) => Linking.openURL(opcao.url).catch(() => {});

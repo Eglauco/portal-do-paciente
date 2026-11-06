@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { OpcoesMapa } from '@/components/opcoes-mapa';
 import { Agendamento } from '@/constants/agendamentos';
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
-import { abrirComoChegar, buscarPerfilUnidade } from '@/services/unidade';
+import { buscarPerfilUnidade } from '@/services/unidade';
 
 interface Props {
   visivel: boolean;
@@ -35,22 +36,36 @@ export function AgendamentoModal({
 
   // Endereço da unidade do agendamento (para o botão "Como chegar"). Reaproveita o perfil da
   // unidade do chat (/meu/unidades/{id}); o botão só aparece quando a unidade tem endereço.
-  const [endereco, setEndereco] = useState<string | null>(null);
+  const [local, setLocal] = useState<{
+    endereco: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  } | null>(null);
+  const [escolhendoMapa, setEscolhendoMapa] = useState(false);
   useEffect(() => {
     let ativo = true;
-    setEndereco(null);
+    setLocal(null);
+    setEscolhendoMapa(false);
     const unidadeId = agendamento?.unidadeId;
     if (!visivel || !unidadeId) return;
     buscarPerfilUnidade(unidadeId)
-      .then((u) => ativo && setEndereco(u.endereco ?? null))
-      .catch(() => ativo && setEndereco(null));
+      .then((u) => {
+        if (ativo && u.endereco) {
+          setLocal({ endereco: u.endereco, latitude: u.latitude, longitude: u.longitude });
+        }
+      })
+      .catch(() => ativo && setLocal(null));
     return () => {
       ativo = false;
     };
   }, [visivel, agendamento?.unidadeId]);
 
   return (
-    <Modal visible={visivel} transparent animationType="fade" onRequestClose={onFechar}>
+    <Modal
+      visible={visivel}
+      transparent
+      animationType="fade"
+      onRequestClose={() => (escolhendoMapa ? setEscolhendoMapa(false) : onFechar())}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Pressable
@@ -97,16 +112,38 @@ export function AgendamentoModal({
             </View>
           )}
 
-          {/* "Como chegar" aparece nos dois modos (aguardando e confirmado), quando a unidade tem endereço. */}
-          {endereco ? (
-            <Pressable
-              style={({ pressed }) => [styles.btnComoChegar, pressed && styles.pressed]}
-              onPress={() => abrirComoChegar(endereco)}
-              accessibilityRole="button"
-              accessibilityLabel="Como chegar à unidade">
-              <Ionicons name="navigate" size={20} color={t.brandDeep} />
-              <Text style={styles.btnComoChegarTxt}>Como chegar</Text>
-            </Pressable>
+          {/* "Como chegar" nos dois modos (aguardando e confirmado): toca → escolhe o app (Google Maps/
+              Waze/Apple Maps) INLINE, sem abrir outro Modal por cima deste (evita o travamento no iOS). */}
+          {local ? (
+            escolhendoMapa ? (
+              <View style={styles.mapaBox}>
+                <View style={styles.mapaTopo}>
+                  <Pressable
+                    style={styles.mapaVoltar}
+                    onPress={() => setEscolhendoMapa(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Voltar">
+                    <Ionicons name="chevron-back" size={22} color={t.muted} />
+                  </Pressable>
+                  <Text style={styles.mapaTitulo}>Abrir rota em</Text>
+                </View>
+                <OpcoesMapa
+                  endereco={local.endereco}
+                  latitude={local.latitude}
+                  longitude={local.longitude}
+                  onEscolher={() => setEscolhendoMapa(false)}
+                />
+              </View>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [styles.btnComoChegar, pressed && styles.pressed]}
+                onPress={() => setEscolhendoMapa(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Como chegar à unidade">
+                <Ionicons name="navigate" size={20} color={t.brandDeep} />
+                <Text style={styles.btnComoChegarTxt}>Como chegar</Text>
+              </Pressable>
+            )
           ) : null}
 
           {cancelarModo ? (
@@ -246,6 +283,23 @@ const criarEstilos = (t: Tema) =>
     marginBottom: 12,
   },
   btnComoChegarTxt: { color: t.brandDeep, fontSize: 15.5, fontWeight: '700' },
+  mapaBox: {
+    width: '100%',
+    marginBottom: 12,
+    backgroundColor: t.bg,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  mapaTopo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingRight: 8,
+    paddingBottom: 2,
+  },
+  mapaVoltar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  mapaTitulo: { fontSize: 13, fontWeight: '700', color: t.muted },
   semCancelamento: {
     width: '100%',
     flexDirection: 'row',
