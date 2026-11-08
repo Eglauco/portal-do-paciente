@@ -79,7 +79,8 @@
       "router": {},
       "eas": {
         "projectId": "25a1f10d-c314-474c-b7d5-3d36be8fd568"
-      }
+      },
+      "dataApp": "2026-11-06"
     }
   }
 }

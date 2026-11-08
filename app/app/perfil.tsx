@@ -467,6 +467,16 @@ export default function PerfilScreen() {
           <Text style={styles.selecionarTxt}>Selecionar perfil</Text>
         </Pressable>
 
+        {/* Sobre: versões (app + servidor). Tela só-leitura, acessível a qualquer perfil. */}
+        <Pressable
+          style={({ pressed }) => [styles.selecionar, pressed && styles.selecionarPressed]}
+          onPress={() => router.push('/sobre')}
+          accessibilityRole="button"
+          accessibilityLabel="Sobre">
+          <Ionicons name="information-circle-outline" size={20} color={t.brandDeep} />
+          <Text style={styles.selecionarTxt}>Sobre</Text>
+        </Pressable>
+
         {/* Exclusão de conta pelo próprio usuário (exigência das lojas Apple/Google). */}
         <Pressable
           style={({ pressed }) => [styles.excluir, pressed && styles.excluirPressed]}
