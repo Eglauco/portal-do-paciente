@@ -5,6 +5,7 @@ import { ArmazenamentoS3Form } from '../../shared/armazenamento/armazenamento-s3
 import { EscopoS3Input } from '../../shared/armazenamento/armazenamento.model';
 import { CredencialIaForm } from '../../shared/credencial-ia/credencial-ia-form';
 import { EscopoIaInput } from '../../shared/credencial-ia/credencial-ia.model';
+import { VersaoService } from '../../core/versao.service';
 import { Ordenacao, alternarOrdenacao } from '../../shared/ordenacao/ordenacao.model';
 import { Ordenavel } from '../../shared/ordenacao/ordenavel';
 import { Configuracao, TipoConfiguracao } from './configuracao.model';
@@ -17,6 +18,7 @@ export type PaginaItem = number | 'ellipsis';
   selector: 'app-configuracoes-list',
   imports: [DatePipe, Ordenavel, ArmazenamentoS3Form, CredencialIaForm],
   templateUrl: './configuracoes-list.html',
+  styleUrl: './configuracoes-list.css',
 })
 export class ConfiguracoesList {
   /** S3 PADRÃO do inquilino (fotos, modelos de TCLE, logomarca) — configurado num modal daqui. */
@@ -28,6 +30,8 @@ export class ConfiguracoesList {
   private readonly service = inject(ConfiguracaoService);
   private readonly router = inject(Router);
   private readonly store = inject(ConfiguracaoBuscaStore);
+  /** Versões (back/front/app) exibidas na seção "Sobre / Versões". */
+  protected readonly versao = inject(VersaoService);
 
   protected readonly tamanhos = ConfiguracaoService.TAMANHOS;
   protected readonly size = signal(this.store.size);

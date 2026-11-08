@@ -156,6 +156,34 @@
     }
   </section>
 
+  <!-- Sobre / Versões -->
+  <section class="panel versoes-panel" aria-labelledby="versoes-titulo">
+    <div class="panel__head">
+      <h2 id="versoes-titulo" class="panel__title">Sobre / Versões</h2>
+    </div>
+    <dl class="versoes">
+      <div class="versoes__item">
+        <dt class="versoes__rotulo">Backend (API)</dt>
+        <dd class="versoes__valor">
+          @if (versao.back(); as b) {
+            <span class="versoes__num">v{{ b.versao }}</span>
+            <span class="versoes__data">{{ versao.formatarData(b.data) }}</span>
+          } @else {
+            <span class="versoes__num">—</span>
+            <span class="versoes__data">indisponível</span>
+          }
+        </dd>
+      </div>
+      <div class="versoes__item">
+        <dt class="versoes__rotulo">Admin (web)</dt>
+        <dd class="versoes__valor">
+          <span class="versoes__num">v{{ versao.front.versao }}</span>
+          <span class="versoes__data">{{ versao.formatarData(versao.front.data) }}</span>
+        </dd>
+      </div>
+    </dl>
+  </section>
+
   @if (mostrarArmazenamento()) {
     <div class="modal-backdrop">
       <div

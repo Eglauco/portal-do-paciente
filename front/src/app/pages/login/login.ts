@@ -2,6 +2,7 @@ import { afterNextRender, Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { MarcaService } from '../../core/marca.service';
+import { VersaoService } from '../../core/versao.service';
 
 @Component({
   selector: 'app-login',
@@ -12,6 +13,8 @@ export class Login {
   private readonly auth = inject(AuthService);
   /** Textos de marca (white-label) para o painel de login. */
   protected readonly marca = inject(MarcaService);
+  /** Versões do sistema — a do FRONT aparece no rodapé da marca e no cabeçalho mobile. */
+  protected readonly versao = inject(VersaoService);
 
   constructor() {
     // Quem já está autenticado não precisa ver o login.

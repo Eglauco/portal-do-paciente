@@ -2,6 +2,7 @@ import { Component, afterNextRender, DestroyRef, ElementRef, inject, signal, vie
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService, UnidadeRef } from '../../core/auth.service';
 import { MarcaService } from '../../core/marca.service';
+import { VersaoService } from '../../core/versao.service';
 import { NotificacaoAdmin, NotificacaoService } from '../../core/notificacao.service';
 import { BuscaFuncionalidades } from '../../shared/busca-funcionalidades/busca-funcionalidades';
 import { RailTooltip } from '../../shared/rail-tooltip.directive';
@@ -130,6 +131,8 @@ export class Shell {
   private readonly destroyRef = inject(DestroyRef);
   /** Nome da plataforma (white-label) para o rodapé da sidebar. */
   protected readonly marca = inject(MarcaService);
+  /** Versões do sistema — a do FRONT vai no rótulo da sidebar. */
+  protected readonly versao = inject(VersaoService);
 
   protected readonly usuario = this.auth.usuario;
   /** Contagem e lista do sino de notificações. */

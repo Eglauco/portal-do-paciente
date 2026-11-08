@@ -15,6 +15,7 @@ import { authInterceptor } from './core/auth.interceptor';
 import { inquilinoInterceptor } from './core/inquilino.interceptor';
 import { TemaService } from './core/tema.service';
 import { MarcaService } from './core/marca.service';
+import { VersaoService } from './core/versao.service';
 import { MarcaTitleStrategy } from './core/marca-title.strategy';
 
 export const appConfig: ApplicationConfig = {
@@ -29,6 +30,8 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(() => inject(TemaService).aplicar()),
     // Carrega a marca (nome + textos do login) via GET /marca no boot — mesma estratégia do tema.
     provideAppInitializer(() => inject(MarcaService).carregar()),
+    // Carrega as versões (back/front/app) via GET /versao (público) no boot — fail-soft (não trava o boot).
+    provideAppInitializer(() => inject(VersaoService).carregar()),
     // Título das abas usa o nome configurável (white-label).
     { provide: TitleStrategy, useClass: MarcaTitleStrategy },
     provideToastr({
