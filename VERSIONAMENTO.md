@@ -52,4 +52,4 @@ Cada arquivo é independente — mexer num **não** afeta os outros.
 
 ## Baseline
 
-Back **1.0.0** · Front **1.0.0** · App **1.0.1** — todos **06/11/2026**.
+Back **1.0.0** · Front **1.0.0** · App **1.0.1** — todos **08/11/2026**.

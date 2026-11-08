@@ -13,5 +13,5 @@
  */
 export const VERSAO_FRONT = {
   versao: '1.0.0',
-  data: '2026-11-06',
+  data: '2026-11-08',
 } as const;
