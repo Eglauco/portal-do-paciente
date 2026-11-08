@@ -77,6 +77,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/marca", "/marca/plataforma").permitAll()
                         // Kill-switch das telas do app: leitura pública p/ o app esconder abas no boot e o front a matriz.
                         .requestMatchers(HttpMethod.GET, "/funcionalidades").permitAll()
+                        // Versão (número + data de back/front/app): leitura pública p/ o app e o admin exibirem.
+                        .requestMatchers(HttpMethod.GET, "/versao").permitAll()
                         .requestMatchers("/dispositivo").permitAll()
                         // ACK de entrega por push (app fechado): chamado pela NSE/iOS e pela task/Android
                         // SEM Bearer; autenticado por um token HMAC assinado que veio no próprio push.
