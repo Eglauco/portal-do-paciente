@@ -32,12 +32,14 @@ public class SirespPacienteAtualizador {
     private final PacienteRepository pacienteRepository;
     private final UnidadeRepository unidadeRepository;
     private final PacienteLogService logService;
+    private final com.example.pop.inquilino.RoteamentoPacienteService roteamentoService;
 
     public SirespPacienteAtualizador(PacienteRepository pacienteRepository, UnidadeRepository unidadeRepository,
-            PacienteLogService logService) {
+            PacienteLogService logService, com.example.pop.inquilino.RoteamentoPacienteService roteamentoService) {
         this.pacienteRepository = pacienteRepository;
         this.unidadeRepository = unidadeRepository;
         this.logService = logService;
+        this.roteamentoService = roteamentoService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -81,6 +83,9 @@ public class SirespPacienteAtualizador {
                     }
                 }
             }
+            // Censo do app (cpf -> inquilino): garante o vínculo com o CPF atual (já com a troca do XML, se
+            // houve) — auto-corrige quem foi criado antes sem o censo. Idempotente; vale mesmo sem mudança.
+            roteamentoService.registrarNoInquilinoAtual(p.getCpf());
             if (!mudou) {
                 return Resultado.NADA;
             }
@@ -99,6 +104,8 @@ public class SirespPacienteAtualizador {
         }
         pacienteRepository.save(novo);
         logService.registrarCriacaoSiresp(novo, usuarioId);
+        // Censo do app (cpf -> inquilino) no public: sem ele o app da loja não acha a clínica do CPF.
+        roteamentoService.registrarNoInquilinoAtual(novo.getCpf());
         return Resultado.CRIADO;
     }
 

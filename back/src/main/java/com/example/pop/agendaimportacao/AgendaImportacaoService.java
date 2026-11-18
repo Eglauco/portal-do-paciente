@@ -70,6 +70,7 @@ public class AgendaImportacaoService {
     private final HorarioEntregaService entregaService;
     private final com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService;
     private final PacienteLogService pacienteLogService;
+    private final com.example.pop.inquilino.RoteamentoPacienteService roteamentoService;
 
     public AgendaImportacaoService(AgendaPlanilhaParser parser,
             ProfissionalSaudeRepository profissionalRepository,
@@ -82,7 +83,9 @@ public class AgendaImportacaoService {
             HorarioLogService logService,
             HorarioEntregaService entregaService,
             com.example.pop.paciente.VinculoPacienteUnidadeService vinculoService,
-            PacienteLogService pacienteLogService) {
+            PacienteLogService pacienteLogService,
+            com.example.pop.inquilino.RoteamentoPacienteService roteamentoService) {
+        this.roteamentoService = roteamentoService;
         this.parser = parser;
         this.profissionalRepository = profissionalRepository;
         this.especialidadeRepository = especialidadeRepository;
@@ -209,7 +212,11 @@ public class AgendaImportacaoService {
     private Paciente obterOuCriarPaciente(HorarioResolvido hr, Long unidadeId, Long uid,
             Map<String, Paciente> criadosPorCpf) {
         if (!hr.criarPaciente()) {
-            return pacienteRepository.findById(hr.paciente().valor()).orElseThrow(() -> sumiu("Paciente"));
+            Paciente existente = pacienteRepository.findById(hr.paciente().valor()).orElseThrow(() -> sumiu("Paciente"));
+            // Censo do app (cpf -> inquilino): garante também para quem já existia (auto-corrige pacientes
+            // criados por uma importação anterior, que não registrava). Idempotente.
+            roteamentoService.registrarNoInquilinoAtual(existente.getCpf());
+            return existente;
         }
         String cpf = hr.cpf().valor();
         Paciente jaCriado = cpf == null ? null : criadosPorCpf.get(cpf);
@@ -239,6 +246,9 @@ public class AgendaImportacaoService {
         unidadeRepository.findById(unidadeId).ifPresent(u -> p.getUnidades().add(u)); // vínculo já no snapshot do log
         Paciente salvo = pacienteRepository.save(p);
         pacienteLogService.registrarCriacaoImportacaoAgenda(salvo, uid);
+        // Censo do app (cpf -> inquilino) no public: sem ele o app da loja não acha a clínica do CPF e o
+        // "Primeiro acesso" responde "não confere". Mesma transação da importação.
+        roteamentoService.registrarNoInquilinoAtual(salvo.getCpf());
         if (cpf != null) {
             criadosPorCpf.put(cpf, salvo);
         }

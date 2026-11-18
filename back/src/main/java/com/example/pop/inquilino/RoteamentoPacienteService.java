@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.pop.paciente.PacienteRepository;
 import com.example.pop.paciente.ResponsavelRepository;
+import com.example.pop.tenant.TenantContext;
 
 /**
  * Mantém os VÍNCULOS de roteamento do paciente/responsável ({@link PacienteLogin}: cpf → inquilino)
@@ -25,12 +26,32 @@ public class RoteamentoPacienteService {
     private final PacienteLoginRepository repository;
     private final PacienteRepository pacienteRepository;
     private final ResponsavelRepository responsavelRepository;
+    private final InquilinoService inquilinoService;
 
     public RoteamentoPacienteService(PacienteLoginRepository repository,
-            PacienteRepository pacienteRepository, ResponsavelRepository responsavelRepository) {
+            PacienteRepository pacienteRepository, ResponsavelRepository responsavelRepository,
+            InquilinoService inquilinoService) {
         this.repository = repository;
         this.pacienteRepository = pacienteRepository;
         this.responsavelRepository = responsavelRepository;
+        this.inquilinoService = inquilinoService;
+    }
+
+    /**
+     * Garante o vínculo do CPF com o inquilino da requisição ATUAL (schema do {@link TenantContext}). Para os
+     * caminhos que criam/reaproveitam paciente FORA do cadastro do admin — importação de agenda (planilha) e
+     * SIRESP —, que antes não registravam o censo: sem o vínculo, o app compartilhado (da loja, sem inquilino
+     * assado) não acha a clínica do CPF e o "Primeiro acesso" responde "não confere" mesmo com dados certos.
+     * CPF normalizado (só dígitos); vazio ou diferente de 11 dígitos é ignorado (a coluna é VARCHAR(11) — um
+     * valor fora disso derrubaria a transação da importação inteira).
+     */
+    @Transactional
+    public void registrarNoInquilinoAtual(String cpf) {
+        String digitos = cpf == null ? "" : cpf.replaceAll("\\D", "");
+        if (digitos.length() != 11) {
+            return;
+        }
+        registrar(digitos, inquilinoService.idPorSchema(TenantContext.atual()));
     }
 
     /**
