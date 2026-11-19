@@ -31,8 +31,14 @@ export function LembretePopup() {
   const [fila, setFila] = useState<Lembrete[]>([]);
   const [processando, setProcessando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Confirmação INLINE do cancelamento (sem Alert/Modal por cima deste — modal sobre modal trava no iOS).
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
 
   const atual = fila[0] ?? null;
+  // Trocou de lembrete na fila: começa sem a pergunta de confirmação.
+  useEffect(() => {
+    setConfirmandoCancelamento(false);
+  }, [atual?.id]);
   // Ids já reconhecidos localmente: impede que um refetch (push/foreground) durante
   // a janela do POST ressuscite um pop-up que o paciente acabou de fechar.
   const reconhecidos = useRef<Set<number>>(new Set());
@@ -81,6 +87,7 @@ export function LembretePopup() {
     } catch {
       // Cancelamento FALHOU (ex.: prazo passou entre abrir o pop-up e clicar): avisa.
       setErro('Não foi possível cancelar (o prazo pode ter passado). Tente pelo menu de Agendamentos.');
+      setConfirmandoCancelamento(false); // volta aos botões normais, com o erro visível
       carregar();
       setProcessando(false);
       return;
@@ -105,7 +112,9 @@ export function LembretePopup() {
       animationType="fade"
       statusBarTranslucent
       onRequestClose={() => {
-        if (!processando) fechar();
+        if (processando) return;
+        if (confirmandoCancelamento) setConfirmandoCancelamento(false);
+        else fechar();
       }}>
       <View style={styles.backdrop}>
         <View style={styles.card} accessibilityViewIsModal accessibilityRole="alert">
@@ -139,22 +148,61 @@ export function LembretePopup() {
             </View>
           )}
 
-          {atual.podeCancelar && podeCancelarAgendamento && (
-            <Pressable style={[styles.btnCancelar, processando && styles.desativado]} onPress={cancelar} disabled={processando}>
-              {processando ? (
-                <ActivityIndicator color="#B23B4E" />
-              ) : (
-                <>
+          {atual.podeCancelar && podeCancelarAgendamento && confirmandoCancelamento ? (
+            <View style={styles.confirmaBox} accessibilityLiveRegion="polite">
+              <View style={styles.confirmaTopo}>
+                <Ionicons name="alert-circle" size={20} color="#B23B4E" />
+                <Text style={styles.confirmaTitulo} accessibilityRole="header">
+                  Deseja mesmo cancelar?
+                </Text>
+              </View>
+              <Text style={styles.confirmaTxt}>
+                Depois de cancelado, não é possível desfazer pelo app. Para um novo horário, fale com a unidade.
+              </Text>
+              <Pressable
+                style={[styles.btnSimCancelar, processando && styles.desativado]}
+                onPress={cancelar}
+                disabled={processando}
+                accessibilityRole="button"
+                accessibilityLabel="Sim, cancelar agendamento"
+                accessibilityState={{ busy: processando, disabled: processando }}>
+                {processando ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnSimCancelarTxt}>Sim, cancelar</Text>
+                )}
+              </Pressable>
+              <Pressable
+                style={[styles.btnManter, processando && styles.desativado]}
+                onPress={() => setConfirmandoCancelamento(false)}
+                disabled={processando}
+                accessibilityRole="button"
+                accessibilityLabel="Não, manter agendamento">
+                <Text style={styles.btnManterTxt}>Não, manter agendamento</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {atual.podeCancelar && podeCancelarAgendamento && (
+                <Pressable
+                  style={[styles.btnCancelar, processando && styles.desativado]}
+                  onPress={() => {
+                    setErro(null);
+                    setConfirmandoCancelamento(true);
+                  }}
+                  disabled={processando}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar agendamento">
                   <Ionicons name="close-circle-outline" size={18} color="#B23B4E" />
                   <Text style={styles.btnCancelarTxt}>Cancelar agendamento</Text>
-                </>
+                </Pressable>
               )}
-            </Pressable>
-          )}
 
-          <Pressable style={[styles.btnOk, processando && styles.desativado]} onPress={fechar} disabled={processando}>
-            <Text style={styles.btnOkTxt}>Ok, entendi</Text>
-          </Pressable>
+              <Pressable style={[styles.btnOk, processando && styles.desativado]} onPress={fechar} disabled={processando}>
+                <Text style={styles.btnOkTxt}>Ok, entendi</Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </View>
     </Modal>
@@ -184,6 +232,22 @@ const criarEstilos = (t: Tema) =>
     height: 50, borderRadius: 14, marginTop: 16, borderWidth: 1.5, borderColor: '#F0C6CD', backgroundColor: '#FBE9EC',
   },
   btnCancelarTxt: { color: '#B23B4E', fontSize: 14.5, fontWeight: '800' },
+  confirmaBox: {
+    width: '100%', marginTop: 16, backgroundColor: '#FDF1F3', borderWidth: 1, borderColor: '#F3D6DB',
+    borderRadius: 16, padding: 14, gap: 10,
+  },
+  confirmaTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  confirmaTitulo: { fontSize: 16, fontWeight: '800', color: '#8A2B3A' },
+  confirmaTxt: { fontSize: 13.5, color: '#6B3540', lineHeight: 19 },
+  btnSimCancelar: {
+    width: '100%', alignItems: 'center', justifyContent: 'center', height: 50, borderRadius: 14, backgroundColor: '#B23B4E',
+  },
+  btnSimCancelarTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  btnManter: {
+    width: '100%', alignItems: 'center', justifyContent: 'center', height: 48, borderRadius: 14,
+    backgroundColor: t.surface, borderWidth: 1, borderColor: t.line,
+  },
+  btnManterTxt: { color: t.brandDeep, fontSize: 15, fontWeight: '700' },
   btnOk: {
     width: '100%', alignItems: 'center', justifyContent: 'center',
     height: 50, borderRadius: 14, marginTop: 10, backgroundColor: t.brand,

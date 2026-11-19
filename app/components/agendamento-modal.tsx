@@ -42,6 +42,13 @@ export function AgendamentoModal({
     longitude?: number | null;
   } | null>(null);
   const [escolhendoMapa, setEscolhendoMapa] = useState(false);
+  // Confirmação do cancelamento: o 1º toque em "Cancelar agendamento" só pergunta; o cancelamento
+  // de fato vem no "Sim, cancelar". É INLINE (troca o rodapé do card) em vez de um Alert/Modal por
+  // cima deste — modal sobre modal trava no iOS (mesmo motivo do seletor de mapa).
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  useEffect(() => {
+    setConfirmandoCancelamento(false); // abriu/fechou ou trocou de agendamento: começa sem a pergunta
+  }, [visivel, agendamento?.id]);
   useEffect(() => {
     let ativo = true;
     setLocal(null);
@@ -65,7 +72,12 @@ export function AgendamentoModal({
       visible={visivel}
       transparent
       animationType="fade"
-      onRequestClose={() => (escolhendoMapa ? setEscolhendoMapa(false) : onFechar())}>
+      onRequestClose={() => {
+        if (processando) return;
+        if (confirmandoCancelamento) setConfirmandoCancelamento(false);
+        else if (escolhendoMapa) setEscolhendoMapa(false);
+        else onFechar();
+      }}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Pressable
@@ -148,19 +160,50 @@ export function AgendamentoModal({
 
           {cancelarModo ? (
             podeCancelar ? (
-              <Pressable
-                style={({ pressed }) => [styles.btnCancelarPrimario, (pressed || processando) && styles.pressed]}
-                onPress={onCancelar}
-                disabled={processando}>
-                {processando ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="close-circle" size={20} color="#fff" />
-                    <Text style={styles.btnCancelarPrimarioTxt}>Cancelar agendamento</Text>
-                  </>
-                )}
-              </Pressable>
+              confirmandoCancelamento ? (
+                <View style={styles.confirmaBox} accessibilityLiveRegion="polite">
+                  <View style={styles.confirmaTopo}>
+                    <Ionicons name="alert-circle" size={20} color="#B23B4E" />
+                    <Text style={styles.confirmaTitulo} accessibilityRole="header">
+                      Deseja mesmo cancelar?
+                    </Text>
+                  </View>
+                  <Text style={styles.confirmaTxt}>
+                    Depois de cancelado, não é possível desfazer pelo app. Para um novo horário, fale com a
+                    unidade.
+                  </Text>
+                  <Pressable
+                    style={({ pressed }) => [styles.btnCancelarPrimario, (pressed || processando) && styles.pressed]}
+                    onPress={onCancelar}
+                    disabled={processando}
+                    accessibilityRole="button"
+                    accessibilityLabel="Sim, cancelar agendamento"
+                    accessibilityState={{ busy: processando, disabled: processando }}>
+                    {processando ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.btnCancelarPrimarioTxt}>Sim, cancelar</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [styles.btnManter, pressed && styles.pressed]}
+                    onPress={() => setConfirmandoCancelamento(false)}
+                    disabled={processando}
+                    accessibilityRole="button"
+                    accessibilityLabel="Não, manter agendamento">
+                    <Text style={styles.btnManterTxt}>Não, manter agendamento</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [styles.btnCancelarPrimario, pressed && styles.pressed]}
+                  onPress={() => setConfirmandoCancelamento(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancelar agendamento">
+                  <Ionicons name="close-circle" size={20} color="#fff" />
+                  <Text style={styles.btnCancelarPrimarioTxt}>Cancelar agendamento</Text>
+                </Pressable>
+              )
             ) : (
               <View style={styles.semCancelamento}>
                 <Ionicons name="lock-closed-outline" size={15} color={t.muted} />
@@ -271,6 +314,29 @@ const criarEstilos = (t: Tema) =>
     backgroundColor: '#B23B4E',
   },
   btnCancelarPrimarioTxt: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  confirmaBox: {
+    width: '100%',
+    backgroundColor: '#FDF1F3',
+    borderWidth: 1,
+    borderColor: '#F3D6DB',
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+  },
+  confirmaTopo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  confirmaTitulo: { fontSize: 16, fontWeight: '800', color: '#8A2B3A' },
+  confirmaTxt: { fontSize: 13.5, color: '#6B3540', lineHeight: 19 },
+  btnManter: {
+    width: '100%',
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.surface,
+    borderWidth: 1,
+    borderColor: t.line,
+  },
+  btnManterTxt: { color: t.brandDeep, fontSize: 15, fontWeight: '700' },
   btnComoChegar: {
     width: '100%',
     flexDirection: 'row',
