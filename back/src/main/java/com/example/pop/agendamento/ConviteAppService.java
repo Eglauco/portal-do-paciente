@@ -81,7 +81,7 @@ public class ConviteAppService {
                 return;
             }
             if (!smsService.configurado()) {
-                log.warn("Convite por SMS ligado, mas o Twilio Messaging não está configurado — nada enviado.");
+                log.warn("Convite por SMS ligado, mas o provedor de SMS (Infobip/Twilio) não está configurado — nada enviado.");
                 return;
             }
             List<String> telefones = carregarTelefonesSemApp(pacienteId);
