@@ -7,6 +7,7 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.data.domain.Page;
@@ -166,7 +167,28 @@ public class UnidadeController {
         aplicarPerfil(unidade, req);
         aplicarFaq(unidade, req);
         aplicarHorarios(unidade, req);
+        aplicarConfirmacaoVencida(unidade, req);
         return UnidadeResponse.from(repository.save(unidade), storageService);
+    }
+
+    /** Teto do prazo da confirmação vencida: 30 dias em minutos (evita valor absurdo digitado errado). */
+    private static final int MAX_MINUTOS_CONFIRMACAO_VENCIDA = 30 * 24 * 60;
+
+    /**
+     * Prazo (minutos após a data/hora do horário) para o "Aguardando confirmação" virar "Confirmação vencida".
+     * null = não mexe (cliente que não envia o campo); 0 = desligado; fora de 0..30 dias → 422.
+     */
+    private void aplicarConfirmacaoVencida(Unidade unidade, UnidadeRequest req) {
+        Integer minutos = req.minutosConfirmacaoVencida();
+        if (minutos == null) {
+            return;
+        }
+        if (minutos < 0 || minutos > MAX_MINUTOS_CONFIRMACAO_VENCIDA) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "O prazo da confirmação vencida deve ficar entre 0 (desligado) e "
+                            + MAX_MINUTOS_CONFIRMACAO_VENCIDA + " minutos (30 dias).");
+        }
+        unidade.setMinutosConfirmacaoVencida(minutos);
     }
 
     @PutMapping("/{id}")
@@ -183,6 +205,7 @@ public class UnidadeController {
                     aplicarPerfil(existente, req);
                     aplicarFaq(existente, req);
                     aplicarHorarios(existente, req);
+                    aplicarConfirmacaoVencida(existente, req);
                     UnidadeResponse resposta = UnidadeResponse.from(repository.save(existente), storageService);
                     // Remove do S3 as imagens que ficaram órfãs (trocou/removeu logo/capa).
                     Set<String> emUso = new HashSet<>();
@@ -215,8 +238,10 @@ public class UnidadeController {
 
     /**
      * Geocodifica o endereço quando ele muda (ou ainda não há coordenadas). Endereço vazio zera as
-     * coordenadas; falha na geocodificação mantém as atuais (não apaga à toa). Fail-soft: nunca
-     * impede o salvamento.
+     * coordenadas. Endereço MUDOU e a geocodificação falhou → também zera: manter as antigas deixava o
+     * pino do mapa no endereço ANTERIOR (coordenada não batia com o endereço cadastrado). Sem
+     * coordenada o app só esconde a miniatura; o "Como chegar" usa o endereço por extenso. Fail-soft:
+     * nunca impede o salvamento.
      */
     private void atualizarCoordenadas(Unidade unidade, String antigo, String novo) {
         if (novo == null) {
@@ -224,11 +249,16 @@ public class UnidadeController {
             unidade.setLongitude(null);
             return;
         }
-        if (!novo.equals(antigo) || unidade.getLatitude() == null) {
-            geocoding.geocodificar(novo).ifPresent(c -> {
-                unidade.setLatitude(c[0]);
-                unidade.setLongitude(c[1]);
-            });
+        boolean mudou = !novo.equals(antigo);
+        if (mudou || unidade.getLatitude() == null) {
+            Optional<double[]> coords = geocoding.geocodificar(novo);
+            if (coords.isPresent()) {
+                unidade.setLatitude(coords.get()[0]);
+                unidade.setLongitude(coords.get()[1]);
+            } else if (mudou) {
+                unidade.setLatitude(null);
+                unidade.setLongitude(null);
+            }
         }
     }
 

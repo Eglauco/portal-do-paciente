@@ -7,7 +7,7 @@ import { abrirEmApp, opcoesComoChegar } from '@/services/unidade';
 
 interface Props {
   endereco: string;
-  /** Coordenadas da unidade (quando geocodificada): deep link mais preciso que o endereço. */
+  /** Coordenadas da unidade: só usadas na rota se NÃO houver endereço (o texto respeita o número da casa). */
   latitude?: number | null;
   longitude?: number | null;
   /** Chamado após abrir um app (p.ex. fechar o seletor). */

@@ -38,6 +38,11 @@ public class GeocodingService {
 
     private static final Pattern LAT = Pattern.compile("\"lat\"\\s*:\\s*\"(-?\\d+(?:\\.\\d+)?)\"");
     private static final Pattern LON = Pattern.compile("\"lon\"\\s*:\\s*\"(-?\\d+(?:\\.\\d+)?)\"");
+    /** CEP brasileiro (com ou sem hífen). */
+    private static final Pattern CEP = Pattern.compile("\\b(\\d{5})-?(\\d{3})\\b");
+    /** "Cidade - UF" (ou "Cidade/UF") fechando um trecho do endereço. */
+    private static final Pattern CIDADE_UF =
+            Pattern.compile("([^,\\-/]+?)\\s*[-/]\\s*([A-Za-z]{2})\\s*(?:,|$)");
     /** Tipos de logradouro no início do 1º trecho, removidos para o Nominatim casar a rua. */
     private static final Pattern LOGRADOURO =
             Pattern.compile("(?i)^\\s*(av\\.?|avenida|r\\.?|rua|rod\\.?|rodovia|al\\.?|alameda|pra[cç]a|travessa|tv\\.?)\\s+");
@@ -77,21 +82,33 @@ public class GeocodingService {
         return Optional.empty();
     }
 
-    /** Monta as tentativas: endereço completo, depois "rua, cidade/UF", depois só "cidade/UF". */
-    private List<String> candidatos(String endereco) {
+    /**
+     * Monta as tentativas: endereço completo → sem o CEP → "rua, cidade, UF" → CEP → "cidade, UF".
+     * Cidade/UF e CEP são achados por padrão (não pela posição): o formato comum
+     * "Av. X, 123 - Bairro, Cidade - UF, 00000-000" terminava no CEP, que antes era tratado como a cidade.
+     * Package-private para teste.
+     */
+    List<String> candidatos(String endereco) {
         LinkedHashSet<String> qs = new LinkedHashSet<>();
         String completo = endereco.trim();
         qs.add(completo);
-        String[] partes = completo.split(",");
-        if (partes.length >= 2) {
-            String cidadeUf = partes[partes.length - 1].trim().replace(" - ", ", ");
-            String rua = limparRua(partes[0]);
-            if (!rua.isBlank() && !cidadeUf.isBlank()) {
-                qs.add(rua + ", " + cidadeUf);
-            }
-            if (!cidadeUf.isBlank()) {
-                qs.add(cidadeUf);
-            }
+        Matcher mCep = CEP.matcher(completo);
+        String cep = mCep.find() ? mCep.group(1) + "-" + mCep.group(2) : null;
+        String semCep = CEP.matcher(completo).replaceAll("").replaceAll("[\\s,\\-]+$", "").trim();
+        if (!semCep.isBlank()) {
+            qs.add(semCep);
+        }
+        Matcher mCidade = CIDADE_UF.matcher(semCep);
+        String cidadeUf = mCidade.find() ? mCidade.group(1).trim() + ", " + mCidade.group(2).toUpperCase() : null;
+        String rua = limparRua(completo.split(",")[0]);
+        if (cidadeUf != null && !rua.isBlank()) {
+            qs.add(rua + ", " + cidadeUf);
+        }
+        if (cep != null) {
+            qs.add(cep);
+        }
+        if (cidadeUf != null) {
+            qs.add(cidadeUf);
         }
         return new ArrayList<>(qs);
     }

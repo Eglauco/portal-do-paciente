@@ -58,28 +58,33 @@ export interface OpcaoMapa {
   url: string;
 }
 
-/** Alvo do deep link: coordenada "lat,lng" (preferida, mais precisa) ou a string do endereço. */
-function alvoMapa(endereco: string, latitude?: number | null, longitude?: number | null): string {
-  if (typeof latitude === 'number' && typeof longitude === 'number') return `${latitude},${longitude}`;
-  return endereco;
+/**
+ * Alvo do deep link: o ENDEREÇO por extenso (preferido) ou, só se não houver endereço, a coordenada.
+ * As coordenadas guardadas vêm do OpenStreetMap/Nominatim, que no Brasil NÃO conhece o número das
+ * casas — devolve um ponto qualquer da rua (ou o centro do CEP), e a rota caía no início da rua.
+ * Google Maps/Waze/Apple geocodificam o texto com o número; a coordenada fica só para a miniatura.
+ */
+function usarEndereco(endereco: string): boolean {
+  return endereco.trim().length > 0;
 }
 
 /**
  * Opções de "Como chegar" conforme a plataforma. Usa URLs UNIVERSAIS (App Links/Universal Links):
  * abrem o app instalado e, se não houver, caem no navegador — sem precisar de `canOpenURL` (logo sem
- * declarar schemes no Info.plist/AndroidManifest). Prefere coordenadas quando a unidade foi
- * geocodificada; senão usa o endereço. Apple Maps só entra no iOS.
+ * declarar schemes no Info.plist/AndroidManifest). Usa o endereço por extenso (respeita o número);
+ * coordenada só como reserva quando a unidade não tem endereço. Apple Maps só entra no iOS.
  */
 export function opcoesComoChegar(
   endereco: string,
   latitude?: number | null,
   longitude?: number | null,
 ): OpcaoMapa[] {
-  const alvo = encodeURIComponent(alvoMapa(endereco, latitude, longitude));
   const temCoord = typeof latitude === 'number' && typeof longitude === 'number';
-  const wazeAlvo = temCoord
-    ? `ll=${encodeURIComponent(`${latitude},${longitude}`)}`
-    : `q=${encodeURIComponent(endereco)}`;
+  const porEndereco = usarEndereco(endereco) || !temCoord;
+  const alvo = encodeURIComponent(porEndereco ? endereco.trim() : `${latitude},${longitude}`);
+  const wazeAlvo = porEndereco
+    ? `q=${encodeURIComponent(endereco.trim())}`
+    : `ll=${encodeURIComponent(`${latitude},${longitude}`)}`;
 
   const opcoes: OpcaoMapa[] = [
     {
