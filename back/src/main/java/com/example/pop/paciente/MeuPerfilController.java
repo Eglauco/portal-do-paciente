@@ -242,7 +242,7 @@ public class MeuPerfilController {
     public record SalvarFotoRequest(@NotBlank String url) {
     }
 
-    /** Troca do PIN: senha atual (quando já existe) + nova senha (6 dígitos). */
+    /** Troca da senha: senha atual (quando já existe) + nova senha (livre, mínimo 8 caracteres). */
     public record AlterarSenhaRequest(String senhaAtual, @NotBlank String senhaNova) {
     }
 }

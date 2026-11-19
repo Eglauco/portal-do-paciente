@@ -21,6 +21,7 @@ import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
 import { buscarMarca, marcaEmCache, type Marca } from '@/services/marca';
 import { type ClinicaLogin } from '@/services/sessao';
+import { SENHA_MAX, SENHA_MIN, tamanhoSenha } from '@/constants/senha';
 
 /** Máscara de CPF "000.000.000-00" enquanto o paciente digita. */
 function mascararCpf(valor: string): string {
@@ -59,7 +60,7 @@ function dataParaIso(valor: string): string {
 /**
  * Etapas do login (CPF-first): digita-se SÓ o CPF; a pré-checagem roteia a próxima tela.
  * - `cpf`: só o CPF → "Continuar" chama a pré-checagem (tem senha central?) e roteia. É a tela inicial.
- * - `senha`: a pré-checagem achou senha → digita só o PIN (login sem SMS). "Esqueci" leva ao SMS.
+ * - `senha`: a pré-checagem achou senha → digita só a senha (login sem SMS). "Esqueci" leva ao SMS.
  * - `clinica`: app COMPARTILHADO (sem inquilino assado) e o CPF está em mais de uma clínica → escolhe qual.
  * - `identidade`: a pré-checagem NÃO achou senha (primeiro acesso) ou veio do "esqueci" → telefone +
  *   CPF + nascimento → envia o código por SMS. (A pré-checagem é clínico-agnóstica: só diz se há PIN na
@@ -100,7 +101,7 @@ export default function LoginScreen() {
   const telefoneValido = [10, 11].includes(telefone.replace(/\D/g, '').length);
   const podeContinuar = cpfValido && !checando;
   const podeEnviarCodigo = cpfValido && dataValida && telefoneValido && !enviando;
-  const podeEntrarSenha = cpfValido && senha.length === 6 && !entrandoSenha;
+  const podeEntrarSenha = cpfValido && tamanhoSenha(senha) >= SENHA_MIN && !entrandoSenha;
   const podeEntrar = codigo.length === 6 && !entrando;
   /** Algum pedido em voo: trava os controles de navegação para não cair numa etapa errada. */
   const ocupado = checando || enviando || entrando || entrandoSenha;
@@ -165,7 +166,7 @@ export default function LoginScreen() {
 
   /** Entra com CPF + senha (sem SMS). App compartilhado com CPF em mais de uma clínica → abre o seletor. */
   async function entrarComSenha() {
-    if (entrandoSenha || !cpfValido || senha.length !== 6) return;
+    if (entrandoSenha || !cpfValido || tamanhoSenha(senha) < SENHA_MIN) return;
     setErro(null);
     setEntrandoSenha(true);
     try {
@@ -262,7 +263,7 @@ export default function LoginScreen() {
       if (etapa === 'codigo') voltarParaIdentidade();
       else if (etapa === 'clinica') {
         setErro(null);
-        setEtapa(clinicaOrigem === 'otp' ? 'identidade' : 'senha'); // volta pra identidade (OTP) ou PIN
+        setEtapa(clinicaOrigem === 'otp' ? 'identidade' : 'senha'); // volta pra identidade (OTP) ou senha
       } else voltarParaCpf(); // senha ou identidade → volta ao CPF
       return true;
     });
@@ -417,25 +418,27 @@ export default function LoginScreen() {
 
               <Text style={styles.title}>Digite sua senha</Text>
               <Text style={styles.subtitle}>
-                CPF {cpf} — entre com a sua senha de 6 dígitos, a mesma de sempre.
+                CPF {cpf} — entre com a sua senha, a mesma de sempre.
               </Text>
 
-              {/* Senha (PIN) */}
+              {/* Senha (livre, mínimo 8 caracteres) */}
               <Text style={styles.label}>Senha</Text>
               <View style={styles.inputWrap}>
                 <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
                 <TextInput
-                  style={[styles.input, styles.codeInput]}
+                  style={styles.input}
                   value={senha}
                   onChangeText={(valor) => {
-                    setSenha(valor.replace(/\D/g, '').slice(0, 6));
+                    setSenha(valor);
                     if (erro) setErro(null);
                   }}
-                  placeholder="••••••"
+                  placeholder="Sua senha"
                   placeholderTextColor="#9AAAA5"
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={6}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="current-password"
+                  textContentType="password"
+                  maxLength={SENHA_MAX}
                   secureTextEntry={!mostrarSenha}
                   autoFocus
                   returnKeyType="done"
@@ -451,7 +454,7 @@ export default function LoginScreen() {
                   <Ionicons name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'} size={20} color={t.muted} />
                 </Pressable>
               </View>
-              <Text style={styles.hint}>São 6 números.</Text>
+              <Text style={styles.hint}>Mínimo de {SENHA_MIN} caracteres.</Text>
 
               {erro && (
                 <View style={styles.erroBox} accessibilityRole="alert" accessibilityLiveRegion="assertive">

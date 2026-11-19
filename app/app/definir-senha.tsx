@@ -18,9 +18,10 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { alpha, type Tema, useTema } from '@/hooks/use-tema';
 import { useSessao } from '@/hooks/use-sessao';
+import { erroSenhaNova, SENHA_MAX, SENHA_MIN, tamanhoSenha } from '@/constants/senha';
 
 /**
- * Definição OBRIGATÓRIA da senha (PIN de 6 dígitos) logo após o OTP, antes de escolher o perfil.
+ * Definição OBRIGATÓRIA da senha (livre, mínimo 8 caracteres) logo após o OTP, antes de escolher o perfil.
  * Com a senha, o próximo acesso entra sem SMS (reduz custo). A navegação de saída é do Navegacao:
  * ao salvar, a sessão passa a "senha definida" e o app segue para "Selecionar Perfil".
  */
@@ -37,13 +38,15 @@ export default function DefinirSenhaScreen() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
-  const senhaValida = senha.length === 6;
-  const confere = confirmar.length === 6 && confirmar === senha;
+  const erroSenha = erroSenhaNova(senha);
+  const senhaValida = erroSenha === null;
+  const confere = confirmar.length > 0 && confirmar === senha;
+  const qtd = tamanhoSenha(senha);
   const podeSalvar = senhaValida && confere && !salvando;
 
   async function salvar() {
     if (!senhaValida) {
-      setErro('A senha deve ter 6 dígitos numéricos.');
+      setErro(erroSenha);
       return;
     }
     if (!confere) {
@@ -86,7 +89,7 @@ export default function DefinirSenhaScreen() {
         </View>
         <Text style={styles.titulo}>Crie sua senha</Text>
         <Text style={styles.subtitulo}>
-          Defina uma senha de 6 dígitos. Na próxima vez você entra com ela, sem esperar o SMS.
+          Crie uma senha com no mínimo {SENHA_MIN} caracteres. Na próxima vez você entra com ela, sem esperar o SMS.
         </Text>
       </SafeAreaView>
 
@@ -102,17 +105,19 @@ export default function DefinirSenhaScreen() {
           <View style={styles.inputWrap}>
             <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, styles.codeInput]}
+              style={styles.input}
               value={senha}
               onChangeText={(valor) => {
-                setSenha(valor.replace(/\D/g, '').slice(0, 6));
+                setSenha(valor);
                 if (erro) setErro(null);
               }}
-              placeholder="••••••"
+              placeholder={`Mínimo de ${SENHA_MIN} caracteres`}
               placeholderTextColor="#9AAAA5"
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={6}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              maxLength={SENHA_MAX}
               secureTextEntry={!mostrar}
               autoFocus
               returnKeyType="next"
@@ -130,17 +135,19 @@ export default function DefinirSenhaScreen() {
           <View style={styles.inputWrap}>
             <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
             <TextInput
-              style={[styles.input, styles.codeInput]}
+              style={styles.input}
               value={confirmar}
               onChangeText={(valor) => {
-                setConfirmar(valor.replace(/\D/g, '').slice(0, 6));
+                setConfirmar(valor);
                 if (erro) setErro(null);
               }}
-              placeholder="••••••"
+              placeholder="Digite a senha de novo"
               placeholderTextColor="#9AAAA5"
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={6}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              maxLength={SENHA_MAX}
               secureTextEntry={!mostrar}
               returnKeyType="done"
               onSubmitEditing={() => {
@@ -148,7 +155,11 @@ export default function DefinirSenhaScreen() {
               }}
             />
           </View>
-          <Text style={styles.hint}>Use 6 números que você lembre com facilidade.</Text>
+          <Text style={[styles.hint, qtd > 0 && qtd < SENHA_MIN && styles.hintAlerta]}>
+            {qtd > 0 && qtd < SENHA_MIN
+              ? `${qtd} de ${SENHA_MIN} caracteres. Pode usar letras, números, símbolos e espaços.`
+              : `Mínimo de ${SENHA_MIN} caracteres. Pode usar letras, números, símbolos e espaços.`}
+          </Text>
 
           {erro && (
             <View style={styles.erroBox}>
@@ -233,8 +244,8 @@ const criarEstilos = (t: Tema) =>
     },
     inputIcon: { marginRight: 10 },
     input: { flex: 1, fontSize: 17, color: t.ink, height: '100%' },
-    codeInput: { fontSize: 24, fontWeight: '700', letterSpacing: 8 },
-    hint: { fontSize: 13, color: t.muted, marginBottom: 22, marginTop: 2 },
+    hint: { fontSize: 13, color: t.muted, marginBottom: 22, marginTop: 2, lineHeight: 18 },
+    hintAlerta: { color: '#8A5A00' },
     erroBox: {
       flexDirection: 'row',
       alignItems: 'center',

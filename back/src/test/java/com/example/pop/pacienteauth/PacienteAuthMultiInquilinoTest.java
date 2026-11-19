@@ -47,7 +47,7 @@ class PacienteAuthMultiInquilinoTest {
     private static final String SCHEMA = "inq_teste_pacauth";
     private static final String SCHEMA2 = "inq_teste_pacauth2";
     private static final String CPF = "52998224725";
-    private static final String PIN = "123456";
+    private static final String PIN = "Senha@123";
     private static final String DISPOSITIVO = "disp-teste-pacauth";
     private static final String TELEFONE = "18988172191";
 

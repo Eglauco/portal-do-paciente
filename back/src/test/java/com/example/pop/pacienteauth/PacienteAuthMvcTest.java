@@ -166,13 +166,13 @@ class PacienteAuthMvcTest {
                 .andExpect(status().isOk()).andReturn();
         String token = ativou.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
 
-        // 2) Define o PIN de 6 dígitos (autenticado com o token do passo 1).
+        // 2) Define a senha (livre, mín. 8) (autenticado com o token do passo 1).
         mvc.perform(post("/paciente-auth/definir-senha").header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"123456\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"Senha@123\"}"))
                 .andExpect(status().isOk());
 
         // 3) Login só com CPF + senha (sem telefone/data) → 200 com token.
-        String loginBody = "{\"cpf\":\"" + CPF + "\",\"senha\":\"123456\",\"dispositivoId\":\"dev-senha\"}";
+        String loginBody = "{\"cpf\":\"" + CPF + "\",\"senha\":\"Senha@123\",\"dispositivoId\":\"dev-senha\"}";
         MvcResult logou = mvc.perform(post("/paciente-auth/login-senha")
                         .contentType(MediaType.APPLICATION_JSON).content(loginBody))
                 .andExpect(status().isOk()).andReturn();
@@ -180,7 +180,7 @@ class PacienteAuthMvcTest {
                 .replaceAll(".*\"token\":\"([^\"]+)\".*", "$1").isBlank());
 
         // 4) Senha errada → 401 (sem revelar a identidade).
-        String errado = "{\"cpf\":\"" + CPF + "\",\"senha\":\"000000\",\"dispositivoId\":\"dev-senha\"}";
+        String errado = "{\"cpf\":\"" + CPF + "\",\"senha\":\"Errada@123\",\"dispositivoId\":\"dev-senha\"}";
         mvc.perform(post("/paciente-auth/login-senha")
                         .contentType(MediaType.APPLICATION_JSON).content(errado))
                 .andExpect(status().isUnauthorized());
@@ -201,11 +201,11 @@ class PacienteAuthMvcTest {
                 .andExpect(status().isOk()).andReturn();
         String token = ativou.getResponse().getContentAsString().replaceAll(".*\"token\":\"([^\"]+)\".*", "$1");
         mvc.perform(post("/paciente-auth/definir-senha").header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"123456\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"Senha@123\"}"))
                 .andExpect(status().isOk());
 
         // 5 tentativas com PIN errado → 401 cada (o contador precisa persistir apesar do throw).
-        String errado = "{\"cpf\":\"" + CPF + "\",\"senha\":\"000000\",\"dispositivoId\":\"dev-lock\"}";
+        String errado = "{\"cpf\":\"" + CPF + "\",\"senha\":\"Errada@123\",\"dispositivoId\":\"dev-lock\"}";
         for (int i = 0; i < 5; i++) {
             mvc.perform(post("/paciente-auth/login-senha")
                             .contentType(MediaType.APPLICATION_JSON).content(errado))
@@ -213,7 +213,7 @@ class PacienteAuthMvcTest {
         }
 
         // 6ª tentativa, agora com a senha CERTA → bloqueada por tentativas (429), não 200.
-        String certo = "{\"cpf\":\"" + CPF + "\",\"senha\":\"123456\",\"dispositivoId\":\"dev-lock\"}";
+        String certo = "{\"cpf\":\"" + CPF + "\",\"senha\":\"Senha@123\",\"dispositivoId\":\"dev-lock\"}";
         mvc.perform(post("/paciente-auth/login-senha")
                         .contentType(MediaType.APPLICATION_JSON).content(certo))
                 .andExpect(status().isTooManyRequests());
@@ -242,7 +242,7 @@ class PacienteAuthMvcTest {
 
         // Define o PIN → pré-check agora deve dizer temSenha=true.
         mvc.perform(post("/paciente-auth/definir-senha").header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"123456\"}"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"senha\":\"Senha@123\"}"))
                 .andExpect(status().isOk());
 
         mvc.perform(post("/paciente-auth/pre-checagem")

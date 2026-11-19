@@ -18,10 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/screen-header';
 import { type Tema, useTema } from '@/hooks/use-tema';
 import { alterarSenha } from '@/services/sessao';
+import { erroSenhaNova, SENHA_MAX, SENHA_MIN, tamanhoSenha } from '@/constants/senha';
 
 /**
- * Troca do PIN de acesso da conta (Meu perfil). É credencial da CONTA (não muda por perfil):
- * exige a senha atual + a nova (6 dígitos, confirmada). Ao salvar, avisa e volta.
+ * Troca da senha de acesso da conta (Meu perfil). É credencial da CONTA (não muda por perfil):
+ * exige a senha atual + a nova (livre, mínimo 8 caracteres, confirmada). Ao salvar, avisa e volta.
  */
 export default function AlterarSenhaScreen() {
   const t = useTema();
@@ -36,18 +37,21 @@ export default function AlterarSenhaScreen() {
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
-  const atualOk = atual.length === 6;
-  const novaOk = nova.length === 6;
-  const confereOk = confirmar.length === 6 && confirmar === nova;
+  // A senha atual só precisa estar preenchida: quem conferir é o backend (sem regra de tamanho aqui).
+  const atualOk = atual.length > 0;
+  const erroNova = erroSenhaNova(nova);
+  const novaOk = erroNova === null;
+  const qtdNova = tamanhoSenha(nova);
+  const confereOk = confirmar.length > 0 && confirmar === nova;
   const podeSalvar = atualOk && novaOk && confereOk && !salvando;
 
   async function salvar() {
     if (!atualOk) {
-      setErro('Informe sua senha atual (6 dígitos).');
+      setErro('Informe sua senha atual.');
       return;
     }
     if (!novaOk) {
-      setErro('A nova senha deve ter 6 dígitos numéricos.');
+      setErro(erroNova);
       return;
     }
     if (!confereOk) {
@@ -73,6 +77,8 @@ export default function AlterarSenhaScreen() {
     setar: (v: string) => void,
     autoFocus: boolean,
     ultimo = false,
+    placeholder = '',
+    nova = true,
   ) {
     return (
       <>
@@ -80,17 +86,19 @@ export default function AlterarSenhaScreen() {
         <View style={styles.inputWrap}>
           <Ionicons name="lock-closed-outline" size={20} color={t.muted} style={styles.inputIcon} />
           <TextInput
-            style={[styles.input, styles.codeInput]}
+            style={styles.input}
             value={valor}
             onChangeText={(v) => {
-              setar(v.replace(/\D/g, '').slice(0, 6));
+              setar(v);
               if (erro) setErro(null);
             }}
-            placeholder="••••••"
+            placeholder={placeholder}
             placeholderTextColor="#9AAAA5"
-            keyboardType="number-pad"
-            inputMode="numeric"
-            maxLength={6}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete={nova ? 'new-password' : 'current-password'}
+            textContentType={nova ? 'newPassword' : 'password'}
+            maxLength={SENHA_MAX}
             secureTextEntry={!mostrar}
             autoFocus={autoFocus}
             returnKeyType={ultimo ? 'done' : 'next'}
@@ -121,15 +129,21 @@ export default function AlterarSenhaScreen() {
           <View style={styles.aviso}>
             <Ionicons name="information-circle-outline" size={16} color={t.muted} />
             <Text style={styles.avisoTxt}>
-              A senha é usada para entrar no app sem SMS. Use 6 números.
+              A senha é usada para entrar no app sem SMS. Use no mínimo {SENHA_MIN} caracteres: letras,
+              números, símbolos e espaços valem.
             </Text>
           </View>
 
-          {campo('Senha atual', atual, setAtual, true)}
+          {campo('Senha atual', atual, setAtual, true, false, '', false)}
           <View style={styles.espaco} />
-          {campo('Nova senha', nova, setNova, false)}
+          {campo('Nova senha', nova, setNova, false, false, `Mínimo de ${SENHA_MIN} caracteres`)}
+          {qtdNova > 0 && qtdNova < SENHA_MIN ? (
+            <Text style={styles.contador} accessibilityLiveRegion="polite">
+              {qtdNova} de {SENHA_MIN} caracteres
+            </Text>
+          ) : null}
           <View style={styles.espaco} />
-          {campo('Repita a nova senha', confirmar, setConfirmar, false, true)}
+          {campo('Repita a nova senha', confirmar, setConfirmar, false, true, 'Digite a nova senha de novo')}
 
           {erro && (
             <View style={styles.erroBox}>
@@ -175,6 +189,7 @@ const criarEstilos = (t: Tema) =>
     avisoTxt: { flex: 1, fontSize: 12.5, color: t.muted, lineHeight: 17 },
     label: { fontSize: 13, fontWeight: '600', color: t.ink, marginBottom: 8 },
     espaco: { height: 14 },
+    contador: { fontSize: 13, color: '#8A5A00', marginTop: 6 },
     inputWrap: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -187,7 +202,6 @@ const criarEstilos = (t: Tema) =>
     },
     inputIcon: { marginRight: 10 },
     input: { flex: 1, fontSize: 17, color: t.ink, height: '100%' },
-    codeInput: { fontSize: 22, fontWeight: '700', letterSpacing: 6 },
     erroBox: {
       flexDirection: 'row',
       alignItems: 'center',

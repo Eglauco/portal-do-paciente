@@ -27,7 +27,7 @@ public class PacienteIdentidade {
     @Column(nullable = false, length = 11)
     private String cpf;
 
-    /** Hash (BCrypt) do PIN de 6 dígitos. Nulo = não definido / resetado por um novo OTP. */
+    /** Hash (BCrypt) da senha livre (mín. 8 caracteres; os PINs de 6 dígitos antigos foram invalidados na V181). Nulo = não definido / resetado por um novo OTP. */
     @Column(name = "senha_hash", length = 100)
     private String senhaHash;
 

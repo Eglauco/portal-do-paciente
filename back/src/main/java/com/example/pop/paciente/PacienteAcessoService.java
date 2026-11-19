@@ -233,7 +233,7 @@ public class PacienteAcessoService {
         return conta;
     }
 
-    /** Define a senha inicial (pós-OTP, PIN de 6 dígitos). Exige que a conta ainda NÃO tenha senha. */
+    /** Define a senha inicial (pós-OTP, senha livre de no mínimo 8 caracteres). Exige que a conta ainda NÃO tenha senha. */
     @Transactional
     public void definirSenhaInicial(Long contaId, String dispositivoId, String pin) {
         ContaApp conta = contaValidaPorId(contaId, dispositivoId); // valida a sessão (cid + aparelho)
@@ -242,7 +242,7 @@ public class PacienteAcessoService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Você já tem uma senha. Use 'Alterar senha' no seu perfil.");
         }
-        validarPin(pin);
+        validarSenha(pin);
         id.setSenhaHash(passwordEncoder.encode(pin));
         id.setSenhaTentativas(0);
         id.setAtualizadoEm(LocalDateTime.now());
@@ -254,7 +254,7 @@ public class PacienteAcessoService {
     public void alterarSenha(Long contaId, String dispositivoId, String pinAtual, String pinNovo) {
         ContaApp conta = contaValidaPorId(contaId, dispositivoId); // valida a sessão (cid + aparelho)
         PacienteIdentidade id = identidadeOuNova(conta.getCpf());
-        validarPin(pinNovo);
+        validarSenha(pinNovo);
         if (id.getSenhaHash() != null
                 && (pinAtual == null || !passwordEncoder.matches(pinAtual, id.getSenhaHash()))) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Senha atual incorreta.");
@@ -306,10 +306,25 @@ public class PacienteAcessoService {
         }
     }
 
-    /** PIN de acesso: exatamente 6 dígitos numéricos. */
-    private static void validarPin(String pin) {
-        if (pin == null || !pin.matches("\\d{6}")) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "A senha deve ter 6 dígitos numéricos.");
+    /** Tamanho mínimo da senha do paciente (livre: letras, números, símbolos, espaços). */
+    public static final int SENHA_MIN = 8;
+    /** Teto da senha: o BCrypt só considera os primeiros 72 BYTES — 64 caracteres mantém folga. */
+    public static final int SENHA_MAX = 64;
+
+    /**
+     * Senha de acesso LIVRE: mínimo {@value #SENHA_MIN} e máximo {@value #SENHA_MAX} caracteres, não pode
+     * ser só espaços, e não pode passar de 72 bytes em UTF-8 (limite do BCrypt — acima disso o resto seria
+     * ignorado em silêncio). Conta caracteres por code point (emoji = 1).
+     */
+    static void validarSenha(String senha) {
+        int tamanho = senha == null ? 0 : senha.codePointCount(0, senha.length());
+        if (senha == null || senha.isBlank() || tamanho < SENHA_MIN) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "A senha deve ter no mínimo " + SENHA_MIN + " caracteres.");
+        }
+        if (tamanho > SENHA_MAX || senha.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
+                    "A senha deve ter no máximo " + SENHA_MAX + " caracteres.");
         }
     }
 
