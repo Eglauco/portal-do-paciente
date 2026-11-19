@@ -20,6 +20,9 @@ public interface UnidadeRepository extends JpaRepository<Unidade, Long> {
             """)
     Page<Unidade> search(@Param("id") Long id, @Param("nome") String nome, Pageable pageable);
 
+    /** Unidades com a regra de confirmação vencida ligada (minutos > 0). */
+    java.util.List<Unidade> findByMinutosConfirmacaoVencidaGreaterThan(int minutos);
+
     // Unicidade do código de integração (único quando preenchido).
     boolean existsByCodigoIntegracao(String codigoIntegracao);
 

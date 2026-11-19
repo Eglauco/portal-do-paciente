@@ -3,7 +3,9 @@ export type StatusAgendamento =
   | 'aguardando'
   | 'realizado'
   | 'cancelado'
-  | 'reagendado';
+  | 'reagendado'
+  /** Passou do prazo sem confirmação (CONFIRMACAO_VENCIDA) — não dá mais para confirmar pelo app. */
+  | 'vencido';
 
 /** Status do agendamento no back-end (enum Java). */
 export type StatusBackend =
@@ -12,7 +14,8 @@ export type StatusBackend =
   | 'CANCELADO_PELA_UNIDADE'
   | 'CANCELADO_PELO_PACIENTE'
   | 'FALTA_PACIENTE'
-  | 'PRESENCA_PACIENTE';
+  | 'PRESENCA_PACIENTE'
+  | 'CONFIRMACAO_VENCIDA';
 
 /** Motivo da falta (id + texto). */
 export interface MotivoFalta {

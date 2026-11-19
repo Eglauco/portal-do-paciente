@@ -24,7 +24,9 @@ public record UnidadeResponse(
         String telefone,
         String endereco,
         List<FaqItem> faq,
-        List<HorarioItem> horarios) {
+        List<HorarioItem> horarios,
+        /** Minutos após a data/hora do horário para virar "Confirmação vencida"; 0 = desligado. */
+        int minutosConfirmacaoVencida) {
 
     /** Validade da URL assinada do preview — longa p/ o cache do front não servir link morto. */
     private static final Duration VALIDADE_IMAGEM = Duration.ofHours(24);
@@ -48,7 +50,8 @@ public record UnidadeResponse(
         return new UnidadeResponse(u.getId(), u.getNome(), u.getCodigoIntegracao(),
                 u.getLogoUrl(), assinar(u.getLogoUrl(), storage),
                 u.getCapaUrl(), assinar(u.getCapaUrl(), storage),
-                u.getSobre(), u.getTelefone(), u.getEndereco(), faq, horarios);
+                u.getSobre(), u.getTelefone(), u.getEndereco(), faq, horarios,
+                u.getMinutosConfirmacaoVencida());
     }
 
     private static String assinar(String url, StorageService storage) {

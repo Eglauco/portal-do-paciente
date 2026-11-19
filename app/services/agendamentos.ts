@@ -55,6 +55,7 @@ const MAPA_STATUS: Record<StatusBackend, StatusAgendamento> = {
   FALTA_PACIENTE: 'cancelado',
   CANCELADO_PELA_UNIDADE: 'cancelado',
   CANCELADO_PELO_PACIENTE: 'cancelado',
+  CONFIRMACAO_VENCIDA: 'vencido',
 };
 
 const MESES = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
@@ -66,7 +67,9 @@ const doisDigitos = (n: number) => String(n).padStart(2, '0');
 function paraViewModel(b: AgendamentoBackend): Agendamento {
   const data = new Date(b.dataHora);
   const status = MAPA_STATUS[b.statusAgendamento] ?? 'aguardando';
-  const grupo = status === 'realizado' || status === 'cancelado' ? 'concluidos' : 'proximos';
+  // Vencido vai para os concluídos: já passou e não há mais ação do paciente (não confirma).
+  const grupo =
+    status === 'realizado' || status === 'cancelado' || status === 'vencido' ? 'concluidos' : 'proximos';
 
   return {
     id: String(b.id),
@@ -151,7 +154,7 @@ export async function listarMotivosFalta(): Promise<MotivoFalta[]> {
 }
 
 /** Quem fez a troca de status registrada no log. */
-export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE';
+export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE' | 'SISTEMA';
 
 /** Item da linha do tempo de status do agendamento (espelha AgendamentoLogResponse no backend). */
 export interface AgendamentoLog {

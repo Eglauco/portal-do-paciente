@@ -45,6 +45,11 @@ public class HorarioLogService {
         gravar(ag, antes, depois, AutorLogHorario.UNIDADE, null, null, usuarioId);
     }
 
+    /** Troca feita por uma rotina automática do sistema (sem ator humano) — ex.: confirmação vencida. */
+    public void registrarDoSistema(Horario ag, StatusAgendamento antes, StatusAgendamento depois) {
+        gravar(ag, antes, depois, AutorLogHorario.SISTEMA, null, null, null);
+    }
+
     private void gravar(Horario ag, StatusAgendamento antes, StatusAgendamento depois,
             AutorLogHorario autor, Long pacienteId, Long responsavelId, Long usuarioId) {
         if (depois == null || antes == depois) {

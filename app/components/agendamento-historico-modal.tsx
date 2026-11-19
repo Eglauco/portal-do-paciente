@@ -34,6 +34,9 @@ function autoria(log: AgendamentoLog): { texto: string; responsavel: boolean } {
   if (log.autor === 'PACIENTE') {
     return { texto: 'pelo paciente', responsavel: false };
   }
+  if (log.autor === 'SISTEMA') {
+    return { texto: 'automaticamente (prazo de confirmação vencido)', responsavel: false };
+  }
   // UNIDADE (atendente do back-office) — mostra o nome quando houver.
   return { texto: log.usuarioNome ? `pela unidade · ${log.usuarioNome}` : 'pela unidade', responsavel: false };
 }

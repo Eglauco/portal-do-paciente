@@ -2211,6 +2211,7 @@
 .status-pill[data-st='CANCELADO_PELO_PACIENTE'] { color: #b23b4e; background: #fbe4e7; }
 .status-pill[data-st='FALTA_PACIENTE'] { color: #8a5a00; background: #fbe9cf; }
 .status-pill[data-st='PRESENCA_PACIENTE'] { color: #2f6df6; background: #e9f0fe; }
+.status-pill[data-st='CONFIRMACAO_VENCIDA'] { color: #b54708; background: #fef0e6; }
 
 /* Status da análise por IA do prontuário/documento */
 .status-pill[data-st='SEM_ALTERACOES'] { color: #6b7280; background: #eceef1; }

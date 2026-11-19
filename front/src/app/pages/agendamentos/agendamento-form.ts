@@ -404,6 +404,9 @@ export class AgendamentoForm implements PodeSair {
     if (log.autor === 'PACIENTE') {
       return log.pacienteNome ?? 'Paciente';
     }
+    if (log.autor === 'SISTEMA') {
+      return 'Sistema · prazo de confirmação vencido';
+    }
     return log.usuarioNome ? `Unidade · ${log.usuarioNome}` : 'Unidade';
   }
 

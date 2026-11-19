@@ -178,6 +178,11 @@ export class UnidadeForm implements PodeSair {
     sobre: new FormControl('', { nonNullable: true }),
     telefone: new FormControl('', { nonNullable: true }),
     endereco: new FormControl('', { nonNullable: true }),
+    /** Prazo da confirmação vencida em minutos (0 = desligado; teto 30 dias, igual ao back). */
+    minutosConfirmacaoVencida: new FormControl(0, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(0), Validators.max(43200)],
+    }),
     faq: new FormArray<FaqItemForm>([]),
     horarios: new FormArray<HorarioForm>(DIAS.map((d) => this.grupoHorario(d.dia))),
   });
@@ -186,7 +191,7 @@ export class UnidadeForm implements PodeSair {
   private controlesDaAba(aba: AbaId): AbstractControl[] {
     switch (aba) {
       case 'dados':
-        return [this.form.controls.nome];
+        return [this.form.controls.nome, this.form.controls.minutosConfirmacaoVencida];
       default:
         return []; // FAQ não tem campos obrigatórios (itens em branco são ignorados)
     }
@@ -221,6 +226,7 @@ export class UnidadeForm implements PodeSair {
             sobre: unidade.sobre ?? '',
             telefone: unidade.telefone ?? '',
             endereco: unidade.endereco ?? '',
+            minutosConfirmacaoVencida: unidade.minutosConfirmacaoVencida ?? 0,
           });
           this.setFaq(unidade.faq ?? []);
           if (unidade.horarios?.length) this.setHorarios(unidade.horarios);
@@ -378,7 +384,7 @@ export class UnidadeForm implements PodeSair {
     return this.confirmar('Existe dados preenchido na tela, deseja sair?');
   }
 
-  protected invalido(campo: 'nome'): boolean {
+  protected invalido(campo: 'nome' | 'minutosConfirmacaoVencida'): boolean {
     const control = this.form.controls[campo];
     return control.invalid && (control.touched || control.dirty);
   }
@@ -392,6 +398,7 @@ export class UnidadeForm implements PodeSair {
       sobre: this.form.controls.sobre.value.trim() || null,
       telefone: this.form.controls.telefone.value.trim() || null,
       endereco: this.form.controls.endereco.value.trim() || null,
+      minutosConfirmacaoVencida: Math.trunc(Number(this.form.controls.minutosConfirmacaoVencida.value) || 0),
       // Só envia itens completos; a ordem na lista é a posição enviada ao backend.
       faq: this.faqItens.controls
         .map((g) => ({

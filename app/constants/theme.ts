@@ -51,6 +51,7 @@ export const Status: Record<string, { fg: string; bg: string }> = {
   realizado: { fg: '#2F6DF6', bg: '#E9F0FE' },
   cancelado: { fg: '#B23B4E', bg: '#FBE4E7' },
   reagendado: { fg: '#7A5AF5', bg: '#EFEAFE' },
+  vencido: { fg: '#B54708', bg: '#FEF0E6' },
 };
 
 /** Cores por tipo de documento do prontuário. */

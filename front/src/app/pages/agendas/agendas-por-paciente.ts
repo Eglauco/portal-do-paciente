@@ -23,6 +23,7 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
   FALTA_PACIENTE: 'st--falta',
   CANCELADO_PELA_UNIDADE: 'st--cancelado',
   CANCELADO_PELO_PACIENTE: 'st--cancelado',
+  CONFIRMACAO_VENCIDA: 'st--vencida',
 };
 
 /**
@@ -67,6 +68,7 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
       .st--presenca { color: #0a7a4b; background: color-mix(in srgb, #12b76a 16%, transparent); }
       .st--falta { color: #b42318; background: color-mix(in srgb, #f04438 15%, transparent); }
       .st--cancelado { color: var(--muted); background: color-mix(in srgb, var(--muted) 16%, transparent); }
+      .st--vencida { color: #b54708; background: color-mix(in srgb, #f79009 16%, transparent); }
     `,
   ],
 })

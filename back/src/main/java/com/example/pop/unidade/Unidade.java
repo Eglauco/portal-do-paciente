@@ -63,6 +63,13 @@ public class Unidade {
     private Double longitude;
 
     /**
+     * Minutos APÓS a data/hora do horário em que um agendamento ainda "Aguardando confirmação" passa a
+     * "Confirmação vencida" (rotina a cada 1 minuto). 0 = regra desligada (padrão).
+     */
+    @Column(name = "minutos_confirmacao_vencida", nullable = false)
+    private int minutosConfirmacaoVencida = 0;
+
+    /**
      * FAQ da unidade (base de conhecimento da IA do chat). Não serializado direto na entidade
      * (o grid/export de unidades não carregam FAQ); é exposto/gravado pelos DTOs do cadastro.
      * Coleção gerenciada com orphanRemoval: alterar SEMPRE pela própria lista (clear/add), nunca

@@ -6,7 +6,9 @@ public enum StatusAgendamento {
     CANCELADO_PELA_UNIDADE("Cancelado pela unidade"),
     CANCELADO_PELO_PACIENTE("Cancelado pelo paciente"),
     FALTA_PACIENTE("Falta do paciente"),
-    PRESENCA_PACIENTE("Presença do paciente");
+    PRESENCA_PACIENTE("Presença do paciente"),
+    /** Passou do prazo (data/hora + minutos da unidade) ainda aguardando confirmação. Aplicado pelo sistema ou pela unidade. */
+    CONFIRMACAO_VENCIDA("Confirmação vencida");
 
     private final String descricao;
 

@@ -207,6 +207,7 @@ export class HorarioDetalhe {
   protected descreverAutor(log: AgendamentoLog): string {
     if (log.autor === 'RESPONSAVEL') return log.responsavelNome ? `${log.responsavelNome} (responsável)` : 'Responsável';
     if (log.autor === 'PACIENTE') return log.pacienteNome ?? 'Paciente';
+    if (log.autor === 'SISTEMA') return 'Sistema · prazo de confirmação vencido';
     return log.usuarioNome ? `Unidade · ${log.usuarioNome}` : 'Unidade';
   }
 

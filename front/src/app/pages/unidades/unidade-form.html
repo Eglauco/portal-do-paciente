@@ -72,6 +72,28 @@
         />
         <span class="field-hint">Opcional. Usado para casar a unidade na importação do SIRESP (único quando preenchido).</span>
       </div>
+      <div class="form-field">
+        <label class="label" for="minutosConfirmacaoVencida">Confirmação vence após (minutos)</label>
+        <input
+          id="minutosConfirmacaoVencida"
+          class="input"
+          type="number"
+          inputmode="numeric"
+          min="0"
+          max="43200"
+          step="1"
+          formControlName="minutosConfirmacaoVencida"
+          aria-describedby="minutosConfirmacaoVencidaHint"
+          [class.input--error]="invalido('minutosConfirmacaoVencida')"
+        />
+        @if (invalido('minutosConfirmacaoVencida')) {
+          <span class="field-error">Informe um número de 0 a 43200 (30 dias).</span>
+        }
+        <span class="field-hint" id="minutosConfirmacaoVencidaHint">
+          Quantos minutos depois da data/hora do agendamento um horário ainda "Aguardando confirmação"
+          passa para "Confirmação vencida". 0 = desligado.
+        </span>
+      </div>
     </div>
     }
 

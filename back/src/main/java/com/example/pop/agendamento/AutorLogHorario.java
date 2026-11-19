@@ -7,5 +7,7 @@ public enum AutorLogHorario {
     /** Um responsável agindo pelo perfil dependente do paciente, pelo app. */
     RESPONSAVEL,
     /** A unidade (atendente do back-office). */
-    UNIDADE
+    UNIDADE,
+    /** O próprio sistema (rotina automática — ex.: confirmação vencida). */
+    SISTEMA
 }

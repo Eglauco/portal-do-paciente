@@ -14,7 +14,12 @@ public record UnidadeRequest(
         String telefone,
         String endereco,
         List<FaqItem> faq,
-        List<HorarioItem> horarios) {
+        List<HorarioItem> horarios,
+        /**
+         * Minutos após a data/hora do horário para o "Aguardando confirmação" virar "Confirmação vencida".
+         * 0 = desligado. null = não mexe (cliente antigo que não envia o campo; na criação vira 0).
+         */
+        Integer minutosConfirmacaoVencida) {
 
     /** Item de FAQ enviado pelo cadastro (a ordem é dada pela posição na lista). */
     public record FaqItem(String pergunta, String resposta) {

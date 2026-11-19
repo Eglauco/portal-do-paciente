@@ -4,7 +4,8 @@ export type StatusAgendamento =
   | 'CANCELADO_PELA_UNIDADE'
   | 'CANCELADO_PELO_PACIENTE'
   | 'FALTA_PACIENTE'
-  | 'PRESENCA_PACIENTE';
+  | 'PRESENCA_PACIENTE'
+  | 'CONFIRMACAO_VENCIDA';
 
 export interface Ref {
   id: number;
@@ -108,6 +109,8 @@ export const STATUS_OPTIONS: { value: StatusAgendamento; label: string }[] = [
   { value: 'CANCELADO_PELO_PACIENTE', label: 'Cancelado pelo paciente' },
   { value: 'FALTA_PACIENTE', label: 'Falta do paciente' },
   { value: 'PRESENCA_PACIENTE', label: 'Presença do paciente' },
+  // Aplicado automaticamente pela rotina (prazo da unidade) e também selecionável manualmente.
+  { value: 'CONFIRMACAO_VENCIDA', label: 'Confirmação vencida' },
 ];
 
 export function statusLabel(valor: StatusAgendamento): string {
@@ -131,7 +134,7 @@ export function entregaLabel(estado: EstadoEntrega | null | undefined): string {
 }
 
 /** Quem fez a troca de status registrada no log. */
-export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE';
+export type AutorLog = 'PACIENTE' | 'RESPONSAVEL' | 'UNIDADE' | 'SISTEMA';
 
 /** Item da linha do tempo de status do agendamento (espelha AgendamentoLogResponse no backend). */
 export interface AgendamentoLog {

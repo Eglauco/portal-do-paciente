@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -206,4 +207,26 @@ public interface HorarioRepository extends JpaRepository<Horario, Long> {
             """)
     List<Object[]> agruparMotivosFalta(@Param("unidadeId") Long unidadeId,
             @Param("inicio") LocalDateTime inicio, @Param("fim") LocalDateTime fim);
+
+    /**
+     * Confirmação vencida: ids dos horários da unidade que ainda estão em {@code status} com data/hora até
+     * {@code limite} (= agora − minutos da unidade). Só ids: evita carregar paciente (EAGER) de cada um.
+     */
+    @Query("""
+            select h.id from Horario h
+            where h.agenda.unidadeSaude.id = :unidadeId
+              and h.statusAgendamento = :status
+              and h.dataHora <= :limite
+            """)
+    List<Long> idsParaVencer(@Param("unidadeId") Long unidadeId, @Param("status") StatusAgendamento status,
+            @Param("limite") LocalDateTime limite);
+
+    /**
+     * Troca o status SÓ se ele ainda for {@code esperado} (update condicional, à prova de corrida: se o
+     * paciente confirmou no mesmo instante, nada muda). Devolve 1 se trocou, 0 se não.
+     */
+    @Modifying
+    @Query("update Horario h set h.statusAgendamento = :novo where h.id = :id and h.statusAgendamento = :esperado")
+    int trocarStatusSe(@Param("id") Long id, @Param("esperado") StatusAgendamento esperado,
+            @Param("novo") StatusAgendamento novo);
 }

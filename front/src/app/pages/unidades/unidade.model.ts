@@ -45,6 +45,11 @@ export interface Unidade {
   faq?: UnidadeFaqItem[];
   /** Horário de funcionamento por dia (não vem no grid). */
   horarios?: UnidadeHorario[];
+  /**
+   * Minutos após a data/hora do agendamento para um "Aguardando confirmação" virar "Confirmação vencida"
+   * (rotina do back a cada minuto). 0 = desligado (padrão).
+   */
+  minutosConfirmacaoVencida?: number;
 }
 
 export interface UnidadeFiltro {

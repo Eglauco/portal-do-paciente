@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.example.pop.agendamento.StatusAgendamento;
+import com.example.pop.chat.StatusChat;
 import com.example.pop.unidade.UnidadeRepository;
 
 @SpringBootTest
@@ -28,7 +30,7 @@ class DashboardControllerTest {
         GeralDashboard d = controller.geral(unidade(), 30);
         assertNotNull(d);
         assertEquals(30, d.dias());
-        assertTrue(d.agendamentosPorStatus().size() == 6, "6 status de agendamento");
+        assertEquals(StatusAgendamento.values().length, d.agendamentosPorStatus().size(), "uma fatia por status de agendamento");
         assertFalse(d.agendamentosPorDia().isEmpty(), "série diária preenchida");
         assertTrue(d.taxaComparecimento() >= 0 && d.taxaComparecimento() <= 100);
         assertTrue(d.pacientesTotal() >= 0);
@@ -38,7 +40,7 @@ class DashboardControllerTest {
     void agendamentosRetornaDistribuicoes() {
         AgendamentoDashboard d = controller.agendamentos(unidade(), 30);
         assertNotNull(d);
-        assertEquals(6, d.porStatus().size());
+        assertEquals(StatusAgendamento.values().length, d.porStatus().size());
         assertNotNull(d.topConfiguracaoAgendas());
         assertNotNull(d.topProfissionais());
         assertNotNull(d.porEspecialidade());
@@ -52,7 +54,7 @@ class DashboardControllerTest {
     void chatsRetornaSnapshotEVolume() {
         ChatDashboard d = controller.chats(unidade(), 30);
         assertNotNull(d);
-        assertEquals(4, d.porStatus().size());
+        assertEquals(StatusChat.values().length, d.porStatus().size());
         assertEquals(d.mensagensPaciente() + d.mensagensUnidade(), d.mensagensPeriodo());
         assertNotNull(d.cargaPorAtendente());
         assertTrue(d.taxaResolucao() >= 0 && d.taxaResolucao() <= 100);
