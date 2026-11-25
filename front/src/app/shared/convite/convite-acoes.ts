@@ -27,7 +27,9 @@ type Modo = 'whatsapp' | 'sms';
     .cv__ic { width: 1rem; height: 1rem; flex: none; }
     .btn--ghost .cv__ic--wa { stroke: #128c7e; }
 
-    .cv-dlg { width: min(500px, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 0.8rem; background: var(--surface, #fff); color: var(--ink); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22); text-align: left; white-space: normal; font-weight: 400; }
+    /* Centraliza explicitamente: o reset global do admin (*, ::before, ::after { margin: 0 }) apaga o
+       margin:auto que o navegador usa para centralizar o <dialog> aberto com showModal(). */
+    .cv-dlg { position: fixed; inset: 0; margin: auto; height: fit-content; max-height: calc(100dvh - 2rem); overflow: auto; width: min(500px, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 0.8rem; background: var(--surface, #fff); color: var(--ink); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22); text-align: left; white-space: normal; font-weight: 400; }
     .cv-dlg::backdrop { background: rgba(0, 0, 0, 0.45); }
     .cv-dlg__in { display: flex; flex-direction: column; }
     .cv-dlg__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem 0.4rem; }

@@ -12,6 +12,6 @@
  * e ajuste a data para o dia do release.
  */
 export const VERSAO_FRONT = {
-  versao: '1.2.0',
-  data: '2026-11-24',
+  versao: '1.2.1',
+  data: '2026-11-25',
 } as const;
