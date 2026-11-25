@@ -148,7 +148,13 @@ export interface AgendamentoLog {
   usuarioNome: string | null;
   statusAnterior: StatusAgendamento | null;
   statusAnteriorDescricao: string | null;
-  statusNovo: StatusAgendamento;
+  /** Nulo nas linhas de EVENTO (ex.: convite do app), que não são troca de status. */
+  statusNovo: StatusAgendamento | null;
   statusNovoDescricao: string | null;
   criadoEm: string;
+  /** Evento que não é troca de status (nulo nas linhas de status). */
+  evento?: 'CONVITE_SMS' | 'CONVITE_WHATSAPP' | null;
+  eventoDescricao?: string | null;
+  /** Complemento do evento (ex.: número mascarado para onde foi o convite). */
+  detalhe?: string | null;
 }

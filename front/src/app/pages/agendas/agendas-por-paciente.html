@@ -73,6 +73,7 @@
   } @else {
     <div class="marc-list">
       @for (m of marcacoes(); track m.id) {
+        <div class="marc-row">
         <a class="marc" [routerLink]="['/horarios', m.id]">
           <div class="marc__data">
             <div class="marc__dia">{{ m.data | date: 'dd/MM/yyyy' }}</div>
@@ -88,6 +89,15 @@
           <span [class]="'st ' + classeStatus(m.statusAgendamento)">{{ m.statusDescricao }}</span>
           <svg class="marc__go" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
         </a>
+          <div class="marc__convite">
+            <app-convite-acoes
+              [horarioId]="m.id"
+              [paciente]="convitePaciente()"
+              [texto]="conviteTexto()"
+              [nome]="m.paciente.nome"
+            />
+          </div>
+        </div>
       }
     </div>
 

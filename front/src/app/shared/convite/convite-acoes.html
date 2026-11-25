@@ -1,0 +1,111 @@
+<div class="cv" role="group" [attr.aria-label]="'Convite do app para ' + nome()">
+  <button
+    type="button"
+    class="btn btn--ghost btn--sm cv__btn"
+    [attr.aria-disabled]="bloqueio() ? 'true' : null"
+    [attr.aria-describedby]="bloqueio() ? uid + '-motivo' : null"
+    [title]="bloqueio() ?? 'Abrir o WhatsApp com o convite do app pronto (abre em nova aba)'"
+    (click)="abrirWhatsapp()"
+  >
+    <svg class="cv__ic cv__ic--wa" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /><path d="M9.5 9.5c.4 1.6 1.7 3.4 3.5 4.3l1.2-1 1.8.8-.4 1.6c-3.4.2-6.6-3-6.4-6.4l1.6-.4.8 1.8Z" /></svg>
+    <span>WhatsApp</span>
+  </button>
+  <button
+    type="button"
+    class="btn btn--ghost btn--sm cv__btn"
+    [attr.aria-disabled]="bloqueio() ? 'true' : null"
+    [attr.aria-describedby]="bloqueio() ? uid + '-motivo' : null"
+    [title]="bloqueio() ?? 'Enviar o convite do app por SMS'"
+    (click)="abrirSms()"
+  >
+    <svg class="cv__ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /><path d="M13 8H7" /><path d="M17 12H7" /></svg>
+    <span>SMS</span>
+  </button>
+  @if (bloqueio(); as motivo) {
+    <span class="sr-only" [id]="uid + '-motivo'">{{ motivo }}</span>
+  }
+</div>
+
+<dialog
+  #dialogo
+  class="cv-dlg"
+  [attr.aria-labelledby]="uid + '-titulo'"
+  (cancel)="aoCancelar($event)"
+  (close)="aoFechar()"
+  (click)="cliqueNoFundo($event)"
+>
+  @if (modo(); as m) {
+    <div class="cv-dlg__in">
+      <div class="cv-dlg__head">
+        <h2 class="cv-dlg__title" [id]="uid + '-titulo'">
+          {{ m === 'sms' ? 'Enviar convite do app por SMS' : 'Convite do app pelo WhatsApp' }}
+        </h2>
+        <button type="button" class="cv-dlg__x" aria-label="Fechar" (click)="fechar()" [disabled]="enviando()">×</button>
+      </div>
+
+      <div class="cv-dlg__body">
+        <p>Paciente: <b>{{ nome() }}</b></p>
+
+        @if (m === 'whatsapp') {
+          <fieldset class="cv-opts">
+            <legend>Em qual número abrir a conversa?</legend>
+            @for (t of telefones(); track t.numero; let i = $index) {
+              <label class="cv-opt">
+                <input
+                  type="radio"
+                  [name]="uid + '-wa'"
+                  [value]="t.numero"
+                  [checked]="escolhaWhats() === t.numero"
+                  [attr.autofocus]="i === 0 ? '' : null"
+                  (change)="escolhaWhats.set(t.numero)"
+                />
+                {{ t.exibicao }}
+              </label>
+            }
+          </fieldset>
+        } @else {
+          <fieldset class="cv-opts">
+            <legend>{{ telefones().length > 1 ? 'Para quais números enviar?' : 'Número do paciente' }}</legend>
+            @for (t of telefones(); track t.numero; let i = $index) {
+              <label class="cv-opt">
+                <input
+                  type="checkbox"
+                  [checked]="escolhaSms().has(t.numero)"
+                  [disabled]="enviando()"
+                  [attr.autofocus]="i === 0 ? '' : null"
+                  (change)="marcarSms(t.numero, $event)"
+                />
+                {{ t.exibicao }}
+              </label>
+            }
+          </fieldset>
+          <p class="cv-nota">Cada SMS enviado é cobrado. No SMS os acentos são removidos.</p>
+        }
+
+        <p class="cv-msg-label" [id]="uid + '-msg'">Mensagem</p>
+        <div class="cv-msg" [attr.aria-labelledby]="uid + '-msg'" role="note">{{ texto() }}</div>
+      </div>
+
+      <div class="cv-dlg__foot">
+        <button type="button" class="btn btn--ghost" (click)="fechar()" [disabled]="enviando()">Cancelar</button>
+        @if (m === 'whatsapp') {
+          @if (linkEscolhido(); as href) {
+            <a class="btn btn--solid" [href]="href" target="_blank" rel="noopener" (click)="confirmarWhatsapp()">Abrir no WhatsApp<span class="sr-only"> (abre em nova aba)</span></a>
+          } @else {
+            <button type="button" class="btn btn--solid" disabled>Abrir no WhatsApp</button>
+          }
+        } @else {
+          <button type="button" class="btn btn--solid" (click)="enviarSms()" [disabled]="enviando() || escolhaSms().size === 0">
+            @if (enviando()) {
+              Enviando…
+            } @else if (escolhaSms().size > 1) {
+              Enviar {{ escolhaSms().size }} SMS
+            } @else {
+              Enviar SMS
+            }
+          </button>
+        }
+      </div>
+    </div>
+  }
+</dialog>

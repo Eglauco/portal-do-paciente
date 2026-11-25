@@ -171,7 +171,7 @@ public class MeusHorariosController {
     public List<HorarioLogResponse> logs(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         acessoService.exigirVisualizar(jwt, FuncionalidadeApp.AGENDAMENTOS);
         Horario agendamento = meuAgendamento(jwt, id); // 404 se não é do paciente logado
-        return logService.listar(agendamento.getId());
+        return logService.listarStatus(agendamento.getId());
     }
 
     /** Carrega o agendamento garantindo que é do paciente logado (404 caso contrário). */

@@ -6,6 +6,8 @@ import { RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { Subject, catchError, debounceTime, distinctUntilChanged, of, switchMap, tap } from 'rxjs';
 import { AuthService } from '../../core/auth.service';
+import { ConviteAcoes } from '../../shared/convite/convite-acoes';
+import { ConviteOpcoes, ConviteService, conviteDoPaciente } from '../../shared/convite/convite.service';
 import { NomePaciente } from '../../shared/nome-paciente';
 import { PacienteSelecao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -33,7 +35,7 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
  */
 @Component({
   selector: 'app-agendas-por-paciente',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, NomePaciente],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, NomePaciente, ConviteAcoes],
   templateUrl: './agendas-por-paciente.html',
   styles: [
     `
@@ -49,8 +51,16 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
       .pac-head__count { margin-left: auto; font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
 
       .marc-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 0.7rem; overflow: hidden; }
-      .marc { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--line); text-decoration: none; color: inherit; transition: background 0.12s; }
-      .marc:last-child { border-bottom: 0; }
+      .marc-row { display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+      .marc-row:last-child { border-bottom: 0; }
+      .marc { flex: 1; min-width: 0; display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0.9rem; text-decoration: none; color: inherit; transition: background 0.12s; }
+      .marc__convite { flex: none; padding: 0 0.9rem 0 0.25rem; }
+      /* Tela estreita: os botões do convite descem para baixo da marcação (sem cortar status/botões). */
+      @media (max-width: 640px) {
+        .marc-row { flex-wrap: wrap; }
+        .marc { flex-basis: 100%; flex-wrap: wrap; gap: 0.5rem 1rem; }
+        .marc__convite { padding: 0 0.9rem 0.75rem; }
+      }
       .marc:hover { background: color-mix(in srgb, var(--brand) 5%, transparent); }
       .marc__data { width: 128px; flex: none; }
       .marc__dia { font-weight: 600; font-size: 0.92rem; }
@@ -75,6 +85,7 @@ const CLASSE_STATUS: Record<StatusAgendamento, string> = {
 export class AgendasPorPaciente {
   private readonly pacienteService = inject(PacienteService);
   private readonly service = inject(AgendaService);
+  private readonly conviteService = inject(ConviteService);
   private readonly auth = inject(AuthService);
   private readonly store = inject(AgendaBuscaStore);
 
@@ -86,6 +97,10 @@ export class AgendasPorPaciente {
   protected readonly paciente = signal<PacienteSelecao | null>(null);
 
   protected readonly marcacoes = signal<Horario[]>([]);
+  /** Opções do convite do app do paciente selecionado: undefined = carregando; null = erro. */
+  private readonly convite = signal<ConviteOpcoes | null | undefined>(undefined);
+  protected readonly conviteTexto = computed(() => this.convite()?.texto ?? null);
+  protected readonly convitePaciente = computed(() => conviteDoPaciente(this.convite(), this.paciente()?.id));
   protected readonly loading = signal(false);
   protected readonly error = signal(false);
 
@@ -182,9 +197,23 @@ export class AgendasPorPaciente {
     if (!this.last()) this.irParaPagina(this.page() + 1);
   }
 
+  /** Situação de convite do app (tem app? celulares) do paciente selecionado — uma busca por paciente. */
+  private carregarConvite(pacienteId: number): void {
+    this.convite.set(undefined);
+    this.conviteService.opcoes([pacienteId]).subscribe({
+      next: (o) => {
+        if (this.paciente()?.id === pacienteId) this.convite.set(o);
+      },
+      error: () => {
+        if (this.paciente()?.id === pacienteId) this.convite.set(null);
+      },
+    });
+  }
+
   private carregar(): void {
     const paciente = this.paciente();
     if (!paciente) return;
+    if (this.convite() === undefined || !this.convitePaciente()) this.carregarConvite(paciente.id);
     this.loading.set(true);
     this.error.set(false);
     this.service.marcacoesPorPaciente(paciente.id, this.auth.unidadeId(), this.page(), this.size).subscribe({

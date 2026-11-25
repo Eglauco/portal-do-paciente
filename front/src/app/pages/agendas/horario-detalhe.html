@@ -41,6 +41,16 @@
                   <dd>{{ h.pacienteCpf || '—' }}</dd>
                 </div>
               </dl>
+              <div class="pac__convite">
+                <span class="pac__convite-rot" aria-hidden="true">Convite do app</span>
+                <app-convite-acoes
+                  [horarioId]="h.id"
+                  [paciente]="convitePaciente()"
+                  [texto]="conviteTexto()"
+                  [nome]="h.paciente.nome"
+                  (registrado)="recarregarHistorico()"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -101,7 +111,7 @@
       <nav class="form-tabs" aria-label="Seções do horário">
         <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'dados'" (click)="selecionarAba('dados')">Dados</button>
         <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'destinatarios'" (click)="selecionarAba('destinatarios')">Destinatários</button>
-        <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'historico'" (click)="selecionarAba('historico')">Histórico de status</button>
+        <button type="button" class="form-tab" [class.form-tab--ativa]="abaAtiva() === 'historico'" (click)="selecionarAba('historico')">Histórico</button>
       </nav>
 
       @if (abaAtiva() === 'dados') {
@@ -154,14 +164,18 @@
 
       @if (abaAtiva() === 'historico') {
         @if (logs().length === 0) {
-          <p class="dest__sub">Sem trocas de status registradas.</p>
+          <p class="dest__sub">Nada registrado no histórico ainda.</p>
         } @else {
           <ul class="tl">
             @for (l of logs(); track l.id) {
               <li class="tl__item">
-                <span class="tl__dot" [class.tl__dot--resp]="autorResponsavel(l)"></span>
+                <span class="tl__dot" [class.tl__dot--resp]="autorResponsavel(l)" [class.tl__dot--evento]="!!l.evento"></span>
                 <span>
-                  <span>{{ l.statusAnteriorDescricao ? l.statusAnteriorDescricao + ' → ' : '' }}<b>{{ l.statusNovoDescricao || l.statusNovo }}</b></span>
+                  @if (l.evento) {
+                    <span><b>{{ l.eventoDescricao || l.evento }}</b>{{ l.detalhe ? ' · ' + l.detalhe : '' }}</span>
+                  } @else {
+                    <span>{{ l.statusAnteriorDescricao ? l.statusAnteriorDescricao + ' → ' : '' }}<b>{{ l.statusNovoDescricao || l.statusNovo }}</b></span>
+                  }
                   <span class="tl__meta"> · {{ descreverAutor(l) }} · {{ l.criadoEm | date: 'dd/MM/yyyy HH:mm' }}</span>
                 </span>
               </li>

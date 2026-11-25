@@ -4,6 +4,8 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NgSelectModule } from '@ng-select/ng-select';
 import { ToastrService } from 'ngx-toastr';
+import { ConviteAcoes } from '../../shared/convite/convite-acoes';
+import { ConviteOpcoes, ConvitePaciente, ConviteService, conviteDoPaciente } from '../../shared/convite/convite.service';
 import { NomePaciente } from '../../shared/nome-paciente';
 import { Paciente, refExibicao } from '../pacientes/paciente.model';
 import { PacienteService } from '../pacientes/paciente.service';
@@ -16,7 +18,7 @@ import { AgendaService } from './agenda.service';
  */
 @Component({
   selector: 'app-agenda-detalhe',
-  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, NomePaciente],
+  imports: [ReactiveFormsModule, NgSelectModule, DatePipe, RouterLink, NomePaciente, ConviteAcoes],
   templateUrl: './agenda-detalhe.html',
   host: { '(keydown.escape)': 'cancelarExclusao()' },
   styles: [`
@@ -27,6 +29,7 @@ import { AgendaService } from './agenda.service';
     .add-row .form-field--paciente { flex: 1 1 320px; min-width: 240px; }
     .add-row .form-field--hora { flex: 0 0 auto; width: 130px; }
     .add-row .btn { flex: 0 0 auto; }
+    .acoes { display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; flex-wrap: nowrap; }
     .status-pill { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: color-mix(in srgb, var(--brand) 12%, transparent); color: var(--brand-deep, var(--brand)); white-space: nowrap; }
     /* Código de integração (CROSS) — badge monoespaçado para rastreio. */
     .cod { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; font-weight: 600; padding: 0.05rem 0.4rem; border-radius: 0.35rem; background: color-mix(in srgb, var(--brand) 10%, transparent); color: var(--brand-deep, var(--brand)); }
@@ -58,6 +61,7 @@ export class AgendaDetalhe {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toastr = inject(ToastrService);
+  private readonly conviteService = inject(ConviteService);
 
   private idAtual: number | null = null;
   /** Converte a entidade Paciente na forma do <app-nome-paciente> (nos itens do seletor). */
@@ -66,6 +70,8 @@ export class AgendaDetalhe {
   protected readonly carregando = signal(false);
   protected readonly erro = signal(false);
   protected readonly pacientes = signal<Paciente[]>([]);
+  /** Opções do convite do app (tem app? celulares) dos pacientes da agenda: undefined = carregando; null = erro. */
+  protected readonly convite = signal<ConviteOpcoes | null | undefined>(undefined);
   protected readonly adicionando = signal(false);
   protected readonly excluindoAgenda = signal(false);
   /** Mostra o modal de confirmação da exclusão da agenda (que remove também todos os horários). */
@@ -127,7 +133,9 @@ export class AgendaDetalhe {
   }
 
   protected cancelarExclusao(): void {
-    if (this.excluindoAgenda()) return;
+    // O Esc do host também chega aqui vindo de OUTROS diálogos da tela (ex.: o do convite do app): sem o
+    // modal de exclusão aberto, não faz nada (senão roubaria o foco para o botão Excluir).
+    if (!this.confirmandoExclusao() || this.excluindoAgenda()) return;
     this.confirmandoExclusao.set(false);
     // Devolve o foco ao botão que abriu o modal (padrão WAI-ARIA de diálogo) — depois que o `inert` do fundo sai.
     setTimeout(() => this.btnExcluir()?.nativeElement.focus(), 0);
@@ -152,6 +160,22 @@ export class AgendaDetalhe {
     });
   }
 
+  protected conviteDe(pacienteId: number): ConvitePaciente | null | undefined {
+    return conviteDoPaciente(this.convite(), pacienteId);
+  }
+
+  /** Busca de uma vez a situação de convite (tem app? celulares) de todos os pacientes da agenda. */
+  private carregarConvite(pacienteIds: number[]): void {
+    if (pacienteIds.length === 0) return;
+    // Paciente novo na agenda (acabou de ser adicionado): mostra "carregando" em vez de "indisponível" até chegar.
+    const atual = this.convite();
+    if (atual && pacienteIds.some((id) => !atual.pacientes[id])) this.convite.set(undefined);
+    this.conviteService.opcoes(pacienteIds).subscribe({
+      next: (o) => this.convite.set(o),
+      error: () => this.convite.set(null),
+    });
+  }
+
   private carregar(): void {
     this.carregando.set(true);
     this.erro.set(false);
@@ -159,6 +183,7 @@ export class AgendaDetalhe {
       next: (a) => {
         this.agenda.set(a);
         this.carregando.set(false);
+        this.carregarConvite(a.horarios.map((h) => h.paciente.id));
       },
       error: () => {
         this.erro.set(true);

@@ -393,7 +393,7 @@ public class AgendamentoController {
         if (!repository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(logService.listar(id));
+        return ResponseEntity.ok(logService.listarStatus(id));
     }
 
     /**

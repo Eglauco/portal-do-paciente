@@ -68,9 +68,22 @@ public class HorarioLog {
     @Column(name = "status_anterior", length = 40)
     private StatusAgendamento statusAnterior;
 
+    /** Status depois da troca. Nulo nas linhas de {@link #evento} (que não são troca de status). */
     @Enumerated(EnumType.STRING)
-    @Column(name = "status_novo", nullable = false, length = 40)
+    @Column(name = "status_novo", length = 40)
     private StatusAgendamento statusNovo;
+
+    /**
+     * Evento que não é troca de status (ex.: convite do app enviado por SMS). Nulo nas linhas de status.
+     * Quando preenchido, {@link #statusAnterior}/{@link #statusNovo} ficam nulos.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "evento", length = 30)
+    private EventoLogHorario evento;
+
+    /** Complemento do evento para exibição (ex.: o número MASCARADO para onde foi o convite). */
+    @Column(name = "detalhe", length = 120)
+    private String detalhe;
 
     @Column(name = "criado_em", nullable = false)
     private LocalDateTime criadoEm;

@@ -3,6 +3,8 @@ import { Component, afterNextRender, computed, inject, signal } from '@angular/c
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { ConviteAcoes } from '../../shared/convite/convite-acoes';
+import { ConviteOpcoes, ConviteService, conviteDoPaciente } from '../../shared/convite/convite.service';
 import { NomePaciente } from '../../shared/nome-paciente';
 import {
   AgendamentoEntrega,
@@ -29,7 +31,7 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
  */
 @Component({
   selector: 'app-horario-detalhe',
-  imports: [ReactiveFormsModule, DatePipe, RouterLink, NomePaciente],
+  imports: [ReactiveFormsModule, DatePipe, RouterLink, NomePaciente, ConviteAcoes],
   templateUrl: './horario-detalhe.html',
   styles: [`
     /* Dois cartões (acima das abas): Paciente (hero com avatar) e Agenda (contexto do slot). */
@@ -46,6 +48,9 @@ type AbaId = 'dados' | 'destinatarios' | 'historico';
     .pac__info { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0.45rem; }
     .pac__nome { margin: 0; font-size: 1.18rem; font-weight: 800; line-height: 1.15; color: var(--ink); word-break: break-word; }
     .pac__meta { margin: 0.1rem 0 0; display: flex; gap: 1.3rem; }
+    .pac__convite { margin-top: 0.55rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.6rem; }
+    .pac__convite-rot { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+    .tl__dot--evento { background: #128c7e; }
     .pac__meta dt { font-size: 0.64rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
     .pac__meta dd { margin: 0.1rem 0 0; font-size: 0.92rem; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
     /* Agenda */
@@ -85,6 +90,7 @@ export class HorarioDetalhe {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toastr = inject(ToastrService);
+  private readonly conviteService = inject(ConviteService);
 
   protected readonly statusOpcoes = STATUS_OPTIONS;
   protected readonly rotuloEntrega = entregaLabel;
@@ -102,6 +108,10 @@ export class HorarioDetalhe {
   protected readonly statusControl = new FormControl<StatusAgendamento | null>(null);
 
   protected readonly logs = signal<AgendamentoLog[]>([]);
+  /** Opções do convite do app do paciente deste horário: undefined = carregando; null = erro. */
+  private readonly convite = signal<ConviteOpcoes | null | undefined>(undefined);
+  protected readonly conviteTexto = computed(() => this.convite()?.texto ?? null);
+  protected readonly convitePaciente = computed(() => conviteDoPaciente(this.convite(), this.horario()?.paciente.id));
   protected readonly entregas = signal<AgendamentoEntrega[]>([]);
 
   protected readonly entregasPorPessoa = computed<DestinatarioEntrega[]>(() => {
@@ -220,11 +230,21 @@ export class HorarioDetalhe {
         this.fotoErro.set(false);
         this.statusControl.setValue(h.statusAgendamento);
         this.carregando.set(false);
+        this.conviteService.opcoes([h.paciente.id]).subscribe({
+          next: (o) => this.convite.set(o),
+          error: () => this.convite.set(null),
+        });
       },
       error: () => {
         this.erro.set(true);
         this.carregando.set(false);
       },
     });
+  }
+
+  /** Depois de um convite (SMS enviado / WhatsApp aberto), recarrega o histórico para mostrar o registro. */
+  protected recarregarHistorico(): void {
+    if (this.idAtual == null) return;
+    this.service.logsHorario(this.idAtual).subscribe({ next: (l) => this.logs.set(l) });
   }
 }

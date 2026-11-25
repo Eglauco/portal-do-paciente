@@ -68,7 +68,7 @@
                 <th>CPF</th>
                 <th>Cód. integração</th>
                 <th>Status</th>
-                <th class="col-act"><span class="sr-only">Ações</span></th>
+                <th class="col-act"><span class="sr-only">Ações e convite do app</span></th>
               </tr>
             </thead>
             <tbody>
@@ -80,7 +80,15 @@
                   <td>@if (h.codigoIntegracao) { <span class="cod">{{ h.codigoIntegracao }}</span> } @else { <span class="muted-cell">—</span> }</td>
                   <td><span class="status-pill">{{ h.statusDescricao || h.statusAgendamento }}</span></td>
                   <td class="col-act">
-                    <a class="btn btn--ghost btn--sm" [routerLink]="['/horarios', h.id]">Abrir</a>
+                    <div class="acoes">
+                      <a class="btn btn--ghost btn--sm" [routerLink]="['/horarios', h.id]">Abrir</a>
+                      <app-convite-acoes
+                        [horarioId]="h.id"
+                        [paciente]="conviteDe(h.paciente.id)"
+                        [texto]="convite()?.texto"
+                        [nome]="h.paciente.nome"
+                      />
+                    </div>
                   </td>
                 </tr>
               }

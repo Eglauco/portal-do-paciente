@@ -81,7 +81,7 @@ public class ConviteAppService {
                 return;
             }
             if (!smsService.configurado()) {
-                log.warn("Convite por SMS ligado, mas o provedor de SMS (Infobip/Twilio) não está configurado — nada enviado.");
+                log.warn("Convite por SMS ligado, mas o provedor de SMS (Comtele/Infobip/Twilio) não está configurado — nada enviado.");
                 return;
             }
             List<String> telefones = carregarTelefonesSemApp(pacienteId);
@@ -133,6 +133,56 @@ public class ConviteAppService {
             return new ArrayList<>(fones);
         });
         return numeros == null ? List.of() : numeros;
+    }
+
+    // ---------- Usados também pelo convite MANUAL (botões de WhatsApp/SMS nas telas de agenda/horário) ----------
+
+    /** Texto do convite configurado (a mensagem inteira, com os links das lojas); {@code null} se em branco. */
+    public String textoConvite() {
+        return montarMensagem();
+    }
+
+    /** O paciente já tem o app (algum aparelho vinculado à conta do CPF, ou legado pelo id)? */
+    public boolean pacienteTemApp(Paciente paciente) {
+        return paciente != null && temApp(paciente.getCpf(), paciente.getId());
+    }
+
+    /** Celulares do cadastro do PACIENTE (não inclui os responsáveis), em E.164, sem repetição e na ordem do cadastro. */
+    public static List<String> celularesDoPaciente(Paciente paciente) {
+        Set<String> fones = new LinkedHashSet<>();
+        if (paciente != null && paciente.getTelefonesAdicionais() != null) {
+            for (String telefone : paciente.getTelefonesAdicionais()) {
+                adicionarSeCelular(fones, telefone);
+            }
+        }
+        return new ArrayList<>(fones);
+    }
+
+    /** Celular BR em E.164 ({@code +5518988172191}) para exibição: {@code (18) 98817-2191}. */
+    public static String exibir(String e164) {
+        String n = parteNacional(e164);
+        if (n == null || n.length() != 11) {
+            return e164;
+        }
+        return "(" + n.substring(0, 2) + ") " + n.substring(2, 7) + "-" + n.substring(7);
+    }
+
+    /** Número mascarado para o histórico (LGPD — só DDD e os 4 finais): {@code (18) •••••-2191}. */
+    public static String mascarar(String e164) {
+        String n = parteNacional(e164);
+        if (n == null || n.length() < 6) {
+            return "•••";
+        }
+        return "(" + n.substring(0, 2) + ") •••••-" + n.substring(n.length() - 4);
+    }
+
+    /** Parte nacional (DDD + assinante) de um número BR, sem o 55. */
+    private static String parteNacional(String telefone) {
+        String d = Documentos.somenteDigitos(telefone);
+        if (d == null) {
+            return null;
+        }
+        return d.startsWith("55") && d.length() >= 12 ? d.substring(2) : d;
     }
 
     /** "Tem app" = algum dispositivo (sessão) vinculado: pela conta do CPF, ou legado por id (só paciente). */
